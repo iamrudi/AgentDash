@@ -113,3 +113,6 @@ The platform is a full-stack JavaScript application using React for the frontend
 - Individual connect/reconnect buttons for each service
 - Real-time integration status display with property/site information
 - OAuth callback handling with success/error messaging
+- Disconnect buttons for GA4 and GSC integrations with service-specific deletion
+- Backend DELETE routes properly filter by clientId and serviceName to ensure only targeted integration is removed
+- Frontend disconnect mutations with proper cache invalidation and toast notifications
