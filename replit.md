@@ -48,3 +48,25 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Authentication**: JWT (JSON Web Tokens), bcrypt
 - **Cloud Services**: Supabase (for database hosting)
 - **OAuth Integrations**: Google OAuth (for GA4 integration)
+
+## Recent Changes
+
+### 2025-10-10: Notification Badge System
+- **Real-time Sidebar Notifications**: Agency portal sidebar displays notification badges for:
+  - Client Messages: Shows count of unread messages from clients
+  - AI Recommendations: Shows count of client responses not yet viewed by admin
+- **Database Schema**: Added `responseViewedByAdmin` field to recommendations table
+- **API Endpoints**:
+  - GET /api/agency/notifications/counts - Returns unread message and unviewed response counts
+  - POST /api/agency/recommendations/mark-viewed - Marks all recommendation responses as viewed
+- **Smart State Management**:
+  - Notifications refresh every 10 seconds automatically
+  - When admin views recommendations page, responses are marked as viewed and badge clears
+  - When client responds to a recommendation, `responseViewedByAdmin` resets to notify admin
+- **User Experience**: Clear visual indicators ensure account managers never miss client messages or recommendation responses
+
+### 2025-10-10: AI Recommendation Approval Workflow
+- **Complete Edit & Send Workflow**: Account managers can edit Draft recommendations and send them to clients
+- **Client Response Actions**: Clients can Approve, Reject, or Discuss sent recommendations with feedback
+- **State Transitions**: Draft → Sent → Approved/Rejected/Discussing
+- **Real-time Updates**: React Query cache invalidation ensures both portals reflect changes immediately
