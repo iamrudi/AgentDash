@@ -6,6 +6,7 @@ import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema } from "@shared/schema";
+import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes (public)
@@ -280,6 +281,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const metric = await storage.createMetric(req.body);
       res.status(201).json(metric);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // OAuth Routes for Google Analytics 4
+  // Initiate OAuth flow (Admin or Client can initiate)
+  app.get("/api/oauth/google/initiate", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+
+      // Get client ID - for Admin, use query param; for Client, use their own
+      let clientId: string;
+      
+      if (profile.role === "Admin") {
+        // Admin is setting up integration for a specific client
+        const targetClientId = req.query.clientId as string;
+        if (!targetClientId) {
+          return res.status(400).json({ message: "clientId query parameter required for Admin" });
+        }
+        clientId = targetClientId;
+      } else if (profile.role === "Client") {
+        // Client is authorizing their own integration
+        const client = await storage.getClientByProfileId(profile.id);
+        if (!client) {
+          return res.status(404).json({ message: "Client record not found" });
+        }
+        clientId = client.id;
+      } else {
+        return res.status(403).json({ message: "Only Admin and Client can initiate OAuth" });
+      }
+
+      // Create state parameter with client ID for CSRF protection
+      const state = JSON.stringify({
+        clientId,
+        initiatedBy: profile.role,
+        timestamp: Date.now(),
+      });
+
+      const authUrl = getAuthUrl(state);
+      res.json({ authUrl });
+    } catch (error: any) {
+      console.error("OAuth initiation error:", error);
+      res.status(500).json({ message: error.message || "OAuth initiation failed" });
+    }
+  });
+
+  // OAuth callback - handles Google's redirect after authorization
+  app.get("/api/oauth/google/callback", async (req, res) => {
+    try {
+      const { code, state, error } = req.query;
+
+      if (error) {
+        return res.redirect(`/client?error=${encodeURIComponent(error as string)}`);
+      }
+
+      if (!code || !state) {
+        return res.redirect('/client?error=missing_parameters');
+      }
+
+      // Parse state to get client ID
+      const stateData = JSON.parse(state as string);
+      const { clientId } = stateData;
+
+      // Exchange code for tokens
+      const tokens = await exchangeCodeForTokens(code as string);
+
+      // Check if integration already exists (upsert pattern)
+      const existing = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (existing) {
+        // Update existing integration
+        await storage.updateIntegration(existing.id, {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken || existing.refreshToken,
+          expiresAt: tokens.expiresAt,
+        });
+      } else {
+        // Create new integration
+        await storage.createIntegration({
+          clientId,
+          serviceName: 'GA4',
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt,
+        });
+      }
+
+      // Redirect based on who initiated
+      if (stateData.initiatedBy === "Admin") {
+        res.redirect(`/agency?success=ga4_connected&clientId=${clientId}`);
+      } else {
+        res.redirect('/client?success=ga4_connected');
+      }
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      res.redirect(`/client?error=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  // Get GA4 integration status for a client
+  app.get("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin", "Client"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own integration
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.json({ connected: false });
+      }
+
+      // Return status without exposing tokens
+      res.json({
+        connected: true,
+        ga4PropertyId: integration.ga4PropertyId,
+        expiresAt: integration.expiresAt,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fetch available GA4 properties (Admin only)
+  app.get("/api/integrations/ga4/:clientId/properties", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "GA4 integration not found" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      const properties = await fetchGA4Properties(integration.accessToken!);
+      res.json(properties);
+    } catch (error: any) {
+      console.error("Fetch properties error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch properties" });
+    }
+  });
+
+  // Save selected GA4 property (Admin only)
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { ga4PropertyId } = req.body;
+
+      if (!ga4PropertyId) {
+        return res.status(400).json({ message: "ga4PropertyId is required" });
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "GA4 integration not found" });
+      }
+
+      const updated = await storage.updateIntegration(integration.id, {
+        ga4PropertyId,
+      });
+
+      res.json({
+        message: "GA4 property saved successfully",
+        ga4PropertyId: updated.ga4PropertyId,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
