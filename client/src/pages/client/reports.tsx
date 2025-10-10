@@ -35,6 +35,10 @@ export default function Reports() {
   const authUser = localStorage.getItem("authUser");
   const clientId = authUser ? JSON.parse(authUser).clientId : null;
 
+  // Debug: Log the clientId to help troubleshoot
+  console.log("Reports page - authUser:", authUser ? JSON.parse(authUser) : null);
+  console.log("Reports page - clientId:", clientId);
+
   // Calculate date range
   const endDate = new Date().toISOString().split('T')[0];
   const startDate = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
