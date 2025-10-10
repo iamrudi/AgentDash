@@ -844,6 +844,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save selected GA4 property (Admin only)
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { ga4PropertyId } = req.body;
+
+      if (!ga4PropertyId) {
+        return res.status(400).json({ message: "ga4PropertyId is required" });
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "GA4 integration not found" });
+      }
+
+      const updated = await storage.updateIntegration(integration.id, {
+        ga4PropertyId,
+      });
+
+      res.json({
+        message: "GA4 property saved successfully",
+        ga4PropertyId: updated.ga4PropertyId,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Disconnect GA4 integration (Admin only)
   app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
