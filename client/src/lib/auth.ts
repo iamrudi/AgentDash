@@ -6,10 +6,11 @@ export interface AuthUser {
   email: string;
   profile: Profile;
   token: string;
+  clientId?: string;
 }
 
 // Store auth user and token in localStorage
-export function setAuthUser(data: { token: string; user: { id: string; email: string; profile: Profile } }) {
+export function setAuthUser(data: { token: string; user: { id: string; email: string; profile: Profile; clientId?: string } }) {
   const authUser: AuthUser = {
     ...data.user,
     token: data.token,
