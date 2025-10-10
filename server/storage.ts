@@ -36,6 +36,7 @@ import {
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { encryptToken, decryptToken } from "./lib/encryption";
 
 export interface IStorage {
   // Users
@@ -294,26 +295,119 @@ export class DbStorage implements IStorage {
         eq(clientIntegrations.serviceName, serviceName)
       ))
       .limit(1);
+    
+    // Decrypt tokens before returning
+    if (result[0] && result[0].accessToken) {
+      const integration = result[0];
+      if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
+        integration.accessToken = decryptToken(
+          integration.accessToken,
+          integration.accessTokenIv,
+          integration.accessTokenAuthTag
+        );
+      }
+      if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
+        integration.refreshToken = decryptToken(
+          integration.refreshToken,
+          integration.refreshTokenIv,
+          integration.refreshTokenAuthTag
+        );
+      }
+    }
+    
     return result[0];
   }
 
   async getAllIntegrationsByClientId(clientId: string): Promise<ClientIntegration[]> {
-    return await db.select().from(clientIntegrations)
+    const results = await db.select().from(clientIntegrations)
       .where(eq(clientIntegrations.clientId, clientId))
       .orderBy(desc(clientIntegrations.createdAt));
+    
+    // Decrypt tokens before returning
+    return results.map(integration => {
+      if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
+        integration.accessToken = decryptToken(
+          integration.accessToken,
+          integration.accessTokenIv,
+          integration.accessTokenAuthTag
+        );
+      }
+      if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
+        integration.refreshToken = decryptToken(
+          integration.refreshToken,
+          integration.refreshTokenIv,
+          integration.refreshTokenAuthTag
+        );
+      }
+      return integration;
+    });
   }
 
   async createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration> {
-    const result = await db.insert(clientIntegrations).values(integration).returning();
-    return result[0];
+    // Encrypt tokens before storage
+    let encryptedData: any = { ...integration };
+    
+    if (integration.accessToken) {
+      const encrypted = encryptToken(integration.accessToken);
+      encryptedData.accessToken = encrypted.encrypted;
+      encryptedData.accessTokenIv = encrypted.iv;
+      encryptedData.accessTokenAuthTag = encrypted.authTag;
+    }
+    
+    if (integration.refreshToken) {
+      const encrypted = encryptToken(integration.refreshToken);
+      encryptedData.refreshToken = encrypted.encrypted;
+      encryptedData.refreshTokenIv = encrypted.iv;
+      encryptedData.refreshTokenAuthTag = encrypted.authTag;
+    }
+    
+    const result = await db.insert(clientIntegrations).values(encryptedData).returning();
+    
+    // Return with decrypted tokens
+    const created = result[0];
+    if (created.accessToken && created.accessTokenIv && created.accessTokenAuthTag) {
+      created.accessToken = decryptToken(created.accessToken, created.accessTokenIv, created.accessTokenAuthTag);
+    }
+    if (created.refreshToken && created.refreshTokenIv && created.refreshTokenAuthTag) {
+      created.refreshToken = decryptToken(created.refreshToken, created.refreshTokenIv, created.refreshTokenAuthTag);
+    }
+    
+    return created;
   }
 
   async updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration> {
+    // Encrypt tokens before storage if provided
+    let encryptedData: any = { ...data };
+    
+    if (data.accessToken) {
+      const encrypted = encryptToken(data.accessToken);
+      encryptedData.accessToken = encrypted.encrypted;
+      encryptedData.accessTokenIv = encrypted.iv;
+      encryptedData.accessTokenAuthTag = encrypted.authTag;
+    }
+    
+    if (data.refreshToken) {
+      const encrypted = encryptToken(data.refreshToken);
+      encryptedData.refreshToken = encrypted.encrypted;
+      encryptedData.refreshTokenIv = encrypted.iv;
+      encryptedData.refreshTokenAuthTag = encrypted.authTag;
+    }
+    
     const result = await db.update(clientIntegrations)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...encryptedData, updatedAt: new Date() })
       .where(eq(clientIntegrations.id, id))
       .returning();
-    return result[0];
+    
+    // Return with decrypted tokens
+    const updated = result[0];
+    if (updated.accessToken && updated.accessTokenIv && updated.accessTokenAuthTag) {
+      updated.accessToken = decryptToken(updated.accessToken, updated.accessTokenIv, updated.accessTokenAuthTag);
+    }
+    if (updated.refreshToken && updated.refreshTokenIv && updated.refreshTokenAuthTag) {
+      updated.refreshToken = decryptToken(updated.refreshToken, updated.refreshTokenIv, updated.refreshTokenAuthTag);
+    }
+    
+    return updated;
   }
 
   async deleteIntegration(id: string): Promise<void> {
