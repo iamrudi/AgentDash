@@ -8,6 +8,7 @@ import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
+import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes (public)
@@ -443,6 +444,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(recommendation);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Generate invoice from approved recommendation
+  app.post("/api/recommendations/:id/generate-invoice", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const invoiceGenerator = new InvoiceGeneratorService(storage);
+      const invoiceId = await invoiceGenerator.generateInvoiceFromRecommendation(id);
+      res.status(201).json({ invoiceId, message: "Invoice generated successfully" });
+    } catch (error: any) {
+      console.error("Generate invoice error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate invoice" });
     }
   });
 
