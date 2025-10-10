@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Recommendation, Client } from "@shared/schema";
+import { Initiative, Client } from "@shared/schema";
 import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,8 +34,8 @@ export default function AgencyRecommendationsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
   
-  const { data: recommendations } = useQuery<Recommendation[]>({
-    queryKey: ["/api/agency/recommendations"],
+  const { data: initiatives } = useQuery<Initiative[]>({
+    queryKey: ["/api/agency/initiatives"],
   });
 
   const { data: clients } = useQuery<Client[]>({
@@ -58,44 +58,44 @@ export default function AgencyRecommendationsPage() {
     clientId: ""
   });
 
-  // Filter recommendations based on selected client
-  const filteredRecommendations = selectedClientId === "ALL"
-    ? recommendations
-    : recommendations?.filter(r => r.clientId === selectedClientId);
+  // Filter initiatives based on selected client
+  const filteredInitiatives = selectedClientId === "ALL"
+    ? initiatives
+    : initiatives?.filter(i => i.clientId === selectedClientId);
 
   const editMutation = useMutation({
     mutationFn: async (data: { id: string; updates: any }) => {
-      return await apiRequest("PATCH", `/api/recommendations/${data.id}`, data.updates);
+      return await apiRequest("PATCH", `/api/initiatives/${data.id}`, data.updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
       setEditingId(null);
       toast({
-        title: "Recommendation updated",
+        title: "Initiative updated",
         description: "Changes saved successfully.",
       });
     },
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (recommendationId: string) => {
-      return await apiRequest("POST", `/api/recommendations/${recommendationId}/send`);
+    mutationFn: async (initiativeId: string) => {
+      return await apiRequest("POST", `/api/initiatives/${initiativeId}/send`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
       toast({
-        title: "Recommendation sent",
-        description: "The recommendation has been sent to the client.",
+        title: "Initiative sent",
+        description: "The initiative has been sent to the client.",
       });
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/recommendations", data);
+      return await apiRequest("POST", "/api/initiatives", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
       setIsCreating(false);
       setCreateForm({
         title: "",
@@ -106,36 +106,36 @@ export default function AgencyRecommendationsPage() {
         clientId: ""
       });
       toast({
-        title: "Recommendation created",
-        description: "The manual recommendation has been created successfully.",
+        title: "Initiative created",
+        description: "The manual initiative has been created successfully.",
       });
     },
   });
 
-  // Mark recommendation responses as viewed when page loads
+  // Mark initiative responses as viewed when page loads
   useEffect(() => {
     const markViewed = async () => {
       try {
-        await apiRequest("POST", "/api/agency/recommendations/mark-viewed");
+        await apiRequest("POST", "/api/agency/initiatives/mark-viewed");
         // Invalidate notification counts to update the sidebar badge
         queryClient.invalidateQueries({ queryKey: ["/api/agency/notifications/counts"] });
       } catch (error) {
         // Silently fail - not critical
-        console.error("Failed to mark recommendations as viewed:", error);
+        console.error("Failed to mark initiatives as viewed:", error);
       }
     };
 
     markViewed();
   }, []); // Run once on mount
 
-  const openEditDialog = (rec: Recommendation) => {
-    setEditingId(rec.id);
+  const openEditDialog = (init: Initiative) => {
+    setEditingId(init.id);
     setEditForm({
-      title: rec.title,
-      observation: rec.observation,
-      proposedAction: rec.proposedAction,
-      cost: rec.cost || "",
-      impact: rec.impact || "Medium"
+      title: init.title,
+      observation: init.observation,
+      proposedAction: init.proposedAction,
+      cost: init.cost || "",
+      impact: init.impact || "Medium"
     });
   };
 
@@ -307,7 +307,7 @@ export default function AgencyRecommendationsPage() {
           </div>
         </div>
 
-        {!filteredRecommendations || filteredRecommendations.length === 0 ? (
+        {!filteredInitiatives || filteredInitiatives.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Lightbulb className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -316,7 +316,7 @@ export default function AgencyRecommendationsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {filteredRecommendations.map((rec) => {
+            {filteredInitiatives.map((rec) => {
               const client = clients?.find(c => c.id === rec.clientId);
               const isDraft = rec.status === "Draft";
               const isSent = rec.sentToClient === "true";
