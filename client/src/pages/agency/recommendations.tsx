@@ -10,7 +10,7 @@ import { Recommendation, Client } from "@shared/schema";
 import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +72,22 @@ export default function AgencyRecommendationsPage() {
       });
     },
   });
+
+  // Mark recommendation responses as viewed when page loads
+  useEffect(() => {
+    const markViewed = async () => {
+      try {
+        await apiRequest("POST", "/api/agency/recommendations/mark-viewed");
+        // Invalidate notification counts to update the sidebar badge
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/notifications/counts"] });
+      } catch (error) {
+        // Silently fail - not critical
+        console.error("Failed to mark recommendations as viewed:", error);
+      }
+    };
+
+    markViewed();
+  }, []); // Run once on mount
 
   const openEditDialog = (rec: Recommendation) => {
     setEditingId(rec.id);

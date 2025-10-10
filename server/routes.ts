@@ -731,6 +731,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get notification counts (Admin only)
+  app.get("/api/agency/notifications/counts", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const counts = await storage.getNotificationCounts();
+      res.json(counts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark recommendation responses as viewed (Admin only)
+  app.post("/api/agency/recommendations/mark-viewed", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      await storage.markRecommendationResponsesViewed();
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

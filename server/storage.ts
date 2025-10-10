@@ -116,6 +116,10 @@ export interface IStorage {
   createMessage(message: InsertClientMessage): Promise<ClientMessage>;
   getAllMessages(): Promise<ClientMessage[]>;
   markMessageAsRead(id: string): Promise<void>;
+  
+  // Notifications
+  getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }>;
+  markRecommendationResponsesViewed(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -316,6 +320,7 @@ export class DbStorage implements IStorage {
         clientResponse: response,
         clientFeedback: feedback || null,
         status: statusMap[response] || "Sent",
+        responseViewedByAdmin: "false", // Reset so admin gets notified
         lastEditedAt: new Date()
       })
       .where(eq(recommendations.id, id))
@@ -523,6 +528,42 @@ export class DbStorage implements IStorage {
     await db.update(clientMessages)
       .set({ isRead: "true" })
       .where(eq(clientMessages.id, id));
+  }
+
+  // Notifications
+  async getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }> {
+    // Count unread messages from clients
+    const unreadMessagesResult = await db.select().from(clientMessages)
+      .where(and(
+        eq(clientMessages.senderRole, "Client"),
+        eq(clientMessages.isRead, "false")
+      ));
+    
+    // Count recommendations with client responses not yet viewed by admin
+    const unviewedResponsesResult = await db.select().from(recommendations)
+      .where(and(
+        eq(recommendations.sentToClient, "true"),
+        eq(recommendations.responseViewedByAdmin, "false")
+      ));
+    
+    // Only count those where clientResponse is NOT 'pending' (meaning client has responded)
+    const unviewedResponses = unviewedResponsesResult.filter(
+      rec => rec.clientResponse && rec.clientResponse !== "pending"
+    );
+    
+    return {
+      unreadMessages: unreadMessagesResult.length,
+      unviewedResponses: unviewedResponses.length
+    };
+  }
+
+  async markRecommendationResponsesViewed(): Promise<void> {
+    await db.update(recommendations)
+      .set({ responseViewedByAdmin: "true" })
+      .where(and(
+        eq(recommendations.sentToClient, "true"),
+        eq(recommendations.responseViewedByAdmin, "false")
+      ));
   }
 }
 

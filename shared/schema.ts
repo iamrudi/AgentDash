@@ -82,6 +82,7 @@ export const recommendations = pgTable("recommendations", {
   sentToClient: text("sent_to_client").default("false"), // Whether sent to client
   clientResponse: text("client_response"), // 'pending', 'approved', 'rejected', 'discussing'
   clientFeedback: text("client_feedback"), // Client's comments/feedback
+  responseViewedByAdmin: text("response_viewed_by_admin").default("false"), // Whether admin has viewed client response
   lastEditedAt: timestamp("last_edited_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
