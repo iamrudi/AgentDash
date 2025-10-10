@@ -49,26 +49,39 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginForm) => {
-      const result = await apiRequest("POST", "/api/auth/login", data);
-      return result;
+      const res = await apiRequest("POST", "/api/auth/login", data);
+      return await res.json();
     },
     onSuccess: (data) => {
-      setAuthUser(data);
-      const role = data.profile.role;
-      
-      // Redirect based on role
-      if (role === "Admin") {
-        setLocation("/agency");
-      } else if (role === "Client") {
-        setLocation("/client");
-      } else if (role === "Staff") {
-        setLocation("/staff");
+      try {
+        // Validate response structure
+        if (!data || !data.user || !data.user.profile || !data.token) {
+          throw new Error("Invalid server response");
+        }
+        
+        setAuthUser(data);
+        const role = data.user.profile.role;
+        
+        // Redirect based on role
+        if (role === "Admin") {
+          setLocation("/agency");
+        } else if (role === "Client") {
+          setLocation("/client");
+        } else if (role === "Staff") {
+          setLocation("/staff");
+        }
+        
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+      } catch (error: any) {
+        toast({
+          title: "Login failed",
+          description: error.message || "Invalid response from server",
+          variant: "destructive",
+        });
       }
-      
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
     },
     onError: (error: any) => {
       toast({
