@@ -48,6 +48,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getAllUsersWithProfiles(): Promise<Array<User & { profile: Profile | null; client?: Client | null }>>;
   updateUserRole(userId: string, role: string): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
   
   // Profiles
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
@@ -178,6 +179,11 @@ export class DbStorage implements IStorage {
     await db.update(profiles)
       .set({ role })
       .where(eq(profiles.userId, userId));
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    // Delete user will cascade to related records (profile, client, etc.) due to foreign key constraints
+    await db.delete(users).where(eq(users.id, userId));
   }
 
   // Profiles

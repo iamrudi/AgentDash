@@ -3,8 +3,8 @@ import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Profile, Client } from "@shared/schema";
-import { Users as UsersIcon, Mail, Building2, Shield, UserCog } from "lucide-react";
+import { User, Profile, Client, createStaffAdminUserSchema, type CreateStaffAdminUser } from "@shared/schema";
+import { Users as UsersIcon, Mail, Building2, Shield, UserCog, Plus, Trash2, Filter } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -20,9 +21,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Table,
   TableBody,
@@ -39,12 +54,48 @@ type UserWithProfile = User & {
 
 export default function AgencyUsersPage() {
   const [isEditing, setIsEditing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithProfile | null>(null);
   const [newRole, setNewRole] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const { toast } = useToast();
+
+  const form = useForm<CreateStaffAdminUser>({
+    resolver: zodResolver(createStaffAdminUserSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      fullName: "",
+      role: "Staff",
+    },
+  });
 
   const { data: users, isLoading } = useQuery<UserWithProfile[]>({
     queryKey: ["/api/agency/users"],
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (data: CreateStaffAdminUser) => {
+      return await apiRequest("POST", "/api/agency/users/create", data);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/agency/users"] });
+      setIsCreating(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      });
+    },
+    onError: (error: any) => {
+      const message = error.errors?.[0]?.message || error.message || "Failed to create user";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    },
   });
 
   const updateRoleMutation = useMutation({
@@ -69,6 +120,28 @@ export default function AgencyUsersPage() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/agency/users/${userId}`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/agency/users"] });
+      setIsDeleting(false);
+      setSelectedUser(null);
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEditRole = (user: UserWithProfile) => {
     setSelectedUser(user);
     setNewRole(user.profile?.role || "Client");
@@ -80,6 +153,27 @@ export default function AgencyUsersPage() {
       updateRoleMutation.mutate({ userId: selectedUser.id, role: newRole });
     }
   };
+
+  const handleDeleteUser = (user: UserWithProfile) => {
+    setSelectedUser(user);
+    setIsDeleting(true);
+  };
+
+  const confirmDelete = () => {
+    if (selectedUser) {
+      deleteUserMutation.mutate(selectedUser.id);
+    }
+  };
+
+  const onSubmit = (data: CreateStaffAdminUser) => {
+    createUserMutation.mutate(data);
+  };
+
+  // Filter users by role
+  const filteredUsers = users?.filter(user => {
+    if (roleFilter === "all") return true;
+    return user.profile?.role === roleFilter;
+  }) || [];
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
@@ -104,14 +198,123 @@ export default function AgencyUsersPage() {
               View and manage all users and their roles
             </p>
           </div>
+          <Dialog open={isCreating} onOpenChange={setIsCreating}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-user">
+                <Plus className="h-4 w-4 mr-2" />
+                Create User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>
+                  Add a new staff member or administrator to the platform
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-role">
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Staff">Staff</SelectItem>
+                            <SelectItem value="Admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John Doe" data-testid="input-fullname" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="john@example.com" data-testid="input-email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input type="password" placeholder="••••••••" data-testid="input-password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreating(false)}
+                      data-testid="button-cancel-create"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createUserMutation.isPending} data-testid="button-submit-user">
+                      {createUserMutation.isPending ? "Creating..." : "Create User"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UsersIcon className="h-5 w-5" />
-              All Users
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <UsersIcon className="h-5 w-5" />
+                All Users
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-role-filter">
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Staff">Staff</SelectItem>
+                    <SelectItem value="Client">Client</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -122,6 +325,11 @@ export default function AgencyUsersPage() {
               <div className="text-center py-8 text-muted-foreground">
                 <UsersIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>No users found</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UsersIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p>No users found with the selected filter</p>
               </div>
             ) : (
               <div className="rounded-md border">
@@ -137,7 +345,7 @@ export default function AgencyUsersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {filteredUsers.map((user) => (
                       <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -171,14 +379,24 @@ export default function AgencyUsersPage() {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditRole(user)}
-                            data-testid={`button-edit-${user.id}`}
-                          >
-                            Edit Role
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditRole(user)}
+                              data-testid={`button-edit-${user.id}`}
+                            >
+                              Edit Role
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user)}
+                              data-testid={`button-delete-${user.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -236,6 +454,29 @@ export default function AgencyUsersPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete User</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {selectedUser?.profile?.fullName}? This action cannot be undone.
+                This will permanently delete the user account and all associated data.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={deleteUserMutation.isPending}
+                data-testid="button-confirm-delete"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteUserMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AgencyLayout>
   );
