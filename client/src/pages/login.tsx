@@ -164,7 +164,7 @@ export default function Login() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button
-            variant="link"
+            variant="ghost"
             onClick={() => setLocation("/signup")}
             data-testid="link-signup"
           >

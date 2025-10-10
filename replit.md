@@ -1,123 +1,217 @@
 # Agency Client Portal
 
+A comprehensive multi-tenant agency management platform with role-based access control, featuring three distinct portals for managing client relationships, projects, tasks, invoices, and AI-powered recommendations.
+
 ## Overview
 
-The Agency Client Portal is a multi-tenant B2B SaaS application that enables agencies to manage client relationships, projects, tasks, and billing. The system provides three distinct user portals:
+This is a fullstack JavaScript application built with React, Express, PostgreSQL (Supabase), and TypeScript. The platform enables agencies to manage multiple clients while providing each client with secure, isolated access to their own data.
 
-- **Client Portal**: Allows clients to view their projects, invoices, tasks, and receive recommendations
-- **Agency Portal (Admin)**: Comprehensive dashboard for agency administrators to manage all clients, projects, and analytics
-- **Staff Portal**: Task management interface for agency staff members to track and update their assigned work
+## Architecture
 
-The application follows a modern SaaS dashboard design approach, combining shadcn/ui components with Linear's minimalist aesthetics and Notion's content hierarchy principles.
+### Technology Stack
+- **Frontend**: React 18, Wouter (routing), TanStack Query, Shadcn/UI, Tailwind CSS
+- **Backend**: Express.js, TypeScript
+- **Database**: PostgreSQL via Supabase
+- **ORM**: Drizzle ORM
+- **Authentication**: JWT with bcrypt password hashing
+- **State Management**: React Query for server state, localStorage for auth
 
-## User Preferences
+### Database Schema
+- **users**: Authentication credentials
+- **profiles**: User profile information with role assignment
+- **clients**: Company information for client accounts
+- **projects**: Client projects with status tracking
+- **tasks**: Project tasks with priority and due dates
+- **staff_assignments**: Links staff members to tasks
+- **invoices**: Client billing with payment status
+- **recommendations**: AI-powered suggestions for clients
+- **daily_metrics**: Performance tracking data
 
-Preferred communication style: Simple, everyday language.
+## Security Implementation
 
-## System Architecture
+### Authentication & Authorization
+- **JWT Tokens**: Signed 7-day expiring tokens with server-side verification
+- **Password Security**: Bcrypt hashing with salt rounds
+- **Role-Based Access Control**: Three roles with distinct permissions
+  - **Client**: Can only view own data (projects, invoices, recommendations)
+  - **Staff**: Can manage assigned tasks
+  - **Admin**: Full access to all client data and management features
 
-### Frontend Architecture
+### Security Features
+- ✅ No role self-selection (signup always creates Client role)
+- ✅ Tenant isolation (clients cannot see other clients' data)
+- ✅ Signed JWT tokens (prevents token tampering)
+- ✅ Protected API endpoints with role verification
+- ✅ Secure password hashing with bcrypt
 
-**Framework & Language**
-- React with TypeScript for type safety
-- Vite as the build tool and development server
-- Wouter for lightweight client-side routing
-- All code must be strongly typed
+### Important Security Notes
+- **JWT Secret**: Set `JWT_SECRET` environment variable in production
+- **Default Secret**: Uses "development_secret_key_change_in_production" if not set
+- **Admin/Staff Provisioning**: Must be created manually (no self-service signup)
 
-**UI Component System**
-- shadcn/ui as the primary component library (Radix UI primitives)
-- Tailwind CSS for styling with custom design tokens
-- "new-york" style variant with CSS variables for theming
-- Support for light and dark modes via theme provider
-- Component aliases configured: `@/components`, `@/lib`, `@/hooks`
+## User Roles & Access
 
-**State Management**
-- TanStack Query (React Query) for server state and data fetching
-- Local state with React hooks
-- Theme context for dark/light mode persistence
+### Client Portal (`/client`)
+- View own projects with status and descriptions
+- Access invoices with payment status
+- See AI-powered recommendations
+- Track performance metrics
+- **Restricted to**: Client role (and Admin for oversight)
 
-**Design System**
-- Custom color palette with semantic tokens (primary, accent, destructive, muted, etc.)
-- Custom border radius values (9px, 6px, 3px)
-- Typography using Inter for body text and JetBrains Mono for numbers/metrics
-- Hover and active elevation effects for interactive elements
+### Agency Admin Portal (`/agency`)
+- Manage all clients across the platform
+- View aggregated metrics and performance
+- Create and manage projects for any client
+- Generate recommendations for clients
+- **Restricted to**: Admin role only
 
-### Backend Architecture
+### Staff Portal (`/staff`)
+- View assigned tasks across projects
+- Update task status and progress
+- See task priorities and due dates
+- **Restricted to**: Staff role (and Admin)
 
-**Server Framework**
-- Express.js with TypeScript
-- ESM module system
-- Development: tsx for hot reload
-- Production: esbuild bundled output
+## Test Accounts
 
-**Authentication & Authorization**
-- JWT-based authentication with Bearer tokens
-- Password hashing using bcryptjs
-- Role-based access control (Admin, Client, Staff)
-- Protected routes enforce authentication and role requirements
-- Security: Self-registration always assigns "Client" role; Admin/Staff roles must be assigned by administrators
+The following accounts are seeded in the database for testing:
 
-**API Structure**
-- RESTful API design with route prefixes:
-  - `/api/auth/*` - Public authentication endpoints
-  - `/api/client/*` - Client-specific endpoints (requires Client role)
-  - `/api/agency/*` - Admin endpoints (requires Admin role)
-  - `/api/staff/*` - Staff endpoints (requires Staff role)
-- Middleware chain: auth verification → role checking → route handler
-- Standardized error handling with status codes and JSON responses
+```
+Admin Account:
+Email: admin@agency.com
+Password: admin123
 
-### Data Storage
+Client Account:
+Email: client@company.com
+Password: client123
+Company: Acme Corporation
 
-**Database**
-- PostgreSQL via Neon serverless
-- Drizzle ORM for type-safe database queries
-- Schema-first approach with migrations in `/migrations`
+Staff Account:
+Email: staff@agency.com
+Password: staff123
+```
 
-**Schema Design**
-- `users` - Authentication table (email, hashed password)
-- `profiles` - User profiles linked to users (fullName, role)
-- `clients` - Company information (companyName, profileId)
-- `projects` - Client projects (name, status, description, clientId)
-- `tasks` - Project tasks (description, status, dueDate, priority, projectId)
-- `staffAssignments` - Links staff to projects
-- `invoices` - Billing records (invoiceNumber, amount, status, clientId)
-- `recommendations` - Strategic suggestions (title, description, impact, cost, status, clientId)
-- `dailyMetrics` - Analytics data (date, source, sessions, conversions, spend, clicks, clientId)
+## API Endpoints
 
-**Relationships**
-- Cascade deletes: Deleting a user removes profile, which removes client data
-- Foreign key constraints enforce referential integrity
-- Join queries using Drizzle's relational query builder for complex data fetching
+### Authentication (Public)
+- `POST /api/auth/signup` - Create new client account
+- `POST /api/auth/login` - Authenticate and receive JWT token
 
-**Data Access Pattern**
-- Storage abstraction layer (`server/storage.ts`) provides interface for all database operations
-- Repositories pattern: all DB queries centralized, not scattered across routes
-- Type-safe queries and inserts using Drizzle schemas
+### Client Portal (Client, Admin)
+- `GET /api/client/projects` - Get client's projects (tenant-isolated)
+- `GET /api/client/invoices` - Get client's invoices (tenant-isolated)
+- `GET /api/client/recommendations` - Get client's recommendations (tenant-isolated)
 
-### External Dependencies
+### Agency Portal (Admin Only)
+- `GET /api/agency/clients` - Get all clients
+- `GET /api/agency/projects` - Get all projects
+- `POST /api/agency/projects` - Create new project
+- `GET /api/agency/metrics` - Get all metrics
+- `POST /api/agency/recommendations` - Create recommendation
 
-**Database Service**
-- Neon PostgreSQL (serverless)
-- WebSocket connection with custom SSL configuration
-- Connection pooling via `@neondatabase/serverless`
+### Staff Portal (Staff, Admin)
+- `GET /api/staff/tasks` - Get staff's assigned tasks
+- `PATCH /api/tasks/:id` - Update task status
 
-**UI Libraries**
-- Radix UI primitives for accessible components
-- Recharts for data visualization (line, area, bar charts)
-- date-fns for date manipulation and formatting
-- Lucide React for icons
+## Frontend Features
 
-**Development Tools**
-- Replit-specific plugins (cartographer, dev-banner, runtime error overlay) for development environment
-- TypeScript compiler for type checking (noEmit mode)
-- PostCSS with Tailwind for CSS processing
+### Design System
+- **Primary Color**: Professional Blue (HSL 221 83% 53%)
+- **Typography**: Inter font family
+- **Components**: Shadcn/UI component library
+- **Dark Mode**: Full theme support with system preference detection
+- **Responsive**: Mobile-first design approach
 
-**Authentication**
-- jsonwebtoken for JWT token generation/verification
-- bcryptjs for password hashing
-- 7-day token expiration by default
+### Key Features
+- Real-time data fetching with TanStack Query
+- Form validation with React Hook Form + Zod
+- Toast notifications for user feedback
+- Loading states and error handling
+- Protected routes with role-based redirects
+- Theme toggle (light/dark mode)
 
-**Form Handling**
-- react-hook-form for form state management
-- zod for schema validation
-- @hookform/resolvers for zod integration
+## Development
+
+### Running the Application
+```bash
+npm run dev
+```
+This starts both the Express backend and Vite frontend on port 5000.
+
+### Database Management
+```bash
+npm run db:push       # Push schema changes
+npm run db:studio     # Open Drizzle Studio
+npx tsx server/seed.ts # Seed test data
+```
+
+### Project Structure
+```
+client/
+  src/
+    pages/           # Route components
+    components/      # Reusable UI components
+    lib/            # Utilities and clients
+server/
+  routes.ts         # API endpoint definitions
+  storage.ts        # Database operations
+  middleware/       # Auth middleware
+  lib/             # Server utilities
+shared/
+  schema.ts         # Shared types and schemas
+```
+
+## Production Deployment
+
+### Environment Variables Required
+- `DATABASE_URL` - PostgreSQL connection string (auto-configured by Supabase)
+- `JWT_SECRET` - Strong secret for JWT signing (REQUIRED in production)
+- `SESSION_SECRET` - Session signing secret
+- `NODE_ENV` - Set to "production"
+
+### Pre-Deployment Checklist
+1. Set strong JWT_SECRET in environment
+2. Ensure DATABASE_URL points to production database
+3. Review and update CORS settings if needed
+4. Test all authentication flows
+5. Verify tenant isolation is working
+6. Check that admin/staff accounts are provisioned
+
+## Recent Changes
+
+### 2025-10-10: Security Hardening Complete
+- Implemented JWT-based authentication with signed tokens
+- Eliminated role self-selection vulnerability (signup restricted to Client role)
+- Added comprehensive tenant isolation (users only see their own data)
+- Applied role-based authorization to all API endpoints
+- Fixed login JSON parsing issue
+- Completed end-to-end security testing
+- All critical security vulnerabilities resolved
+
+## Future Enhancements
+
+Potential areas for expansion:
+- Email notifications for invoice due dates
+- Real-time collaboration features
+- Advanced analytics dashboard
+- File upload for project attachments
+- Audit logging for compliance
+- Two-factor authentication
+- API rate limiting
+- Webhook integrations
+
+## Troubleshooting
+
+### Login Issues
+- Ensure JWT_SECRET is set in production
+- Check that passwords are properly hashed
+- Verify database connection
+
+### Access Denied Errors
+- Confirm user has correct role assigned
+- Check ProtectedRoute configuration
+- Verify JWT token is being sent in headers
+
+### Data Not Appearing
+- For Clients: Ensure they have a client record linked to their profile
+- For Staff: Verify staff_assignments exist for their tasks
+- For Admins: Check that endpoints return all data (not tenant-scoped)
