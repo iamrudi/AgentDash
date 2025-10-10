@@ -26,6 +26,9 @@ This is a fullstack JavaScript application built with React, Express, PostgreSQL
 - **invoices**: Client billing with payment status
 - **recommendations**: AI-powered suggestions for clients
 - **daily_metrics**: Performance tracking data
+- **client_messages**: Chat messages between clients and account managers
+- **client_integrations**: OAuth integration data (GA4, etc.) with encrypted tokens
+- **client_objectives**: Client goals and objectives for dashboard display
 
 ## Security Implementation
 
@@ -61,7 +64,7 @@ Enhanced with sidebar navigation and dedicated pages for comprehensive self-serv
 - **Billing** (`/client/billing`): Invoice management with payment instructions
 - **Reports** (`/client/reports`): Analytics and performance metrics (coming soon)
 - **Profile** (`/client/profile`): Account information and settings
-- **Support** (`/client/support`): Help resources and contact options
+- **Support** (`/client/support`): Real-time chat with account manager for direct communication
 
 **Features:**
 - Collapsible sidebar navigation with theme toggle
@@ -76,6 +79,8 @@ Enhanced with sidebar navigation and dedicated pages for comprehensive self-serv
 - View aggregated metrics and performance
 - Create and manage projects for any client
 - Generate recommendations for clients
+- Monitor client messages with unread count badges
+- View recent client communications in dedicated messages section
 - **Restricted to**: Admin role only
 
 ### Staff Portal (`/staff`)
@@ -113,6 +118,8 @@ Password: staff123
 - `GET /api/client/projects` - Get client's projects (tenant-isolated)
 - `GET /api/client/invoices` - Get client's invoices (tenant-isolated)
 - `GET /api/client/recommendations` - Get client's recommendations (tenant-isolated)
+- `POST /api/client/messages` - Send message to account manager (tenant-isolated)
+- `GET /api/client/messages` - Get client's chat history (tenant-isolated)
 
 ### Agency Portal (Admin Only)
 - `GET /api/agency/clients` - Get all clients
@@ -120,6 +127,7 @@ Password: staff123
 - `POST /api/agency/projects` - Create new project
 - `GET /api/agency/metrics` - Get all metrics
 - `POST /api/agency/recommendations` - Create recommendation
+- `GET /api/agency/messages` - Get all client messages across platform
 
 ### Staff Portal (Staff, Admin)
 - `GET /api/staff/tasks` - Get staff's assigned tasks
@@ -200,6 +208,18 @@ shared/
 
 ## Recent Changes
 
+### 2025-10-10: Client-to-Account Manager Chat System
+- **Database Schema**: Added `client_messages` table for chat history storage
+- **Chat API Endpoints**: 
+  - POST /api/client/messages - Send message (client authenticated)
+  - GET /api/client/messages - Get client's chat history
+  - GET /api/agency/messages - Get all messages from all clients (admin only)
+- **Client Support Page**: Transformed into real-time chat interface with message history and send functionality
+- **Agency Dashboard**: New "Client Messages" section displays all client messages with unread count badges
+- **Message Features**: Messages include sender role badges, timestamps, client attribution, and read/unread status
+- **Security**: Full tenant isolation - clients can only see their own messages, admins see all
+- **Navigation**: Smooth client-side routing using wouter Link components
+
 ### 2025-10-10: Client Portal Enhanced with Sidebar Navigation
 - **Client Layout Component**: New layout with Shadcn sidebar and collapsible navigation
 - **Dedicated Pages**: Separate pages for Dashboard, Projects, Recommendations, Billing, Reports, Profile, and Support
@@ -209,7 +229,6 @@ shared/
 - **Recommendations Page**: Display AI recommendations with observation and proposed action details
 - **Reports Page**: Placeholder for future analytics features
 - **Profile Page**: User account information display
-- **Support Page**: Contact options and FAQ section
 - **Navigation**: Smooth client-side routing using wouter Link components
 
 ### 2025-10-10: GA4 OAuth Integration Complete
