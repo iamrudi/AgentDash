@@ -92,3 +92,24 @@ The platform is a full-stack JavaScript application using React for the frontend
 - Client filter for per-client invoice management
 - PDF generation and view actions in invoice table
 - System dependency: Chromium installed for Puppeteer
+
+### 2025-10-10: Google Search Console Integration
+**Extended OAuth Infrastructure for Multi-Service Support**
+- OAuth library extended to support both GA4 and Search Console with service-specific scopes
+- OAuth state parameter enhanced with service type (GA4/GSC/BOTH) and HMAC-SHA256 signing
+- Database schema: added gscSiteUrl field to integrations table
+- Backend routes: GET/POST endpoints for GSC status, sites fetching, and site selection
+- Frontend: Agency integrations page supports connecting both GA4 and GSC with dual selection dialogs
+
+**Technical Implementation**
+- Single OAuth flow handles multiple Google services via service parameter
+- Token storage: shared refresh/access tokens for both GA4 and GSC integrations
+- Security: JWT authentication required for all OAuth endpoints
+- Site selection: fetchGSCSites function retrieves verified properties from Search Console API
+- Property/site persistence: Separate dialogs for GA4 properties and GSC sites with cache invalidation
+
+**Agency Portal Features**
+- Connect Both button for clients without any integration
+- Individual connect/reconnect buttons for each service
+- Real-time integration status display with property/site information
+- OAuth callback handling with success/error messaging
