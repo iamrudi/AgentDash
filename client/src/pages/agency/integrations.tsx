@@ -226,6 +226,56 @@ export default function AgencyIntegrationsPage() {
     });
   };
 
+  // Disconnect GA4 mutation
+  const disconnectGA4Mutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      await apiRequest("DELETE", `/api/integrations/ga4/${clientId}`);
+    },
+    onSuccess: (_, clientId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/ga4", clientId] });
+      toast({
+        title: "Disconnected",
+        description: "GA4 integration disconnected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect GSC mutation
+  const disconnectGSCMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      await apiRequest("DELETE", `/api/integrations/gsc/${clientId}`);
+    },
+    onSuccess: (_, clientId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/gsc", clientId] });
+      toast({
+        title: "Disconnected",
+        description: "Search Console integration disconnected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC') => {
+    if (service === 'GA4') {
+      disconnectGA4Mutation.mutate(clientId);
+    } else {
+      disconnectGSCMutation.mutate(clientId);
+    }
+  };
+
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
@@ -253,7 +303,7 @@ export default function AgencyIntegrationsPage() {
         ) : (
           <div className="space-y-4">
             {filteredClients.map((client) => {
-              return <ClientIntegrationCard key={client.id} client={client} onConnect={handleConnect} />;
+              return <ClientIntegrationCard key={client.id} client={client} onConnect={handleConnect} onDisconnect={handleDisconnect} />;
             })}
           </div>
         )}
@@ -336,10 +386,12 @@ export default function AgencyIntegrationsPage() {
 
 function ClientIntegrationCard({ 
   client, 
-  onConnect 
+  onConnect,
+  onDisconnect
 }: { 
   client: Client; 
   onConnect: (clientId: string, service: 'GA4' | 'GSC' | 'BOTH') => void;
+  onDisconnect: (clientId: string, service: 'GA4' | 'GSC') => void;
 }) {
   const { data: ga4Status } = useQuery<IntegrationStatus>({
     queryKey: ["/api/integrations/ga4", client.id],
@@ -404,6 +456,14 @@ function ClientIntegrationCard({
                 >
                   Reconnect
                 </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onDisconnect(client.id, 'GA4')}
+                  data-testid={`button-disconnect-ga4-${client.id}`}
+                >
+                  Disconnect
+                </Button>
               </>
             ) : (
               <>
@@ -453,6 +513,14 @@ function ClientIntegrationCard({
                   data-testid={`button-reconnect-gsc-${client.id}`}
                 >
                   Reconnect
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onDisconnect(client.id, 'GSC')}
+                  data-testid={`button-disconnect-gsc-${client.id}`}
+                >
+                  Disconnect
                 </Button>
               </>
             ) : (

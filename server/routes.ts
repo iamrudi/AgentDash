@@ -844,6 +844,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Disconnect GA4 integration (Admin only)
+  app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "GA4 integration not found" });
+      }
+
+      await storage.deleteIntegration(integration.id);
+
+      res.json({ message: "GA4 integration disconnected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Disconnect GSC integration (Admin only)
+  app.delete("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Search Console integration not found" });
+      }
+
+      await storage.deleteIntegration(integration.id);
+
+      res.json({ message: "Search Console integration disconnected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Client Objectives API
 
   // Get objectives for a client (Admin only)
