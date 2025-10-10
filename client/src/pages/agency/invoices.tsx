@@ -57,8 +57,9 @@ export default function AgencyInvoicesPage() {
     resolver: zodResolver(insertInvoiceSchema),
     defaultValues: {
       invoiceNumber: "",
-      amount: "",
-      status: "Pending",
+      totalAmount: "",
+      status: "Draft",
+      issueDate: "",
       dueDate: "",
       clientId: "",
       pdfUrl: "",
@@ -120,7 +121,9 @@ export default function AgencyInvoicesPage() {
     switch (status) {
       case "Paid":
         return "default";
-      case "Pending":
+      case "Draft":
+        return "outline";
+      case "Due":
         return "secondary";
       case "Overdue":
         return "destructive";
@@ -194,12 +197,25 @@ export default function AgencyInvoicesPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="amount"
+                    name="totalAmount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Amount</FormLabel>
+                        <FormLabel>Total Amount</FormLabel>
                         <FormControl>
                           <Input type="number" step="0.01" placeholder="1000.00" data-testid="input-amount" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="issueDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Issue Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" data-testid="input-issue-date" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -231,7 +247,8 @@ export default function AgencyInvoicesPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Draft">Draft</SelectItem>
+                            <SelectItem value="Due">Due</SelectItem>
                             <SelectItem value="Paid">Paid</SelectItem>
                             <SelectItem value="Overdue">Overdue</SelectItem>
                           </SelectContent>
@@ -302,7 +319,7 @@ export default function AgencyInvoicesPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4 text-muted-foreground" />
-                            {parseFloat(invoice.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {parseFloat(invoice.totalAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -322,7 +339,8 @@ export default function AgencyInvoicesPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="Draft">Draft</SelectItem>
+                                <SelectItem value="Due">Due</SelectItem>
                                 <SelectItem value="Paid">Paid</SelectItem>
                                 <SelectItem value="Overdue">Overdue</SelectItem>
                               </SelectContent>

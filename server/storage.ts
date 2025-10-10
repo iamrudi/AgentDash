@@ -13,6 +13,8 @@ import {
   type InsertStaffAssignment,
   type Invoice,
   type InsertInvoice,
+  type InvoiceLineItem,
+  type InsertInvoiceLineItem,
   type Recommendation,
   type InsertRecommendation,
   type DailyMetric,
@@ -30,6 +32,7 @@ import {
   tasks,
   staffAssignments,
   invoices,
+  invoiceLineItems,
   recommendations,
   dailyMetrics,
   clientIntegrations,
@@ -86,6 +89,13 @@ export interface IStorage {
   getAllInvoices(): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoiceStatus(invoiceId: string, status: string): Promise<Invoice>;
+  updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice>;
+  
+  // Invoice Line Items
+  getInvoiceLineItemsByInvoiceId(invoiceId: string): Promise<InvoiceLineItem[]>;
+  createInvoiceLineItem(lineItem: InsertInvoiceLineItem): Promise<InvoiceLineItem>;
+  createInvoiceLineItems(lineItems: InsertInvoiceLineItem[]): Promise<InvoiceLineItem[]>;
+  deleteInvoiceLineItem(id: string): Promise<void>;
   
   // Recommendations
   getRecommendationById(id: string): Promise<Recommendation | undefined>;
@@ -315,6 +325,34 @@ export class DbStorage implements IStorage {
       .where(eq(invoices.id, invoiceId))
       .returning();
     return result[0];
+  }
+
+  async updateInvoice(id: string, data: Partial<Invoice>): Promise<Invoice> {
+    const result = await db.update(invoices)
+      .set(data)
+      .where(eq(invoices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Invoice Line Items
+  async getInvoiceLineItemsByInvoiceId(invoiceId: string): Promise<InvoiceLineItem[]> {
+    return await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId));
+  }
+
+  async createInvoiceLineItem(lineItem: InsertInvoiceLineItem): Promise<InvoiceLineItem> {
+    const result = await db.insert(invoiceLineItems).values(lineItem).returning();
+    return result[0];
+  }
+
+  async createInvoiceLineItems(lineItems: InsertInvoiceLineItem[]): Promise<InvoiceLineItem[]> {
+    if (lineItems.length === 0) return [];
+    const result = await db.insert(invoiceLineItems).values(lineItems).returning();
+    return result;
+  }
+
+  async deleteInvoiceLineItem(id: string): Promise<void> {
+    await db.delete(invoiceLineItems).where(eq(invoiceLineItems.id, id));
   }
 
   // Recommendations
