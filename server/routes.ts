@@ -554,8 +554,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Profile not found" });
       }
 
-      // Get service type from query parameter (default to BOTH for backward compatibility)
-      const service = (req.query.service as 'GA4' | 'GSC' | 'BOTH') || 'BOTH';
+      // Get service type from query parameter
+      const service = req.query.service as 'GA4' | 'GSC';
+      if (!service || (service !== 'GA4' && service !== 'GSC')) {
+        return res.status(400).json({ message: "service query parameter must be 'GA4' or 'GSC'" });
+      }
 
       // Get client ID - for Admin, use query param; for Client, use their own
       let clientId: string;
@@ -616,35 +619,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Exchange code for tokens
       const tokens = await exchangeCodeForTokens(code as string);
 
-      // Determine which service(s) to store
-      const servicesToStore: Array<'GA4' | 'GSC'> = service === 'BOTH' ? ['GA4', 'GSC'] : [service];
-
-      // Store integration for each service
-      for (const serviceName of servicesToStore) {
-        const existing = await storage.getIntegrationByClientId(clientId, serviceName);
-        
-        if (existing) {
-          // Update existing integration
-          await storage.updateIntegration(existing.id, {
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken || existing.refreshToken,
-            expiresAt: tokens.expiresAt,
-          });
-        } else {
-          // Create new integration
-          await storage.createIntegration({
-            clientId,
-            serviceName,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            expiresAt: tokens.expiresAt,
-          });
-        }
+      // Store integration for the specified service
+      const serviceName = service;
+      const existing = await storage.getIntegrationByClientId(clientId, serviceName);
+      
+      if (existing) {
+        // Update existing integration
+        await storage.updateIntegration(existing.id, {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken || existing.refreshToken,
+          expiresAt: tokens.expiresAt,
+        });
+      } else {
+        // Create new integration
+        await storage.createIntegration({
+          clientId,
+          serviceName,
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          expiresAt: tokens.expiresAt,
+        });
       }
 
       // Redirect based on who initiated
       if (stateData.initiatedBy === "Admin") {
-        res.redirect(`/agency/integrations?success=google_connected&clientId=${clientId}`);
+        res.redirect(`/agency/integrations?success=google_connected&clientId=${clientId}&service=${service}`);
       } else {
         res.redirect('/client?oauth_success=true');
       }

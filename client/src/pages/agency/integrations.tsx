@@ -59,18 +59,22 @@ export default function AgencyIntegrationsPage() {
     const params = new URLSearchParams(window.location.search);
     const success = params.get("success");
     const clientId = params.get("clientId");
+    const service = params.get("service") as 'GA4' | 'GSC' | null;
     const oauthError = params.get("oauth_error");
 
-    if (success === "google_connected" && clientId) {
+    if (success === "google_connected" && clientId && service) {
       toast({
         title: "OAuth Successful",
         description: "Google integration connected. Please select a property/site.",
       });
       
-      // Open dialogs for property/site selection
+      // Open appropriate dialog(s) based on service
       setCurrentClientId(clientId);
-      setGa4DialogOpen(true);
-      setGscDialogOpen(true);
+      if (service === 'GA4') {
+        setGa4DialogOpen(true);
+      } else if (service === 'GSC') {
+        setGscDialogOpen(true);
+      }
       
       // Clean URL
       window.history.replaceState({}, "", "/agency/integrations");
@@ -185,7 +189,7 @@ export default function AgencyIntegrationsPage() {
     },
   });
 
-  const handleConnect = async (clientId: string, service: 'GA4' | 'GSC' | 'BOTH') => {
+  const handleConnect = async (clientId: string, service: 'GA4' | 'GSC') => {
     try {
       // Get auth token for Authorization header
       const authUser = localStorage.getItem("authUser");
@@ -452,7 +456,7 @@ function ClientIntegrationCard({
   onDisconnect
 }: { 
   client: Client; 
-  onConnect: (clientId: string, service: 'GA4' | 'GSC' | 'BOTH') => void;
+  onConnect: (clientId: string, service: 'GA4' | 'GSC') => void;
   onDisconnect: (clientId: string, service: 'GA4' | 'GSC') => void;
 }) {
   const { data: ga4Status } = useQuery<IntegrationStatus>({
@@ -476,15 +480,6 @@ function ClientIntegrationCard({
               Client ID: {client.id.slice(0, 8)}...
             </p>
           </div>
-          {!ga4Status?.connected && !gscStatus?.connected && (
-            <Button
-              variant="default"
-              onClick={() => onConnect(client.id, 'BOTH')}
-              data-testid={`button-connect-both-${client.id}`}
-            >
-              Connect Both
-            </Button>
-          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
