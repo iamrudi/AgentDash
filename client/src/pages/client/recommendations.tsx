@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Lightbulb, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle } from "lucide-react";
-import { RecommendationWithClient } from "@shared/schema";
+import { InitiativeWithClient } from "@shared/schema";
 import { format } from "date-fns";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/dialog";
 
 export default function Recommendations() {
-  const { data: recommendations = [], isLoading } = useQuery<RecommendationWithClient[]>({
-    queryKey: ["/api/client/recommendations"],
+  const { data: initiatives = [], isLoading } = useQuery<InitiativeWithClient[]>({
+    queryKey: ["/api/client/initiatives"],
   });
 
   const { toast } = useToast();
@@ -31,13 +31,13 @@ export default function Recommendations() {
 
   const respondMutation = useMutation({
     mutationFn: async (data: { id: string; response: string; feedback?: string }) => {
-      return await apiRequest("POST", `/api/recommendations/${data.id}/respond`, {
+      return await apiRequest("POST", `/api/initiatives/${data.id}/respond`, {
         response: data.response,
         feedback: data.feedback
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/client/recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client/initiatives"] });
       setRespondingId(null);
       setResponseType(null);
       setFeedback("");
@@ -92,10 +92,10 @@ export default function Recommendations() {
     }
   };
 
-  const canRespond = (rec: RecommendationWithClient) => {
-    return rec.sentToClient === "true" && 
-           rec.clientResponse === "pending" && 
-           rec.status === "Sent";
+  const canRespond = (init: InitiativeWithClient) => {
+    return init.sentToClient === "true" && 
+           init.clientResponse === "pending" && 
+           init.status === "Sent";
   };
 
   return (
@@ -109,20 +109,20 @@ export default function Recommendations() {
         {isLoading ? (
           <Card>
             <CardContent className="py-8">
-              <div className="text-center text-muted-foreground">Loading recommendations...</div>
+              <div className="text-center text-muted-foreground">Loading initiatives...</div>
             </CardContent>
           </Card>
-        ) : recommendations.length === 0 ? (
+        ) : initiatives.length === 0 ? (
           <Card>
             <CardContent className="py-8">
               <div className="text-center">
                 <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">No recommendations available</p>
+                <p className="text-muted-foreground">No initiatives available</p>
               </div>
             </CardContent>
           </Card>
         ) : (
-          recommendations
+          initiatives
             .filter(rec => rec.sentToClient === "true")
             .map((recommendation) => (
             <Card key={recommendation.id} data-testid={`recommendation-card-${recommendation.id}`} className="hover-elevate">
