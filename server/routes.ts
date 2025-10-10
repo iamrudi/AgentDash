@@ -593,6 +593,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Client Messages API
+
+  // Send message from client to account manager
+  app.post("/api/client/messages", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const { message } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const newMessage = await storage.createMessage({
+        clientId: client.id,
+        message: message.trim(),
+        senderRole: "Client",
+      });
+
+      res.status(201).json(newMessage);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get messages for logged-in client
+  app.get("/api/client/messages", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.json([]);
+      }
+
+      const messages = await storage.getMessagesByClientId(client.id);
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all messages (Admin only)
+  app.get("/api/agency/messages", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const messages = await storage.getAllMessages();
+      res.json(messages);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark message as read (Admin only)
+  app.patch("/api/agency/messages/:id/read", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.markMessageAsRead(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send message from admin to client
+  app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { message } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const newMessage = await storage.createMessage({
+        clientId,
+        message: message.trim(),
+        senderRole: "Admin",
+      });
+
+      res.status(201).json(newMessage);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
