@@ -166,17 +166,40 @@ shared/
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured by Supabase)
 - `JWT_SECRET` - Strong secret for JWT signing (REQUIRED in production)
 - `SESSION_SECRET` - Session signing secret
+- `ENCRYPTION_KEY` - 32-byte base64 encryption key for OAuth tokens (REQUIRED)
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID for GA4 integration
+- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
 - `NODE_ENV` - Set to "production"
 
 ### Pre-Deployment Checklist
 1. Set strong JWT_SECRET in environment
 2. Ensure DATABASE_URL points to production database
-3. Review and update CORS settings if needed
-4. Test all authentication flows
-5. Verify tenant isolation is working
-6. Check that admin/staff accounts are provisioned
+3. Configure Google OAuth credentials:
+   - Create OAuth 2.0 Client ID in Google Cloud Console
+   - Enable Google Analytics Data API
+   - Add authorized redirect URI: `https://your-domain.com/api/oauth/google/callback`
+   - Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
+4. Generate ENCRYPTION_KEY: `openssl rand -base64 32`
+5. Review and update CORS settings if needed
+6. Test all authentication flows
+7. Verify tenant isolation is working
+8. Check that admin/staff accounts are provisioned
 
 ## Recent Changes
+
+### 2025-10-10: GA4 OAuth Integration Complete
+- **Database Schema Extended**: Added `client_integrations` and `client_objectives` tables
+- **Token Encryption**: AES-256-GCM encryption for OAuth tokens with IV and auth tag storage
+- **OAuth Security**: HMAC-SHA256 signed state parameters prevent CSRF and token fixation
+- **Agency Portal**: Client detail page with GA4 integration management and property selection
+- **Client Portal**: OAuth authorization flow with connection banners and status display
+- **API Endpoints**: 
+  - GET /api/client/profile - Client info for authenticated users
+  - GET /api/integrations/ga4/:clientId - Integration status
+  - GET /api/oauth/google/initiate - OAuth flow initiation
+  - GET /api/oauth/google/callback - OAuth callback handler
+  - GET /api/integrations/ga4/:clientId/properties - Fetch GA4 properties
+  - POST /api/integrations/ga4/:clientId/property - Save selected property
 
 ### 2025-10-10: Security Hardening Complete
 - Implemented JWT-based authentication with signed tokens

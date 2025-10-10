@@ -88,6 +88,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client Portal Routes (protected)
+  
+  // Get client profile/company info for the logged-in client
+  app.get("/api/client/profile", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client record not found" });
+      }
+
+      res.json({
+        id: client.id,
+        companyName: client.companyName,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/client/projects", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
@@ -349,11 +369,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { code, state, error } = req.query;
 
       if (error) {
-        return res.redirect(`/client?error=${encodeURIComponent(error as string)}`);
+        return res.redirect(`/client?oauth_error=${encodeURIComponent(error as string)}`);
       }
 
       if (!code || !state) {
-        return res.redirect('/client?error=missing_parameters');
+        return res.redirect('/client?oauth_error=missing_parameters');
       }
 
       // Verify and parse signed state parameter
@@ -362,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stateData = verifyOAuthState(state as string);
       } catch (error: any) {
         console.error("State verification failed:", error.message);
-        return res.redirect(`/client?error=invalid_state`);
+        return res.redirect(`/client?oauth_error=invalid_state`);
       }
       
       const { clientId } = stateData;
@@ -395,11 +415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (stateData.initiatedBy === "Admin") {
         res.redirect(`/agency?success=ga4_connected&clientId=${clientId}`);
       } else {
-        res.redirect('/client?success=ga4_connected');
+        res.redirect('/client?oauth_success=true');
       }
     } catch (error: any) {
       console.error("OAuth callback error:", error);
-      res.redirect(`/client?error=${encodeURIComponent(error.message)}`);
+      res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
     }
   });
 

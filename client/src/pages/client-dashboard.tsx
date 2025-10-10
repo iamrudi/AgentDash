@@ -1,19 +1,31 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { InvoiceCard } from "@/components/dashboard/invoice-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
 import { useLocation } from "wouter";
-import { Building2, LogOut, FolderKanban, FileText, Lightbulb, TrendingUp } from "lucide-react";
+import { Building2, LogOut, FolderKanban, FileText, Lightbulb, TrendingUp, AlertCircle, Link as LinkIcon } from "lucide-react";
 import { ProjectWithClient, InvoiceWithClient, RecommendationWithClient } from "@shared/schema";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+
+interface GA4Integration {
+  connected: boolean;
+  ga4PropertyId?: string;
+  connectedAt?: string;
+  lastUpdated?: string;
+}
 
 export default function ClientDashboard() {
   const [, setLocation] = useLocation();
   const authUser = getAuthUser();
+  const { toast } = useToast();
+  const [searchParams] = useLocation();
 
   const { data: projects, isLoading: loadingProjects } = useQuery<ProjectWithClient[]>({
     queryKey: ["/api/client/projects"],
@@ -25,6 +37,78 @@ export default function ClientDashboard() {
 
   const { data: recommendations, isLoading: loadingRecommendations } = useQuery<RecommendationWithClient[]>({
     queryKey: ["/api/client/recommendations"],
+  });
+
+  // First fetch the client record to get client ID
+  const { data: clientRecord } = useQuery<{ id: string; companyName: string }>({
+    queryKey: ["/api/client/profile"],
+    enabled: !!authUser && authUser.profile.role === "Client",
+  });
+
+  const { data: ga4Integration } = useQuery<GA4Integration>({
+    queryKey: [`/api/integrations/ga4/${clientRecord?.id}`],
+    enabled: !!clientRecord?.id,
+  });
+
+  // Handle OAuth callback success/error messages
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get("oauth_success");
+    const error = params.get("oauth_error");
+
+    if (success === "true") {
+      toast({
+        title: "Connected Successfully",
+        description: "Your Google Analytics account has been connected.",
+      });
+      // Clean up URL
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (error) {
+      toast({
+        title: "Connection Failed",
+        description: decodeURIComponent(error),
+        variant: "destructive",
+      });
+      // Clean up URL
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [toast]);
+
+  const connectGoogleMutation = useMutation({
+    mutationFn: async () => {
+      if (!clientRecord?.id) {
+        throw new Error("Client ID not available");
+      }
+
+      if (!authUser?.token) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientRecord.id}`, {
+        headers: {
+          Authorization: `Bearer ${authUser.token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to initiate OAuth");
+      }
+
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      // Redirect to Google OAuth
+      window.location.href = data.authUrl;
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Connection Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   const handleLogout = () => {
@@ -83,6 +167,45 @@ export default function ClientDashboard() {
 
       {/* Main Content */}
       <main className="container mx-auto px-6 lg:px-8 py-8">
+        {/* GA4 Integration Banner */}
+        {ga4Integration && !ga4Integration.connected && (
+          <Alert className="mb-6 border-primary/20 bg-primary/5" data-testid="alert-ga4-integration">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium text-foreground">Connect Google Analytics</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Connect your Google Analytics account to unlock AI-powered insights and recommendations based on your website data.
+                </p>
+              </div>
+              <Button
+                onClick={() => connectGoogleMutation.mutate()}
+                disabled={connectGoogleMutation.isPending}
+                className="shrink-0"
+                data-testid="button-connect-google"
+              >
+                <LinkIcon className="h-4 w-4 mr-2" />
+                {connectGoogleMutation.isPending ? "Connecting..." : "Connect with Google"}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Connected Integration Status */}
+        {ga4Integration && ga4Integration.connected && (
+          <Alert className="mb-6 border-green-500/20 bg-green-500/5" data-testid="alert-ga4-connected">
+            <AlertCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <div>
+                <p className="font-medium text-foreground">Google Analytics Connected</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your Google Analytics account is connected. {ga4Integration.ga4PropertyId && `Property: ${ga4Integration.ga4PropertyId}`}
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
