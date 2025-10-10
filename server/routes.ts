@@ -9,8 +9,17 @@ import { insertUserSchema, insertProfileSchema, insertClientSchema, createClient
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
+import { PDFGeneratorService } from "./services/pdfGenerator";
+import { PDFStorageService } from "./services/pdfStorage";
+import express from "express";
+import path from "path";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Serve static invoice PDFs
+  const pdfStorageService = new PDFStorageService();
+  await pdfStorageService.initialize();
+  app.use('/invoices', express.static(path.join(process.cwd(), 'public', 'invoices')));
+
   // Authentication Routes (public)
   app.post("/api/auth/signup", async (req, res) => {
     try {
@@ -387,6 +396,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Create invoice line items error:", error);
       res.status(500).json({ message: error.message || "Failed to create invoice line items" });
+    }
+  });
+
+  // Generate PDF for invoice
+  app.post("/api/invoices/:invoiceId/generate-pdf", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { invoiceId } = req.params;
+      
+      const invoice = await storage.getInvoiceById(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Generate PDF
+      const pdfGenerator = new PDFGeneratorService(storage);
+      const pdfBuffer = await pdfGenerator.generateInvoicePDF(invoiceId);
+
+      // Save PDF and get URL
+      const pdfUrl = await pdfStorageService.savePDF(invoice.invoiceNumber, pdfBuffer);
+
+      // Update invoice with PDF URL
+      await storage.updateInvoice(invoiceId, { pdfUrl });
+
+      res.json({ pdfUrl, message: "PDF generated successfully" });
+    } catch (error: any) {
+      console.error("Generate PDF error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate PDF" });
     }
   });
 
