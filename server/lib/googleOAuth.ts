@@ -248,6 +248,54 @@ export async function fetchGA4Data(
 }
 
 /**
+ * Fetch GA4 acquisition channels data
+ * @param accessToken - Valid access token
+ * @param propertyId - GA4 property ID
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Acquisition channels data
+ */
+export async function fetchGA4AcquisitionChannels(
+  accessToken: string,
+  propertyId: string,
+  startDate: string,
+  endDate: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const analyticsData = google.analyticsdata({
+    version: 'v1beta',
+    auth: oauth2Client,
+  });
+
+  try {
+    const response = await analyticsData.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        metrics: [
+          { name: 'sessions' },
+          { name: 'totalUsers' },
+        ],
+        dimensions: [{ name: 'sessionDefaultChannelGrouping' }],
+      },
+    });
+
+    return {
+      rows: response.data.rows || [],
+      totals: response.data.totals || [],
+      rowCount: response.data.rowCount || 0,
+    };
+  } catch (error: any) {
+    console.error('Error fetching GA4 acquisition channels data:', error);
+    throw new Error('Failed to fetch GA4 acquisition channels data');
+  }
+}
+
+/**
  * Fetch Google Search Console analytics data
  * @param accessToken - Valid access token
  * @param siteUrl - GSC site URL
