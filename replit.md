@@ -75,12 +75,23 @@ Enhanced with sidebar navigation and dedicated pages for comprehensive self-serv
 - **Restricted to**: Client role (and Admin for oversight)
 
 ### Agency Admin Portal (`/agency`)
-- Manage all clients across the platform
-- View aggregated metrics and performance
-- Create and manage projects for any client
-- Generate recommendations for clients
-- Monitor client messages with unread count badges
-- View recent client communications in dedicated messages section
+Enhanced with sidebar navigation and dedicated pages for comprehensive agency management:
+
+**Navigation Pages:**
+- **Dashboard** (`/agency`): Overview with key metrics (clients, projects, messages, recommendations)
+- **Client Messages** (`/agency/messages`): View and respond to client messages with task creation
+- **Tasks & Projects** (`/agency/tasks`): Manage all client projects with Active/Completed tabs
+- **AI Recommendations** (`/agency/recommendations`): AI-powered insights with send-to-client feature
+- **Clients** (`/agency/clients`): Client management with GA4/GSC integration and objectives
+- **Staff** (`/agency/staff`): Staff assignments and task status updates
+
+**Features:**
+- Collapsible sidebar navigation with theme toggle
+- Reply to client messages directly from the portal
+- Create tasks for staff based on client messages
+- Send AI recommendations to specific clients
+- View aggregated metrics and performance charts
+- Manage client integrations (GA4, GSC) and objectives
 - **Restricted to**: Admin role only
 
 ### Staff Portal (`/staff`)
@@ -207,6 +218,17 @@ shared/
 8. Check that admin/staff accounts are provisioned
 
 ## Recent Changes
+
+### 2025-10-10: Agency Portal Navigation Restructure
+- **Agency Layout Component**: New layout with Shadcn sidebar and collapsible navigation
+- **Dedicated Pages**: Separate pages for Dashboard, Client Messages, Tasks & Projects, AI Recommendations, Clients, and Staff
+- **Dashboard Page**: Overview with key metrics (clients, projects, messages, recommendations) and performance charts
+- **Client Messages Page**: Full message management with reply functionality and task creation
+- **Tasks & Projects Page**: Tabbed interface for Active and Completed projects across all clients
+- **AI Recommendations Page**: View all recommendations with send-to-client feature
+- **Clients Page**: List all clients with quick access to client detail pages
+- **Staff Page**: Manage staff assignments and view task statuses
+- **Navigation**: Smooth client-side routing using wouter Link components with active state highlighting
 
 ### 2025-10-10: Client-to-Account Manager Chat System
 - **Database Schema**: Added `client_messages` table for chat history storage
