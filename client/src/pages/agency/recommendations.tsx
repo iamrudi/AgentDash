@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Recommendation, Client } from "@shared/schema";
-import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { ClientFilter } from "@/components/client-filter";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,11 @@ import {
 } from "@/components/ui/select";
 
 export default function AgencyRecommendationsPage() {
+  const [selectedClientId, setSelectedClientId] = useState("ALL");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
+  
   const { data: recommendations } = useQuery<Recommendation[]>({
     queryKey: ["/api/agency/recommendations"],
   });
@@ -36,8 +42,6 @@ export default function AgencyRecommendationsPage() {
     queryKey: ["/api/agency/clients"],
   });
 
-  const { toast } = useToast();
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: "",
     observation: "",
@@ -45,6 +49,19 @@ export default function AgencyRecommendationsPage() {
     cost: "",
     impact: "Medium"
   });
+  const [createForm, setCreateForm] = useState({
+    title: "",
+    observation: "",
+    proposedAction: "",
+    cost: "",
+    impact: "Medium",
+    clientId: ""
+  });
+
+  // Filter recommendations based on selected client
+  const filteredRecommendations = selectedClientId === "ALL"
+    ? recommendations
+    : recommendations?.filter(r => r.clientId === selectedClientId);
 
   const editMutation = useMutation({
     mutationFn: async (data: { id: string; updates: any }) => {
@@ -69,6 +86,28 @@ export default function AgencyRecommendationsPage() {
       toast({
         title: "Recommendation sent",
         description: "The recommendation has been sent to the client.",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/recommendations", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      setIsCreating(false);
+      setCreateForm({
+        title: "",
+        observation: "",
+        proposedAction: "",
+        cost: "",
+        impact: "Medium",
+        clientId: ""
+      });
+      toast({
+        title: "Recommendation created",
+        description: "The manual recommendation has been created successfully.",
       });
     },
   });
@@ -112,6 +151,18 @@ export default function AgencyRecommendationsPage() {
     sendMutation.mutate(id);
   };
 
+  const handleCreate = () => {
+    if (!createForm.clientId || !createForm.title || !createForm.observation || !createForm.proposedAction) {
+      return;
+    }
+    
+    createMutation.mutate({
+      ...createForm,
+      status: "Draft",
+      sentToClient: "false"
+    });
+  };
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "Draft": return "secondary";
@@ -135,14 +186,128 @@ export default function AgencyRecommendationsPage() {
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-semibold mb-2">AI Recommendations</h1>
-          <p className="text-muted-foreground">
-            Edit, approve, and send AI-powered recommendations to clients
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold mb-2">AI Recommendations</h1>
+            <p className="text-muted-foreground">
+              Edit, approve, and send AI-powered recommendations to clients
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <ClientFilter
+              clients={clients}
+              selectedClientId={selectedClientId}
+              onClientChange={setSelectedClientId}
+            />
+            <Dialog open={isCreating} onOpenChange={setIsCreating}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-recommendation">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Manual Recommendation
+                </Button>
+              </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Create Manual Recommendation</DialogTitle>
+                <DialogDescription>
+                  Create a new recommendation for a client
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div>
+                  <Label htmlFor="create-client">Client</Label>
+                  <Select value={createForm.clientId} onValueChange={(value) => setCreateForm({ ...createForm, clientId: value })}>
+                    <SelectTrigger data-testid="select-create-client">
+                      <SelectValue placeholder="Select a client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients?.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.companyName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="create-title">Title</Label>
+                  <Input
+                    id="create-title"
+                    value={createForm.title}
+                    onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                    placeholder="Recommendation title"
+                    data-testid="input-create-title"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="create-observation">Observation</Label>
+                  <Textarea
+                    id="create-observation"
+                    value={createForm.observation}
+                    onChange={(e) => setCreateForm({ ...createForm, observation: e.target.value })}
+                    placeholder="What did you observe?"
+                    rows={3}
+                    data-testid="textarea-create-observation"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="create-proposedAction">Proposed Action</Label>
+                  <Textarea
+                    id="create-proposedAction"
+                    value={createForm.proposedAction}
+                    onChange={(e) => setCreateForm({ ...createForm, proposedAction: e.target.value })}
+                    placeholder="What action do you propose?"
+                    rows={3}
+                    data-testid="textarea-create-action"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="create-cost">Estimated Cost</Label>
+                    <Input
+                      id="create-cost"
+                      value={createForm.cost}
+                      onChange={(e) => setCreateForm({ ...createForm, cost: e.target.value })}
+                      placeholder="5000"
+                      data-testid="input-create-cost"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="create-impact">Impact Level</Label>
+                    <Select value={createForm.impact} onValueChange={(value) => setCreateForm({ ...createForm, impact: value })}>
+                      <SelectTrigger data-testid="select-create-impact">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="Low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCreating(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreate}
+                    disabled={!createForm.clientId || !createForm.title || !createForm.observation || !createForm.proposedAction || createMutation.isPending}
+                    data-testid="button-save-create"
+                  >
+                    {createMutation.isPending ? "Creating..." : "Create Recommendation"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {!recommendations || recommendations.length === 0 ? (
+        {!filteredRecommendations || filteredRecommendations.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Lightbulb className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -151,7 +316,7 @@ export default function AgencyRecommendationsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {recommendations.map((rec) => {
+            {filteredRecommendations.map((rec) => {
               const client = clients?.find(c => c.id === rec.clientId);
               const isDraft = rec.status === "Draft";
               const isSent = rec.sentToClient === "true";

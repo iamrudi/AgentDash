@@ -78,6 +78,29 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Security: All endpoints protected by requireAuth and requireRole middleware
 - **User Experience**: Clear visual indicators across all portals ensure no messages, recommendations, or tasks are missed
 
+### 2025-10-10: Manual AI Recommendation Creation & Client Filtering
+- **Manual Recommendation Creation**: Admins can now create recommendations manually via dialog form
+  - Client selector to target specific clients
+  - All standard fields: title, observation, proposed action, cost, impact
+  - Creates recommendations with "Draft" status for review before sending
+- **Universal Client Filter**: Reusable filter component added to all agency pages
+  - Dashboard: Filter all metrics, projects, messages by client
+  - Client Messages: View messages from specific clients or all
+  - AI Recommendations: Filter recommendations by client
+  - Tasks & Projects: View projects for specific clients
+  - Clients: Quick filter to specific client
+  - Google Integrations: Filter integration status by client
+- **Google Integrations Management Page**: New page for viewing and managing Google service connections
+  - Displays GA4 (Google Analytics 4) connection status per client
+  - Shows Google Search Console connection status per client
+  - Visual indicators for connected/disconnected state
+  - Connect/Reconnect buttons for OAuth flow initiation (placeholder)
+  - Client filter for quick navigation
+- **API Enhancements**:
+  - POST /api/recommendations - Create manual recommendations
+  - GET /api/agency/integrations - Fetch all client integrations (tokens excluded for security)
+- **Security**: Integration tokens remain server-side, only status metadata exposed to frontend
+
 ### 2025-10-10: AI Recommendation Approval Workflow
 - **Complete Edit & Send Workflow**: Account managers can edit Draft recommendations and send them to clients
 - **Client Response Actions**: Clients can Approve, Reject, or Discuss sent recommendations with feedback

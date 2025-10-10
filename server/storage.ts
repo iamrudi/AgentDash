@@ -100,6 +100,7 @@ export interface IStorage {
   // Client Integrations
   getIntegrationByClientId(clientId: string, serviceName: string): Promise<ClientIntegration | undefined>;
   getAllIntegrationsByClientId(clientId: string): Promise<ClientIntegration[]>;
+  getAllIntegrations(): Promise<ClientIntegration[]>;
   createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration>;
   updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration>;
   deleteIntegration(id: string): Promise<void>;
@@ -403,6 +404,23 @@ export class DbStorage implements IStorage {
       }
       return integration;
     });
+  }
+
+  async getAllIntegrations(): Promise<ClientIntegration[]> {
+    const results = await db.select().from(clientIntegrations)
+      .orderBy(desc(clientIntegrations.createdAt));
+    
+    // Note: We don't decrypt tokens for the admin list view for security
+    // Remove sensitive fields
+    return results.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...integration }) => ({
+      ...integration,
+      accessToken: null,
+      refreshToken: null,
+      accessTokenIv: null,
+      refreshTokenIv: null,
+      accessTokenAuthTag: null,
+      refreshTokenAuthTag: null,
+    }));
   }
 
   async createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration> {

@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ClientFilter } from "@/components/client-filter";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,11 @@ import {
 } from "@/components/ui/dialog";
 
 export default function AgencyMessagesPage() {
+  const [selectedClientId, setSelectedClientId] = useState("ALL");
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const { toast } = useToast();
+
   const { data: messages } = useQuery<ClientMessage[]>({
     queryKey: ["/api/agency/messages"],
   });
@@ -28,9 +34,10 @@ export default function AgencyMessagesPage() {
     queryKey: ["/api/agency/clients"],
   });
 
-  const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState("");
-  const { toast } = useToast();
+  // Filter messages based on selected client
+  const filteredMessages = selectedClientId === "ALL"
+    ? messages
+    : messages?.filter(m => m.clientId === selectedClientId);
 
   const replyMutation = useMutation({
     mutationFn: async (data: { clientId: string; message: string }) => {
@@ -55,7 +62,7 @@ export default function AgencyMessagesPage() {
     });
   };
 
-  const unreadCount = messages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
+  const unreadCount = filteredMessages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
 
   return (
     <AgencyLayout>
@@ -67,21 +74,28 @@ export default function AgencyMessagesPage() {
               Manage and respond to client communications
             </p>
           </div>
-          <Badge variant="secondary" className="text-lg px-4 py-2">
-            {unreadCount} Unread
-          </Badge>
+          <div className="flex items-center gap-4">
+            <ClientFilter
+              clients={clients}
+              selectedClientId={selectedClientId}
+              onClientChange={setSelectedClientId}
+            />
+            <Badge variant="secondary" className="text-lg px-4 py-2">
+              {unreadCount} Unread
+            </Badge>
+          </div>
         </div>
 
         <Card>
           <CardContent className="p-0">
-            {!messages || messages.length === 0 ? (
+            {!filteredMessages || filteredMessages.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No messages yet</p>
               </div>
             ) : (
               <div className="divide-y">
-                {messages.map((message) => {
+                {filteredMessages.map((message) => {
                   const client = clients?.find(c => c.id === message.clientId);
                   return (
                     <div

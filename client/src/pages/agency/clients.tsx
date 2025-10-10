@@ -5,23 +5,39 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Client } from "@shared/schema";
 import { Building2, ChevronRight } from "lucide-react";
+import { ClientFilter } from "@/components/client-filter";
+import { useState } from "react";
 
 export default function AgencyClientsPage() {
+  const [selectedClientId, setSelectedClientId] = useState("ALL");
+
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/agency/clients"],
   });
 
+  // Filter clients based on selection
+  const filteredClients = selectedClientId === "ALL"
+    ? clients
+    : clients?.filter(c => c.id === selectedClientId);
+
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-semibold mb-2">Clients</h1>
-          <p className="text-muted-foreground">
-            Manage client information, integrations, and objectives
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold mb-2">Clients</h1>
+            <p className="text-muted-foreground">
+              Manage client information, integrations, and objectives
+            </p>
+          </div>
+          <ClientFilter
+            clients={clients}
+            selectedClientId={selectedClientId}
+            onClientChange={setSelectedClientId}
+          />
         </div>
 
-        {!clients || clients.length === 0 ? (
+        {!filteredClients || filteredClients.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -30,7 +46,7 @@ export default function AgencyClientsPage() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {clients.map((client) => (
+            {filteredClients.map((client) => (
               <Card key={client.id} className="hover-elevate">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">

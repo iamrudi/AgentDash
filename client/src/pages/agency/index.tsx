@@ -5,8 +5,12 @@ import { Building2, FolderKanban, MessageSquare, TrendingUp } from "lucide-react
 import { Project, Client, Recommendation, ClientMessage } from "@shared/schema";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { DailyMetric } from "@shared/schema";
+import { ClientFilter } from "@/components/client-filter";
+import { useState } from "react";
 
 export default function AgencyDashboard() {
+  const [selectedClientId, setSelectedClientId] = useState("ALL");
+
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/agency/projects"],
   });
@@ -27,21 +31,45 @@ export default function AgencyDashboard() {
     queryKey: ["/api/agency/metrics"],
   });
 
-  const activeProjects = projects?.filter(p => p.status === "Active").length || 0;
+  // Filter data based on selected client
+  const filteredProjects = selectedClientId === "ALL" 
+    ? projects 
+    : projects?.filter(p => p.clientId === selectedClientId);
+  
+  const filteredRecommendations = selectedClientId === "ALL"
+    ? recommendations
+    : recommendations?.filter(r => r.clientId === selectedClientId);
+  
+  const filteredMessages = selectedClientId === "ALL"
+    ? messages
+    : messages?.filter(m => m.clientId === selectedClientId);
+  
+  const filteredMetrics = selectedClientId === "ALL"
+    ? metrics
+    : metrics?.filter(m => m.clientId === selectedClientId);
+
+  const activeProjects = filteredProjects?.filter(p => p.status === "Active").length || 0;
   const totalClients = clients?.length || 0;
-  const newRecommendations = recommendations?.filter(r => r.status === "New").length || 0;
-  const unreadMessages = messages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
-  const recentMetrics = metrics?.slice(0, 30) || [];
+  const newRecommendations = filteredRecommendations?.filter(r => r.status === "New").length || 0;
+  const unreadMessages = filteredMessages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
+  const recentMetrics = filteredMetrics?.slice(0, 30) || [];
   const totalRevenue = recentMetrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0);
 
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-semibold mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Overview of your agency's performance and key metrics
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold mb-2">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Overview of your agency's performance and key metrics
+            </p>
+          </div>
+          <ClientFilter
+            clients={clients}
+            selectedClientId={selectedClientId}
+            onClientChange={setSelectedClientId}
+          />
         </div>
 
         {/* Key Metrics */}

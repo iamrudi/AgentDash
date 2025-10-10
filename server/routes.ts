@@ -250,6 +250,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/agency/integrations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const integrations = await storage.getAllIntegrations();
+      // Only return safe metadata - no tokens
+      const safeIntegrations = integrations.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...safe }) => safe);
+      res.json(safeIntegrations);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Staff Portal Routes (protected - Staff only)
   app.get("/api/staff/tasks", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
     try {

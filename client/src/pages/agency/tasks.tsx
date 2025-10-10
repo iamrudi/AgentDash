@@ -5,8 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Project, Client } from "@shared/schema";
 import { FolderKanban, Building2 } from "lucide-react";
+import { ClientFilter } from "@/components/client-filter";
+import { useState } from "react";
 
 export default function AgencyTasksPage() {
+  const [selectedClientId, setSelectedClientId] = useState("ALL");
+
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/agency/projects"],
   });
@@ -15,17 +19,29 @@ export default function AgencyTasksPage() {
     queryKey: ["/api/agency/clients"],
   });
 
-  const activeProjects = projects?.filter(p => p.status === "Active") || [];
-  const completedProjects = projects?.filter(p => p.status === "Completed") || [];
+  // Filter projects based on selected client
+  const filteredProjects = selectedClientId === "ALL"
+    ? projects
+    : projects?.filter(p => p.clientId === selectedClientId);
+
+  const activeProjects = filteredProjects?.filter(p => p.status === "Active") || [];
+  const completedProjects = filteredProjects?.filter(p => p.status === "Completed") || [];
 
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-semibold mb-2">Tasks & Projects</h1>
-          <p className="text-muted-foreground">
-            Manage all client projects and task assignments
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold mb-2">Tasks & Projects</h1>
+            <p className="text-muted-foreground">
+              Manage all client projects and task assignments
+            </p>
+          </div>
+          <ClientFilter
+            clients={clients}
+            selectedClientId={selectedClientId}
+            onClientChange={setSelectedClientId}
+          />
         </div>
 
         <Tabs defaultValue="active" className="space-y-4">

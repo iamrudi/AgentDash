@@ -1,4 +1,4 @@
-import { Home, MessageSquare, FolderKanban, Lightbulb, Building2, Users, LogOut, Shield } from "lucide-react";
+import { Home, MessageSquare, FolderKanban, Lightbulb, Building2, Users, LogOut, Shield, Link2 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -44,6 +44,12 @@ const menuItems = [
     title: "Clients",
     url: "/agency/clients",
     icon: Building2,
+    notificationKey: null,
+  },
+  {
+    title: "Google Integrations",
+    url: "/agency/integrations",
+    icon: Link2,
     notificationKey: null,
   },
   {
