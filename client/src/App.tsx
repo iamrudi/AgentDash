@@ -5,14 +5,23 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ProtectedRoute } from "@/components/protected-route";
+import { ClientLayout } from "@/components/client-layout";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
-import ClientDashboard from "@/pages/client-dashboard";
 import AgencyDashboard from "@/pages/agency-dashboard";
 import ClientDetail from "@/pages/client-detail";
 import StaffDashboard from "@/pages/staff-dashboard";
+
+// New Client Portal Pages
+import Dashboard from "@/pages/client/dashboard";
+import Projects from "@/pages/client/projects";
+import Recommendations from "@/pages/client/recommendations";
+import Billing from "@/pages/client/billing";
+import Reports from "@/pages/client/reports";
+import Profile from "@/pages/client/profile";
+import Support from "@/pages/client/support";
 
 function Router() {
   return (
@@ -21,10 +30,60 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       
-      {/* Client Portal */}
+      {/* Client Portal - All routes wrapped in ClientLayout */}
       <Route path="/client">
         <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientDashboard />
+          <ClientLayout>
+            <Dashboard />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/projects">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Projects />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/recommendations">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Recommendations />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/billing">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Billing />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/reports">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Reports />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/profile">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Profile />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/support">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <Support />
+          </ClientLayout>
         </ProtectedRoute>
       </Route>
       
