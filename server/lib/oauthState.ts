@@ -6,6 +6,7 @@ const STATE_SECRET = process.env.JWT_SECRET || 'development_secret_key_change_in
 interface OAuthState {
   clientId: string;
   initiatedBy: string;
+  service: 'GA4' | 'GSC' | 'BOTH';
   timestamp: number;
 }
 
@@ -13,12 +14,14 @@ interface OAuthState {
  * Generate a cryptographically signed OAuth state parameter
  * @param clientId - The client ID for this OAuth flow
  * @param initiatedBy - The role of the user who initiated (Admin/Client)
+ * @param service - Which Google service(s) to authenticate (GA4, GSC, or BOTH)
  * @returns Signed state string
  */
-export function generateOAuthState(clientId: string, initiatedBy: string): string {
+export function generateOAuthState(clientId: string, initiatedBy: string, service: 'GA4' | 'GSC' | 'BOTH' = 'BOTH'): string {
   const state: OAuthState = {
     clientId,
     initiatedBy,
+    service,
     timestamp: Date.now(),
   };
 

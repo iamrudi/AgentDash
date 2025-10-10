@@ -6,7 +6,7 @@ import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema } from "@shared/schema";
-import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
+import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // OAuth Routes for Google Analytics 4
+  // OAuth Routes for Google integrations (GA4 and Search Console)
   // Initiate OAuth flow (Admin or Client can initiate)
   app.get("/api/oauth/google/initiate", requireAuth, async (req: AuthRequest, res) => {
     try {
@@ -553,6 +553,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
+
+      // Get service type from query parameter (default to BOTH for backward compatibility)
+      const service = (req.query.service as 'GA4' | 'GSC' | 'BOTH') || 'BOTH';
 
       // Get client ID - for Admin, use query param; for Client, use their own
       let clientId: string;
@@ -576,9 +579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create cryptographically signed state parameter for CSRF protection
-      const state = generateOAuthState(clientId, profile.role);
+      const state = generateOAuthState(clientId, profile.role, service);
 
-      const authUrl = getAuthUrl(state);
+      const authUrl = getAuthUrl(state, service);
       res.json({ authUrl });
     } catch (error: any) {
       console.error("OAuth initiation error:", error);
@@ -608,35 +611,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(`/client?oauth_error=invalid_state`);
       }
       
-      const { clientId } = stateData;
+      const { clientId, service } = stateData;
 
       // Exchange code for tokens
       const tokens = await exchangeCodeForTokens(code as string);
 
-      // Check if integration already exists (upsert pattern)
-      const existing = await storage.getIntegrationByClientId(clientId, 'GA4');
-      
-      if (existing) {
-        // Update existing integration
-        await storage.updateIntegration(existing.id, {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken || existing.refreshToken,
-          expiresAt: tokens.expiresAt,
-        });
-      } else {
-        // Create new integration
-        await storage.createIntegration({
-          clientId,
-          serviceName: 'GA4',
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          expiresAt: tokens.expiresAt,
-        });
+      // Determine which service(s) to store
+      const servicesToStore: Array<'GA4' | 'GSC'> = service === 'BOTH' ? ['GA4', 'GSC'] : [service];
+
+      // Store integration for each service
+      for (const serviceName of servicesToStore) {
+        const existing = await storage.getIntegrationByClientId(clientId, serviceName);
+        
+        if (existing) {
+          // Update existing integration
+          await storage.updateIntegration(existing.id, {
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken || existing.refreshToken,
+            expiresAt: tokens.expiresAt,
+          });
+        } else {
+          // Create new integration
+          await storage.createIntegration({
+            clientId,
+            serviceName,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            expiresAt: tokens.expiresAt,
+          });
+        }
       }
 
       // Redirect based on who initiated
       if (stateData.initiatedBy === "Admin") {
-        res.redirect(`/agency?success=ga4_connected&clientId=${clientId}`);
+        res.redirect(`/agency/integrations?success=google_connected&clientId=${clientId}`);
       } else {
         res.redirect('/client?oauth_success=true');
       }
@@ -734,6 +742,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         message: "GA4 property saved successfully",
         ga4PropertyId: updated.ga4PropertyId,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Google Search Console Routes
+  
+  // Get GSC integration status for a client
+  app.get("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin", "Client"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own integration
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      
+      if (!integration) {
+        return res.json({ connected: false });
+      }
+
+      // Return status without exposing tokens
+      res.json({
+        connected: true,
+        gscSiteUrl: integration.gscSiteUrl,
+        expiresAt: integration.expiresAt,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fetch available GSC sites (Admin only)
+  app.get("/api/integrations/gsc/:clientId/sites", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      let integration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Search Console integration not found" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      const sites = await fetchGSCSites(integration.accessToken!);
+      res.json(sites);
+    } catch (error: any) {
+      console.error("Fetch sites error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch sites" });
+    }
+  });
+
+  // Save selected GSC site (Admin only)
+  app.post("/api/integrations/gsc/:clientId/site", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { gscSiteUrl } = req.body;
+
+      if (!gscSiteUrl) {
+        return res.status(400).json({ message: "gscSiteUrl is required" });
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "Search Console integration not found" });
+      }
+
+      const updated = await storage.updateIntegration(integration.id, {
+        gscSiteUrl,
+      });
+
+      res.json({
+        message: "Search Console site saved successfully",
+        gscSiteUrl: updated.gscSiteUrl,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -5,11 +5,24 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:5000/api/oauth/google/callback';
 
-// GA4 Analytics scopes
-const SCOPES = [
+// Google service scopes
+const GA4_SCOPES = [
   'https://www.googleapis.com/auth/analytics.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
 ];
+
+const GSC_SCOPES = [
+  'https://www.googleapis.com/auth/webmasters.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
+
+const ALL_SCOPES = [
+  'https://www.googleapis.com/auth/analytics.readonly',
+  'https://www.googleapis.com/auth/webmasters.readonly',
+  'https://www.googleapis.com/auth/userinfo.email',
+];
+
+export type GoogleService = 'GA4' | 'GSC' | 'BOTH';
 
 /**
  * Create OAuth2 client for Google authentication
@@ -27,16 +40,35 @@ export function createOAuth2Client() {
 }
 
 /**
+ * Get scopes for a specific service
+ * @param service - Which Google service(s) to authenticate
+ * @returns Array of OAuth scopes
+ */
+function getScopes(service: GoogleService): string[] {
+  switch (service) {
+    case 'GA4':
+      return GA4_SCOPES;
+    case 'GSC':
+      return GSC_SCOPES;
+    case 'BOTH':
+      return ALL_SCOPES;
+    default:
+      return ALL_SCOPES;
+  }
+}
+
+/**
  * Generate OAuth authorization URL
  * @param state - State parameter for CSRF protection (should include client ID)
+ * @param service - Which Google service(s) to authenticate for
  * @returns Authorization URL
  */
-export function getAuthUrl(state: string): string {
+export function getAuthUrl(state: string, service: GoogleService = 'BOTH'): string {
   const oauth2Client = createOAuth2Client();
   
   return oauth2Client.generateAuthUrl({
     access_type: 'offline', // Request refresh token
-    scope: SCOPES,
+    scope: getScopes(service),
     state,
     prompt: 'consent', // Force consent screen to always get refresh token
   });
@@ -132,5 +164,35 @@ export async function fetchGA4Properties(accessToken: string) {
   } catch (error) {
     console.error('Error fetching GA4 properties:', error);
     throw new Error('Failed to fetch GA4 properties');
+  }
+}
+
+/**
+ * Fetch Google Search Console sites accessible to the user
+ * @param accessToken - Valid access token
+ * @returns List of Search Console sites
+ */
+export async function fetchGSCSites(accessToken: string) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const searchconsole = google.searchconsole({
+    version: 'v1',
+    auth: oauth2Client,
+  });
+
+  try {
+    const sitesResponse = await searchconsole.sites.list();
+    const sites = sitesResponse.data.siteEntry || [];
+
+    return sites.map(site => ({
+      siteUrl: site.siteUrl || '',
+      permissionLevel: site.permissionLevel || 'UNKNOWN',
+    }));
+  } catch (error) {
+    console.error('Error fetching Search Console sites:', error);
+    throw new Error('Failed to fetch Search Console sites');
   }
 }
