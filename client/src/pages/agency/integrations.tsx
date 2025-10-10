@@ -33,8 +33,9 @@ interface IntegrationStatus {
 }
 
 interface GA4Property {
-  name: string;
+  propertyId: string;
   displayName: string;
+  accountName: string;
 }
 
 interface GSCSite {
@@ -359,8 +360,8 @@ export default function AgencyIntegrationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {ga4Properties.map((property) => (
-                    <SelectItem key={property.name} value={property.name}>
-                      {property.displayName}
+                    <SelectItem key={property.propertyId} value={property.propertyId}>
+                      {property.displayName} ({property.accountName})
                     </SelectItem>
                   ))}
                 </SelectContent>
