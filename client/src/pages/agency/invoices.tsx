@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Invoice, Client, insertInvoiceSchema, type InsertInvoice } from "@shared/schema";
-import { FileText, Plus, DollarSign, Calendar, TrendingUp, AlertCircle, Receipt } from "lucide-react";
+import { FileText, Plus, DollarSign, Calendar, TrendingUp, AlertCircle, Receipt, Download, Eye } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -106,6 +106,26 @@ export default function AgencyInvoicesPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to update invoice status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generatePdfMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      return await apiRequest("POST", `/api/invoices/${invoiceId}/generate-pdf`, {});
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/client/invoices"] });
+      toast({
+        title: "Success",
+        description: "PDF generated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate PDF",
         variant: "destructive",
       });
     },
@@ -438,25 +458,52 @@ export default function AgencyInvoicesPage() {
                           {new Date(invoice.createdAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          {editingStatusId === invoice.id ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingStatusId(null)}
-                              data-testid={`button-cancel-edit-${invoice.id}`}
-                            >
-                              Cancel
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingStatusId(invoice.id)}
-                              data-testid={`button-edit-status-${invoice.id}`}
-                            >
-                              Change Status
-                            </Button>
-                          )}
+                          <div className="flex justify-end gap-2">
+                            {editingStatusId === invoice.id ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingStatusId(null)}
+                                data-testid={`button-cancel-edit-${invoice.id}`}
+                              >
+                                Cancel
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setEditingStatusId(invoice.id)}
+                                  data-testid={`button-edit-status-${invoice.id}`}
+                                >
+                                  Status
+                                </Button>
+                                {!invoice.pdfUrl && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => generatePdfMutation.mutate(invoice.id)}
+                                    disabled={generatePdfMutation.isPending}
+                                    data-testid={`button-generate-pdf-${invoice.id}`}
+                                  >
+                                    <Download className="h-3 w-3 mr-1" />
+                                    PDF
+                                  </Button>
+                                )}
+                                {invoice.pdfUrl && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(invoice.pdfUrl!, "_blank")}
+                                    data-testid={`button-view-pdf-${invoice.id}`}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    PDF
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
