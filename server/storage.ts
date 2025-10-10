@@ -21,6 +21,8 @@ import {
   type InsertClientIntegration,
   type ClientObjective,
   type InsertClientObjective,
+  type ClientMessage,
+  type InsertClientMessage,
   users,
   profiles,
   clients,
@@ -32,6 +34,7 @@ import {
   dailyMetrics,
   clientIntegrations,
   clientObjectives,
+  clientMessages,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -104,6 +107,12 @@ export interface IStorage {
   createObjective(objective: InsertClientObjective): Promise<ClientObjective>;
   updateObjective(id: string, data: Partial<ClientObjective>): Promise<ClientObjective>;
   deleteObjective(id: string): Promise<void>;
+  
+  // Client Messages
+  getMessagesByClientId(clientId: string): Promise<ClientMessage[]>;
+  createMessage(message: InsertClientMessage): Promise<ClientMessage>;
+  getAllMessages(): Promise<ClientMessage[]>;
+  markMessageAsRead(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -445,6 +454,29 @@ export class DbStorage implements IStorage {
 
   async deleteObjective(id: string): Promise<void> {
     await db.delete(clientObjectives).where(eq(clientObjectives.id, id));
+  }
+
+  // Client Messages
+  async getMessagesByClientId(clientId: string): Promise<ClientMessage[]> {
+    return await db.select().from(clientMessages)
+      .where(eq(clientMessages.clientId, clientId))
+      .orderBy(clientMessages.createdAt);
+  }
+
+  async createMessage(message: InsertClientMessage): Promise<ClientMessage> {
+    const result = await db.insert(clientMessages).values(message).returning();
+    return result[0];
+  }
+
+  async getAllMessages(): Promise<ClientMessage[]> {
+    return await db.select().from(clientMessages)
+      .orderBy(desc(clientMessages.createdAt));
+  }
+
+  async markMessageAsRead(id: string): Promise<void> {
+    await db.update(clientMessages)
+      .set({ isRead: "true" })
+      .where(eq(clientMessages.id, id));
   }
 }
 

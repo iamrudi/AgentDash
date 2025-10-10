@@ -126,6 +126,16 @@ export const clientObjectives = pgTable("client_objectives", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// CLIENT MESSAGES (Chat messages between clients and account managers)
+export const clientMessages = pgTable("client_messages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  senderRole: text("sender_role").notNull(), // 'Client' or 'Admin'
+  isRead: text("is_read").default("false"), // Using text for boolean compatibility
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -184,6 +194,11 @@ export const insertClientObjectiveSchema = createInsertSchema(clientObjectives).
   updatedAt: true,
 });
 
+export const insertClientMessageSchema = createInsertSchema(clientMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -217,6 +232,9 @@ export type InsertClientIntegration = z.infer<typeof insertClientIntegrationSche
 
 export type ClientObjective = typeof clientObjectives.$inferSelect;
 export type InsertClientObjective = z.infer<typeof insertClientObjectiveSchema>;
+
+export type ClientMessage = typeof clientMessages.$inferSelect;
+export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };
