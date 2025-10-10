@@ -71,9 +71,18 @@ export default function Reports() {
     enabled: !!clientId && !!token,
   });
 
+  // Helper function to parse GA4 date format (YYYYMMDD)
+  const parseGA4Date = (dateStr: string) => {
+    if (!dateStr || dateStr.length !== 8) return 'Invalid Date';
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    return new Date(`${year}-${month}-${day}`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   // Process GA4 data for charts
   const ga4ChartData = ga4Data?.rows?.map(row => ({
-    date: new Date(row.dimensionValues[0].value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    date: parseGA4Date(row.dimensionValues[0]?.value || ''),
     sessions: parseInt(row.metricValues[0]?.value || '0'),
     users: parseInt(row.metricValues[1]?.value || '0'),
     pageviews: parseInt(row.metricValues[2]?.value || '0'),
@@ -93,8 +102,7 @@ export default function Reports() {
   const totalSessions = parseInt(ga4Totals[0]?.value || '0');
   const totalUsers = parseInt(ga4Totals[1]?.value || '0');
   const totalPageviews = parseInt(ga4Totals[2]?.value || '0');
-  const avgSessionDuration = parseFloat(ga4Totals[3]?.value || '0');
-  const bounceRate = (parseFloat(ga4Totals[4]?.value || '0') * 100).toFixed(1);
+  const totalEngagedSessions = parseInt(ga4Totals[3]?.value || '0');
 
   const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
   const totalImpressions = gscData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
@@ -168,14 +176,14 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-bounce-rate">
+          <Card data-testid="card-engaged-sessions">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
-              <ArrowUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Engaged Sessions</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{ga4Loading ? '...' : bounceRate}%</div>
-              <p className="text-xs text-muted-foreground">Session bounce rate</p>
+              <div className="text-2xl font-bold">{ga4Loading ? '...' : totalEngagedSessions.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Sessions with engagement</p>
             </CardContent>
           </Card>
         </div>
