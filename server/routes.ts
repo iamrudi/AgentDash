@@ -839,6 +839,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all users (Admin only)
+  app.get("/api/agency/users", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const users = await storage.getAllUsersWithProfiles();
+      res.json(users);
+    } catch (error: any) {
+      console.error("Get users error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch users" });
+    }
+  });
+
+  // Update user role (Admin only)
+  app.patch("/api/agency/users/:userId/role", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!["Client", "Staff", "Admin"].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      await storage.updateUserRole(userId, role);
+      res.json({ message: "User role updated successfully" });
+    } catch (error: any) {
+      console.error("Update user role error:", error);
+      res.status(500).json({ message: error.message || "Failed to update user role" });
+    }
+  });
+
   // Create staff or admin user (Admin only)
   app.post("/api/agency/users/create", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {

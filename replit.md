@@ -78,6 +78,21 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Security: All endpoints protected by requireAuth and requireRole middleware
 - **User Experience**: Clear visual indicators across all portals ensure no messages, recommendations, or tasks are missed
 
+### 2025-10-10: Complete User Management System
+- **User Management Dashboard**: Admins have a dedicated section to view and edit all users
+  - Comprehensive table showing: Name, Email, Role, Company, Created date
+  - Visual role indicators with colored badges (Admin: default, Staff: secondary, Client: outline)
+  - User icons differentiate between Admin (Shield), Staff (UserCog), Client (Building)
+- **Edit User Roles**: Admins can change any user's role
+  - Edit dialog with role dropdown (Client, Staff, Admin)
+  - Real-time UI updates after role changes
+  - Proper query invalidation ensures immediate visual feedback
+- **API Endpoints**:
+  - GET /api/agency/users - Retrieve all users with profiles and client information
+  - PATCH /api/agency/users/:userId/role - Update user role
+- **Security**: All endpoints protected by requireAuth and requireRole("Admin") middleware
+- **Navigation**: User Management accessible from agency sidebar with UserCog icon
+
 ### 2025-10-10: Admin User Management - Create Clients, Staff, and Admin Users
 - **Client Creation**: Admins can create new client users with company information
   - Form includes: Company name, contact full name, email, password

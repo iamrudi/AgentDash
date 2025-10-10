@@ -46,6 +46,8 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getAllUsersWithProfiles(): Promise<Array<User & { profile: Profile | null; client?: Client | null }>>;
+  updateUserRole(userId: string, role: string): Promise<void>;
   
   // Profiles
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
@@ -144,6 +146,38 @@ export class DbStorage implements IStorage {
       password: hashedPassword,
     }).returning();
     return result[0];
+  }
+
+  async getAllUsersWithProfiles(): Promise<Array<User & { profile: Profile | null; client?: Client | null }>> {
+    const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+    
+    const usersWithProfiles = await Promise.all(
+      allUsers.map(async (user) => {
+        const profile = await this.getProfileByUserId(user.id);
+        let client = null;
+        if (profile && profile.role === "Client") {
+          client = await this.getClientByProfileId(profile.id);
+        }
+        return {
+          ...user,
+          profile: profile || null,
+          client: client || null,
+        };
+      })
+    );
+    
+    return usersWithProfiles;
+  }
+
+  async updateUserRole(userId: string, role: string): Promise<void> {
+    const profile = await this.getProfileByUserId(userId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    
+    await db.update(profiles)
+      .set({ role })
+      .where(eq(profiles.userId, userId));
   }
 
   // Profiles

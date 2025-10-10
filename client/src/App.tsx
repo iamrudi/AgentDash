@@ -30,6 +30,7 @@ import AgencyRecommendations from "@/pages/agency/recommendations";
 import AgencyClients from "@/pages/agency/clients";
 import AgencyStaff from "@/pages/agency/staff";
 import AgencyIntegrations from "@/pages/agency/integrations";
+import AgencyUsers from "@/pages/agency/users";
 
 function Router() {
   return (
@@ -129,6 +130,12 @@ function Router() {
       <Route path="/agency/staff">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyStaff />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/users">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyUsers />
         </ProtectedRoute>
       </Route>
 
