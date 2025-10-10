@@ -31,6 +31,16 @@ interface GSCData {
   }>;
 }
 
+interface AcquisitionChannelsData {
+  rows: Array<{
+    dimensionValues: Array<{ value: string }>;
+    metricValues: Array<{ value: string }>;
+  }>;
+  totals?: Array<{
+    metricValues: Array<{ value: string }>;
+  }>;
+}
+
 export default function Reports() {
   const { toast } = useToast();
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 30));
@@ -111,6 +121,21 @@ export default function Reports() {
     enabled: !!clientId && !!token && compareEnabled,
   });
 
+  // Fetch acquisition channels data
+  const { data: channelsData, isLoading: channelsLoading } = useQuery<AcquisitionChannelsData>({
+    queryKey: ["/api/analytics/ga4", clientId, "channels", startDate, endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/ga4/${clientId}/channels?startDate=${startDate}&endDate=${endDate}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error('Failed to fetch acquisition channels data');
+      return res.json();
+    },
+    enabled: !!clientId && !!token,
+  });
+
   // Helper function to parse GA4 date format (YYYYMMDD)
   const parseGA4Date = (dateStr: string) => {
     if (!dateStr || dateStr.length !== 8) return 'Invalid Date';
@@ -136,6 +161,13 @@ export default function Reports() {
     ctr: (row.ctr || 0) * 100,
     position: row.position || 0,
   })) || [];
+
+  // Process acquisition channels data for charts
+  const channelsChartData = channelsData?.rows?.map(row => ({
+    channel: row.dimensionValues[0]?.value || 'Unknown',
+    sessions: parseInt(row.metricValues[0]?.value || '0'),
+    users: parseInt(row.metricValues[1]?.value || '0'),
+  })).sort((a, b) => b.sessions - a.sessions) || [];
 
   // Calculate totals
   const ga4Totals = ga4Data?.totals?.[0]?.metricValues || [];
@@ -333,6 +365,34 @@ export default function Reports() {
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground">
               No GA4 data available. Make sure your Google Analytics 4 integration is connected.
+            </CardContent>
+          </Card>
+        )}
+        {/* Acquisition Channels Chart */}
+        {channelsChartData.length > 0 ? (
+          <Card data-testid="card-acquisition-channels">
+            <CardHeader>
+              <CardTitle>Acquisition Channels</CardTitle>
+              <CardDescription>Traffic sources and channel performance</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={channelsChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="channel" type="category" width={120} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="sessions" fill="hsl(var(--primary))" name="Sessions" />
+                  <Bar dataKey="users" fill="hsl(var(--chart-2))" name="Users" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        ) : !channelsLoading && (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              No acquisition channels data available.
             </CardContent>
           </Card>
         )}
