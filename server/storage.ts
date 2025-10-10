@@ -120,6 +120,8 @@ export interface IStorage {
   // Notifications
   getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }>;
   markRecommendationResponsesViewed(): Promise<void>;
+  getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }>;
+  getStaffNotificationCounts(staffProfileId: string): Promise<{ newTasks: number; highPriorityTasks: number }>;
 }
 
 export class DbStorage implements IStorage {
@@ -564,6 +566,55 @@ export class DbStorage implements IStorage {
         eq(recommendations.sentToClient, "true"),
         eq(recommendations.responseViewedByAdmin, "false")
       ));
+  }
+
+  async getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }> {
+    // Count unread messages from Admin
+    const unreadMessagesResult = await db.select().from(clientMessages)
+      .where(and(
+        eq(clientMessages.clientId, clientId),
+        eq(clientMessages.senderRole, "Admin"),
+        eq(clientMessages.isRead, "false")
+      ));
+    
+    // Count new recommendations sent to client with status 'Sent' (not yet acted upon)
+    const newRecommendationsResult = await db.select().from(recommendations)
+      .where(and(
+        eq(recommendations.clientId, clientId),
+        eq(recommendations.sentToClient, "true"),
+        eq(recommendations.status, "Sent")
+      ));
+    
+    return {
+      unreadMessages: unreadMessagesResult.length,
+      newRecommendations: newRecommendationsResult.length
+    };
+  }
+
+  async getStaffNotificationCounts(staffProfileId: string): Promise<{ newTasks: number; highPriorityTasks: number }> {
+    // Get all tasks assigned to this staff member
+    const assignments = await db.select().from(staffAssignments)
+      .where(eq(staffAssignments.staffProfileId, staffProfileId));
+    
+    const taskIds = assignments.map(a => a.taskId);
+    
+    if (taskIds.length === 0) {
+      return { newTasks: 0, highPriorityTasks: 0 };
+    }
+    
+    // Count new tasks (status = 'Pending')
+    const allTasks = await db.select().from(tasks);
+    const assignedTasks = allTasks.filter(t => taskIds.includes(t.id));
+    
+    const newTasks = assignedTasks.filter(t => t.status === "Pending");
+    const highPriorityTasks = assignedTasks.filter(t => 
+      t.priority === "High" && (t.status === "Pending" || t.status === "In Progress")
+    );
+    
+    return {
+      newTasks: newTasks.length,
+      highPriorityTasks: highPriorityTasks.length
+    };
   }
 }
 

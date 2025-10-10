@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -23,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser, getUserRole } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -30,6 +32,12 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
   const role = getUserRole();
+
+  const { data: notificationCounts } = useQuery<{ newTasks: number; highPriorityTasks: number }>({
+    queryKey: ["/api/staff/notifications/counts"],
+    refetchInterval: 10000, // Refresh every 10 seconds
+    enabled: role === "Staff", // Only fetch for staff users
+  });
 
   const handleLogout = () => {
     clearAuthUser();
@@ -42,6 +50,7 @@ export function AppSidebar() {
       title: "Dashboard",
       url: "/agency",
       icon: LayoutDashboard,
+      notificationKey: null,
     },
   ];
 
@@ -51,6 +60,7 @@ export function AppSidebar() {
       title: "My Tasks",
       url: "/staff",
       icon: CheckSquare,
+      notificationKey: "newTasks" as const,
     },
   ];
 
@@ -73,7 +83,7 @@ export function AppSidebar() {
             <Building2 className="h-4 w-4 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">Agency Portal</h2>
+            <h2 className="font-semibold text-sm">{role === "Staff" ? "Staff Portal" : "Agency Portal"}</h2>
             <p className="text-xs text-muted-foreground">{role}</p>
           </div>
         </div>
@@ -83,23 +93,38 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location === item.url}
-                    data-testid={`link-${item.title.toLowerCase().replace(" ", "-")}`}
-                  >
-                    <a href={item.url} onClick={(e) => {
-                      e.preventDefault();
-                      setLocation(item.url);
-                    }}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                const count = item.notificationKey && notificationCounts 
+                  ? notificationCounts[item.notificationKey] 
+                  : 0;
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      data-testid={`link-${item.title.toLowerCase().replace(" ", "-")}`}
+                    >
+                      <a href={item.url} onClick={(e) => {
+                        e.preventDefault();
+                        setLocation(item.url);
+                      }}>
+                        <item.icon className="h-4 w-4" />
+                        <span className="flex-1">{item.title}</span>
+                        {count > 0 && (
+                          <Badge 
+                            variant="default" 
+                            className="ml-auto h-5 min-w-5 px-1 text-xs"
+                            data-testid={`notification-badge-${item.notificationKey}`}
+                          >
+                            {count}
+                          </Badge>
+                        )}
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

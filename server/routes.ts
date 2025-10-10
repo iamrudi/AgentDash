@@ -751,6 +751,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get client notification counts (Client only)
+  app.get("/api/client/notifications/counts", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.json({ unreadMessages: 0, newRecommendations: 0 });
+      }
+
+      const counts = await storage.getClientNotificationCounts(client.id);
+      res.json(counts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get staff notification counts (Staff only)
+  app.get("/api/staff/notifications/counts", requireAuth, requireRole("Staff"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      if (!profile) {
+        return res.json({ newTasks: 0, highPriorityTasks: 0 });
+      }
+
+      const counts = await storage.getStaffNotificationCounts(profile.id);
+      res.json(counts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
