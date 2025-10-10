@@ -31,13 +31,11 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState("30"); // days
   const { toast } = useToast();
 
-  // Get current user's client ID from localStorage
+  // Get current user's client ID and token from localStorage
   const authUser = localStorage.getItem("authUser");
-  const clientId = authUser ? JSON.parse(authUser).clientId : null;
-
-  // Debug: Log the clientId to help troubleshoot
-  console.log("Reports page - authUser:", authUser ? JSON.parse(authUser) : null);
-  console.log("Reports page - clientId:", clientId);
+  const parsedAuthUser = authUser ? JSON.parse(authUser) : null;
+  const clientId = parsedAuthUser?.clientId || null;
+  const token = parsedAuthUser?.token || null;
 
   // Calculate date range
   const endDate = new Date().toISOString().split('T')[0];
@@ -49,13 +47,13 @@ export default function Reports() {
     queryFn: async () => {
       const res = await fetch(`/api/analytics/ga4/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
       if (!res.ok) throw new Error('Failed to fetch GA4 data');
       return res.json();
     },
-    enabled: !!clientId,
+    enabled: !!clientId && !!token,
   });
 
   // Fetch GSC data
@@ -64,13 +62,13 @@ export default function Reports() {
     queryFn: async () => {
       const res = await fetch(`/api/analytics/gsc/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
       if (!res.ok) throw new Error('Failed to fetch GSC data');
       return res.json();
     },
-    enabled: !!clientId,
+    enabled: !!clientId && !!token,
   });
 
   // Process GA4 data for charts
