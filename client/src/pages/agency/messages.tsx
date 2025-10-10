@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,18 +28,18 @@ export default function AgencyMessagesPage() {
     queryKey: ["/api/agency/clients"],
   });
 
-  const [selectedMessage, setSelectedMessage] = useState<ClientMessage | null>(null);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const { toast } = useToast();
 
   const replyMutation = useMutation({
     mutationFn: async (data: { clientId: string; message: string }) => {
-      return await apiRequest("/api/client/messages", "POST", data);
+      return await apiRequest("POST", `/api/agency/messages/${data.clientId}`, { message: data.message });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/messages"] });
       setReplyText("");
-      setSelectedMessage(null);
+      setReplyingToId(null);
       toast({
         title: "Reply sent",
         description: "Your message has been sent to the client.",
@@ -46,10 +47,10 @@ export default function AgencyMessagesPage() {
     },
   });
 
-  const handleReply = () => {
-    if (!selectedMessage || !replyText.trim()) return;
+  const handleReply = (clientId: string) => {
+    if (!replyText.trim()) return;
     replyMutation.mutate({
-      clientId: selectedMessage.clientId,
+      clientId,
       message: replyText,
     });
   };
@@ -105,12 +106,22 @@ export default function AgencyMessagesPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Dialog>
+                          <Dialog 
+                            open={replyingToId === message.id} 
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setReplyingToId(message.id);
+                                setReplyText("");
+                              } else {
+                                setReplyingToId(null);
+                                setReplyText("");
+                              }
+                            }}
+                          >
                             <DialogTrigger asChild>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setSelectedMessage(message)}
                                 data-testid={`button-reply-${message.id}`}
                               >
                                 <Send className="h-4 w-4 mr-1" />
@@ -120,6 +131,9 @@ export default function AgencyMessagesPage() {
                             <DialogContent>
                               <DialogHeader>
                                 <DialogTitle>Reply to {client?.companyName}</DialogTitle>
+                                <DialogDescription>
+                                  Send a reply to this client's message
+                                </DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 mt-4">
                                 <div className="p-3 bg-muted rounded-md">
@@ -135,12 +149,12 @@ export default function AgencyMessagesPage() {
                                 />
                                 <div className="flex justify-end gap-2">
                                   <Button
-                                    onClick={handleReply}
+                                    onClick={() => handleReply(message.clientId)}
                                     disabled={!replyText.trim() || replyMutation.isPending}
                                     data-testid="button-send-reply"
                                   >
                                     <Send className="h-4 w-4 mr-1" />
-                                    Send Reply
+                                    {replyMutation.isPending ? "Sending..." : "Send Reply"}
                                   </Button>
                                 </div>
                               </div>

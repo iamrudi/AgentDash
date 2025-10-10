@@ -21,7 +21,7 @@ export default function AgencyRecommendationsPage() {
 
   const sendMutation = useMutation({
     mutationFn: async (recommendationId: string) => {
-      return await apiRequest(`/api/recommendations/${recommendationId}/send`, "POST");
+      return await apiRequest("POST", `/api/recommendations/${recommendationId}/send`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
