@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { CheckCircle2, XCircle, ExternalLink, Loader2 } from "lucide-react";
-import { Client } from "@shared/schema";
+import { CheckCircle2, XCircle, ExternalLink, Loader2, Plus, Trash2, Target } from "lucide-react";
+import { Client, ClientObjective } from "@shared/schema";
 import { useState } from "react";
 
 interface GA4Integration {
@@ -171,6 +173,9 @@ export default function ClientDetail() {
                   <TabsTrigger value="integrations" data-testid="tab-integrations">
                     Integrations
                   </TabsTrigger>
+                  <TabsTrigger value="objectives" data-testid="tab-objectives">
+                    Objectives
+                  </TabsTrigger>
                   <TabsTrigger value="details" data-testid="tab-details">
                     Details
                   </TabsTrigger>
@@ -306,6 +311,10 @@ export default function ClientDetail() {
                   </Card>
                 </TabsContent>
 
+                <TabsContent value="objectives" className="space-y-4 mt-6">
+                  <ObjectivesManager clientId={clientId!} />
+                </TabsContent>
+
                 <TabsContent value="details" className="space-y-4 mt-6">
                   <Card>
                     <CardHeader>
@@ -331,5 +340,220 @@ export default function ClientDetail() {
         </div>
       </div>
     </SidebarProvider>
+  );
+}
+
+// Objectives Manager Component
+function ObjectivesManager({ clientId }: { clientId: string }) {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [description, setDescription] = useState("");
+  const [targetMetric, setTargetMetric] = useState("");
+
+  const { data: objectives = [], isLoading } = useQuery<ClientObjective[]>({
+    queryKey: [`/api/agency/clients/${clientId}/objectives`],
+    enabled: !!clientId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { description: string; targetMetric: string }) => {
+      return await apiRequest("POST", `/api/agency/clients/${clientId}/objectives`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      setDescription("");
+      setTargetMetric("");
+      setShowForm(false);
+      toast({
+        title: "Success",
+        description: "Objective created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: string }) => {
+      return await apiRequest("PATCH", `/api/agency/objectives/${id}`, {
+        isActive: isActive === "true" ? "false" : "true",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      toast({
+        title: "Success",
+        description: "Objective updated successfully",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/agency/objectives/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      toast({
+        title: "Success",
+        description: "Objective deleted successfully",
+      });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!description.trim() || !targetMetric.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createMutation.mutate({ description, targetMetric });
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Client Objectives</CardTitle>
+              <CardDescription>
+                Set goals and targets for this client to guide AI recommendations
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => setShowForm(!showForm)}
+              size="sm"
+              data-testid="button-add-objective"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Objective
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {showForm && (
+            <div className="mb-6 p-4 border rounded-lg space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="target-metric" className="text-sm font-medium">
+                  Target Metric
+                </label>
+                <Input
+                  id="target-metric"
+                  placeholder="e.g., conversions, sessions, revenue"
+                  value={targetMetric}
+                  onChange={(e) => setTargetMetric(e.target.value)}
+                  data-testid="input-target-metric"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="description" className="text-sm font-medium">
+                  Description
+                </label>
+                <Textarea
+                  id="description"
+                  placeholder="e.g., Increase qualified organic leads by 20% in Q4"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  data-testid="textarea-objective-description"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={createMutation.isPending}
+                  data-testid="button-save-objective"
+                >
+                  {createMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Objective"
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowForm(false);
+                    setDescription("");
+                    setTargetMetric("");
+                  }}
+                  data-testid="button-cancel-objective"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : objectives.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Target className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No objectives set for this client yet</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {objectives.map((objective) => (
+                <div
+                  key={objective.id}
+                  className="p-4 border rounded-lg flex items-start justify-between gap-4"
+                  data-testid={`objective-${objective.id}`}
+                >
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {objective.targetMetric}
+                      </Badge>
+                      <Badge variant={objective.isActive === "true" ? "default" : "secondary"}>
+                        {objective.isActive === "true" ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <p className="text-sm">{objective.description}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleActiveMutation.mutate({
+                        id: objective.id,
+                        isActive: objective.isActive || "true",
+                      })}
+                      disabled={toggleActiveMutation.isPending}
+                      data-testid={`button-toggle-objective-${objective.id}`}
+                    >
+                      {objective.isActive === "true" ? "Deactivate" : "Activate"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(objective.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-objective-${objective.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

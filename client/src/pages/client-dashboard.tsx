@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { InvoiceCard } from "@/components/dashboard/invoice-card";
@@ -8,8 +9,8 @@ import { RecommendationCard } from "@/components/dashboard/recommendation-card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
 import { useLocation } from "wouter";
-import { Building2, LogOut, FolderKanban, FileText, Lightbulb, TrendingUp, AlertCircle, Link as LinkIcon } from "lucide-react";
-import { ProjectWithClient, InvoiceWithClient, RecommendationWithClient } from "@shared/schema";
+import { Building2, LogOut, FolderKanban, FileText, Lightbulb, TrendingUp, AlertCircle, Link as LinkIcon, Target } from "lucide-react";
+import { ProjectWithClient, InvoiceWithClient, RecommendationWithClient, ClientObjective } from "@shared/schema";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
@@ -37,6 +38,11 @@ export default function ClientDashboard() {
 
   const { data: recommendations, isLoading: loadingRecommendations } = useQuery<RecommendationWithClient[]>({
     queryKey: ["/api/client/recommendations"],
+  });
+
+  const { data: objectives = [] } = useQuery<ClientObjective[]>({
+    queryKey: ["/api/client/objectives"],
+    enabled: !!authUser && authUser.profile.role === "Client",
   });
 
   // First fetch the client record to get client ID
@@ -308,6 +314,34 @@ export default function ClientDashboard() {
             </Card>
           )}
         </section>
+
+        {/* Active Objectives */}
+        {objectives.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Your Objectives</h2>
+            <div className="space-y-3">
+              {objectives.map((objective) => (
+                <Card key={objective.id} data-testid={`client-objective-${objective.id}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <Target className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">
+                            {objective.targetMetric}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-foreground">{objective.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* AI Recommendations */}
         <section>

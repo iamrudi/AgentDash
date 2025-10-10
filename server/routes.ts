@@ -517,6 +517,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Client Objectives API
+
+  // Get objectives for a client (Admin only)
+  app.get("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const objectives = await storage.getObjectivesByClientId(clientId);
+      res.json(objectives);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get active objectives for logged-in client
+  app.get("/api/client/objectives", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.json([]);
+      }
+
+      const objectives = await storage.getActiveObjectivesByClientId(client.id);
+      res.json(objectives);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create objective for a client (Admin only)
+  app.post("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { description, targetMetric } = req.body;
+
+      if (!description || !targetMetric) {
+        return res.status(400).json({ message: "description and targetMetric are required" });
+      }
+
+      const objective = await storage.createObjective({
+        clientId,
+        description,
+        targetMetric,
+      });
+
+      res.status(201).json(objective);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update objective (Admin only)
+  app.patch("/api/agency/objectives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const updated = await storage.updateObjective(id, updates);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete objective (Admin only)
+  app.delete("/api/agency/objectives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteObjective(id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
