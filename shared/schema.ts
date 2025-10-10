@@ -75,10 +75,14 @@ export const recommendations = pgTable("recommendations", {
   title: text("title").notNull(),
   observation: text("observation").notNull(),
   proposedAction: text("proposed_action").notNull(),
-  status: text("status").notNull(), // 'New', 'In Review', 'Approved', 'Rejected', 'Implemented'
+  status: text("status").notNull(), // 'Draft', 'Sent', 'Approved', 'Rejected', 'Discussing', 'Implemented'
   cost: numeric("cost"),
   impact: text("impact"), // 'High', 'Medium', 'Low'
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  sentToClient: text("sent_to_client").default("false"), // Whether sent to client
+  clientResponse: text("client_response"), // 'pending', 'approved', 'rejected', 'discussing'
+  clientFeedback: text("client_feedback"), // Client's comments/feedback
+  lastEditedAt: timestamp("last_edited_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

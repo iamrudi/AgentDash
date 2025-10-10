@@ -313,6 +313,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update recommendation (edit before sending)
+  app.patch("/api/recommendations/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { title, observation, proposedAction, cost, impact } = req.body;
+      
+      const recommendation = await storage.updateRecommendation(id, {
+        title,
+        observation,
+        proposedAction,
+        cost,
+        impact
+      });
+      
+      res.json(recommendation);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send recommendation to client
+  app.post("/api/recommendations/:id/send", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const recommendation = await storage.sendRecommendationToClient(id);
+      res.json(recommendation);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Client responds to recommendation (approve/reject/discuss)
+  app.post("/api/recommendations/:id/respond", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { response, feedback } = req.body;
+      
+      if (!["approved", "rejected", "discussing"].includes(response)) {
+        return res.status(400).json({ message: "Invalid response. Must be 'approved', 'rejected', or 'discussing'" });
+      }
+      
+      const recommendation = await storage.updateRecommendationClientResponse(id, response, feedback);
+      res.json(recommendation);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const metric = await storage.createMetric(req.body);

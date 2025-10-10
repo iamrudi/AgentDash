@@ -149,20 +149,26 @@ async function seed() {
       title: "Implement A/B Testing for Landing Pages",
       observation: "Current landing page conversion rate is 2.3%, below industry average of 3.5%",
       proposedAction: "Set up A/B testing framework to test different headlines, CTAs, and layouts",
-      status: "New",
+      status: "Draft",
       cost: "2500.00",
       impact: "High",
       clientId: client.id,
+      sentToClient: "false",
+      clientResponse: null,
+      clientFeedback: null,
     });
 
     await storage.createRecommendation({
       title: "Expand Google Ads Budget",
       observation: "Current campaigns have 8.2% CTR and $3.50 CPA, significantly outperforming benchmarks",
       proposedAction: "Increase monthly Google Ads budget by 50% to capitalize on high-performing campaigns",
-      status: "In Review",
+      status: "Sent",
       cost: "15000.00",
       impact: "High",
       clientId: client.id,
+      sentToClient: "true",
+      clientResponse: "pending",
+      clientFeedback: null,
     });
 
     await storage.createRecommendation({
@@ -173,6 +179,9 @@ async function seed() {
       cost: "1200.00",
       impact: "Medium",
       clientId: client.id,
+      sentToClient: "true",
+      clientResponse: "approved",
+      clientFeedback: "This sounds great! Let's proceed with the implementation.",
     });
 
     // Create daily metrics (last 30 days)

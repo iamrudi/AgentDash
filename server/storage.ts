@@ -88,6 +88,9 @@ export interface IStorage {
   getRecommendationsByClientId(clientId: string): Promise<Recommendation[]>;
   getAllRecommendations(): Promise<Recommendation[]>;
   createRecommendation(rec: InsertRecommendation): Promise<Recommendation>;
+  updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation>;
+  sendRecommendationToClient(id: string): Promise<Recommendation>;
+  updateRecommendationClientResponse(id: string, response: string, feedback?: string): Promise<Recommendation>;
   
   // Daily Metrics
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
@@ -274,6 +277,49 @@ export class DbStorage implements IStorage {
 
   async createRecommendation(rec: InsertRecommendation): Promise<Recommendation> {
     const result = await db.insert(recommendations).values(rec).returning();
+    return result[0];
+  }
+
+  async updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation> {
+    const result = await db
+      .update(recommendations)
+      .set({ ...updates, lastEditedAt: new Date() })
+      .where(eq(recommendations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async sendRecommendationToClient(id: string): Promise<Recommendation> {
+    const result = await db
+      .update(recommendations)
+      .set({ 
+        sentToClient: "true", 
+        status: "Sent", 
+        clientResponse: "pending",
+        lastEditedAt: new Date() 
+      })
+      .where(eq(recommendations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateRecommendationClientResponse(id: string, response: string, feedback?: string): Promise<Recommendation> {
+    const statusMap: Record<string, string> = {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "discussing": "Discussing"
+    };
+    
+    const result = await db
+      .update(recommendations)
+      .set({ 
+        clientResponse: response,
+        clientFeedback: feedback || null,
+        status: statusMap[response] || "Sent",
+        lastEditedAt: new Date()
+      })
+      .where(eq(recommendations.id, id))
+      .returning();
     return result[0];
   }
 
