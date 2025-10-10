@@ -31,13 +31,13 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Security**: AES-256-GCM encryption for sensitive OAuth tokens, HMAC-SHA256 for CSRF protection.
 
 ### Feature Specifications
-- **Client Portal**: Dashboard, Projects, AI Recommendations (approve/reject/discuss), Billing, Profile, Support Chat.
-- **Agency Admin Portal**: Dashboard, Client Messages (reply, task creation), Tasks & Projects (all clients), AI Recommendations (draft, send, manage client responses), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments).
+- **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat.
+- **Agency Admin Portal**: Dashboard, Client Messages (reply, task creation), Tasks & Projects (all clients), Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments).
   - **User Management**: Create/edit/delete users (clients, staff, admin), manage roles.
-  - **Invoice Management**: Create, view, update status, generate PDFs for invoices; automated monthly retainer invoicing, on-demand invoicing from approved recommendations.
-  - **Manual Recommendation Creation**: Admins can manually create and send recommendations with client filtering.
+  - **Invoice Management**: Create, view, update status, generate PDFs for invoices; automated monthly retainer invoicing, on-demand invoicing from approved initiatives.
+  - **Manual Initiative Creation**: Admins can manually create and send initiatives with client filtering.
 - **Staff Portal**: View assigned tasks, update status, prioritize.
-- **AI Recommendation Workflow**: Draft → Sent → Approved/Rejected/Discussing.
+- **Strategic Initiative Workflow**: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured.
 - **Client-to-Account Manager Chat System**: Real-time messaging.
 
 ### System Design Choices
@@ -57,10 +57,27 @@ The platform is a full-stack JavaScript application using React for the frontend
 
 ## Recent Changes
 
+### 2025-10-10: Strategic Initiatives System Transformation
+**Evolved from Recommendations to Strategic Initiatives**
+- Database migration: Renamed `recommendations` table to `initiatives` with backward compatibility
+- Added impact measurement fields: triggerMetric, baselineValue, startDate, implementationDate, measuredImprovement
+- Added initiativeId foreign key to tasks table for linking tasks to strategic initiatives
+- Updated status workflow: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured
+- Backend API migration: All `/api/recommendations/*` endpoints renamed to `/api/initiatives/*`
+- Frontend updates: Agency and Client portals now use initiatives API endpoints
+- Invoice generation: Seamlessly works with approved initiatives (no changes needed)
+- Storage layer: All recommendation methods renamed to initiative methods for consistency
+
+**Technical Architecture**
+- One initiative → Many tasks relationship via initiativeId
+- Impact tracking: Baseline metrics → Implementation → Measured improvement
+- Maintains full compatibility with existing invoice system
+- Database schema uses ALTER TABLE for safe data preservation
+
 ### 2025-10-10: Frictionless Invoicing System
 **Automated Invoice Generation & PDF Creation**
 - Monthly retainer invoicing via node-cron scheduler (runs daily at 9:00 AM)
-- On-demand invoice generation from approved recommendations
+- On-demand invoice generation from approved initiatives
 - Professional PDF generation with Puppeteer (resource-safe with guaranteed browser cleanup)
 - PDF storage in local file system with static serving
 - Database schema: retainerAmount/billingDay on clients, totalAmount/issueDate/pdfUrl on invoices, invoice_line_items table
