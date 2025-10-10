@@ -51,19 +51,32 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 
 ## Recent Changes
 
-### 2025-10-10: Notification Badge System
-- **Real-time Sidebar Notifications**: Agency portal sidebar displays notification badges for:
+### 2025-10-10: Complete Notification Badge System Across All Portals
+- **Client Portal Notifications**: Sidebar displays badges for:
+  - Support: Shows count of unread messages from admin/account manager
+  - Recommendations: Shows count of new recommendations (status="Sent", not yet acted upon)
+- **Agency Admin Portal Notifications**: Sidebar displays badges for:
   - Client Messages: Shows count of unread messages from clients
   - AI Recommendations: Shows count of client responses not yet viewed by admin
+- **Staff Portal Notifications**: Sidebar displays badges for:
+  - My Tasks: Shows count of new pending task assignments
 - **Database Schema**: Added `responseViewedByAdmin` field to recommendations table
 - **API Endpoints**:
-  - GET /api/agency/notifications/counts - Returns unread message and unviewed response counts
+  - GET /api/client/notifications/counts - Returns { unreadMessages, newRecommendations }
+  - GET /api/agency/notifications/counts - Returns { unreadMessages, unviewedResponses }
+  - GET /api/staff/notifications/counts - Returns { newTasks, highPriorityTasks }
   - POST /api/agency/recommendations/mark-viewed - Marks all recommendation responses as viewed
+  - POST /api/test/create-user - Development-only endpoint for creating users with specific roles (testing)
 - **Smart State Management**:
-  - Notifications refresh every 10 seconds automatically
+  - Notifications refresh every 10 seconds automatically via React Query polling
   - When admin views recommendations page, responses are marked as viewed and badge clears
   - When client responds to a recommendation, `responseViewedByAdmin` resets to notify admin
-- **User Experience**: Clear visual indicators ensure account managers never miss client messages or recommendation responses
+  - Badges appear next to sidebar menu items only when count > 0
+- **Technical Implementation**:
+  - TanStack Query with 10-second refetch interval for real-time updates
+  - Role-based notification counts using existing database fields
+  - Security: All endpoints protected by requireAuth and requireRole middleware
+- **User Experience**: Clear visual indicators across all portals ensure no messages, recommendations, or tasks are missed
 
 ### 2025-10-10: AI Recommendation Approval Workflow
 - **Complete Edit & Send Workflow**: Account managers can edit Draft recommendations and send them to clients

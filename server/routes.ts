@@ -709,7 +709,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Send message from admin to client
+  // Send message (supports clientId in body)
+  app.post("/api/agency/messages", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId, message, senderRole } = req.body;
+      
+      if (!message || !message.trim()) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      if (!clientId) {
+        return res.status(400).json({ message: "Client ID is required" });
+      }
+
+      const newMessage = await storage.createMessage({
+        clientId,
+        message: message.trim(),
+        senderRole: senderRole || "Admin",
+      });
+
+      res.status(201).json(newMessage);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Send message from admin to client (legacy route with clientId in URL)
   app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
@@ -750,6 +775,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // TEST ENDPOINT: Create user with specific role (development only)
+  // This endpoint bypasses normal security restrictions for testing purposes
+  if (process.env.NODE_ENV === "development") {
+    app.post("/api/test/create-user", async (req, res) => {
+      try {
+        const { email, password, fullName, role, companyName } = req.body;
+        
+        // Check if user exists
+        const existingUser = await storage.getUserByEmail(email);
+        if (existingUser) {
+          return res.status(400).json({ message: "User already exists" });
+        }
+
+        // Create user
+        const user = await storage.createUser({ email, password });
+
+        // Create profile with specified role (bypassing normal security)
+        const profile = await storage.createProfile({
+          userId: user.id,
+          fullName,
+          role: role || "Client",
+        });
+
+        // Create client record if role is Client and companyName provided
+        if (role === "Client" && companyName) {
+          await storage.createClient({
+            companyName,
+            profileId: profile.id,
+          });
+        }
+
+        res.status(201).json({ 
+          message: "Test user created successfully",
+          user: { id: user.id, email: user.email },
+          profile: { id: profile.id, fullName: profile.fullName, role: profile.role }
+        });
+      } catch (error: any) {
+        console.error("Test user creation error:", error);
+        res.status(500).json({ message: error.message || "User creation failed" });
+      }
+    });
+  }
 
   // Get client notification counts (Client only)
   app.get("/api/client/notifications/counts", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
