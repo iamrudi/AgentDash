@@ -1,306 +1,50 @@
 # Agency Client Portal
 
-A comprehensive multi-tenant agency management platform with role-based access control, featuring three distinct portals for managing client relationships, projects, tasks, invoices, and AI-powered recommendations.
-
 ## Overview
 
-This is a fullstack JavaScript application built with React, Express, PostgreSQL (Supabase), and TypeScript. The platform enables agencies to manage multiple clients while providing each client with secure, isolated access to their own data.
+This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides distinct portals for clients, staff, and administrators, ensuring secure, role-based access to their specific data and functionalities. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations.
 
-## Architecture
+## User Preferences
 
-### Technology Stack
-- **Frontend**: React 18, Wouter (routing), TanStack Query, Shadcn/UI, Tailwind CSS
-- **Backend**: Express.js, TypeScript
-- **Database**: PostgreSQL via Supabase
-- **ORM**: Drizzle ORM
-- **Authentication**: JWT with bcrypt password hashing
-- **State Management**: React Query for server state, localStorage for auth
+I prefer concise and direct communication. When making changes, prioritize iterative development and provide clear explanations of the modifications. Before implementing any major architectural changes or introducing new external dependencies, please ask for approval. Ensure that all code adheres to modern JavaScript/TypeScript best practices.
 
-### Database Schema
-- **users**: Authentication credentials
-- **profiles**: User profile information with role assignment
-- **clients**: Company information for client accounts
-- **projects**: Client projects with status tracking
-- **tasks**: Project tasks with priority and due dates
-- **staff_assignments**: Links staff members to tasks
-- **invoices**: Client billing with payment status
-- **recommendations**: AI-powered suggestions for clients
-- **daily_metrics**: Performance tracking data
-- **client_messages**: Chat messages between clients and account managers
-- **client_integrations**: OAuth integration data (GA4, etc.) with encrypted tokens
-- **client_objectives**: Client goals and objectives for dashboard display
+## System Architecture
 
-## Security Implementation
+The platform is a full-stack JavaScript application utilizing React for the frontend, Express.js for the backend, and PostgreSQL (managed via Supabase) as the database. Drizzle ORM is used for database interactions. Authentication is handled with JWT and bcrypt for password hashing, implementing a robust Role-Based Access Control (RBAC) system with Client, Staff, and Admin roles.
 
-### Authentication & Authorization
-- **JWT Tokens**: Signed 7-day expiring tokens with server-side verification
-- **Password Security**: Bcrypt hashing with salt rounds
-- **Role-Based Access Control**: Three roles with distinct permissions
-  - **Client**: Can only view own data (projects, invoices, recommendations)
-  - **Staff**: Can manage assigned tasks
-  - **Admin**: Full access to all client data and management features
-
-### Security Features
-- ✅ No role self-selection (signup always creates Client role)
-- ✅ Tenant isolation (clients cannot see other clients' data)
-- ✅ Signed JWT tokens (prevents token tampering)
-- ✅ Protected API endpoints with role verification
-- ✅ Secure password hashing with bcrypt
-
-### Important Security Notes
-- **JWT Secret**: Set `JWT_SECRET` environment variable in production
-- **Default Secret**: Uses "development_secret_key_change_in_production" if not set
-- **Admin/Staff Provisioning**: Must be created manually (no self-service signup)
-
-## User Roles & Access
-
-### Client Portal (`/client`)
-Enhanced with sidebar navigation and dedicated pages for comprehensive self-service access:
-
-**Navigation Pages:**
-- **Dashboard** (`/client`): Performance overview with KPI scorecards and client objectives
-- **Projects** (`/client/projects`): Active and completed projects with tabbed view
-- **Recommendations** (`/client/recommendations`): AI-powered insights and suggestions
-- **Billing** (`/client/billing`): Invoice management with payment instructions
-- **Reports** (`/client/reports`): Analytics and performance metrics (coming soon)
-- **Profile** (`/client/profile`): Account information and settings
-- **Support** (`/client/support`): Real-time chat with account manager for direct communication
-
-**Features:**
-- Collapsible sidebar navigation with theme toggle
-- View own projects with status and descriptions
-- Access invoices with payment status
-- See AI-powered recommendations with observations and proposed actions
-- Track performance metrics via KPI scorecards
-- **Restricted to**: Client role (and Admin for oversight)
-
-### Agency Admin Portal (`/agency`)
-Enhanced with sidebar navigation and dedicated pages for comprehensive agency management:
-
-**Navigation Pages:**
-- **Dashboard** (`/agency`): Overview with key metrics (clients, projects, messages, recommendations)
-- **Client Messages** (`/agency/messages`): View and respond to client messages with task creation
-- **Tasks & Projects** (`/agency/tasks`): Manage all client projects with Active/Completed tabs
-- **AI Recommendations** (`/agency/recommendations`): AI-powered insights with send-to-client feature
-- **Clients** (`/agency/clients`): Client management with GA4/GSC integration and objectives
-- **Staff** (`/agency/staff`): Staff assignments and task status updates
-
-**Features:**
-- Collapsible sidebar navigation with theme toggle
-- Reply to client messages directly from the portal
-- Create tasks for staff based on client messages
-- Send AI recommendations to specific clients
-- View aggregated metrics and performance charts
-- Manage client integrations (GA4, GSC) and objectives
-- **Restricted to**: Admin role only
-
-### Staff Portal (`/staff`)
-- View assigned tasks across projects
-- Update task status and progress
-- See task priorities and due dates
-- **Restricted to**: Staff role (and Admin)
-
-## Test Accounts
-
-The following accounts are seeded in the database for testing:
-
-```
-Admin Account:
-Email: admin@agency.com
-Password: admin123
-
-Client Account:
-Email: client@company.com
-Password: client123
-Company: Acme Corporation
-
-Staff Account:
-Email: staff@agency.com
-Password: staff123
-```
-
-## API Endpoints
-
-### Authentication (Public)
-- `POST /api/auth/signup` - Create new client account
-- `POST /api/auth/login` - Authenticate and receive JWT token
-
-### Client Portal (Client, Admin)
-- `GET /api/client/projects` - Get client's projects (tenant-isolated)
-- `GET /api/client/invoices` - Get client's invoices (tenant-isolated)
-- `GET /api/client/recommendations` - Get client's recommendations (tenant-isolated)
-- `POST /api/client/messages` - Send message to account manager (tenant-isolated)
-- `GET /api/client/messages` - Get client's chat history (tenant-isolated)
-
-### Agency Portal (Admin Only)
-- `GET /api/agency/clients` - Get all clients
-- `GET /api/agency/projects` - Get all projects
-- `POST /api/agency/projects` - Create new project
-- `GET /api/agency/metrics` - Get all metrics
-- `POST /api/agency/recommendations` - Create recommendation
-- `GET /api/agency/messages` - Get all client messages across platform
-
-### Staff Portal (Staff, Admin)
-- `GET /api/staff/tasks` - Get staff's assigned tasks
-- `PATCH /api/tasks/:id` - Update task status
-
-## Frontend Features
-
-### Design System
-- **Primary Color**: Professional Blue (HSL 221 83% 53%)
+### UI/UX Decisions
+- **Frontend Framework**: React 18
+- **Routing**: Wouter
+- **State Management**: TanStack Query for server state
+- **Styling**: Tailwind CSS with Shadcn/UI component library
+- **Theming**: Full dark mode support with system preference detection
+- **Responsiveness**: Mobile-first design approach
 - **Typography**: Inter font family
-- **Components**: Shadcn/UI component library
-- **Dark Mode**: Full theme support with system preference detection
-- **Responsive**: Mobile-first design approach
+- **Primary Color**: Professional Blue (HSL 221 83% 53%)
 
-### Key Features
-- Real-time data fetching with TanStack Query
-- Form validation with React Hook Form + Zod
-- Toast notifications for user feedback
-- Loading states and error handling
-- Protected routes with role-based redirects
-- Theme toggle (light/dark mode)
+### Technical Implementations
+- **Authentication**: JWT tokens (7-day expiry), bcrypt hashing, no role self-selection on signup.
+- **Authorization**: Role-based access control, tenant isolation ensuring clients only view their own data.
+- **Forms**: React Hook Form with Zod for validation.
+- **Notifications**: Toast notifications for user feedback.
+- **Data Fetching**: Real-time data fetching and cache invalidation with TanStack Query.
+- **Security**: AES-256-GCM encryption for sensitive OAuth tokens, HMAC-SHA256 signed state parameters for CSRF protection.
 
-## Development
+### Feature Specifications
+- **Client Portal**: Dashboard (KPIs, objectives), Projects, AI Recommendations, Billing (invoices), Profile, Support (chat with account manager).
+- **Agency Admin Portal**: Dashboard (overview metrics), Client Messages (reply, task creation), Tasks & Projects (all clients), AI Recommendations (send to client), Clients (management, GA4/GSC integration, objectives), Staff (assignments).
+- **Staff Portal**: View assigned tasks, update status, prioritize tasks.
+- **AI Recommendation Workflow**: Draft, Sent, Approved/Rejected/Discussing statuses with client feedback.
+- **Client-to-Account Manager Chat System**: Real-time messaging with historical view.
 
-### Running the Application
-```bash
-npm run dev
-```
-This starts both the Express backend and Vite frontend on port 5000.
+### System Design Choices
+- **Multi-tenancy**: Achieved through strict tenant isolation at the database and API level.
+- **API Structure**: Clearly defined RESTful API endpoints for authentication, client, agency, and staff portals, with role-based access enforcement.
+- **Project Structure**: Organized separation of client (frontend), server (backend), and shared (schemas/types) codebases.
 
-### Database Management
-```bash
-npm run db:push       # Push schema changes
-npm run db:studio     # Open Drizzle Studio
-npx tsx server/seed.ts # Seed test data
-```
+## External Dependencies
 
-### Project Structure
-```
-client/
-  src/
-    pages/           # Route components
-    components/      # Reusable UI components
-    lib/            # Utilities and clients
-server/
-  routes.ts         # API endpoint definitions
-  storage.ts        # Database operations
-  middleware/       # Auth middleware
-  lib/             # Server utilities
-shared/
-  schema.ts         # Shared types and schemas
-```
-
-## Production Deployment
-
-### Environment Variables Required
-- `DATABASE_URL` - PostgreSQL connection string (auto-configured by Supabase)
-- `JWT_SECRET` - Strong secret for JWT signing (REQUIRED in production)
-- `SESSION_SECRET` - Session signing secret
-- `ENCRYPTION_KEY` - 32-byte base64 encryption key for OAuth tokens (REQUIRED)
-- `GOOGLE_CLIENT_ID` - Google OAuth client ID for GA4 integration
-- `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
-- `NODE_ENV` - Set to "production"
-
-### Pre-Deployment Checklist
-1. Set strong JWT_SECRET in environment
-2. Ensure DATABASE_URL points to production database
-3. Configure Google OAuth credentials:
-   - Create OAuth 2.0 Client ID in Google Cloud Console
-   - Enable Google Analytics Data API
-   - Add authorized redirect URI: `https://your-domain.com/api/oauth/google/callback`
-   - Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables
-4. Generate ENCRYPTION_KEY: `openssl rand -base64 32`
-5. Review and update CORS settings if needed
-6. Test all authentication flows
-7. Verify tenant isolation is working
-8. Check that admin/staff accounts are provisioned
-
-## Recent Changes
-
-### 2025-10-10: Agency Portal Navigation Restructure
-- **Agency Layout Component**: New layout with Shadcn sidebar and collapsible navigation
-- **Dedicated Pages**: Separate pages for Dashboard, Client Messages, Tasks & Projects, AI Recommendations, Clients, and Staff
-- **Dashboard Page**: Overview with key metrics (clients, projects, messages, recommendations) and performance charts
-- **Client Messages Page**: Full message management with reply functionality and task creation
-- **Tasks & Projects Page**: Tabbed interface for Active and Completed projects across all clients
-- **AI Recommendations Page**: View all recommendations with send-to-client feature
-- **Clients Page**: List all clients with quick access to client detail pages
-- **Staff Page**: Manage staff assignments and view task statuses
-- **Navigation**: Smooth client-side routing using wouter Link components with active state highlighting
-
-### 2025-10-10: Client-to-Account Manager Chat System
-- **Database Schema**: Added `client_messages` table for chat history storage
-- **Chat API Endpoints**: 
-  - POST /api/client/messages - Send message (client authenticated)
-  - GET /api/client/messages - Get client's chat history
-  - GET /api/agency/messages - Get all messages from all clients (admin only)
-- **Client Support Page**: Transformed into real-time chat interface with message history and send functionality
-- **Agency Dashboard**: New "Client Messages" section displays all client messages with unread count badges
-- **Message Features**: Messages include sender role badges, timestamps, client attribution, and read/unread status
-- **Security**: Full tenant isolation - clients can only see their own messages, admins see all
-- **Navigation**: Smooth client-side routing using wouter Link components
-
-### 2025-10-10: Client Portal Enhanced with Sidebar Navigation
-- **Client Layout Component**: New layout with Shadcn sidebar and collapsible navigation
-- **Dedicated Pages**: Separate pages for Dashboard, Projects, Recommendations, Billing, Reports, Profile, and Support
-- **Dashboard Page**: Performance Overview with Client Objective card and 4 KPI scorecards (Revenue, Users, Growth, Performance)
-- **Projects Page**: Tabbed interface for Active and Completed projects with project cards
-- **Billing Page**: "How to Pay" information card and Invoice table (without Pay Now buttons)
-- **Recommendations Page**: Display AI recommendations with observation and proposed action details
-- **Reports Page**: Placeholder for future analytics features
-- **Profile Page**: User account information display
-- **Navigation**: Smooth client-side routing using wouter Link components
-
-### 2025-10-10: GA4 OAuth Integration Complete
-- **Database Schema Extended**: Added `client_integrations` and `client_objectives` tables
-- **Token Encryption**: AES-256-GCM encryption for OAuth tokens with IV and auth tag storage
-- **OAuth Security**: HMAC-SHA256 signed state parameters prevent CSRF and token fixation
-- **Agency Portal**: Client detail page with GA4 integration management and property selection
-- **Client Portal**: OAuth authorization flow with connection banners and status display
-- **API Endpoints**: 
-  - GET /api/client/profile - Client info for authenticated users
-  - GET /api/integrations/ga4/:clientId - Integration status
-  - GET /api/oauth/google/initiate - OAuth flow initiation
-  - GET /api/oauth/google/callback - OAuth callback handler
-  - GET /api/integrations/ga4/:clientId/properties - Fetch GA4 properties
-  - POST /api/integrations/ga4/:clientId/property - Save selected property
-
-### 2025-10-10: Security Hardening Complete
-- Implemented JWT-based authentication with signed tokens
-- Eliminated role self-selection vulnerability (signup restricted to Client role)
-- Added comprehensive tenant isolation (users only see their own data)
-- Applied role-based authorization to all API endpoints
-- Fixed login JSON parsing issue
-- Completed end-to-end security testing
-- All critical security vulnerabilities resolved
-
-## Future Enhancements
-
-Potential areas for expansion:
-- Email notifications for invoice due dates
-- Real-time collaboration features
-- Advanced analytics dashboard
-- File upload for project attachments
-- Audit logging for compliance
-- Two-factor authentication
-- API rate limiting
-- Webhook integrations
-
-## Troubleshooting
-
-### Login Issues
-- Ensure JWT_SECRET is set in production
-- Check that passwords are properly hashed
-- Verify database connection
-
-### Access Denied Errors
-- Confirm user has correct role assigned
-- Check ProtectedRoute configuration
-- Verify JWT token is being sent in headers
-
-### Data Not Appearing
-- For Clients: Ensure they have a client record linked to their profile
-- For Staff: Verify staff_assignments exist for their tasks
-- For Admins: Check that endpoints return all data (not tenant-scoped)
+- **Database**: PostgreSQL (via Supabase)
+- **Authentication**: JWT (JSON Web Tokens), bcrypt
+- **Cloud Services**: Supabase (for database hosting)
+- **OAuth Integrations**: Google OAuth (for GA4 integration)
