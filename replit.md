@@ -83,6 +83,9 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Comprehensive table showing: Name, Email, Role, Company, Created date
   - Visual role indicators with colored badges (Admin: default, Staff: secondary, Client: outline)
   - User icons differentiate between Admin (Shield), Staff (UserCog), Client (Building)
+  - **Role Filter**: Dropdown to filter users by Admin, Staff, Client, or view all
+  - **Create User**: Button to add new staff/admin users directly from User Management page
+  - **Delete User**: Trash icon button with confirmation dialog for safe user deletion
 - **Edit User Roles**: Admins can change any user's role
   - Edit dialog with role dropdown (Client, Staff, Admin)
   - Real-time UI updates after role changes
@@ -90,7 +93,8 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **API Endpoints**:
   - GET /api/agency/users - Retrieve all users with profiles and client information
   - PATCH /api/agency/users/:userId/role - Update user role
-- **Security**: All endpoints protected by requireAuth and requireRole("Admin") middleware
+  - DELETE /api/agency/users/:userId - Delete user (prevents self-deletion, cascades to related records)
+- **Security**: All endpoints protected by requireAuth and requireRole("Admin") middleware, cascade deletes configured in schema
 - **Navigation**: User Management accessible from agency sidebar with UserCog icon
 
 ### 2025-10-10: Admin User Management - Create Clients, Staff, and Admin Users
