@@ -83,12 +83,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: profile.role,
       });
 
+      // For Client users, include clientId in response
+      let clientId;
+      if (profile.role === "Client") {
+        const client = await storage.getClientByProfileId(profile.id);
+        clientId = client?.id;
+      }
+
       res.json({
         token,
         user: {
           id: user.id,
           email: user.email,
           profile,
+          clientId,
         },
       });
     } catch (error: any) {
