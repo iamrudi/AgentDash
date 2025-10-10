@@ -97,22 +97,33 @@ The platform is a full-stack JavaScript application using React for the frontend
 **Extended OAuth Infrastructure for Multi-Service Support**
 - OAuth library extended to support both GA4 and Search Console with service-specific scopes
 - OAuth state parameter enhanced with service type (GA4/GSC/BOTH) and HMAC-SHA256 signing
-- Database schema: added gscSiteUrl field to integrations table
-- Backend routes: GET/POST endpoints for GSC status, sites fetching, and site selection
+- Database schema: added gscSiteUrl and ga4PropertyId fields to integrations table
+- Backend routes: GET/POST endpoints for GA4/GSC status, properties/sites fetching, and selection
 - Frontend: Agency integrations page supports connecting both GA4 and GSC with dual selection dialogs
 
 **Technical Implementation**
 - Single OAuth flow handles multiple Google services via service parameter
 - Token storage: shared refresh/access tokens for both GA4 and GSC integrations
 - Security: JWT authentication required for all OAuth endpoints
-- Site selection: fetchGSCSites function retrieves verified properties from Search Console API
+- Property/Site selection:
+  - fetchGA4Properties retrieves GA4 properties from Google Analytics Admin API
+  - fetchGSCSites retrieves verified sites from Search Console API
+  - POST /api/integrations/ga4/:clientId/property saves selected GA4 property
+  - POST /api/integrations/gsc/:clientId/site saves selected GSC site
 - Property/site persistence: Separate dialogs for GA4 properties and GSC sites with cache invalidation
 
 **Agency Portal Features**
 - Connect Both button for clients without any integration
 - Individual connect/reconnect buttons for each service
-- Real-time integration status display with property/site information
+- Real-time integration status display with property/site information (property ID for GA4, site URL for GSC)
 - OAuth callback handling with success/error messaging
+- Property/Site selection dialogs automatically open after successful OAuth
 - Disconnect buttons for GA4 and GSC integrations with service-specific deletion
 - Backend DELETE routes properly filter by clientId and serviceName to ensure only targeted integration is removed
 - Frontend disconnect mutations with proper cache invalidation and toast notifications
+
+**Required Google Cloud Setup**
+- **CRITICAL**: Google Analytics Admin API must be enabled in Google Cloud Console
+- Visit: https://console.developers.google.com/apis/api/analyticsadmin.googleapis.com/overview?project=YOUR_PROJECT_ID
+- Without this API enabled, GA4 property fetching will fail with 403 Forbidden error
+- Search Console API is typically enabled by default with OAuth consent screen setup
