@@ -144,3 +144,33 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Client Response Actions**: Clients can Approve, Reject, or Discuss sent recommendations with feedback
 - **State Transitions**: Draft → Sent → Approved/Rejected/Discussing
 - **Real-time Updates**: React Query cache invalidation ensures both portals reflect changes immediately
+
+### 2025-10-10: Invoice Management System for Admins
+- **Invoice Management Page**: Complete admin interface for managing client invoices
+  - Comprehensive table displaying: Invoice #, Client, Amount, Due Date, Status, Created Date, Actions
+  - Visual status badges: Paid (blue/default), Pending (gray/secondary), Overdue (red/destructive)
+  - Amounts formatted with dollar sign and 2 decimal places
+  - Client filter to view invoices for specific clients or all
+- **Create Invoice**: Full invoice creation workflow
+  - Form fields: Client selector, Invoice Number, Amount, Due Date, Status
+  - Validates with insertInvoiceSchema via react-hook-form and Zod
+  - Creates invoice with selected client association
+  - Shows success toast and updates table immediately
+- **Update Invoice Status**: Quick status change functionality
+  - "Change Status" button in Actions column
+  - Dropdown selector with options: Pending, Paid, Overdue
+  - Real-time status updates with proper validation
+  - Immediate UI feedback with toast notifications
+- **API Endpoints**:
+  - POST /api/invoices - Create invoice (Admin only, validates with Zod, returns InvoiceWithClient)
+  - PATCH /api/invoices/:invoiceId/status - Update status (Admin only, validates with z.enum, checks existence, returns InvoiceWithClient)
+  - GET /api/client/invoices - Fetch all invoices (returns InvoiceWithClient[])
+- **Data Architecture**:
+  - InvoiceWithClient type: Invoice & { client: Client } for consistent frontend display
+  - Storage methods return persisted records for state consistency
+  - Zod validation on both client and server with detailed error messages
+- **Technical Implementation**:
+  - TanStack Query with proper cache invalidation after mutations
+  - Awaited invalidation ensures UI updates before dialogs close
+  - Comprehensive error handling with field-level validation feedback
+- **Security**: All invoice endpoints protected by requireAuth and requireRole("Admin") middleware
