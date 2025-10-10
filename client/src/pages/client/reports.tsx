@@ -2,10 +2,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, TrendingUp, Users, Eye, MousePointer, ArrowUp, Calendar } from "lucide-react";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { BarChart3, TrendingUp, Users, Eye, MousePointer, ArrowUp, Calendar, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from "recharts";
 import { useToast } from "@/hooks/use-toast";
+import { format, subDays } from "date-fns";
 
 interface GA4Data {
   rows: Array<{
@@ -28,8 +32,10 @@ interface GSCData {
 }
 
 export default function Reports() {
-  const [dateRange, setDateRange] = useState("30"); // days
   const { toast } = useToast();
+  const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 30));
+  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [compareEnabled, setCompareEnabled] = useState(false);
 
   // Get current user's client ID and token from localStorage
   const authUser = localStorage.getItem("authUser");
@@ -37,9 +43,14 @@ export default function Reports() {
   const clientId = parsedAuthUser?.clientId || null;
   const token = parsedAuthUser?.token || null;
 
-  // Calculate date range
-  const endDate = new Date().toISOString().split('T')[0];
-  const startDate = new Date(Date.now() - parseInt(dateRange) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Calculate date ranges
+  const startDate = format(dateFrom, 'yyyy-MM-dd');
+  const endDate = format(dateTo, 'yyyy-MM-dd');
+  
+  // Calculate comparison period (same length as selected period)
+  const daysDiff = Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24));
+  const compareStartDate = format(subDays(dateFrom, daysDiff + 1), 'yyyy-MM-dd');
+  const compareEndDate = format(subDays(dateFrom, 1), 'yyyy-MM-dd');
 
   // Fetch GA4 data
   const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
@@ -69,6 +80,35 @@ export default function Reports() {
       return res.json();
     },
     enabled: !!clientId && !!token,
+  });
+
+  // Fetch comparison data if enabled
+  const { data: ga4CompareData } = useQuery<GA4Data>({
+    queryKey: ["/api/analytics/ga4", clientId, compareStartDate, compareEndDate, "compare"],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/ga4/${clientId}?startDate=${compareStartDate}&endDate=${compareEndDate}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error('Failed to fetch comparison GA4 data');
+      return res.json();
+    },
+    enabled: !!clientId && !!token && compareEnabled,
+  });
+
+  const { data: gscCompareData } = useQuery<GSCData>({
+    queryKey: ["/api/analytics/gsc", clientId, compareStartDate, compareEndDate, "compare"],
+    queryFn: async () => {
+      const res = await fetch(`/api/analytics/gsc/${clientId}?startDate=${compareStartDate}&endDate=${compareEndDate}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) throw new Error('Failed to fetch comparison GSC data');
+      return res.json();
+    },
+    enabled: !!clientId && !!token && compareEnabled,
   });
 
   // Helper function to parse GA4 date format (YYYYMMDD)
@@ -111,26 +151,93 @@ export default function Reports() {
     ? (gscData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscData.rows.length).toFixed(1)
     : '0';
 
+  // Calculate comparison totals
+  const ga4CompareTotals = ga4CompareData?.totals?.[0]?.metricValues || [];
+  const compareSessionsTotal = parseInt(ga4CompareTotals[0]?.value || '0');
+  const compareUsersTotal = parseInt(ga4CompareTotals[1]?.value || '0');
+  const comparePageviewsTotal = parseInt(ga4CompareTotals[2]?.value || '0');
+  const compareEngagedSessionsTotal = parseInt(ga4CompareTotals[3]?.value || '0');
+
+  const compareClicksTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
+  const compareImpressionsTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
+  const compareAvgCTR = compareImpressionsTotal > 0 ? ((compareClicksTotal / compareImpressionsTotal) * 100).toFixed(2) : '0';
+  const compareAvgPosition = gscCompareData?.rows?.length 
+    ? (gscCompareData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscCompareData.rows.length).toFixed(1)
+    : '0';
+
+  // Helper to calculate percentage change
+  const calcChange = (current: number, previous: number) => {
+    if (previous === 0) return 0;
+    return ((current - previous) / previous) * 100;
+  };
+
+  // Helper to render comparison badge
+  const ComparisonBadge = ({ current, previous }: { current: number; previous: number }) => {
+    if (!compareEnabled) return null;
+    const change = calcChange(current, previous);
+    const isPositive = change > 0;
+    const isNegative = change < 0;
+    
+    return (
+      <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'}`}>
+        {isPositive && <ArrowUpRight className="h-3 w-3" />}
+        {isNegative && <ArrowDownRight className="h-3 w-3" />}
+        <span>{Math.abs(change).toFixed(1)}%</span>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-reports">Analytics Reports</h1>
           <p className="text-muted-foreground mt-1">Google Analytics 4 and Search Console metrics</p>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[180px]" data-testid="select-date-range">
-              <SelectValue placeholder="Select date range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="compare-toggle" className="text-sm">Compare to previous period</Label>
+            <Switch 
+              id="compare-toggle"
+              checked={compareEnabled} 
+              onCheckedChange={setCompareEnabled}
+              data-testid="switch-compare-period"
+            />
+          </div>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-date-picker">
+                <Calendar className="h-4 w-4" />
+                {format(dateFrom, "MMM d")} - {format(dateTo, "MMM d, yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="flex gap-2 p-3">
+                <div>
+                  <p className="text-sm font-medium mb-2">From</p>
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={(date) => date && setDateFrom(date)}
+                    disabled={(date) => date > dateTo || date > new Date()}
+                    data-testid="calendar-date-from"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">To</p>
+                  <CalendarComponent
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={(date) => date && setDateTo(date)}
+                    disabled={(date) => date < dateFrom || date > new Date()}
+                    data-testid="calendar-date-to"
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -150,7 +257,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{ga4Loading ? '...' : totalSessions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total user sessions</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Total user sessions</p>
+                <ComparisonBadge current={totalSessions} previous={compareSessionsTotal} />
+              </div>
             </CardContent>
           </Card>
 
@@ -161,7 +271,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{ga4Loading ? '...' : totalUsers.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total unique users</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Total unique users</p>
+                <ComparisonBadge current={totalUsers} previous={compareUsersTotal} />
+              </div>
             </CardContent>
           </Card>
 
@@ -172,7 +285,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{ga4Loading ? '...' : totalPageviews.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total page views</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Total page views</p>
+                <ComparisonBadge current={totalPageviews} previous={comparePageviewsTotal} />
+              </div>
             </CardContent>
           </Card>
 
@@ -183,7 +299,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{ga4Loading ? '...' : totalEngagedSessions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Sessions with engagement</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Sessions with engagement</p>
+                <ComparisonBadge current={totalEngagedSessions} previous={compareEngagedSessionsTotal} />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -235,7 +354,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{gscLoading ? '...' : totalClicks.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total search clicks</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Total search clicks</p>
+                <ComparisonBadge current={totalClicks} previous={compareClicksTotal} />
+              </div>
             </CardContent>
           </Card>
 
@@ -246,7 +368,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{gscLoading ? '...' : totalImpressions.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground">Total search impressions</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Total search impressions</p>
+                <ComparisonBadge current={totalImpressions} previous={compareImpressionsTotal} />
+              </div>
             </CardContent>
           </Card>
 
@@ -257,7 +382,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{gscLoading ? '...' : avgCTR}%</div>
-              <p className="text-xs text-muted-foreground">Click-through rate</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Click-through rate</p>
+                <ComparisonBadge current={parseFloat(avgCTR)} previous={parseFloat(compareAvgCTR)} />
+              </div>
             </CardContent>
           </Card>
 
@@ -268,7 +396,10 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{gscLoading ? '...' : avgPosition}</div>
-              <p className="text-xs text-muted-foreground">Average search position</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Average search position</p>
+                <ComparisonBadge current={parseFloat(avgPosition)} previous={parseFloat(compareAvgPosition)} />
+              </div>
             </CardContent>
           </Card>
         </div>
