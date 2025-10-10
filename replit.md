@@ -174,3 +174,40 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Awaited invalidation ensures UI updates before dialogs close
   - Comprehensive error handling with field-level validation feedback
 - **Security**: All invoice endpoints protected by requireAuth and requireRole("Admin") middleware
+
+### 2025-10-10: Frictionless Invoicing System - Core Schema and Automation
+- **Database Schema Modernization**: Updated invoice system with comprehensive fields
+  - **Clients Table**: Added retainerAmount (numeric) and billingDay (integer) for automated monthly invoicing
+  - **Invoices Table**: Renamed amount→totalAmount, added issueDate (date), pdfUrl (text), updated status enum to "Draft" | "Due" | "Paid" | "Overdue"
+  - **Invoice Line Items Table**: New table with invoiceId, description, quantity (integer), unitPrice (numeric), lineTotal (numeric), optional projectId/taskId for tracking billable work
+- **Automated Invoice Generation**: Node-cron scheduler for monthly retainer invoicing
+  - Runs daily at 9:00 AM checking clients' billing day
+  - Prevents duplicate invoices for the same month
+  - Auto-creates line items for monthly retainer fees
+  - Generates unique invoice numbers: INV-CLIENTID-YYYYMMDD-XXX
+- **On-Demand Invoice Generation**: Create invoices from approved recommendations
+  - POST /api/recommendations/:id/generate-invoice - Converts approved recommendation to invoice
+  - Automatically creates line item from recommendation details
+  - 30-day payment terms by default
+- **Professional PDF Generation**: Puppeteer-based invoice PDF creation
+  - POST /api/invoices/:invoiceId/generate-pdf - Generates and stores PDF
+  - Professional HTML template with company branding
+  - Formatted currency, dates, and status badges
+  - Resource-safe with guaranteed browser cleanup (try/finally pattern)
+- **PDF Storage & Serving**: Local file system storage with public URLs
+  - PDFs saved to public/invoices directory
+  - Static file serving at /invoices/:filename
+  - Sanitized filenames for security
+  - Invoice pdfUrl updated automatically
+- **API Endpoints**:
+  - POST /api/recommendations/:id/generate-invoice - Generate invoice from recommendation (Admin only)
+  - POST /api/invoices/:invoiceId/generate-pdf - Generate PDF for invoice (Admin only)
+  - GET /api/invoices/:invoiceId/line-items - Fetch invoice line items
+  - POST /api/invoices/:invoiceId/line-items - Create line items with Zod validation (Admin only)
+  - GET /invoices/:filename - Serve invoice PDF files (static)
+- **Technical Architecture**:
+  - InvoiceGeneratorService: Handles retainer and recommendation-based invoice creation
+  - InvoiceScheduler: Cron-based automation for monthly invoicing
+  - PDFGeneratorService: Puppeteer-based PDF generation with professional template
+  - PDFStorageService: File system management for invoice PDFs
+- **Security**: All protected endpoints require authentication and Admin role, browser process cleanup guaranteed
