@@ -17,6 +17,10 @@ import {
   type InsertRecommendation,
   type DailyMetric,
   type InsertDailyMetric,
+  type ClientIntegration,
+  type InsertClientIntegration,
+  type ClientObjective,
+  type InsertClientObjective,
   users,
   profiles,
   clients,
@@ -26,6 +30,8 @@ import {
   invoices,
   recommendations,
   dailyMetrics,
+  clientIntegrations,
+  clientObjectives,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -83,6 +89,20 @@ export interface IStorage {
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
   getAllMetrics(limit?: number): Promise<DailyMetric[]>;
   createMetric(metric: InsertDailyMetric): Promise<DailyMetric>;
+  
+  // Client Integrations
+  getIntegrationByClientId(clientId: string, serviceName: string): Promise<ClientIntegration | undefined>;
+  getAllIntegrationsByClientId(clientId: string): Promise<ClientIntegration[]>;
+  createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration>;
+  updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration>;
+  deleteIntegration(id: string): Promise<void>;
+  
+  // Client Objectives
+  getObjectivesByClientId(clientId: string): Promise<ClientObjective[]>;
+  getActiveObjectivesByClientId(clientId: string): Promise<ClientObjective[]>;
+  createObjective(objective: InsertClientObjective): Promise<ClientObjective>;
+  updateObjective(id: string, data: Partial<ClientObjective>): Promise<ClientObjective>;
+  deleteObjective(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -264,6 +284,73 @@ export class DbStorage implements IStorage {
   async createMetric(metric: InsertDailyMetric): Promise<DailyMetric> {
     const result = await db.insert(dailyMetrics).values(metric).returning();
     return result[0];
+  }
+
+  // Client Integrations
+  async getIntegrationByClientId(clientId: string, serviceName: string): Promise<ClientIntegration | undefined> {
+    const result = await db.select().from(clientIntegrations)
+      .where(and(
+        eq(clientIntegrations.clientId, clientId),
+        eq(clientIntegrations.serviceName, serviceName)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getAllIntegrationsByClientId(clientId: string): Promise<ClientIntegration[]> {
+    return await db.select().from(clientIntegrations)
+      .where(eq(clientIntegrations.clientId, clientId))
+      .orderBy(desc(clientIntegrations.createdAt));
+  }
+
+  async createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration> {
+    const result = await db.insert(clientIntegrations).values(integration).returning();
+    return result[0];
+  }
+
+  async updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration> {
+    const result = await db.update(clientIntegrations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientIntegrations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteIntegration(id: string): Promise<void> {
+    await db.delete(clientIntegrations).where(eq(clientIntegrations.id, id));
+  }
+
+  // Client Objectives
+  async getObjectivesByClientId(clientId: string): Promise<ClientObjective[]> {
+    return await db.select().from(clientObjectives)
+      .where(eq(clientObjectives.clientId, clientId))
+      .orderBy(desc(clientObjectives.createdAt));
+  }
+
+  async getActiveObjectivesByClientId(clientId: string): Promise<ClientObjective[]> {
+    return await db.select().from(clientObjectives)
+      .where(and(
+        eq(clientObjectives.clientId, clientId),
+        eq(clientObjectives.isActive, "true")
+      ))
+      .orderBy(desc(clientObjectives.createdAt));
+  }
+
+  async createObjective(objective: InsertClientObjective): Promise<ClientObjective> {
+    const result = await db.insert(clientObjectives).values(objective).returning();
+    return result[0];
+  }
+
+  async updateObjective(id: string, data: Partial<ClientObjective>): Promise<ClientObjective> {
+    const result = await db.update(clientObjectives)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientObjectives.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteObjective(id: string): Promise<void> {
+    await db.delete(clientObjectives).where(eq(clientObjectives.id, id));
   }
 }
 

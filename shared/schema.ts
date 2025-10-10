@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -96,6 +96,36 @@ export const dailyMetrics = pgTable("daily_metrics", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// CLIENT INTEGRATIONS (OAuth tokens for external services)
+export const clientIntegrations = pgTable("client_integrations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  serviceName: text("service_name").notNull(), // 'GA4', 'Google Ads', etc.
+  accessToken: text("access_token"), // Encrypted before storage
+  refreshToken: text("refresh_token"), // Encrypted before storage
+  accessTokenIv: text("access_token_iv"), // IV for access token encryption
+  refreshTokenIv: text("refresh_token_iv"), // IV for refresh token encryption
+  accessTokenAuthTag: text("access_token_auth_tag"), // Auth tag for access token
+  refreshTokenAuthTag: text("refresh_token_auth_tag"), // Auth tag for refresh token
+  expiresAt: timestamp("expires_at"),
+  ga4PropertyId: text("ga4_property_id"), // The specific GA4 property ID
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueClientService: uniqueIndex("client_integrations_client_service_idx").on(table.clientId, table.serviceName),
+}));
+
+// CLIENT OBJECTIVES (Client goals for AI recommendations)
+export const clientObjectives = pgTable("client_objectives", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  description: text("description").notNull(), // e.g., 'Increase qualified organic leads by 20% in Q4'
+  targetMetric: text("target_metric").notNull(), // e.g., 'conversions', 'sessions', 'revenue'
+  isActive: text("is_active").default("true"), // Using text for boolean compatibility
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -142,6 +172,18 @@ export const insertDailyMetricSchema = createInsertSchema(dailyMetrics).omit({
   createdAt: true,
 });
 
+export const insertClientIntegrationSchema = createInsertSchema(clientIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientObjectiveSchema = createInsertSchema(clientObjectives).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -169,6 +211,12 @@ export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 
 export type DailyMetric = typeof dailyMetrics.$inferSelect;
 export type InsertDailyMetric = z.infer<typeof insertDailyMetricSchema>;
+
+export type ClientIntegration = typeof clientIntegrations.$inferSelect;
+export type InsertClientIntegration = z.infer<typeof insertClientIntegrationSchema>;
+
+export type ClientObjective = typeof clientObjectives.$inferSelect;
+export type InsertClientObjective = z.infer<typeof insertClientObjectiveSchema>;
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };
