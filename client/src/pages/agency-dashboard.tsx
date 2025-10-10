@@ -2,14 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
-import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight } from "lucide-react";
-import { Project, Client, DailyMetric, Recommendation } from "@shared/schema";
+import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight, MessageSquare } from "lucide-react";
+import { Project, Client, DailyMetric, Recommendation, ClientMessage } from "@shared/schema";
+import { format } from "date-fns";
 
 export default function AgencyDashboard() {
   const { data: projects } = useQuery<Project[]>({
@@ -28,10 +30,14 @@ export default function AgencyDashboard() {
     queryKey: ["/api/agency/recommendations"],
   });
 
+  const { data: messages } = useQuery<ClientMessage[]>({
+    queryKey: ["/api/agency/messages"],
+  });
+
   const activeProjects = projects?.filter(p => p.status === "Active").length || 0;
   const totalClients = clients?.length || 0;
   const recentMetrics = metrics?.slice(0, 30) || [];
-  const totalRevenue = recentMetrics.reduce((sum, m) => sum + parseFloat(m.spend), 0);
+  const totalRevenue = recentMetrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0);
   const newRecommendations = recommendations?.filter(r => r.status === "New").length || 0;
 
   const style = {
@@ -154,6 +160,69 @@ export default function AgencyDashboard() {
                   </>
                 )}
               </div>
+
+              {/* Client Messages */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Client Messages
+                  </h2>
+                  <Badge variant="secondary" data-testid="badge-message-count">
+                    {messages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0} Unread
+                  </Badge>
+                </div>
+                <Card>
+                  <CardContent className="p-0">
+                    {!messages || messages.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No messages yet</p>
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {messages.slice(0, 10).map((message) => {
+                          const client = clients?.find(c => c.id === message.clientId);
+                          return (
+                            <div
+                              key={message.id}
+                              className={`p-4 hover-elevate ${message.isRead === "false" && message.senderRole === "Client" ? "bg-muted/50" : ""}`}
+                              data-testid={`message-item-${message.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <p className="font-semibold" data-testid={`message-client-${message.id}`}>
+                                      {client?.companyName || "Unknown Client"}
+                                    </p>
+                                    <Badge variant={message.senderRole === "Client" ? "default" : "outline"} className="text-xs">
+                                      {message.senderRole}
+                                    </Badge>
+                                    {message.isRead === "false" && message.senderRole === "Client" && (
+                                      <Badge variant="secondary" className="text-xs">New</Badge>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`message-text-${message.id}`}>
+                                    {message.message}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {format(new Date(message.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                  </p>
+                                </div>
+                                <Link href={`/agency/clients/${message.clientId}`}>
+                                  <Button variant="ghost" size="sm" data-testid={`button-view-message-${message.id}`}>
+                                    View
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </section>
 
               {/* Recent Projects */}
               <section>
