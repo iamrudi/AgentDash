@@ -5,7 +5,7 @@ import { requireAuth, requireRole, type AuthRequest } from "./middleware/auth";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 
@@ -308,10 +308,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const invoice = await storage.createInvoice(req.body);
-      res.status(201).json(invoice);
+      const validatedData = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice(validatedData);
+      const client = await storage.getClientById(invoice.clientId);
+      res.status(201).json({ ...invoice, client });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      res.status(500).json({ message: error.message || "Failed to create invoice" });
+    }
+  });
+
+  app.patch("/api/invoices/:invoiceId/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { invoiceId } = req.params;
+      const { status } = z.object({ 
+        status: z.enum(["Paid", "Pending", "Overdue"]) 
+      }).parse(req.body);
+
+      const invoice = await storage.getInvoiceById(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const updatedInvoice = await storage.updateInvoiceStatus(invoiceId, status);
+      const client = await storage.getClientById(updatedInvoice.clientId);
+      res.json({ ...updatedInvoice, client });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      console.error("Update invoice status error:", error);
+      res.status(500).json({ message: error.message || "Failed to update invoice status" });
     }
   });
 

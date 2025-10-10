@@ -1,4 +1,4 @@
-import { Home, MessageSquare, FolderKanban, Lightbulb, Building2, Users, LogOut, Shield, Link2, UserCog } from "lucide-react";
+import { Home, MessageSquare, FolderKanban, Lightbulb, Building2, Users, LogOut, Shield, Link2, UserCog, FileText } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -44,6 +44,12 @@ const menuItems = [
     title: "Clients",
     url: "/agency/clients",
     icon: Building2,
+    notificationKey: null,
+  },
+  {
+    title: "Invoices",
+    url: "/agency/invoices",
+    icon: FileText,
     notificationKey: null,
   },
   {

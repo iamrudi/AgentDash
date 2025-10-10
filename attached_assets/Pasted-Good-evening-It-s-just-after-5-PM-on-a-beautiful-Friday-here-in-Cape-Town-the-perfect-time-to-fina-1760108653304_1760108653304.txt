@@ -1,0 +1,118 @@
+Good evening! It's just after 5 PM on a beautiful Friday here in Cape Town, the perfect time to finalize this blueprint.
+
+Absolutely. Let's integrate this entire, detailed, frictionless invoicing system into the master "Constitution" for your Replit AI, Agent 3. This will give the AI a complete understanding of the feature, from the database schema all the way to the automated workflows and user interface.
+
+This is a significant update that will make your AI co-pilot incredibly powerful.
+
+How to Use This Update
+This is an update to your existing System Instructions. You will add the new content below into the relevant sections of your master Replit prompt.
+
+In your Replit project, open the AI Chat pane and find your System Instructions.
+
+Merge the content:
+
+Add the new table definitions to your existing # 3. DATABASE SCHEMA section.
+
+Add the new "Core Feature: Frictionless Invoicing System" to your existing # 4. APPLICATION ARCHITECTURE section.
+
+Add the new UI blueprints to your existing # 5. UI/UX BLUEPRINT section.
+
+(Copy the sections below and add them to your existing Replit AI prompt)
+
+UPDATED SYSTEM INSTRUCTIONS FOR AGENT 3
+// --- UPDATE: In your # 3. DATABASE SCHEMA section, add these new table definitions and add the new columns to the clients table. --- //
+
+// CLIENTS (Updated)
+clients {
+  // ... (all existing columns)
+  retainer_amount: numeric,
+  billing_day: integer // e.g., 25 for the 25th of the month
+}
+
+// INVOICES (Updated)
+invoices {
+  id: uuid (Primary Key),
+  client_id: uuid (Foreign Key to clients.id),
+  invoice_number: text,
+  status: text ('Draft', 'Due', 'Paid', 'Overdue'),
+  issue_date: date,
+  due_date: date,
+  total_amount: numeric,
+  pdf_url: text
+}
+
+// INVOICE LINE ITEMS (New & Upgraded)
+invoice_line_items {
+  id: uuid (Primary Key),
+  invoice_id: uuid (Foreign Key to invoices.id),
+  description: text,
+  quantity: integer,
+  unit_price: numeric,
+  line_total: numeric,
+  project_id: uuid (nullable, Foreign Key to projects.id),
+  task_id: uuid (nullable, Foreign Key to tasks.id)
+}
+// --- UPDATE: In your # 4. APPLICATION ARCHITECTURE section, add this new Core Feature. --- //
+
+## Core Feature: Frictionless Invoicing System
+This system is designed to automate invoice creation and provide maximum transparency to the client.
+
+### Automated Generation Engine (Express Backend):
+
+Workflow A: Recurring Retainer Invoices:
+
+A scheduled job (using node-cron) will run monthly on the day specified in clients.billing_day.
+
+It will query for all active clients with a retainer_amount, create new records in the invoices and invoice_line_items tables, and trigger a notification.
+
+Workflow B: On-Demand "Upsell" Invoices:
+
+Triggered by an API call from the Client Portal when a recommendation is approved for payment.
+
+The Express backend will create a new invoice and invoice_line_item, linking it to the recommendation and its associated project_id or task_id.
+
+PDF Generation: Both workflows will use a library like pdf-lib to generate a PDF of the invoice, upload it to Supabase Storage, and save the URL in invoices.pdf_url.
+
+### Proactive Notification Layer:
+
+The Express server will be responsible for sending emails for:
+
+New Invoice Notifications: Sent to the client with a link to the portal.
+
+Payment Reminders: Automated for due or overdue invoices.
+
+Payment Confirmations: Sent when an AM marks an invoice as "Paid".
+
+// --- UPDATE: In your # 5. UI/UX BLUEPRINT section, add these new blueprints. --- //
+
+## Agency Portal UI (Billing)
+
+Master Billing Dashboard: A view of all invoices across all clients, filterable by status (Due, Overdue, Paid).
+
+Client-Specific Billing Tab: A view of a single client's full invoice history.
+
+Manual Actions:
+
+A "Mark as Paid" button on each invoice to manually update its status.
+
+A "Create Manual Invoice" form that allows creating an invoice with custom line items, including optional linking to projects/tasks.
+
+## Client Portal UI (Billing - Updated)
+
+Billing Page:
+
+A prominent Card at the top with the title "How to Pay," displaying the agency's bank details and payment reference instructions.
+
+A Table below listing all of the client's invoices (Invoice #, Issue Date, Due Date, Amount, Status).
+
+Each invoice number in the table is a link to a dedicated HTML Invoice View page (/billing/[invoice_id]).
+
+HTML Invoice View Page:
+
+A clean, web-native display of a single invoice.
+
+It must show a detailed breakdown of all invoice_line_items.
+
+Crucially, if a line item has a project_id or task_id, its description must be a clickable link that navigates to that project/task page in the portal.
+
+A "Download PDF" button must also be present.

@@ -85,6 +85,7 @@ export interface IStorage {
   getInvoicesByClientId(clientId: string): Promise<Invoice[]>;
   getAllInvoices(): Promise<Invoice[]>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoiceStatus(invoiceId: string, status: string): Promise<Invoice>;
   
   // Recommendations
   getRecommendationById(id: string): Promise<Recommendation | undefined>;
@@ -305,6 +306,14 @@ export class DbStorage implements IStorage {
 
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
     const result = await db.insert(invoices).values(invoice).returning();
+    return result[0];
+  }
+
+  async updateInvoiceStatus(invoiceId: string, status: string): Promise<Invoice> {
+    const result = await db.update(invoices)
+      .set({ status })
+      .where(eq(invoices.id, invoiceId))
+      .returning();
     return result[0];
   }
 

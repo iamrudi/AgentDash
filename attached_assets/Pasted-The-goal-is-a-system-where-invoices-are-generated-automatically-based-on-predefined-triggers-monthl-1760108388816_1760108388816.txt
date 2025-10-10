@@ -1,0 +1,116 @@
+The goal is a system where invoices are generated automatically based on predefined triggers (monthly retainers, approved work), and clients can view and understand them without ever needing to search through their email.
+
+This system will have five core components:
+
+An Enhanced Database Schema: To store detailed invoice data.
+
+An Automated Generation Engine: Backend logic in your Express server.
+
+An Agency Control Panel: For management and overrides in the Agency Portal.
+
+A Transparent Client Interface: A clear and simple view in the Client Portal.
+
+A Proactive Notification Layer: To keep everyone informed automatically.
+
+Part 1: The Foundation (Database Schema Enhancement)
+To create truly clear invoices, we need to upgrade our schema. Instead of just one invoices table, we'll use two: one for the invoice header and one for the individual line items.
+
+Action: Update your schema.ts file with this structure.
+
+Table 1: invoices (Updated)
+
+id (UUID, Primary Key)
+
+client_id (UUID, Foreign key to clients.id)
+
+invoice_number (text, e.g., "INV-2025-001") - We'll generate this automatically.
+
+status (text: "Draft", "Due", "Paid", "Overdue")
+
+issue_date (date)
+
+due_date (date)
+
+total_amount (numeric) - This will be the sum of all line items.
+
+pdf_url (text) - Link to the generated PDF in Supabase Storage.
+
+Table 2: invoice_line_items (New)
+
+id (UUID, Primary Key)
+
+invoice_id (UUID, Foreign key to invoices.id)
+
+description (text) - e.g., "Monthly SEO Retainer - October 2025" or "Approved: Title Tag Optimization for 5 Pages".
+
+quantity (integer) - Default is 1.
+
+unit_price (numeric)
+
+line_total (numeric)
+
+This structure allows an invoice to have multiple, clearly described items, which is essential for client transparency.
+
+Part 2: The Engine (Automated Generation in Express)
+This is the "frictionless" magic for your agency. This logic will live in your Express server (/server folder) and will handle invoice creation automatically.
+
+Workflow A: Recurring Retainer Invoices
+
+Trigger: A scheduled job (using a library like node-cron in your Express app) that runs once a month (e.g., on the 25th).
+
+Logic:
+
+The job queries the clients table for all clients with an active retainer. (This implies we add retainer_amount and billing_day columns to the clients table).
+
+For each client, it creates a new record in the invoices table with a status of "Due".
+
+It adds a record to invoice_line_items with the description "Monthly Retainer for [Next Month]".
+
+It triggers the notification service (see Part 5).
+
+Workflow B: On-Demand "Upsell" Invoices
+
+Trigger: A client clicks the "Approve & Pay" button for a recommendation in their Client Portal.
+
+Logic:
+
+The frontend calls a specific API endpoint on your Express server (e.g., POST /api/invoices/from-recommendation).
+
+The backend securely verifies the request.
+
+It creates a new invoice and invoice_line_item using the title and cost from the recommendations table.
+
+It triggers the notification service.
+
+A key part of both workflows is using a library like pdf-lib to generate a professional PDF of the invoice, which is then uploaded to Supabase Storage.
+
+Part 3: The Agency Interface (in the Agency Portal)
+This is the control panel for your team.
+
+Master Billing Dashboard: A view showing all invoices across all clients, with powerful filters for "Overdue", "Due", and "Paid". This gives a real-time overview of the agency's cash flow.
+
+Client-Specific Billing Tab: When viewing a single client, a tab shows their complete invoice history.
+
+Manual Actions:
+
+"Mark as Paid": A button next to each "Due" invoice. When the AM receives a bank transfer, they click this, and the status updates for everyone.
+
+"Create Manual Invoice": A form to create one-off invoices for work not captured by the automated flows.
+
+Part 4: The Client Interface (in the Client Portal)
+This is the visual breakdown for the "Billing" page we discussed, now fully integrated.
+
+Payment Details Card: The prominent card at the top with your bank details and the crucial instruction: "Please use the Invoice Number as your payment reference."
+
+Invoice Table: A clean table of their invoices (invoice_number, issue_date, due_date, total_amount, status). The status is a colored badge.
+
+HTML Invoice View (New Feature): When a client clicks on an invoice number in the table, instead of just downloading a PDF, they are taken to a new page (/billing/[invoice_id]). This page displays a beautiful, web-native version of the invoice, showing all the line items from the invoice_line_items table. This is far more modern and frictionless than a PDF. A "Download PDF" button would still be present on this page.
+
+Part 5: The Notification Layer
+To be truly frictionless, the system must communicate proactively. Your Express server will be responsible for sending emails.
+
+New Invoice Notification: When an invoice is generated, the client automatically receives an email with the total amount, due date, and a direct link to view the full invoice in their portal.
+
+Payment Reminder: A scheduled job can run daily to find invoices that are due soon or are overdue and send polite, automated reminder emails.
+
+Payment Confirmation: When an AM clicks "Mark as Paid," the client automatically receives a "Thank you for your payment" email with a receipt.
