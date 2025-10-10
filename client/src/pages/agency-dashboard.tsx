@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
-import { Building2, FolderKanban, Users, DollarSign, TrendingUp } from "lucide-react";
+import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight } from "lucide-react";
 import { Project, Client, DailyMetric, Recommendation } from "@shared/schema";
 
 export default function AgencyDashboard() {
@@ -159,6 +161,38 @@ export default function AgencyDashboard() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {projects?.slice(0, 6).map((project) => (
                     <ProjectCard key={project.id} project={project} />
+                  ))}
+                </div>
+              </section>
+
+              {/* Clients List */}
+              <section>
+                <h2 className="text-xl font-semibold mb-4">All Clients</h2>
+                <div className="space-y-2">
+                  {clients?.map((client) => (
+                    <Card key={client.id} className="hover-elevate">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Building2 className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                              <h3 className="font-medium" data-testid={`text-client-${client.id}`}>
+                                {client.companyName}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Client ID: {client.id.slice(0, 8)}...
+                              </p>
+                            </div>
+                          </div>
+                          <Link href={`/agency/clients/${client.id}`}>
+                            <Button variant="ghost" size="sm" data-testid={`button-view-client-${client.id}`}>
+                              View Details
+                              <ChevronRight className="ml-1 h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
               </section>

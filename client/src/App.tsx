@@ -11,6 +11,7 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ClientDashboard from "@/pages/client-dashboard";
 import AgencyDashboard from "@/pages/agency-dashboard";
+import ClientDetail from "@/pages/client-detail";
 import StaffDashboard from "@/pages/staff-dashboard";
 
 function Router() {
@@ -31,6 +32,12 @@ function Router() {
       <Route path="/agency">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/clients/:clientId">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <ClientDetail />
         </ProtectedRoute>
       </Route>
       

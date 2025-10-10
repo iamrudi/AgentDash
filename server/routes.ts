@@ -188,6 +188,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const client = await storage.getClientById(clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      res.json(client);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const projects = await storage.getAllProjects();
