@@ -204,9 +204,28 @@ export const insertClientMessageSchema = createInsertSchema(clientMessages).omit
   createdAt: true,
 });
 
+// Admin user creation schemas
+export const createClientUserSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  fullName: z.string().min(1, "Full name is required"),
+  companyName: z.string().min(1, "Company name is required"),
+});
+
+export const createStaffAdminUserSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  fullName: z.string().min(1, "Full name is required"),
+  role: z.enum(["Staff", "Admin"], {
+    errorMap: () => ({ message: "Role must be Staff or Admin" })
+  }),
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type CreateClientUser = z.infer<typeof createClientUserSchema>;
+export type CreateStaffAdminUser = z.infer<typeof createStaffAdminUserSchema>;
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;

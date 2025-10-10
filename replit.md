@@ -78,6 +78,25 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Security: All endpoints protected by requireAuth and requireRole middleware
 - **User Experience**: Clear visual indicators across all portals ensure no messages, recommendations, or tasks are missed
 
+### 2025-10-10: Admin User Management - Create Clients, Staff, and Admin Users
+- **Client Creation**: Admins can create new client users with company information
+  - Form includes: Company name, contact full name, email, password
+  - Automatically creates user account, profile with Client role, and client record
+  - Accessible from Clients page with "Create Client" button
+- **Staff and Admin Creation**: Admins can create staff members and administrators
+  - Form includes: Role selector (Staff/Admin), full name, email, password
+  - Creates user account and profile with selected role
+  - Accessible from Staff page with "Create User" button
+- **Form Validation**: All forms use react-hook-form with Zod schema validation
+  - Email validation (valid email format required)
+  - Password minimum length (6 characters)
+  - All fields required with inline error messages
+  - Client-side and server-side validation consistency
+- **API Endpoints**:
+  - POST /api/agency/clients/create-user - Create client users with schema validation
+  - POST /api/agency/users/create - Create staff/admin users with schema validation
+- **Security**: All endpoints protected by requireAuth and requireRole("Admin") middleware
+
 ### 2025-10-10: Manual AI Recommendation Creation & Client Filtering
 - **Manual Recommendation Creation**: Admins can now create recommendations manually via dialog form
   - Client selector to target specific clients

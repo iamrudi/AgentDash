@@ -5,7 +5,7 @@ import { requireAuth, requireRole, type AuthRequest } from "./middleware/auth";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 
@@ -784,6 +784,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create client user (Admin only)
+  app.post("/api/agency/clients/create-user", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      // Validate request body with schema
+      const validatedData = createClientUserSchema.parse(req.body);
+      const { email, password, fullName, companyName } = validatedData;
+
+      // Check if user exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Create user
+      const user = await storage.createUser({ email, password });
+
+      // Create profile with Client role
+      const profile = await storage.createProfile({
+        userId: user.id,
+        fullName,
+        role: "Client",
+      });
+
+      // Create client record
+      const client = await storage.createClient({
+        companyName,
+        profileId: profile.id,
+      });
+
+      res.status(201).json({ 
+        message: "Client created successfully",
+        client: { 
+          id: client.id, 
+          companyName: client.companyName,
+          user: { 
+            email: user.email,
+            fullName: profile.fullName
+          }
+        }
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      console.error("Client creation error:", error);
+      res.status(500).json({ message: error.message || "Client creation failed" });
+    }
+  });
+
+  // Create staff or admin user (Admin only)
+  app.post("/api/agency/users/create", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      // Validate request body with schema
+      const validatedData = createStaffAdminUserSchema.parse(req.body);
+      const { email, password, fullName, role } = validatedData;
+
+      // Check if user exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Create user
+      const user = await storage.createUser({ email, password });
+
+      // Create profile with specified role
+      const profile = await storage.createProfile({
+        userId: user.id,
+        fullName,
+        role,
+      });
+
+      res.status(201).json({ 
+        message: `${role} user created successfully`,
+        user: { 
+          id: user.id,
+          email: user.email,
+          fullName: profile.fullName,
+          role: profile.role
+        }
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      console.error("User creation error:", error);
+      res.status(500).json({ message: error.message || "User creation failed" });
     }
   });
 
