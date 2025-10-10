@@ -52,5 +52,26 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Authentication**: JWT, bcrypt
 - **Cloud Services**: Supabase
 - **OAuth Integrations**: Google OAuth (for GA4 integration)
-- **PDF Generation**: Puppeteer
+- **PDF Generation**: Puppeteer (requires Chromium system package)
 - **Scheduling**: node-cron
+
+## Recent Changes
+
+### 2025-10-10: Frictionless Invoicing System
+**Automated Invoice Generation & PDF Creation**
+- Monthly retainer invoicing via node-cron scheduler (runs daily at 9:00 AM)
+- On-demand invoice generation from approved recommendations
+- Professional PDF generation with Puppeteer (resource-safe with guaranteed browser cleanup)
+- PDF storage in local file system with static serving
+- Database schema: retainerAmount/billingDay on clients, totalAmount/issueDate/pdfUrl on invoices, invoice_line_items table
+
+**Client Portal Enhancements**
+- Billing page with invoice table, payment instructions, PDF download
+- Detailed invoice view with line items breakdown at /client/invoices/:id
+- Secure authorization - clients can only view their own invoices
+
+**Agency Portal Enhancements**
+- Master billing dashboard with financial metrics (Total Revenue, Outstanding, Total Invoices, Overdue)
+- Client filter for per-client invoice management
+- PDF generation and view actions in invoice table
+- System dependency: Chromium installed for Puppeteer
