@@ -237,6 +237,14 @@ export async function fetchGA4Data(
       },
     });
 
+    // Debug: Log the actual response to understand the structure
+    console.log('GA4 API Response:', JSON.stringify({
+      rowCount: response.data.rows?.length || 0,
+      totalCount: response.data.totals?.length || 0,
+      sampleRow: response.data.rows?.[0],
+      sampleTotal: response.data.totals?.[0],
+    }, null, 2));
+
     return {
       rows: response.data.rows || [],
       totals: response.data.totals || [],
