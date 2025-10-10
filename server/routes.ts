@@ -6,7 +6,7 @@ import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema } from "@shared/schema";
-import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites } from "./lib/googleOAuth";
+import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGSCData } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
@@ -907,6 +907,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Search Console integration disconnected successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Analytics Data API
+
+  // Get GA4 analytics data for a client
+  app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { startDate, endDate } = req.query;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own analytics
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration || !integration.ga4PropertyId) {
+        return res.status(404).json({ message: "GA4 integration not configured" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      // Default to last 30 days if not specified
+      const end = endDate as string || new Date().toISOString().split('T')[0];
+      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      if (!integration.accessToken) {
+        return res.status(401).json({ message: "Access token not available" });
+      }
+
+      const data = await fetchGA4Data(integration.accessToken, integration.ga4PropertyId!, start, end);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Fetch GA4 analytics error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch GA4 analytics" });
+    }
+  });
+
+  // Get GSC analytics data for a client
+  app.get("/api/analytics/gsc/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { startDate, endDate } = req.query;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own analytics
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let integration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      
+      if (!integration || !integration.gscSiteUrl) {
+        return res.status(404).json({ message: "Search Console integration not configured" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      // Default to last 30 days if not specified
+      const end = endDate as string || new Date().toISOString().split('T')[0];
+      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      if (!integration.accessToken) {
+        return res.status(401).json({ message: "Access token not available" });
+      }
+
+      const data = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Fetch GSC analytics error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch Search Console analytics" });
     }
   });
 

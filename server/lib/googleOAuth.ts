@@ -196,3 +196,97 @@ export async function fetchGSCSites(accessToken: string) {
     throw new Error('Failed to fetch Search Console sites');
   }
 }
+
+/**
+ * Fetch GA4 analytics data
+ * @param accessToken - Valid access token
+ * @param propertyId - GA4 property ID
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Analytics data
+ */
+export async function fetchGA4Data(
+  accessToken: string,
+  propertyId: string,
+  startDate: string,
+  endDate: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const analyticsData = google.analyticsdata({
+    version: 'v1beta',
+    auth: oauth2Client,
+  });
+
+  try {
+    const response = await analyticsData.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        metrics: [
+          { name: 'sessions' },
+          { name: 'totalUsers' },
+          { name: 'screenPageViews' },
+          { name: 'averageSessionDuration' },
+          { name: 'bounceRate' },
+        ],
+        dimensions: [{ name: 'date' }],
+      },
+    });
+
+    return {
+      rows: response.data.rows || [],
+      totals: response.data.totals || [],
+    };
+  } catch (error: any) {
+    console.error('Error fetching GA4 data:', error);
+    throw new Error('Failed to fetch GA4 analytics data');
+  }
+}
+
+/**
+ * Fetch Google Search Console analytics data
+ * @param accessToken - Valid access token
+ * @param siteUrl - GSC site URL
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Search Console data
+ */
+export async function fetchGSCData(
+  accessToken: string,
+  siteUrl: string,
+  startDate: string,
+  endDate: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const searchconsole = google.searchconsole({
+    version: 'v1',
+    auth: oauth2Client,
+  });
+
+  try {
+    const response = await searchconsole.searchanalytics.query({
+      siteUrl,
+      requestBody: {
+        startDate,
+        endDate,
+        dimensions: ['date'],
+        rowLimit: 1000,
+      },
+    });
+
+    return {
+      rows: response.data.rows || [],
+    };
+  } catch (error: any) {
+    console.error('Error fetching GSC data:', error);
+    throw new Error('Failed to fetch Search Console data');
+  }
+}
