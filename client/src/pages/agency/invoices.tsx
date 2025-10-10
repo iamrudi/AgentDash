@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Invoice, Client, insertInvoiceSchema, type InsertInvoice } from "@shared/schema";
-import { FileText, Plus, DollarSign, Calendar } from "lucide-react";
+import { FileText, Plus, DollarSign, Calendar, TrendingUp, AlertCircle, Receipt } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
@@ -131,6 +131,19 @@ export default function AgencyInvoicesPage() {
         return "outline";
     }
   };
+
+  // Calculate metrics
+  const totalRevenue = invoices
+    .filter(inv => inv.status === "Paid")
+    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
+
+  const outstandingAmount = invoices
+    .filter(inv => inv.status === "Due" || inv.status === "Overdue")
+    .reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
+
+  const totalInvoices = invoices.length;
+
+  const overdueCount = invoices.filter(inv => inv.status === "Overdue").length;
 
   return (
     <AgencyLayout>
@@ -274,6 +287,61 @@ export default function AgencyInvoicesPage() {
               </Form>
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Metrics Dashboard */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card data-testid="card-total-revenue">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-revenue">
+                ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">From paid invoices</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-outstanding">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-outstanding">
+                ${outstandingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-muted-foreground">Due and overdue</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-total-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-invoices">
+                {totalInvoices}
+              </div>
+              <p className="text-xs text-muted-foreground">All statuses</p>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-overdue">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Overdue</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive" data-testid="text-overdue-count">
+                {overdueCount}
+              </div>
+              <p className="text-xs text-muted-foreground">Require attention</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
