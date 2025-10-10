@@ -360,6 +360,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single invoice by ID
+  app.get("/api/client/invoices/:invoiceId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { invoiceId } = req.params;
+      const invoice = await storage.getInvoiceById(invoiceId);
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      // Check authorization - clients can only view their own invoices
+      if (req.user!.role === "Client") {
+        const user = await storage.getUserById(req.user!.id);
+        if (!user) {
+          return res.status(403).json({ message: "User not found" });
+        }
+        const profile = await storage.getProfileByUserId(user.id);
+        if (!profile) {
+          return res.status(403).json({ message: "Profile not found" });
+        }
+        const client = await storage.getClientByProfileId(profile.id);
+        
+        if (!client) {
+          return res.status(403).json({ message: "Client not found" });
+        }
+        
+        // Verify the invoice belongs to this client
+        if (invoice.clientId !== client.id) {
+          return res.status(403).json({ message: "Not authorized to view this invoice" });
+        }
+      }
+
+      const client = await storage.getClientById(invoice.clientId);
+      res.json({ ...invoice, client });
+    } catch (error: any) {
+      console.error("Get invoice by ID error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch invoice" });
+    }
+  });
+
   // Invoice Line Items
   app.get("/api/invoices/:invoiceId/line-items", requireAuth, async (req: AuthRequest, res) => {
     try {

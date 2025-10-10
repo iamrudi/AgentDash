@@ -1,15 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CreditCard, FileText } from "lucide-react";
+import { CreditCard, FileText, Download, Eye } from "lucide-react";
 import { InvoiceWithClient } from "@shared/schema";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 
 export default function Billing() {
+  const [, setLocation] = useLocation();
   const { data: invoices = [], isLoading } = useQuery<InvoiceWithClient[]>({
     queryKey: ["/api/client/invoices"],
   });
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "Paid":
+        return "default";
+      case "Overdue":
+        return "destructive";
+      default:
+        return "secondary";
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -65,10 +79,11 @@ export default function Billing() {
               <TableHeader>
                 <TableRow>
                   <TableHead data-testid="table-head-invoice">Invoice #</TableHead>
-                  <TableHead data-testid="table-head-date">Date</TableHead>
+                  <TableHead data-testid="table-head-date">Issue Date</TableHead>
                   <TableHead data-testid="table-head-amount">Amount</TableHead>
                   <TableHead data-testid="table-head-status">Status</TableHead>
                   <TableHead data-testid="table-head-due-date">Due Date</TableHead>
+                  <TableHead data-testid="table-head-actions">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -78,20 +93,42 @@ export default function Billing() {
                       #{invoice.invoiceNumber}
                     </TableCell>
                     <TableCell data-testid={`invoice-date-${invoice.id}`}>
-                      {format(new Date(invoice.createdAt), "MMM d, yyyy")}
+                      {invoice.issueDate ? format(new Date(invoice.issueDate), "MMM d, yyyy") : "N/A"}
                     </TableCell>
                     <TableCell data-testid={`invoice-amount-${invoice.id}`}>
-                      ${invoice.amount.toLocaleString()}
+                      ${Number(invoice.totalAmount).toFixed(2)}
                     </TableCell>
                     <TableCell data-testid={`invoice-status-${invoice.id}`}>
-                      <Badge 
-                        variant={invoice.status === "Paid" ? "default" : invoice.status === "Pending" ? "secondary" : "destructive"}
-                      >
+                      <Badge variant={getStatusVariant(invoice.status)}>
                         {invoice.status}
                       </Badge>
                     </TableCell>
                     <TableCell data-testid={`invoice-due-date-${invoice.id}`}>
                       {format(new Date(invoice.dueDate), "MMM d, yyyy")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setLocation(`/client/invoices/${invoice.id}`)}
+                          data-testid={`button-view-invoice-${invoice.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
+                        {invoice.pdfUrl && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(invoice.pdfUrl!, "_blank")}
+                            data-testid={`button-download-pdf-${invoice.id}`}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            PDF
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

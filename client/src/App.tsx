@@ -18,6 +18,7 @@ import Dashboard from "@/pages/client/dashboard";
 import Projects from "@/pages/client/projects";
 import Recommendations from "@/pages/client/recommendations";
 import Billing from "@/pages/client/billing";
+import InvoiceDetail from "@/pages/client/invoice-detail";
 import Reports from "@/pages/client/reports";
 import Profile from "@/pages/client/profile";
 import Support from "@/pages/client/support";
@@ -69,6 +70,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Client"]}>
           <ClientLayout>
             <Billing />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/invoices/:id">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <InvoiceDetail />
           </ClientLayout>
         </ProtectedRoute>
       </Route>
