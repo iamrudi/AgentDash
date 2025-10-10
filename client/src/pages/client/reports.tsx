@@ -43,7 +43,7 @@ export default function Reports() {
   const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
     queryKey: ["/api/analytics/ga4", clientId, startDate, endDate],
     queryFn: async () => {
-      const res = await fetch(`/api/analytics/ga4?startDate=${startDate}&endDate=${endDate}`, {
+      const res = await fetch(`/api/analytics/ga4/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -58,7 +58,7 @@ export default function Reports() {
   const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
     queryKey: ["/api/analytics/gsc", clientId, startDate, endDate],
     queryFn: async () => {
-      const res = await fetch(`/api/analytics/gsc?startDate=${startDate}&endDate=${endDate}`, {
+      const res = await fetch(`/api/analytics/gsc/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
