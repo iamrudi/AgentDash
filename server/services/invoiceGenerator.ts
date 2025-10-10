@@ -75,22 +75,22 @@ export class InvoiceGeneratorService {
   }
 
   /**
-   * Generate invoice from approved recommendation
-   * Called when admin approves a paid recommendation
+   * Generate invoice from approved initiative
+   * Called when admin approves a paid initiative
    */
-  async generateInvoiceFromRecommendation(recommendationId: string): Promise<string> {
+  async generateInvoiceFromInitiative(initiativeId: string): Promise<string> {
     try {
-      const recommendation = await this.storage.getRecommendationById(recommendationId);
+      const initiative = await this.storage.getInitiativeById(initiativeId);
       
-      if (!recommendation) {
-        throw new Error("Recommendation not found");
+      if (!initiative) {
+        throw new Error("Initiative not found");
       }
 
-      if (recommendation.status !== "Approved") {
-        throw new Error("Only approved recommendations can be invoiced");
+      if (initiative.status !== "Approved") {
+        throw new Error("Only approved initiatives can be invoiced");
       }
 
-      const client = await this.storage.getClientById(recommendation.clientId);
+      const client = await this.storage.getClientById(initiative.clientId);
       if (!client) {
         throw new Error("Client not found");
       }
@@ -103,7 +103,7 @@ export class InvoiceGeneratorService {
       dueDate.setDate(dueDate.getDate() + 30);
 
       // Get cost value
-      const costValue = recommendation.cost || "0";
+      const costValue = initiative.cost || "0";
 
       // Create invoice
       const invoice: InsertInvoice = {
@@ -118,10 +118,10 @@ export class InvoiceGeneratorService {
 
       const createdInvoice = await this.storage.createInvoice(invoice);
 
-      // Create line item from recommendation
+      // Create line item from initiative
       const lineItem: InsertInvoiceLineItem = {
         invoiceId: createdInvoice.id,
-        description: recommendation.title,
+        description: initiative.title,
         quantity: 1,
         unitPrice: costValue,
         lineTotal: costValue,
@@ -131,11 +131,11 @@ export class InvoiceGeneratorService {
 
       await this.storage.createInvoiceLineItems([lineItem]);
 
-      console.log(`Generated invoice ${invoiceNumber} from recommendation ${recommendationId}`);
+      console.log(`Generated invoice ${invoiceNumber} from initiative ${initiativeId}`);
       
       return createdInvoice.id;
     } catch (error) {
-      console.error("Error generating invoice from recommendation:", error);
+      console.error("Error generating invoice from initiative:", error);
       throw error;
     }
   }

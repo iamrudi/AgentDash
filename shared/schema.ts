@@ -48,6 +48,7 @@ export const tasks = pgTable("tasks", {
   dueDate: date("due_date"),
   priority: text("priority").default("Medium"), // 'High', 'Medium', 'Low'
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -85,13 +86,13 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// RECOMMENDATIONS (For the AI Engine)
-export const recommendations = pgTable("recommendations", {
+// INITIATIVES (Strategic AI-powered recommendations with task breakdown)
+export const initiatives = pgTable("initiatives", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   observation: text("observation").notNull(),
   proposedAction: text("proposed_action").notNull(),
-  status: text("status").notNull(), // 'Draft', 'Sent', 'Approved', 'Rejected', 'Discussing', 'Implemented'
+  status: text("status").notNull(), // 'Needs Review', 'Awaiting Approval', 'Approved', 'In Progress', 'Completed', 'Measured'
   cost: numeric("cost"),
   impact: text("impact"), // 'High', 'Medium', 'Low'
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
@@ -99,6 +100,11 @@ export const recommendations = pgTable("recommendations", {
   clientResponse: text("client_response"), // 'pending', 'approved', 'rejected', 'discussing'
   clientFeedback: text("client_feedback"), // Client's comments/feedback
   responseViewedByAdmin: text("response_viewed_by_admin").default("false"), // Whether admin has viewed client response
+  triggerMetric: text("trigger_metric"), // The metric that triggered this initiative
+  baselineValue: numeric("baseline_value"), // Starting value of the metric
+  startDate: date("start_date"), // When initiative tracking began
+  implementationDate: date("implementation_date"), // When initiative was completed
+  measuredImprovement: numeric("measured_improvement"), // Final measured improvement percentage
   lastEditedAt: timestamp("last_edited_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -198,7 +204,7 @@ export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).
   createdAt: true,
 });
 
-export const insertRecommendationSchema = createInsertSchema(recommendations).omit({
+export const insertInitiativeSchema = createInsertSchema(initiatives).omit({
   id: true,
   createdAt: true,
 });
@@ -269,8 +275,8 @@ export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
 export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
 
-export type Recommendation = typeof recommendations.$inferSelect;
-export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
+export type Initiative = typeof initiatives.$inferSelect;
+export type InsertInitiative = z.infer<typeof insertInitiativeSchema>;
 
 export type DailyMetric = typeof dailyMetrics.$inferSelect;
 export type InsertDailyMetric = z.infer<typeof insertDailyMetricSchema>;
@@ -290,5 +296,5 @@ export type TaskWithProject = Task & { project?: Project };
 export type InvoiceWithClient = Invoice & { client?: Client };
 export type InvoiceWithLineItems = Invoice & { lineItems?: InvoiceLineItem[] };
 export type InvoiceWithClientAndLineItems = Invoice & { client?: Client; lineItems?: InvoiceLineItem[] };
-export type RecommendationWithClient = Recommendation & { client?: Client };
+export type InitiativeWithClient = Initiative & { client?: Client };
 export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };

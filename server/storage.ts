@@ -15,8 +15,8 @@ import {
   type InsertInvoice,
   type InvoiceLineItem,
   type InsertInvoiceLineItem,
-  type Recommendation,
-  type InsertRecommendation,
+  type Initiative,
+  type InsertInitiative,
   type DailyMetric,
   type InsertDailyMetric,
   type ClientIntegration,
@@ -33,7 +33,7 @@ import {
   staffAssignments,
   invoices,
   invoiceLineItems,
-  recommendations,
+  initiatives,
   dailyMetrics,
   clientIntegrations,
   clientObjectives,
@@ -97,14 +97,14 @@ export interface IStorage {
   createInvoiceLineItems(lineItems: InsertInvoiceLineItem[]): Promise<InvoiceLineItem[]>;
   deleteInvoiceLineItem(id: string): Promise<void>;
   
-  // Recommendations
-  getRecommendationById(id: string): Promise<Recommendation | undefined>;
-  getRecommendationsByClientId(clientId: string): Promise<Recommendation[]>;
-  getAllRecommendations(): Promise<Recommendation[]>;
-  createRecommendation(rec: InsertRecommendation): Promise<Recommendation>;
-  updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation>;
-  sendRecommendationToClient(id: string): Promise<Recommendation>;
-  updateRecommendationClientResponse(id: string, response: string, feedback?: string): Promise<Recommendation>;
+  // Initiatives
+  getInitiativeById(id: string): Promise<Initiative | undefined>;
+  getInitiativesByClientId(clientId: string): Promise<Initiative[]>;
+  getAllInitiatives(): Promise<Initiative[]>;
+  createInitiative(rec: InsertInitiative): Promise<Initiative>;
+  updateInitiative(id: string, updates: Partial<InsertInitiative>): Promise<Initiative>;
+  sendInitiativeToClient(id: string): Promise<Initiative>;
+  updateInitiativeClientResponse(id: string, response: string, feedback?: string): Promise<Initiative>;
   
   // Daily Metrics
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
@@ -134,7 +134,7 @@ export interface IStorage {
   
   // Notifications
   getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }>;
-  markRecommendationResponsesViewed(): Promise<void>;
+  markInitiativeResponsesViewed(): Promise<void>;
   getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }>;
   getStaffNotificationCounts(staffProfileId: string): Promise<{ newTasks: number; highPriorityTasks: number }>;
 }
@@ -355,49 +355,49 @@ export class DbStorage implements IStorage {
     await db.delete(invoiceLineItems).where(eq(invoiceLineItems.id, id));
   }
 
-  // Recommendations
-  async getRecommendationById(id: string): Promise<Recommendation | undefined> {
-    const result = await db.select().from(recommendations).where(eq(recommendations.id, id)).limit(1);
+  // Initiatives
+  async getInitiativeById(id: string): Promise<Initiative | undefined> {
+    const result = await db.select().from(initiatives).where(eq(initiatives.id, id)).limit(1);
     return result[0];
   }
 
-  async getRecommendationsByClientId(clientId: string): Promise<Recommendation[]> {
-    return await db.select().from(recommendations).where(eq(recommendations.clientId, clientId)).orderBy(desc(recommendations.createdAt));
+  async getInitiativesByClientId(clientId: string): Promise<Initiative[]> {
+    return await db.select().from(initiatives).where(eq(initiatives.clientId, clientId)).orderBy(desc(initiatives.createdAt));
   }
 
-  async getAllRecommendations(): Promise<Recommendation[]> {
-    return await db.select().from(recommendations).orderBy(desc(recommendations.createdAt));
+  async getAllInitiatives(): Promise<Initiative[]> {
+    return await db.select().from(initiatives).orderBy(desc(initiatives.createdAt));
   }
 
-  async createRecommendation(rec: InsertRecommendation): Promise<Recommendation> {
-    const result = await db.insert(recommendations).values(rec).returning();
+  async createInitiative(rec: InsertInitiative): Promise<Initiative> {
+    const result = await db.insert(initiatives).values(rec).returning();
     return result[0];
   }
 
-  async updateRecommendation(id: string, updates: Partial<InsertRecommendation>): Promise<Recommendation> {
+  async updateInitiative(id: string, updates: Partial<InsertInitiative>): Promise<Initiative> {
     const result = await db
-      .update(recommendations)
+      .update(initiatives)
       .set({ ...updates, lastEditedAt: new Date() })
-      .where(eq(recommendations.id, id))
+      .where(eq(initiatives.id, id))
       .returning();
     return result[0];
   }
 
-  async sendRecommendationToClient(id: string): Promise<Recommendation> {
+  async sendInitiativeToClient(id: string): Promise<Initiative> {
     const result = await db
-      .update(recommendations)
+      .update(initiatives)
       .set({ 
         sentToClient: "true", 
-        status: "Sent", 
+        status: "Awaiting Approval", 
         clientResponse: "pending",
         lastEditedAt: new Date() 
       })
-      .where(eq(recommendations.id, id))
+      .where(eq(initiatives.id, id))
       .returning();
     return result[0];
   }
 
-  async updateRecommendationClientResponse(id: string, response: string, feedback?: string): Promise<Recommendation> {
+  async updateInitiativeClientResponse(id: string, response: string, feedback?: string): Promise<Initiative> {
     const statusMap: Record<string, string> = {
       "approved": "Approved",
       "rejected": "Rejected",
@@ -405,15 +405,15 @@ export class DbStorage implements IStorage {
     };
     
     const result = await db
-      .update(recommendations)
+      .update(initiatives)
       .set({ 
         clientResponse: response,
         clientFeedback: feedback || null,
-        status: statusMap[response] || "Sent",
+        status: statusMap[response] || "Awaiting Approval",
         responseViewedByAdmin: "false", // Reset so admin gets notified
         lastEditedAt: new Date()
       })
-      .where(eq(recommendations.id, id))
+      .where(eq(initiatives.id, id))
       .returning();
     return result[0];
   }
@@ -646,11 +646,11 @@ export class DbStorage implements IStorage {
         eq(clientMessages.isRead, "false")
       ));
     
-    // Count recommendations with client responses not yet viewed by admin
-    const unviewedResponsesResult = await db.select().from(recommendations)
+    // Count initiatives with client responses not yet viewed by admin
+    const unviewedResponsesResult = await db.select().from(initiatives)
       .where(and(
-        eq(recommendations.sentToClient, "true"),
-        eq(recommendations.responseViewedByAdmin, "false")
+        eq(initiatives.sentToClient, "true"),
+        eq(initiatives.responseViewedByAdmin, "false")
       ));
     
     // Only count those where clientResponse is NOT 'pending' (meaning client has responded)
@@ -664,12 +664,12 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async markRecommendationResponsesViewed(): Promise<void> {
-    await db.update(recommendations)
+  async markInitiativeResponsesViewed(): Promise<void> {
+    await db.update(initiatives)
       .set({ responseViewedByAdmin: "true" })
       .where(and(
-        eq(recommendations.sentToClient, "true"),
-        eq(recommendations.responseViewedByAdmin, "false")
+        eq(initiatives.sentToClient, "true"),
+        eq(initiatives.responseViewedByAdmin, "false")
       ));
   }
 
@@ -682,17 +682,17 @@ export class DbStorage implements IStorage {
         eq(clientMessages.isRead, "false")
       ));
     
-    // Count new recommendations sent to client with status 'Sent' (not yet acted upon)
-    const newRecommendationsResult = await db.select().from(recommendations)
+    // Count new initiatives sent to client with status 'Awaiting Approval' (not yet acted upon)
+    const newInitiativesResult = await db.select().from(initiatives)
       .where(and(
-        eq(recommendations.clientId, clientId),
-        eq(recommendations.sentToClient, "true"),
-        eq(recommendations.status, "Sent")
+        eq(initiatives.clientId, clientId),
+        eq(initiatives.sentToClient, "true"),
+        eq(initiatives.status, "Awaiting Approval")
       ));
     
     return {
       unreadMessages: unreadMessagesResult.length,
-      newRecommendations: newRecommendationsResult.length
+      newRecommendations: newInitiativesResult.length
     };
   }
 

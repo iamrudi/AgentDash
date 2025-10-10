@@ -178,21 +178,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/client/recommendations", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/client/initiatives", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
-        // Admins see all recommendations
-        const allRecommendations = await storage.getAllRecommendations();
-        const recsWithClients = await Promise.all(
-          allRecommendations.map(async (rec) => {
-            const client = await storage.getClientById(rec.clientId);
-            return { ...rec, client };
+        // Admins see all initiatives
+        const allInitiatives = await storage.getAllInitiatives();
+        const initsWithClients = await Promise.all(
+          allInitiatives.map(async (init) => {
+            const client = await storage.getClientById(init.clientId);
+            return { ...init, client };
           })
         );
-        return res.json(recsWithClients);
+        return res.json(initsWithClients);
       }
 
-      // Clients see only their own recommendations
+      // Clients see only their own initiatives
       const profile = await storage.getUserById(req.user!.id).then(u => storage.getProfileByUserId(u!.id));
       const client = await storage.getClientByProfileId(profile!.id);
       
@@ -200,9 +200,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
-      const recommendations = await storage.getRecommendationsByClientId(client.id);
-      const recsWithClient = recommendations.map(r => ({ ...r, client }));
-      res.json(recsWithClient);
+      const initiatives = await storage.getInitiativesByClientId(client.id);
+      const initsWithClient = initiatives.map(i => ({ ...i, client }));
+      res.json(initsWithClient);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -251,10 +251,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/recommendations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/initiatives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const recommendations = await storage.getAllRecommendations();
-      res.json(recommendations);
+      const initiatives = await storage.getAllInitiatives();
+      res.json(initiatives);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -466,22 +466,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/recommendations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/initiatives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const recommendation = await storage.createRecommendation(req.body);
-      res.status(201).json(recommendation);
+      const initiative = await storage.createInitiative(req.body);
+      res.status(201).json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Update recommendation (edit before sending)
-  app.patch("/api/recommendations/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  // Update initiative (edit before sending)
+  app.patch("/api/initiatives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const { title, observation, proposedAction, cost, impact } = req.body;
       
-      const recommendation = await storage.updateRecommendation(id, {
+      const initiative = await storage.updateInitiative(id, {
         title,
         observation,
         proposedAction,
@@ -489,25 +489,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         impact
       });
       
-      res.json(recommendation);
+      res.json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Send recommendation to client
-  app.post("/api/recommendations/:id/send", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  // Send initiative to client
+  app.post("/api/initiatives/:id/send", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
-      const recommendation = await storage.sendRecommendationToClient(id);
-      res.json(recommendation);
+      const initiative = await storage.sendInitiativeToClient(id);
+      res.json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Client responds to recommendation (approve/reject/discuss)
-  app.post("/api/recommendations/:id/respond", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  // Client responds to initiative (approve/reject/discuss)
+  app.post("/api/initiatives/:id/respond", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const { response, feedback } = req.body;
@@ -516,19 +516,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid response. Must be 'approved', 'rejected', or 'discussing'" });
       }
       
-      const recommendation = await storage.updateRecommendationClientResponse(id, response, feedback);
-      res.json(recommendation);
+      const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
+      res.json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Generate invoice from approved recommendation
-  app.post("/api/recommendations/:id/generate-invoice", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  // Generate invoice from approved initiative
+  app.post("/api/initiatives/:id/generate-invoice", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const invoiceGenerator = new InvoiceGeneratorService(storage);
-      const invoiceId = await invoiceGenerator.generateInvoiceFromRecommendation(id);
+      const invoiceId = await invoiceGenerator.generateInvoiceFromInitiative(id);
       res.status(201).json({ invoiceId, message: "Invoice generated successfully" });
     } catch (error: any) {
       console.error("Generate invoice error:", error);
@@ -941,10 +941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mark recommendation responses as viewed (Admin only)
-  app.post("/api/agency/recommendations/mark-viewed", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  // Mark initiative responses as viewed (Admin only)
+  app.post("/api/agency/initiatives/mark-viewed", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      await storage.markRecommendationResponsesViewed();
+      await storage.markInitiativeResponsesViewed();
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
