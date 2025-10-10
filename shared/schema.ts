@@ -25,6 +25,8 @@ export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: text("company_name").notNull(),
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
+  billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -61,11 +63,25 @@ export const staffAssignments = pgTable("staff_assignments", {
 export const invoices = pgTable("invoices", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   invoiceNumber: text("invoice_number").notNull().unique(),
-  amount: numeric("amount").notNull(),
-  status: text("status").notNull(), // 'Paid', 'Pending', 'Overdue'
+  totalAmount: numeric("total_amount").notNull(),
+  status: text("status").notNull(), // 'Draft', 'Due', 'Paid', 'Overdue'
+  issueDate: date("issue_date").notNull(),
   dueDate: date("due_date").notNull(),
   pdfUrl: text("pdf_url"),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// INVOICE LINE ITEMS
+export const invoiceLineItems = pgTable("invoice_line_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: uuid("invoice_id").notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: numeric("unit_price").notNull(),
+  lineTotal: numeric("line_total").notNull(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -177,6 +193,11 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   createdAt: true,
 });
 
+export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertRecommendationSchema = createInsertSchema(recommendations).omit({
   id: true,
   createdAt: true,
@@ -245,6 +266,9 @@ export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 
+export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
+export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
+
 export type Recommendation = typeof recommendations.$inferSelect;
 export type InsertRecommendation = z.infer<typeof insertRecommendationSchema>;
 
@@ -264,5 +288,7 @@ export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
 export type ProjectWithClient = Project & { client?: Client };
 export type TaskWithProject = Task & { project?: Project };
 export type InvoiceWithClient = Invoice & { client?: Client };
+export type InvoiceWithLineItems = Invoice & { lineItems?: InvoiceLineItem[] };
+export type InvoiceWithClientAndLineItems = Invoice & { client?: Client; lineItems?: InvoiceLineItem[] };
 export type RecommendationWithClient = Recommendation & { client?: Client };
 export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };
