@@ -27,6 +27,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ClientFilter } from "@/components/client-filter";
 import {
   Table,
   TableBody,
@@ -43,6 +44,7 @@ type InvoiceWithClient = Invoice & {
 export default function AgencyInvoicesPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingStatusId, setEditingStatusId] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>("ALL");
   const { toast } = useToast();
 
   const { data: invoices = [], isLoading } = useQuery<InvoiceWithClient[]>({
@@ -132,18 +134,23 @@ export default function AgencyInvoicesPage() {
     }
   };
 
-  // Calculate metrics
-  const totalRevenue = invoices
+  // Filter invoices by selected client
+  const filteredInvoices = selectedClientId === "ALL" 
+    ? invoices 
+    : invoices.filter(inv => inv.clientId === selectedClientId);
+
+  // Calculate metrics from filtered invoices
+  const totalRevenue = filteredInvoices
     .filter(inv => inv.status === "Paid")
     .reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
 
-  const outstandingAmount = invoices
+  const outstandingAmount = filteredInvoices
     .filter(inv => inv.status === "Due" || inv.status === "Overdue")
     .reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
 
-  const totalInvoices = invoices.length;
+  const totalInvoices = filteredInvoices.length;
 
-  const overdueCount = invoices.filter(inv => inv.status === "Overdue").length;
+  const overdueCount = filteredInvoices.filter(inv => inv.status === "Overdue").length;
 
   return (
     <AgencyLayout>
@@ -155,13 +162,20 @@ export default function AgencyInvoicesPage() {
               Create and manage client invoices
             </p>
           </div>
-          <Dialog open={isCreating} onOpenChange={setIsCreating}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-invoice">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-3">
+            <ClientFilter 
+              clients={clients}
+              selectedClientId={selectedClientId}
+              onClientChange={setSelectedClientId}
+              testId="select-invoice-client-filter"
+            />
+            <Dialog open={isCreating} onOpenChange={setIsCreating}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-invoice">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Invoice
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Invoice</DialogTitle>
@@ -286,7 +300,8 @@ export default function AgencyInvoicesPage() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         {/* Metrics Dashboard */}
@@ -356,7 +371,7 @@ export default function AgencyInvoicesPage() {
               <div className="text-center py-8 text-muted-foreground">
                 Loading invoices...
               </div>
-            ) : invoices.length === 0 ? (
+            ) : filteredInvoices.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>No invoices found</p>
@@ -376,7 +391,7 @@ export default function AgencyInvoicesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invoices.map((invoice) => (
+                    {filteredInvoices.map((invoice) => (
                       <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
                         <TableCell className="font-medium">
                           {invoice.invoiceNumber}
