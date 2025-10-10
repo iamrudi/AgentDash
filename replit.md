@@ -127,3 +127,35 @@ The platform is a full-stack JavaScript application using React for the frontend
 - Visit: https://console.developers.google.com/apis/api/analyticsadmin.googleapis.com/overview?project=YOUR_PROJECT_ID
 - Without this API enabled, GA4 property fetching will fail with 403 Forbidden error
 - Search Console API is typically enabled by default with OAuth consent screen setup
+
+### 2025-10-10: Analytics Reporting Dashboard
+**Client Portal Analytics Visualization**
+- Complete Reports page with GA4 and GSC metrics visualization using Recharts
+- Date range selector (7/30/90 days) with automatic data refetch
+- Real-time analytics data fetching from Google Analytics Data API and Search Console API
+
+**GA4 Metrics Dashboard**
+- Key metrics cards: Sessions, Users, Pageviews, Bounce Rate
+- Line chart visualization showing traffic trends over time
+- Totals calculated from Google Analytics Data API responses
+
+**GSC Metrics Dashboard**
+- Key metrics cards: Clicks, Impressions, CTR, Average Position
+- Dual-axis line chart showing clicks and impressions over time
+- Aggregated metrics from Search Console API data
+
+**Backend Implementation**
+- Analytics endpoints: GET /api/analytics/ga4 and GET /api/analytics/gsc
+- Helper functions: fetchGA4Data and fetchGSCData in server/lib/googleOAuth.ts
+- Secure token retrieval and refresh handling for Google API calls
+- Date range parameter support (startDate/endDate) for filtered data requests
+
+**Authentication Enhancement**
+- Login endpoint updated to include clientId in response for Client users
+- ClientId enables Reports page queries (queries disabled without valid clientId)
+- Auth response structure: { token, user: { id, email, profile, clientId } }
+
+**Required Google Cloud APIs**
+- Google Analytics Data API (for GA4 metrics)
+- Google Search Console API (for search performance data)
+- Both APIs must be enabled in Google Cloud Console for the project
