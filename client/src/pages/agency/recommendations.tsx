@@ -3,10 +3,29 @@ import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Recommendation, Client } from "@shared/schema";
-import { Lightbulb, Send, Building2 } from "lucide-react";
+import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function AgencyRecommendationsPage() {
   const { data: recommendations } = useQuery<Recommendation[]>({
@@ -18,6 +37,28 @@ export default function AgencyRecommendationsPage() {
   });
 
   const { toast } = useToast();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    observation: "",
+    proposedAction: "",
+    cost: "",
+    impact: "Medium"
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: any }) => {
+      return await apiRequest("PATCH", `/api/recommendations/${data.id}`, data.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      setEditingId(null);
+      toast({
+        title: "Recommendation updated",
+        description: "Changes saved successfully.",
+      });
+    },
+  });
 
   const sendMutation = useMutation({
     mutationFn: async (recommendationId: string) => {
@@ -32,8 +73,47 @@ export default function AgencyRecommendationsPage() {
     },
   });
 
+  const openEditDialog = (rec: Recommendation) => {
+    setEditingId(rec.id);
+    setEditForm({
+      title: rec.title,
+      observation: rec.observation,
+      proposedAction: rec.proposedAction,
+      cost: rec.cost || "",
+      impact: rec.impact || "Medium"
+    });
+  };
+
+  const handleSave = () => {
+    if (!editingId) return;
+    editMutation.mutate({
+      id: editingId,
+      updates: editForm
+    });
+  };
+
   const handleSendToClient = (id: string) => {
     sendMutation.mutate(id);
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "Draft": return "secondary";
+      case "Sent": return "default";
+      case "Approved": return "default";
+      case "Rejected": return "destructive";
+      case "Discussing": return "outline";
+      default: return "secondary";
+    }
+  };
+
+  const getResponseIcon = (response: string | null) => {
+    switch (response) {
+      case "approved": return <ThumbsUp className="h-4 w-4" />;
+      case "rejected": return <ThumbsDown className="h-4 w-4" />;
+      case "discussing": return <MessageSquare className="h-4 w-4" />;
+      default: return null;
+    }
   };
 
   return (
@@ -42,7 +122,7 @@ export default function AgencyRecommendationsPage() {
         <div>
           <h1 className="text-3xl font-semibold mb-2">AI Recommendations</h1>
           <p className="text-muted-foreground">
-            AI-powered recommendations based on GA4 and GSC data
+            Edit, approve, and send AI-powered recommendations to clients
           </p>
         </div>
 
@@ -57,6 +137,9 @@ export default function AgencyRecommendationsPage() {
           <div className="space-y-4">
             {recommendations.map((rec) => {
               const client = clients?.find(c => c.id === rec.clientId);
+              const isDraft = rec.status === "Draft";
+              const isSent = rec.sentToClient === "true";
+              
               return (
                 <Card key={rec.id} data-testid={`recommendation-${rec.id}`}>
                   <CardHeader>
@@ -65,22 +148,129 @@ export default function AgencyRecommendationsPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />
                           <span className="font-semibold">{client?.companyName || "Unknown Client"}</span>
-                          <Badge variant={rec.status === "New" ? "default" : "secondary"}>
+                          <Badge variant={getStatusVariant(rec.status)}>
                             {rec.status}
                           </Badge>
+                          {rec.clientResponse && (
+                            <Badge variant="outline" className="gap-1">
+                              {getResponseIcon(rec.clientResponse)}
+                              {rec.clientResponse}
+                            </Badge>
+                          )}
                         </div>
                         <CardTitle className="text-lg">{rec.title}</CardTitle>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSendToClient(rec.id)}
-                        disabled={sendMutation.isPending}
-                        data-testid={`button-send-${rec.id}`}
-                      >
-                        <Send className="h-4 w-4 mr-1" />
-                        Send to Client
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {isDraft && (
+                          <Dialog open={editingId === rec.id} onOpenChange={(open) => !open && setEditingId(null)}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditDialog(rec)}
+                                data-testid={`button-edit-${rec.id}`}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl">
+                              <DialogHeader>
+                                <DialogTitle>Edit Recommendation</DialogTitle>
+                                <DialogDescription>
+                                  Edit the recommendation details before sending to client
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 mt-4">
+                                <div>
+                                  <Label htmlFor="title">Title</Label>
+                                  <Input
+                                    id="title"
+                                    value={editForm.title}
+                                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                    placeholder="Recommendation title"
+                                    data-testid="input-edit-title"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="observation">Observation</Label>
+                                  <Textarea
+                                    id="observation"
+                                    value={editForm.observation}
+                                    onChange={(e) => setEditForm({ ...editForm, observation: e.target.value })}
+                                    placeholder="What did you observe?"
+                                    rows={3}
+                                    data-testid="textarea-edit-observation"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="proposedAction">Proposed Action</Label>
+                                  <Textarea
+                                    id="proposedAction"
+                                    value={editForm.proposedAction}
+                                    onChange={(e) => setEditForm({ ...editForm, proposedAction: e.target.value })}
+                                    placeholder="What action do you propose?"
+                                    rows={3}
+                                    data-testid="textarea-edit-action"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <Label htmlFor="cost">Estimated Cost</Label>
+                                    <Input
+                                      id="cost"
+                                      value={editForm.cost}
+                                      onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })}
+                                      placeholder="5000"
+                                      data-testid="input-edit-cost"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="impact">Impact Level</Label>
+                                    <Select value={editForm.impact} onValueChange={(value) => setEditForm({ ...editForm, impact: value })}>
+                                      <SelectTrigger data-testid="select-edit-impact">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="High">High</SelectItem>
+                                        <SelectItem value="Medium">Medium</SelectItem>
+                                        <SelectItem value="Low">Low</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => setEditingId(null)}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    onClick={handleSave}
+                                    disabled={!editForm.title || !editForm.observation || !editForm.proposedAction || editMutation.isPending}
+                                    data-testid="button-save-edit"
+                                  >
+                                    {editMutation.isPending ? "Saving..." : "Save Changes"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                        {isDraft && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSendToClient(rec.id)}
+                            disabled={sendMutation.isPending}
+                            data-testid={`button-send-${rec.id}`}
+                          >
+                            <Send className="h-4 w-4 mr-1" />
+                            Send to Client
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -94,6 +284,24 @@ export default function AgencyRecommendationsPage() {
                       <div>
                         <p className="text-sm font-medium mb-1">Proposed Action</p>
                         <p className="text-sm text-muted-foreground">{rec.proposedAction}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 text-sm">
+                      {rec.cost && (
+                        <div>
+                          <span className="font-medium">Cost:</span> ${rec.cost}
+                        </div>
+                      )}
+                      {rec.impact && (
+                        <div>
+                          <span className="font-medium">Impact:</span> {rec.impact}
+                        </div>
+                      )}
+                    </div>
+                    {isSent && rec.clientFeedback && (
+                      <div className="mt-4 pt-4 border-t">
+                        <p className="text-sm font-medium mb-1">Client Feedback</p>
+                        <p className="text-sm text-muted-foreground">{rec.clientFeedback}</p>
                       </div>
                     )}
                   </CardContent>
