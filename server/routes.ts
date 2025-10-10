@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties } from "./lib/googleOAuth";
+import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication Routes (public)
@@ -316,12 +317,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only Admin and Client can initiate OAuth" });
       }
 
-      // Create state parameter with client ID for CSRF protection
-      const state = JSON.stringify({
-        clientId,
-        initiatedBy: profile.role,
-        timestamp: Date.now(),
-      });
+      // Create cryptographically signed state parameter for CSRF protection
+      const state = generateOAuthState(clientId, profile.role);
 
       const authUrl = getAuthUrl(state);
       res.json({ authUrl });
@@ -344,8 +341,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect('/client?error=missing_parameters');
       }
 
-      // Parse state to get client ID
-      const stateData = JSON.parse(state as string);
+      // Verify and parse signed state parameter
+      let stateData;
+      try {
+        stateData = verifyOAuthState(state as string);
+      } catch (error: any) {
+        console.error("State verification failed:", error.message);
+        return res.redirect(`/client?error=invalid_state`);
+      }
+      
       const { clientId } = stateData;
 
       // Exchange code for tokens
