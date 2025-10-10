@@ -52,10 +52,23 @@ This is a fullstack JavaScript application built with React, Express, PostgreSQL
 ## User Roles & Access
 
 ### Client Portal (`/client`)
+Enhanced with sidebar navigation and dedicated pages for comprehensive self-service access:
+
+**Navigation Pages:**
+- **Dashboard** (`/client`): Performance overview with KPI scorecards and client objectives
+- **Projects** (`/client/projects`): Active and completed projects with tabbed view
+- **Recommendations** (`/client/recommendations`): AI-powered insights and suggestions
+- **Billing** (`/client/billing`): Invoice management with payment instructions
+- **Reports** (`/client/reports`): Analytics and performance metrics (coming soon)
+- **Profile** (`/client/profile`): Account information and settings
+- **Support** (`/client/support`): Help resources and contact options
+
+**Features:**
+- Collapsible sidebar navigation with theme toggle
 - View own projects with status and descriptions
 - Access invoices with payment status
-- See AI-powered recommendations
-- Track performance metrics
+- See AI-powered recommendations with observations and proposed actions
+- Track performance metrics via KPI scorecards
 - **Restricted to**: Client role (and Admin for oversight)
 
 ### Agency Admin Portal (`/agency`)
@@ -186,6 +199,18 @@ shared/
 8. Check that admin/staff accounts are provisioned
 
 ## Recent Changes
+
+### 2025-10-10: Client Portal Enhanced with Sidebar Navigation
+- **Client Layout Component**: New layout with Shadcn sidebar and collapsible navigation
+- **Dedicated Pages**: Separate pages for Dashboard, Projects, Recommendations, Billing, Reports, Profile, and Support
+- **Dashboard Page**: Performance Overview with Client Objective card and 4 KPI scorecards (Revenue, Users, Growth, Performance)
+- **Projects Page**: Tabbed interface for Active and Completed projects with project cards
+- **Billing Page**: "How to Pay" information card and Invoice table (without Pay Now buttons)
+- **Recommendations Page**: Display AI recommendations with observation and proposed action details
+- **Reports Page**: Placeholder for future analytics features
+- **Profile Page**: User account information display
+- **Support Page**: Contact options and FAQ section
+- **Navigation**: Smooth client-side routing using wouter Link components
 
 ### 2025-10-10: GA4 OAuth Integration Complete
 - **Database Schema Extended**: Added `client_integrations` and `client_objectives` tables
