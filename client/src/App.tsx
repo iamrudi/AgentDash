@@ -10,11 +10,10 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
-import AgencyDashboard from "@/pages/agency-dashboard";
 import ClientDetail from "@/pages/client-detail";
 import StaffDashboard from "@/pages/staff-dashboard";
 
-// New Client Portal Pages
+// Client Portal Pages
 import Dashboard from "@/pages/client/dashboard";
 import Projects from "@/pages/client/projects";
 import Recommendations from "@/pages/client/recommendations";
@@ -22,6 +21,14 @@ import Billing from "@/pages/client/billing";
 import Reports from "@/pages/client/reports";
 import Profile from "@/pages/client/profile";
 import Support from "@/pages/client/support";
+
+// Agency Portal Pages
+import AgencyDashboard from "@/pages/agency/index";
+import AgencyMessages from "@/pages/agency/messages";
+import AgencyTasks from "@/pages/agency/tasks";
+import AgencyRecommendations from "@/pages/agency/recommendations";
+import AgencyClients from "@/pages/agency/clients";
+import AgencyStaff from "@/pages/agency/staff";
 
 function Router() {
   return (
@@ -91,6 +98,36 @@ function Router() {
       <Route path="/agency">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/messages">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyMessages />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/tasks">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyTasks />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/recommendations">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyRecommendations />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/clients">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyClients />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/staff">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyStaff />
         </ProtectedRoute>
       </Route>
 
