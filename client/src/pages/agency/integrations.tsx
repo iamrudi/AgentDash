@@ -51,6 +51,8 @@ export default function AgencyIntegrationsPage() {
   const [ga4DialogOpen, setGa4DialogOpen] = useState(false);
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
+  const [selectedGA4Property, setSelectedGA4Property] = useState("");
+  const [selectedGSCSite, setSelectedGSCSite] = useState("");
   
   // Check for OAuth success/error in URL
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function AgencyIntegrationsPage() {
         title: "Success",
         description: "GA4 property saved successfully",
       });
+      setSelectedGA4Property("");
       setGa4DialogOpen(false);
     },
     onError: (error: Error) => {
@@ -170,6 +173,7 @@ export default function AgencyIntegrationsPage() {
         title: "Success",
         description: "Search Console site saved successfully",
       });
+      setSelectedGSCSite("");
       setGscDialogOpen(false);
     },
     onError: (error: Error) => {
@@ -212,17 +216,35 @@ export default function AgencyIntegrationsPage() {
     }
   };
 
-  const handleGA4PropertySave = (propertyId: string) => {
+  const handleGA4PropertySave = () => {
+    if (!selectedGA4Property) {
+      toast({
+        title: "Error",
+        description: "Please select a GA4 property",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     saveGA4PropertyMutation.mutate({
       clientId: currentClientId,
-      propertyId,
+      propertyId: selectedGA4Property,
     });
   };
 
-  const handleGSCSiteSave = (siteUrl: string) => {
+  const handleGSCSiteSave = () => {
+    if (!selectedGSCSite) {
+      toast({
+        title: "Error",
+        description: "Please select a Search Console site",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     saveGSCSiteMutation.mutate({
       clientId: currentClientId,
-      siteUrl,
+      siteUrl: selectedGSCSite,
     });
   };
 
@@ -310,7 +332,10 @@ export default function AgencyIntegrationsPage() {
       </div>
 
       {/* GA4 Property Selection Dialog */}
-      <Dialog open={ga4DialogOpen} onOpenChange={setGa4DialogOpen}>
+      <Dialog open={ga4DialogOpen} onOpenChange={(open) => {
+        setGa4DialogOpen(open);
+        if (!open) setSelectedGA4Property("");
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Select GA4 Property</DialogTitle>
@@ -324,7 +349,7 @@ export default function AgencyIntegrationsPage() {
             </div>
           ) : ga4Properties && ga4Properties.length > 0 ? (
             <div className="space-y-4">
-              <Select onValueChange={handleGA4PropertySave}>
+              <Select value={selectedGA4Property} onValueChange={setSelectedGA4Property}>
                 <SelectTrigger data-testid="select-ga4-property">
                   <SelectValue placeholder="Select a property" />
                 </SelectTrigger>
@@ -336,6 +361,23 @@ export default function AgencyIntegrationsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setGa4DialogOpen(false)}
+                  data-testid="button-cancel-ga4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGA4PropertySave}
+                  disabled={!selectedGA4Property || saveGA4PropertyMutation.isPending}
+                  data-testid="button-save-ga4"
+                >
+                  {saveGA4PropertyMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save
+                </Button>
+              </div>
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-4">
@@ -346,7 +388,10 @@ export default function AgencyIntegrationsPage() {
       </Dialog>
 
       {/* GSC Site Selection Dialog */}
-      <Dialog open={gscDialogOpen} onOpenChange={setGscDialogOpen}>
+      <Dialog open={gscDialogOpen} onOpenChange={(open) => {
+        setGscDialogOpen(open);
+        if (!open) setSelectedGSCSite("");
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Select Search Console Site</DialogTitle>
@@ -360,7 +405,7 @@ export default function AgencyIntegrationsPage() {
             </div>
           ) : gscSites && gscSites.length > 0 ? (
             <div className="space-y-4">
-              <Select onValueChange={handleGSCSiteSave}>
+              <Select value={selectedGSCSite} onValueChange={setSelectedGSCSite}>
                 <SelectTrigger data-testid="select-gsc-site">
                   <SelectValue placeholder="Select a site" />
                 </SelectTrigger>
@@ -372,6 +417,23 @@ export default function AgencyIntegrationsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setGscDialogOpen(false)}
+                  data-testid="button-cancel-gsc"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleGSCSiteSave}
+                  disabled={!selectedGSCSite || saveGSCSiteMutation.isPending}
+                  data-testid="button-save-gsc"
+                >
+                  {saveGSCSiteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save
+                </Button>
+              </div>
             </div>
           ) : (
             <p className="text-center text-muted-foreground py-4">
