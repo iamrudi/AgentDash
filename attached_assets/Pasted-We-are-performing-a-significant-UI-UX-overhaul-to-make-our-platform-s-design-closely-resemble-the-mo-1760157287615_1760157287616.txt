@@ -1,0 +1,215 @@
+We are performing a significant UI/UX overhaul to make our platform's design closely resemble the modern, professional aesthetic. This involves updating our color palette, typography, component styling, and theme provider logic. Your primary tech stack of Tailwind CSS and Shadcn/UI is perfect for this. Please execute the following steps precisely.
+
+Step 1: Overhaul the Color Palette & Default Theme
+
+Open client/src/index.css.
+
+Replace the existing :root and .dark CSS variable declarations with this new block. This establishes a "dark-first" theme with  signature green as the primary accent color.
+
+CSS
+
+:root {
+  --background: 224 71% 4%;
+  --foreground: 210 40% 98%;
+  --card: 224 71% 9%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 216 34% 17%;
+  --popover: 224 71% 4%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 150 76% 42%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 216 34% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 216 34% 17%;
+  --muted-foreground: 216 34% 65%;
+  --accent: 216 34% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 216 34% 17%;
+  --input: 216 34% 17%;
+  --ring: 150 76% 42%;
+  --radius: 0.5rem;
+}
+
+.light {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --card-border: 240 5% 92%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 150 76% 42%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 150 76% 42%;
+}
+Also in client/src/index.css, add the following .card-glow utility class inside the @layer utilities block to create a subtle glow effect on hover for cards.
+
+CSS
+
+@layer utilities {
+  .card-glow:hover {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary) / 0.25);
+  }
+  /* ... other utilities */
+}
+Step 2: Update the Theme Provider and Toggle
+
+The theme system needs to support "Light", "Dark", and a time-based "System" mode.
+
+Open client/src/components/theme-provider.tsx and replace its entire content with the code below. This new provider understands the "system" setting and will apply light or dark theme based on the time of day (daytime is 6 AM to 6 PM).
+
+TypeScript
+
+import { createContext, useContext, useEffect, useState } from "react";
+
+type Theme = "dark" | "light" | "system";
+
+type ThemeProviderProps = {
+  children: React.ReactNode;
+  defaultTheme?: Theme;
+};
+
+type ThemeProviderState = {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+};
+
+const initialState: ThemeProviderState = {
+  theme: "system",
+  setTheme: () => null,
+};
+
+const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+
+export function ThemeProvider({
+  children,
+  defaultTheme = "system",
+}: ThemeProviderProps) {
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem("theme") as Theme) || defaultTheme
+  );
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+
+    root.classList.remove("light", "dark");
+
+    if (theme === "system") {
+      const currentHour = new Date().getHours();
+      const isDaytime = currentHour >= 6 && currentHour < 18;
+
+      if (isDaytime) {
+        root.classList.add("light");
+      } else {
+        root.classList.add("dark");
+      }
+      return;
+    }
+
+    root.classList.add(theme);
+  }, [theme]);
+
+  const value = {
+    theme,
+    setTheme: (theme: Theme) => {
+      localStorage.setItem("theme", theme);
+      setTheme(theme);
+    },
+  };
+
+  return (
+    <ThemeProviderContext.Provider value={value}>
+      {children}
+    </ThemeProviderContext.Provider>
+  );
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeProviderContext);
+
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider");
+
+  return context;
+};
+Open client/src/components/theme-toggle.tsx and replace its entire content with this new version, which uses a dropdown menu for theme selection.
+
+TypeScript
+
+import { Moon, Sun, Monitor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+export function ThemeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" data-testid="button-theme-toggle">
+          <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+          <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          <span className="sr-only">Toggle theme</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setTheme("light")}>
+          <Sun className="mr-2 h-4 w-4" />
+          <span>Light</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>
+          <Moon className="mr-2 h-4 w-4" />
+          <span>Dark</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>
+          <Monitor className="mr-2 h-4 w-4" />
+          <span>System</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+Step 3: Refine Typography
+
+Open client/index.html.
+
+Remove all existing Google Fonts <link> tags and replace them with this single import for Geist Sans and Geist Mono.
+
+HTML
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@100..900&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
+Open tailwind.config.ts and update the fontFamily configuration.
+
+TypeScript
+
+// in tailwind.config.ts
+fontFamily: {
+  sans: ["'Geist Sans'", "sans-serif"],
+  mono: ["'Geist Mono'", "monospace"],
+},
+After executing these changes, the application will have a new, modern UI that defaults to a dark theme, supports a light theme, and includes a time-based automatic "System" theme.
+
+
+
+

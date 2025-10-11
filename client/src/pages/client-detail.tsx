@@ -309,6 +309,8 @@ export default function ClientDetail() {
                       )}
                     </CardContent>
                   </Card>
+
+                  <SyncMetricsCard clientId={clientId!} />
                 </TabsContent>
 
                 <TabsContent value="objectives" className="space-y-4 mt-6">
@@ -745,4 +747,60 @@ function getDaySuffix(day: number): string {
     case 3: return 'rd';
     default: return 'th';
   }
+}
+
+function SyncMetricsCard({ clientId }: { clientId: string }) {
+  const { toast } = useToast();
+
+  const syncMetricsMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/agency/clients/${clientId}/sync-metrics`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/metrics`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/recommendations'] });
+      toast({
+        title: "Success",
+        description: "Metrics synced successfully from GA4 and GSC",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Sync Analytics Metrics</CardTitle>
+        <CardDescription>
+          Fetch the latest metrics from Google Analytics 4 and Google Search Console to enable AI recommendations
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground mb-4">
+          Click the button below to sync the last 30 days of analytics data. This data is required for generating AI-powered strategic recommendations.
+        </p>
+        <Button
+          onClick={() => syncMetricsMutation.mutate()}
+          disabled={syncMetricsMutation.isPending}
+          data-testid="button-sync-metrics"
+        >
+          {syncMetricsMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Syncing Metrics...
+            </>
+          ) : (
+            "Sync Metrics"
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
