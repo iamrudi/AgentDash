@@ -128,35 +128,57 @@ The platform is a full-stack JavaScript application using React for the frontend
 - Without this API enabled, GA4 property fetching will fail with 403 Forbidden error
 - Search Console API is typically enabled by default with OAuth consent screen setup
 
-### 2025-10-11: GA4 Lead Event Configuration System
-**Real Conversion Tracking with GA4 Key Events**
-- Database schema: Added `ga4_lead_event_name` field to client_integrations table (varchar 100, nullable)
-- Agency Portal enhancement: Lead event name input field in GA4 property selection dialog
-- Backend validation: Lead event name length validation (max 100 chars), trimmed whitespace, empty converts to null
-- GA4 Data API integration: fetchGA4KeyEvents function to retrieve specific event conversions
+### 2025-10-11: GA4 Lead Event Configuration System (Updated)
+**Real Conversion Tracking with GA4 Key Events - Multi-Event Support**
+- Database schema: `ga4_lead_event_name` field in client_integrations table (text type, unlimited length)
+- Agency Portal enhancements: 
+  - Lead event name input field in GA4 property selection dialog
+  - "Edit Lead Events" button for existing GA4 connections (updates without OAuth reconnection)
+  - Edit dialog allows admins to modify lead event names post-setup
+- Backend validation: Lead event name length validation (max 500 chars), trimmed whitespace, empty converts to null
+- GA4 Data API integration: fetchGA4KeyEvents function supports multiple comma-separated event names
 - Outcome metrics upgrade: Real GA4 Key Events data replaces sample data when lead event configured
+
+**Multi-Event Support (Added 2025-10-11)**
+- **Critical Fix**: GA4 API now uses OR filter logic for multiple events instead of single EXACT match
+- **Multiple Events**: Admins can enter comma-separated event names (e.g., "form_submit, generate_lead, Main_Form")
+- **Total Aggregation**: System sums conversions across all specified events for accurate totals
+- **Character Limit**: Extended from 100 to 500 characters to support multiple event names
+- **Edit Functionality**: PATCH /api/integrations/ga4/:clientId/lead-event endpoint for updating lead events
+- **OR Filter Logic**: fetchGA4KeyEvents builds orGroup dimension filter for multiple EXACT matches
 
 **Technical Implementation**
 - Lead event configuration flow:
   1. Admin connects GA4 for client
-  2. Admin selects GA4 property and optionally enters lead event name (e.g., "generate_lead", "form_submission")
-  3. System saves both property ID and lead event name to integration record
-  4. Reports page fetches actual conversions from GA4 using configured event name
-- Backend endpoint: GET /api/analytics/ga4/:clientId/conversions returns Key Events data filtered by event name
+  2. Admin selects GA4 property and optionally enters lead event name(s) - single or comma-separated
+  3. System saves both property ID and lead event name(s) to integration record
+  4. Reports page fetches actual conversions from GA4 using configured event name(s)
+  5. Admin can edit lead event names anytime via Edit button (no reconnection required)
+- Backend endpoints:
+  - GET /api/analytics/ga4/:clientId/conversions returns Key Events data filtered by event name(s)
+  - PATCH /api/integrations/ga4/:clientId/lead-event updates lead event configuration
+- fetchGA4KeyEvents implementation:
+  - Parses comma-separated event names, trims whitespace
+  - Single event: uses simple EXACT match filter
+  - Multiple events: uses orGroup with EXACT matches for each event
+  - Aggregates totalEventCount from all matching rows
 - Fallback logic: Uses dailyMetrics sample data if GA4 not configured or lead event name not set
 - Pipeline Value calculation: Now based on real GA4 conversion data when available
-- fetchGA4KeyEvents: Uses eventCount metric, eventName dimension with EXACT match filter, calculates totals from rows
 
 **Agency Portal Features**
 - Lead event name input in GA4 property selection dialog with helpful placeholder text
-- Validation feedback for invalid event names
+- Edit Lead Events button appears next to connected GA4 integrations
+- Edit dialog pre-populates current lead event name(s) for modification
+- Validation feedback for invalid event names (max 500 chars)
 - Persistent storage alongside GA4 property ID
 - Clear indication when lead event is configured vs. not configured
+- Integration status displays configured lead event name(s)
 
 **Reports Page Enhancement**
-- Conversions metric sourced from real GA4 Key Events when lead event name is set
+- Conversions metric sourced from real GA4 Key Events when lead event name(s) set
+- Supports multiple event types summed together (e.g., form submissions + contact clicks)
 - Pipeline Value automatically calculated from real conversion data
-- CPA (Cost Per Acquisition) reflects actual GA4 conversions
+- CPA (Cost Per Acquisition) reflects actual GA4 conversions across all specified events
 - Graceful degradation to sample data when GA4 unavailable
 
 ### 2025-10-11: Advanced Analytics Dashboard with Comparison & Acquisition Channels
