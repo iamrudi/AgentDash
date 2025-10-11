@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AgencyLayout } from "@/components/agency-layout";
-import { Building2, FolderKanban, MessageSquare, TrendingUp, Sparkles, MousePointer, Eye, DollarSign } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Building2, FolderKanban, MessageSquare, TrendingUp, Sparkles, MousePointer, Eye, DollarSign, AlertCircle } from "lucide-react";
 import { Project, Client, Initiative, ClientMessage } from "@shared/schema";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { DailyMetric } from "@shared/schema";
@@ -71,22 +73,22 @@ export default function AgencyDashboard() {
   const startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
   const endDate = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
+  const { data: ga4Data, isLoading: ga4Loading, error: ga4Error } = useQuery<GA4Data>({
     queryKey: ['/api/analytics/ga4', selectedClientId, { startDate, endDate }],
     enabled: selectedClientId !== "ALL",
   });
 
-  const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
+  const { data: gscData, isLoading: gscLoading, error: gscError } = useQuery<GSCData>({
     queryKey: ['/api/analytics/gsc', selectedClientId, { startDate, endDate }],
     enabled: selectedClientId !== "ALL",
   });
 
-  const { data: gscQueries } = useQuery<GSCQueryData>({
+  const { data: gscQueries, isLoading: gscQueriesLoading, error: gscQueriesError } = useQuery<GSCQueryData>({
     queryKey: ['/api/analytics/gsc', selectedClientId, 'queries', { startDate, endDate }],
     enabled: selectedClientId !== "ALL",
   });
 
-  const { data: outcomeMetrics } = useQuery<OutcomeMetrics>({
+  const { data: outcomeMetrics, isLoading: outcomeLoading, error: outcomeError } = useQuery<OutcomeMetrics>({
     queryKey: ['/api/analytics/outcome-metrics', selectedClientId, { startDate, endDate }],
     enabled: selectedClientId !== "ALL",
   });
@@ -122,6 +124,25 @@ export default function AgencyDashboard() {
   const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
   const avgPosition = gscData?.rows?.length ? 
     gscData.rows.reduce((sum, row) => sum + (parseFloat(row.metricValues?.[3]?.value) || 0), 0) / gscData.rows.length : 0;
+
+  const MetricCardSkeleton = () => (
+    <Card>
+      <CardHeader className="pb-3">
+        <Skeleton className="h-4 w-32" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-10 w-20" />
+      </CardContent>
+    </Card>
+  );
+
+  const ErrorAlert = ({ title, message }: { title: string; message: string }) => (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
+  );
 
   return (
     <AgencyLayout>
@@ -226,73 +247,89 @@ export default function AgencyDashboard() {
               <h2 className="text-2xl font-semibold mb-4">Analytics for {selectedClient.companyName}</h2>
               
               {/* Outcome Metrics */}
-              {outcomeMetrics && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Conversions
-                        </CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold font-mono" data-testid="text-conversions">
-                        {outcomeMetrics.conversions}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Pipeline Value
-                        </CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold font-mono" data-testid="text-pipeline-value">
-                        ${outcomeMetrics.estimatedPipelineValue.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Organic Clicks
-                        </CardTitle>
-                        <MousePointer className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold font-mono" data-testid="text-organic-clicks">
-                        {outcomeMetrics.organicClicks.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Cost per Acquisition
-                        </CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold font-mono" data-testid="text-cpa">
-                        ${outcomeMetrics.cpa.toFixed(2)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+              {outcomeError && (
+                <ErrorAlert 
+                  title="Failed to Load Metrics" 
+                  message={(outcomeError as Error).message || "Unable to fetch outcome metrics. Please try again."} 
+                />
               )}
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {outcomeLoading ? (
+                  <>
+                    <MetricCardSkeleton />
+                    <MetricCardSkeleton />
+                    <MetricCardSkeleton />
+                    <MetricCardSkeleton />
+                  </>
+                ) : outcomeMetrics ? (
+                  <>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Conversions
+                          </CardTitle>
+                          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-mono" data-testid="text-conversions">
+                          {outcomeMetrics.conversions}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Pipeline Value
+                          </CardTitle>
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-mono" data-testid="text-pipeline-value">
+                          ${outcomeMetrics.estimatedPipelineValue.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Organic Clicks
+                          </CardTitle>
+                          <MousePointer className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-mono" data-testid="text-organic-clicks">
+                          {outcomeMetrics.organicClicks.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Cost per Acquisition
+                          </CardTitle>
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold font-mono" data-testid="text-cpa">
+                          ${outcomeMetrics.cpa.toFixed(2)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                ) : null}
+              </div>
 
               {/* GSC Overview */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -356,7 +393,14 @@ export default function AgencyDashboard() {
                   <CardDescription>Best organic search terms from Google Search Console</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {topQueries.length > 0 ? (
+                  {gscQueriesError && <ErrorAlert title="Query Data Error" message={(gscQueriesError as Error).message || "Failed to load query data"} />}
+                  {gscQueriesLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : topQueries.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -380,9 +424,7 @@ export default function AgencyDashboard() {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-center text-muted-foreground py-8">
-                      {gscLoading ? 'Loading...' : 'No query data available'}
-                    </p>
+                    <p className="text-center text-muted-foreground py-8">No query data available</p>
                   )}
                 </CardContent>
               </Card>

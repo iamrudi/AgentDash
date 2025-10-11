@@ -7,7 +7,9 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, DollarSign, Users, MousePointer, Sparkles, ExternalLink } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, DollarSign, Users, MousePointer, Sparkles, ExternalLink, AlertCircle } from "lucide-react";
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from "recharts";
 import { format, subDays } from "date-fns";
 import { AIChatModal } from "@/components/ai-chat-modal";
@@ -71,37 +73,37 @@ export default function Reports() {
   const compareEndDate = format(subDays(dateFrom, 1), 'yyyy-MM-dd');
 
   // Fetch GA4 data
-  const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
+  const { data: ga4Data, isLoading: ga4Loading, error: ga4Error } = useQuery<GA4Data>({
     queryKey: ['/api/analytics/ga4', clientId, { startDate, endDate }],
     enabled: !!clientId && !!token,
   });
 
   // Fetch GSC data (for impressions chart)
-  const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
+  const { data: gscData, isLoading: gscLoading, error: gscError } = useQuery<GSCData>({
     queryKey: ['/api/analytics/gsc', clientId, { startDate, endDate }],
     enabled: !!clientId && !!token,
   });
 
   // Fetch GSC top queries (for keywords table)
-  const { data: gscQueries } = useQuery<GSCData>({
+  const { data: gscQueries, isLoading: gscQueriesLoading, error: gscQueriesError } = useQuery<GSCData>({
     queryKey: ['/api/analytics/gsc', clientId, 'queries', { startDate, endDate }],
     enabled: !!clientId && !!token,
   });
 
   // Fetch acquisition channels
-  const { data: channelsData } = useQuery<AcquisitionChannelsData>({
+  const { data: channelsData, error: channelsError } = useQuery<AcquisitionChannelsData>({
     queryKey: ['/api/analytics/ga4', clientId, 'channels', { startDate, endDate }],
     enabled: !!clientId && !!token,
   });
 
   // Fetch outcome metrics
-  const { data: outcomeMetrics, isLoading: outcomeLoading } = useQuery<OutcomeMetrics>({
+  const { data: outcomeMetrics, isLoading: outcomeLoading, error: outcomeError } = useQuery<OutcomeMetrics>({
     queryKey: ['/api/analytics/outcome-metrics', clientId, { startDate, endDate }],
     enabled: !!clientId && !!token,
   });
 
   // Fetch comparison data
-  const { data: outcomeCompareMetrics } = useQuery<OutcomeMetrics>({
+  const { data: outcomeCompareMetrics, error: outcomeCompareError } = useQuery<OutcomeMetrics>({
     queryKey: ['/api/analytics/outcome-metrics', clientId, { startDate: compareStartDate, endDate: compareEndDate }],
     enabled: !!clientId && !!token && compareEnabled,
   });
@@ -186,6 +188,33 @@ export default function Reports() {
     );
   };
 
+  const MetricCardSkeleton = () => (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-4 w-4" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-8 w-24 mb-1" />
+        <Skeleton className="h-3 w-20" />
+      </CardContent>
+    </Card>
+  );
+
+  const ErrorAlert = ({ title, message }: { title: string; message: string }) => (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
+  );
+
+  const ChartSkeleton = () => (
+    <div className="space-y-3">
+      <Skeleton className="h-[300px] w-full" />
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6">
       {/* Control Bar */}
@@ -256,80 +285,98 @@ export default function Reports() {
       </div>
 
       {/* Outcome Scorecards */}
+      {outcomeError && (
+        <ErrorAlert 
+          title="Failed to Load Metrics" 
+          message={(outcomeError as Error).message || "Unable to fetch outcome metrics. Please try again."} 
+        />
+      )}
+      
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card data-testid="card-conversions">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Leads/Conversions</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{outcomeLoading ? '...' : (outcomeMetrics?.conversions || 0).toLocaleString()}</div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">Total conversions</p>
-              <ComparisonBadge 
-                current={outcomeMetrics?.conversions || 0} 
-                previous={outcomeCompareMetrics?.conversions || 0} 
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {outcomeLoading ? (
+          <>
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+            <MetricCardSkeleton />
+          </>
+        ) : (
+          <>
+            <Card data-testid="card-conversions">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Leads/Conversions</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{(outcomeMetrics?.conversions || 0).toLocaleString()}</div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Total conversions</p>
+                  <ComparisonBadge 
+                    current={outcomeMetrics?.conversions || 0} 
+                    previous={outcomeCompareMetrics?.conversions || 0} 
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card data-testid="card-pipeline-value">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estimated Pipeline Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {outcomeLoading ? '...' : `$${(outcomeMetrics?.estimatedPipelineValue || 0).toLocaleString()}`}
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">Projected revenue</p>
-              <ComparisonBadge 
-                current={outcomeMetrics?.estimatedPipelineValue || 0} 
-                previous={outcomeCompareMetrics?.estimatedPipelineValue || 0} 
-              />
-            </div>
-          </CardContent>
-        </Card>
+            <Card data-testid="card-pipeline-value">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Estimated Pipeline Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${(outcomeMetrics?.estimatedPipelineValue || 0).toLocaleString()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Projected revenue</p>
+                  <ComparisonBadge 
+                    current={outcomeMetrics?.estimatedPipelineValue || 0} 
+                    previous={outcomeCompareMetrics?.estimatedPipelineValue || 0} 
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card data-testid="card-cpa">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CPA</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {outcomeLoading ? '...' : `$${(outcomeMetrics?.cpa || 0).toLocaleString()}`}
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">Cost per acquisition</p>
-              <ComparisonBadge 
-                current={outcomeMetrics?.cpa || 0} 
-                previous={outcomeCompareMetrics?.cpa || 0} 
-              />
-            </div>
-          </CardContent>
-        </Card>
+            <Card data-testid="card-cpa">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">CPA</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${(outcomeMetrics?.cpa || 0).toLocaleString()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Cost per acquisition</p>
+                  <ComparisonBadge 
+                    current={outcomeMetrics?.cpa || 0} 
+                    previous={outcomeCompareMetrics?.cpa || 0} 
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card data-testid="card-organic-clicks">
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Organic Clicks</CardTitle>
-            <MousePointer className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {outcomeLoading ? '...' : (outcomeMetrics?.organicClicks || 0).toLocaleString()}
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground">From search results</p>
-              <ComparisonBadge 
-                current={outcomeMetrics?.organicClicks || 0} 
-                previous={outcomeCompareMetrics?.organicClicks || 0} 
-              />
-            </div>
-          </CardContent>
-        </Card>
+            <Card data-testid="card-organic-clicks">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Organic Clicks</CardTitle>
+                <MousePointer className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {(outcomeMetrics?.organicClicks || 0).toLocaleString()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">From search results</p>
+                  <ComparisonBadge 
+                    current={outcomeMetrics?.organicClicks || 0} 
+                    previous={outcomeCompareMetrics?.organicClicks || 0} 
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Two-Column Layout */}
@@ -343,17 +390,23 @@ export default function Reports() {
               <CardDescription>GA4 Sessions and GSC Clicks over time</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={combinedTrafficData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} name="Sessions" />
-                  <Line type="monotone" dataKey="clicks" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Organic Clicks" />
-                </LineChart>
-              </ResponsiveContainer>
+              {ga4Error && <ErrorAlert title="GA4 Data Error" message={(ga4Error as Error).message || "Failed to load GA4 data"} />}
+              {gscError && <ErrorAlert title="GSC Data Error" message={(gscError as Error).message || "Failed to load GSC data"} />}
+              {(ga4Loading || gscLoading) ? (
+                <ChartSkeleton />
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={combinedTrafficData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} name="Sessions" />
+                    <Line type="monotone" dataKey="clicks" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Organic Clicks" />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -364,16 +417,21 @@ export default function Reports() {
               <CardDescription>Session distribution across sources</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={channelsChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="channel" type="category" width={100} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="sessions" fill="hsl(var(--primary))" name="Sessions" />
-                </BarChart>
-              </ResponsiveContainer>
+              {channelsError && <ErrorAlert title="Channel Data Error" message={(channelsError as Error).message || "Failed to load channel data"} />}
+              {ga4Loading ? (
+                <ChartSkeleton />
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={channelsChartData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis dataKey="channel" type="category" width={100} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="sessions" fill="hsl(var(--primary))" name="Sessions" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -387,16 +445,21 @@ export default function Reports() {
               <CardDescription>Organic visibility over time</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={impressionsChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="impressions" stroke="hsl(var(--chart-3))" strokeWidth={2} name="Impressions" />
-                </LineChart>
-              </ResponsiveContainer>
+              {gscError && <ErrorAlert title="GSC Data Error" message={(gscError as Error).message || "Failed to load GSC data"} />}
+              {gscLoading ? (
+                <ChartSkeleton />
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={impressionsChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="impressions" stroke="hsl(var(--chart-3))" strokeWidth={2} name="Impressions" />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -407,7 +470,14 @@ export default function Reports() {
               <CardDescription>Your best organic search terms</CardDescription>
             </CardHeader>
             <CardContent>
-              {topQueries.length > 0 ? (
+              {gscQueriesError && <ErrorAlert title="Query Data Error" message={(gscQueriesError as Error).message || "Failed to load query data"} />}
+              {gscQueriesLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : topQueries.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -431,9 +501,7 @@ export default function Reports() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  {gscLoading ? 'Loading...' : 'No query data available'}
-                </p>
+                <p className="text-center text-muted-foreground py-8">No query data available</p>
               )}
             </CardContent>
           </Card>
