@@ -114,3 +114,68 @@ Analyze this data and generate 2-5 strategic recommendations focusing on:
     throw new Error(`Failed to analyze client metrics: ${error}`);
   }
 }
+
+export async function analyzeDataOnDemand(
+  clientName: string,
+  contextData: any,
+  question: string
+): Promise<RecommendationOutput> {
+  try {
+    const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.
+The client is asking a question about a specific dataset. Your task is to:
+1. Analyze the provided data in the context of their question.
+2. Provide a clear, concise observation.
+3. Propose a single, actionable next step that the agency could perform for a fee.
+4. Frame this as a single, valuable "Initiative" or "Recommendation".
+5. Estimate the impact and a reasonable one-time cost for this action.
+
+Respond with a single JSON object matching the required schema.`;
+
+    const prompt = `
+CLIENT: ${clientName}
+CONTEXT DATA:
+${JSON.stringify(contextData, null, 2)}
+
+CLIENT'S QUESTION: "${question}"
+
+Based on the data and the question, generate a single, actionable recommendation.
+- The title should be a summary of the proposed action.
+- The observation must directly answer their question using the data.
+- The proposed action should be a clear service the agency can offer.
+- The trigger metric should be the primary data point from the context (e.g., 'Clicks', 'CTR', 'Impressions').
+- The baseline value should be a key value from the data relevant to the observation.
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            observation: { type: "string" },
+            proposedAction: { type: "string" },
+            impact: { type: "string", enum: ["High", "Medium", "Low"] },
+            estimatedCost: { type: "number" },
+            triggerMetric: { type: "string" },
+            baselineValue: { type: "number" },
+          },
+          required: ["title", "observation", "proposedAction", "impact", "estimatedCost", "triggerMetric", "baselineValue"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (rawJson) {
+      return JSON.parse(rawJson) as RecommendationOutput;
+    } else {
+      throw new Error("Empty response from Gemini AI");
+    }
+  } catch (error) {
+    console.error("Gemini on-demand analysis error:", error);
+    throw new Error(`Failed to analyze data on demand: ${error}`);
+  }
+}

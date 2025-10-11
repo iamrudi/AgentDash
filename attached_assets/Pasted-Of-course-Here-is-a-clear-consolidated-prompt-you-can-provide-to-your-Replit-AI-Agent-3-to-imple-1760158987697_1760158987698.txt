@@ -1,0 +1,342 @@
+Of course. Here is a clear, consolidated prompt you can provide to your Replit AI, Agent 3, to implement the interactive "Chat with your Data" feature.
+
+Prompt for Replit AI (Agent 3)
+Objective: We will implement a new feature called "Chat with your Data" on the Client Reports page (/client/reports). This feature will allow clients to ask questions about their data, receive AI-generated recommendations, and request action on those recommendations, which will then be billable by the agency. This implementation follows the blueprint specifications.
+
+Please execute the following steps precisely.
+
+Step 1: Implement the Backend Logic
+
+Open server/gemini.ts and add the new analyzeDataOnDemand function. This function will handle contextual, on-demand analysis for the client chat feature.
+
+TypeScript
+
+// ... (keep existing imports and the analyzeClientMetrics function)
+
+export async function analyzeDataOnDemand(
+  clientName: string,
+  contextData: any,
+  question: string
+): Promise<RecommendationOutput> {
+  try {
+    const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.
+The client is asking a question about a specific dataset. Your task is to:
+1.  Analyze the provided data in the context of their question.
+2.  Provide a clear, concise observation.
+3.  Propose a single, actionable next step that the agency could perform for a fee.
+4.  Frame this as a single, valuable "Initiative" or "Recommendation".
+5.  Estimate the impact and a reasonable one-time cost for this action.
+
+Respond with a single JSON object matching the required schema.`;
+
+    const prompt = `
+CLIENT: ${clientName}
+CONTEXT DATA:
+${JSON.stringify(contextData, null, 2)}
+
+CLIENT'S QUESTION: "${question}"
+
+Based on the data and the question, generate a single, actionable recommendation.
+- The title should be a summary of the proposed action.
+- The observation must directly answer their question using the data.
+- The proposed action should be a clear service the agency can offer.
+- The trigger metric should be the primary data point from the context (e.g., 'Clicks', 'CTR', 'Impressions').
+- The baseline value should be a key value from the data relevant to the observation.
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            observation: { type: "string" },
+            proposedAction: { type: "string" },
+            impact: { type: "string", enum: ["High", "Medium", "Low"] },
+            estimatedCost: { type: "number" },
+            triggerMetric: { type: "string" },
+            baselineValue: { type: "number" },
+          },
+          required: ["title", "observation", "proposedAction", "impact", "estimatedCost", "triggerMetric", "baselineValue"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (rawJson) {
+      return JSON.parse(rawJson) as RecommendationOutput;
+    } else {
+      throw new Error("Empty response from Gemini AI");
+    }
+  } catch (error) {
+    console.error("Gemini on-demand analysis error:", error);
+    throw new Error(`Failed to analyze data on demand: ${error}`);
+  }
+}
+Open server/routes.ts and add two new API endpoints inside the registerRoutes function to handle the AI chat and action requests.
+
+TypeScript
+
+// Add this import at the top of routes.ts
+import { analyzeDataOnDemand } from "./gemini";
+
+// Add these routes inside the registerRoutes function
+app.post("/api/ai/analyze-data", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+  try {
+    const { contextData, question } = req.body;
+    const profile = await storage.getProfileByUserId(req.user!.id);
+    const client = await storage.getClientByProfileId(profile!.id);
+
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    const analysis = await analyzeDataOnDemand(
+      client.companyName,
+      contextData,
+      question
+    );
+
+    res.json(analysis);
+  } catch (error: any) {
+    console.error("On-demand AI analysis error:", error);
+    res.status(500).json({ message: error.message || "Failed to get analysis" });
+  }
+});
+
+app.post("/api/ai/request-action", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+  try {
+    const recommendation = req.body;
+    const profile = await storage.getProfileByUserId(req.user!.id);
+    const client = await storage.getClientByProfileId(profile!.id);
+
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    const initiative = await storage.createInitiative({
+      clientId: client.id,
+      title: recommendation.title,
+      observation: recommendation.observation,
+      proposedAction: recommendation.proposedAction,
+      cost: recommendation.estimatedCost.toString(),
+      impact: recommendation.impact,
+      status: "Needs Review",
+      triggerMetric: recommendation.triggerMetric,
+      baselineValue: recommendation.baselineValue.toString(),
+      sentToClient: "false",
+    });
+
+    res.status(201).json({ initiativeId: initiative.id, message: "Recommendation submitted for review." });
+  } catch (error: any) {
+    console.error("AI request action error:", error);
+    res.status(500).json({ message: error.message || "Failed to submit recommendation" });
+  }
+});
+Step 2: Implement the Frontend UI
+
+Create a new file at client/src/components/ai-chat-modal.tsx. Populate it with the following code to create the reusable chat modal component.
+
+TypeScript
+
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Sparkles, Send, Loader2, ThumbsUp, MessageSquare } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+interface AIChatModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  contextData: any;
+  initialQuestion: string;
+}
+
+interface AIAnalysisResult {
+  title: string;
+  observation: string;
+  proposedAction: string;
+  impact: "High" | "Medium" | "Low";
+  estimatedCost: number;
+  triggerMetric: string;
+  baselineValue: number;
+}
+
+export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: AIChatModalProps) {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [question, setQuestion] = useState(initialQuestion);
+  const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
+
+  const analyzeMutation = useMutation({
+    mutationFn: (userQuestion: string) => 
+      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }).then(res => res.json()),
+    onSuccess: (data: AIAnalysisResult) => {
+      setAnalysis(data);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Analysis Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const requestActionMutation = useMutation({
+    mutationFn: (recommendation: AIAnalysisResult) => 
+      apiRequest("POST", "/api/ai/request-action", recommendation),
+    onSuccess: () => {
+      toast({
+        title: "Action Requested!",
+        description: "Your request has been sent to the agency for review. You can track it on the Recommendations page.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/client/initiatives"] });
+      onClose();
+      setLocation("/client/recommendations");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAsk = () => {
+    if (!question.trim()) return;
+    setAnalysis(null);
+    analyzeMutation.mutate(question);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Ask AI about your Data
+          </DialogTitle>
+          <DialogDescription>
+            Get instant insights and actionable recommendations based on your performance metrics.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="ai-question">Your Question</Label>
+            <Textarea
+              id="ai-question"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ask a question about your data..."
+              rows={3}
+              className="mt-1"
+            />
+          </div>
+          <Button onClick={handleAsk} disabled={analyzeMutation.isPending}>
+            {analyzeMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            {analyzeMutation.isPending ? "Analyzing..." : "Ask Question"}
+          </Button>
+
+          {analysis && (
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="font-semibold text-lg">{analysis.title}</h3>
+              <div>
+                <h4 className="font-medium text-sm mb-1">Observation</h4>
+                <p className="text-sm text-muted-foreground">{analysis.observation}</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-sm mb-1">Proposed Action</h4>
+                <p className="text-sm text-muted-foreground">{analysis.proposedAction}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <Badge variant="secondary">Impact: {analysis.impact}</Badge>
+                <Badge variant="secondary">Cost: ${analysis.estimatedCost.toLocaleString()}</Badge>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {analysis && (
+          <DialogFooter className="border-t pt-4">
+            <div className="flex w-full justify-between items-center">
+                <p className="text-sm text-muted-foreground">Happy with this suggestion?</p>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setLocation('/client/support')}>
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        Discuss with My AM
+                    </Button>
+                    <Button 
+                        size="sm"
+                        onClick={() => requestActionMutation.mutate(analysis)}
+                        disabled={requestActionMutation.isPending}
+                    >
+                        {requestActionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <ThumbsUp className="h-4 w-4 mr-2" />
+                        Request Action on This
+                    </Button>
+                </div>
+            </div>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+Open client/src/pages/client/reports.tsx and modify it to include and control the new AI chat modal.
+
+TypeScript
+
+// Add these imports at the top
+import { AIChatModal } from "@/components/ai-chat-modal";
+import { apiRequest } from "@/lib/queryClient";
+
+export default function Reports() {
+  // ... (keep existing state)
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
+  // ... (keep existing data fetching)
+
+  // Find the "Top Performing Queries" Card and update the "Ask AI" button
+  // ... in the JSX ...
+  <Button 
+    variant="outline" 
+    size="sm" 
+    className="gap-2" 
+    data-testid="button-ask-ai"
+    onClick={() => setIsAiModalOpen(true)}
+    disabled={!topQueries || topQueries.length === 0}
+  >
+    <Sparkles className="h-4 w-4" />
+    Ask AI
+  </Button>
+
+  // ... at the end of the main component return ...
+  <AIChatModal
+    isOpen={isAiModalOpen}
+    onClose={() => setIsAiModalOpen(false)}
+    contextData={{
+      type: "Top Performing Search Queries",
+      data: topQueries,
+    }}
+    initialQuestion="Based on my top queries, what is one new blog post I could write to attract more clicks?"
+  />
+</div>
+);
+}

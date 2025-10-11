@@ -11,6 +11,7 @@ import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
+import { analyzeDataOnDemand } from "./gemini";
 import express from "express";
 import path from "path";
 
@@ -1577,6 +1578,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // AI Chat & Data Analysis API (Client only)
+  
+  // Analyze data on demand
+  app.post("/api/ai/analyze-data", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const analyzeDataSchema = z.object({
+        contextData: z.any(),
+        question: z.string().min(1, "Question is required"),
+      });
+
+      const validationResult = analyzeDataSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ message: "Invalid request data", errors: validationResult.error.errors });
+      }
+
+      const { contextData, question } = validationResult.data;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const analysis = await analyzeDataOnDemand(
+        client.companyName,
+        contextData,
+        question
+      );
+
+      res.json(analysis);
+    } catch (error: any) {
+      console.error("On-demand AI analysis error:", error);
+      res.status(500).json({ message: error.message || "Failed to get analysis" });
+    }
+  });
+
+  // Request action on AI recommendation
+  app.post("/api/ai/request-action", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const recommendationSchema = z.object({
+        title: z.string().min(1),
+        observation: z.string().min(1),
+        proposedAction: z.string().min(1),
+        impact: z.enum(["High", "Medium", "Low"]),
+        estimatedCost: z.number().min(0),
+        triggerMetric: z.string().min(1),
+        baselineValue: z.number(),
+      });
+
+      const validationResult = recommendationSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ message: "Invalid recommendation data", errors: validationResult.error.errors });
+      }
+
+      const recommendation = validationResult.data;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const initiative = await storage.createInitiative({
+        clientId: client.id,
+        title: recommendation.title,
+        observation: recommendation.observation,
+        proposedAction: recommendation.proposedAction,
+        cost: recommendation.estimatedCost.toString(),
+        impact: recommendation.impact,
+        status: "Needs Review",
+        triggerMetric: recommendation.triggerMetric,
+        baselineValue: recommendation.baselineValue.toString(),
+        sentToClient: "false",
+      });
+
+      res.status(201).json({ initiativeId: initiative.id, message: "Recommendation submitted for review." });
+    } catch (error: any) {
+      console.error("AI request action error:", error);
+      res.status(500).json({ message: error.message || "Failed to submit recommendation" });
     }
   });
 

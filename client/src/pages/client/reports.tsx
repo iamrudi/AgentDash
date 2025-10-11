@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, DollarSign, Users, MousePointer, Sparkles, ExternalLink } from "lucide-react";
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from "recharts";
 import { format, subDays } from "date-fns";
+import { AIChatModal } from "@/components/ai-chat-modal";
 
 interface GA4Data {
   rows: Array<{
@@ -55,6 +56,7 @@ export default function Reports() {
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 30));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [compareEnabled, setCompareEnabled] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
   const authUser = localStorage.getItem("authUser");
   const parsedAuthUser = authUser ? JSON.parse(authUser) : null;
@@ -397,7 +399,14 @@ export default function Reports() {
                   <CardTitle>Top Performing Queries</CardTitle>
                   <CardDescription>Your best organic search terms</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="gap-2" data-testid="button-ask-ai">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2" 
+                  data-testid="button-ask-ai"
+                  onClick={() => setIsAiModalOpen(true)}
+                  disabled={!topQueries || topQueries.length === 0}
+                >
                   <Sparkles className="h-4 w-4" />
                   Ask AI
                 </Button>
@@ -436,6 +445,16 @@ export default function Reports() {
           </Card>
         </div>
       </div>
+
+      <AIChatModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        contextData={{
+          type: "Top Performing Search Queries",
+          data: topQueries,
+        }}
+        initialQuestion="Based on my top queries, what is one new blog post I could write to attract more clicks?"
+      />
     </div>
   );
 }
