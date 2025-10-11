@@ -1085,6 +1085,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get outcome metrics (Pipeline Value, CPA, conversions, organic clicks) for Reports page
+  app.get("/api/analytics/outcome-metrics/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { startDate, endDate } = req.query;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own analytics
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Get client data for pipeline calculation
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Default to last 30 days if not specified
+      const end = endDate as string || new Date().toISOString().split('T')[0];
+      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      // Initialize metrics
+      let totalConversions = 0;
+      let totalSpend = 0;
+      let totalOrganicClicks = 0;
+
+      // Try to get conversions from GA4
+      const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken) {
+        try {
+          // Check if token is expired and refresh if needed
+          let integration = ga4Integration;
+          if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+            if (integration.refreshToken) {
+              const newTokens = await refreshAccessToken(integration.refreshToken);
+              integration = await storage.updateIntegration(integration.id, {
+                accessToken: newTokens.accessToken,
+                expiresAt: newTokens.expiresAt,
+              });
+            }
+          }
+
+          // Note: GA4 doesn't have "conversions" metric by default - would need to set up conversion events
+          // For now, we'll rely on dailyMetrics table for conversion data
+        } catch (error) {
+          console.error("Error fetching GA4 conversion data:", error);
+        }
+      }
+
+      // Get conversions and spend from dailyMetrics table
+      const dailyMetrics = await storage.getMetricsByClientId(clientId);
+      if (dailyMetrics && dailyMetrics.length > 0) {
+        // Filter by date range
+        const startTimestamp = new Date(start).getTime();
+        const endTimestamp = new Date(end).getTime();
+        
+        const filteredMetrics = dailyMetrics.filter((metric: any) => {
+          const metricTimestamp = new Date(metric.date).getTime();
+          return metricTimestamp >= startTimestamp && metricTimestamp <= endTimestamp;
+        });
+
+        totalConversions = filteredMetrics.reduce((sum: number, metric: any) => sum + (metric.conversions || 0), 0);
+        totalSpend = filteredMetrics.reduce((sum: number, metric: any) => sum + parseFloat(metric.spend || '0'), 0);
+      }
+
+      // Get organic clicks from GSC
+      const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      if (gscIntegration && gscIntegration.gscSiteUrl && gscIntegration.accessToken) {
+        try {
+          // Check if token is expired and refresh if needed
+          let integration = gscIntegration;
+          if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+            if (integration.refreshToken) {
+              const newTokens = await refreshAccessToken(integration.refreshToken);
+              integration = await storage.updateIntegration(integration.id, {
+                accessToken: newTokens.accessToken,
+                expiresAt: newTokens.expiresAt,
+              });
+            }
+          }
+
+          if (integration.accessToken) {
+            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end);
+            totalOrganicClicks = gscData.rows?.reduce((sum: number, row: any) => sum + (row.clicks || 0), 0) || 0;
+          }
+        } catch (error) {
+          console.error("Error fetching GSC data:", error);
+        }
+      }
+
+      // Calculate Pipeline Value
+      const leadToOpportunityRate = parseFloat(client.leadToOpportunityRate || '0');
+      const opportunityToCloseRate = parseFloat(client.opportunityToCloseRate || '0');
+      const averageDealSize = parseFloat(client.averageDealSize || '0');
+      
+      const estimatedPipelineValue = totalConversions * leadToOpportunityRate * opportunityToCloseRate * averageDealSize;
+
+      // Calculate CPA (Cost Per Acquisition)
+      const cpa = totalConversions > 0 ? totalSpend / totalConversions : 0;
+
+      res.json({
+        conversions: totalConversions,
+        estimatedPipelineValue: Math.round(estimatedPipelineValue),
+        cpa: Math.round(cpa * 100) / 100, // Round to 2 decimal places
+        organicClicks: totalOrganicClicks,
+        spend: totalSpend,
+        // Include the rates for transparency
+        pipelineCalculation: {
+          leadToOpportunityRate,
+          opportunityToCloseRate,
+          averageDealSize,
+        }
+      });
+    } catch (error: any) {
+      console.error("Fetch outcome metrics error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch outcome metrics" });
+    }
+  });
+
   // Client Objectives API
 
   // Get objectives for a client (Admin only)

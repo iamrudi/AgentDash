@@ -6,9 +6,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, TrendingUp, Users, Eye, MousePointer, ArrowUp, Calendar, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from "recharts";
-import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, DollarSign, Users, MousePointer, Sparkles, ExternalLink } from "lucide-react";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Pie, PieChart, Cell } from "recharts";
 import { format, subDays } from "date-fns";
 
 interface GA4Data {
@@ -36,28 +36,34 @@ interface AcquisitionChannelsData {
     dimensionValues: Array<{ value: string }>;
     metricValues: Array<{ value: string }>;
   }>;
-  totals?: Array<{
-    metricValues: Array<{ value: string }>;
-  }>;
+}
+
+interface OutcomeMetrics {
+  conversions: number;
+  estimatedPipelineValue: number;
+  cpa: number;
+  organicClicks: number;
+  spend: number;
+  pipelineCalculation: {
+    leadToOpportunityRate: number;
+    opportunityToCloseRate: number;
+    averageDealSize: number;
+  };
 }
 
 export default function Reports() {
-  const { toast } = useToast();
   const [dateFrom, setDateFrom] = useState<Date>(subDays(new Date(), 30));
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [compareEnabled, setCompareEnabled] = useState(false);
 
-  // Get current user's client ID and token from localStorage
   const authUser = localStorage.getItem("authUser");
   const parsedAuthUser = authUser ? JSON.parse(authUser) : null;
   const clientId = parsedAuthUser?.clientId || null;
   const token = parsedAuthUser?.token || null;
 
-  // Calculate date ranges
   const startDate = format(dateFrom, 'yyyy-MM-dd');
   const endDate = format(dateTo, 'yyyy-MM-dd');
   
-  // Calculate comparison period (same length as selected period)
   const daysDiff = Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24));
   const compareStartDate = format(subDays(dateFrom, daysDiff + 1), 'yyyy-MM-dd');
   const compareEndDate = format(subDays(dateFrom, 1), 'yyyy-MM-dd');
@@ -65,78 +71,33 @@ export default function Reports() {
   // Fetch GA4 data
   const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
     queryKey: ["/api/analytics/ga4", clientId, startDate, endDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/ga4/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch GA4 data');
-      return res.json();
-    },
     enabled: !!clientId && !!token,
   });
 
   // Fetch GSC data
   const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
     queryKey: ["/api/analytics/gsc", clientId, startDate, endDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/gsc/${clientId}?startDate=${startDate}&endDate=${endDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch GSC data');
-      return res.json();
-    },
     enabled: !!clientId && !!token,
   });
 
-  // Fetch comparison data if enabled
-  const { data: ga4CompareData } = useQuery<GA4Data>({
-    queryKey: ["/api/analytics/ga4", clientId, compareStartDate, compareEndDate, "compare"],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/ga4/${clientId}?startDate=${compareStartDate}&endDate=${compareEndDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch comparison GA4 data');
-      return res.json();
-    },
-    enabled: !!clientId && !!token && compareEnabled,
-  });
-
-  const { data: gscCompareData } = useQuery<GSCData>({
-    queryKey: ["/api/analytics/gsc", clientId, compareStartDate, compareEndDate, "compare"],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/gsc/${clientId}?startDate=${compareStartDate}&endDate=${compareEndDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch comparison GSC data');
-      return res.json();
-    },
-    enabled: !!clientId && !!token && compareEnabled,
-  });
-
-  // Fetch acquisition channels data
-  const { data: channelsData, isLoading: channelsLoading } = useQuery<AcquisitionChannelsData>({
+  // Fetch acquisition channels
+  const { data: channelsData } = useQuery<AcquisitionChannelsData>({
     queryKey: ["/api/analytics/ga4", clientId, "channels", startDate, endDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/analytics/ga4/${clientId}/channels?startDate=${startDate}&endDate=${endDate}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) throw new Error('Failed to fetch acquisition channels data');
-      return res.json();
-    },
     enabled: !!clientId && !!token,
   });
 
-  // Helper function to parse GA4 date format (YYYYMMDD)
+  // Fetch outcome metrics
+  const { data: outcomeMetrics, isLoading: outcomeLoading } = useQuery<OutcomeMetrics>({
+    queryKey: ["/api/analytics/outcome-metrics", clientId, startDate, endDate],
+    enabled: !!clientId && !!token,
+  });
+
+  // Fetch comparison data
+  const { data: outcomeCompareMetrics } = useQuery<OutcomeMetrics>({
+    queryKey: ["/api/analytics/outcome-metrics", clientId, compareStartDate, compareEndDate, "compare"],
+    enabled: !!clientId && !!token && compareEnabled,
+  });
+
   const parseGA4Date = (dateStr: string) => {
     if (!dateStr || dateStr.length !== 8) return 'Invalid Date';
     const year = dateStr.substring(0, 4);
@@ -145,10 +106,9 @@ export default function Reports() {
     return new Date(`${year}-${month}-${day}`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Process GA4 data for charts
-  const ga4ChartData = (ga4Data?.rows ?? []).map(row => {
+  // Process combined traffic chart data (GA4 Sessions + GSC Clicks)
+  const trafficChartData = (ga4Data?.rows ?? []).map(row => {
     const dateStr = row.dimensionValues[0]?.value || '';
-    // Parse YYYYMMDD to actual Date for proper sorting
     const year = dateStr.substring(0, 4);
     const month = dateStr.substring(4, 6);
     const day = dateStr.substring(6, 8);
@@ -158,73 +118,53 @@ export default function Reports() {
       dateObj,
       date: parseGA4Date(dateStr),
       sessions: parseInt(row.metricValues[0]?.value || '0'),
-      users: parseInt(row.metricValues[1]?.value || '0'),
-      pageviews: parseInt(row.metricValues[2]?.value || '0'),
-      engagedSessions: parseInt(row.metricValues[3]?.value || '0'),
     };
   }).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
-  // Process GSC data for charts
-  const gscChartData = gscData?.rows?.map(row => ({
+  // Add GSC clicks to traffic data
+  const gscChartData = (gscData?.rows ?? []).map(row => ({
     date: row.keys[0] ? new Date(row.keys[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
     clicks: row.clicks || 0,
-    impressions: row.impressions || 0,
-    ctr: (row.ctr || 0) * 100,
-    position: row.position || 0,
-  })) || [];
+  }));
 
-  // Process acquisition channels data for charts
-  const channelsChartData = channelsData?.rows?.map(row => ({
+  // Merge GA4 and GSC data by date
+  const combinedTrafficData = trafficChartData.map(ga4Point => {
+    const gscPoint = gscChartData.find(gsc => gsc.date === ga4Point.date);
+    return {
+      date: ga4Point.date,
+      sessions: ga4Point.sessions,
+      clicks: gscPoint?.clicks || 0,
+    };
+  });
+
+  // Process GSC impressions chart data
+  const impressionsChartData = (gscData?.rows ?? []).map(row => ({
+    date: row.keys[0] ? new Date(row.keys[0]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+    impressions: row.impressions || 0,
+  }));
+
+  // Process acquisition channels for donut chart
+  const channelsChartData = (channelsData?.rows ?? []).map(row => ({
     channel: row.dimensionValues[0]?.value || 'Unknown',
     sessions: parseInt(row.metricValues[0]?.value || '0'),
-    users: parseInt(row.metricValues[1]?.value || '0'),
-  })).sort((a, b) => b.sessions - a.sessions) || [];
+  })).sort((a, b) => b.sessions - a.sessions);
 
-  // Calculate totals from row data (GA4 API doesn't always return totals)
-  const totalSessions = ga4ChartData.reduce((sum, row) => sum + row.sessions, 0);
-  const totalUsers = ga4ChartData.reduce((sum, row) => sum + row.users, 0);
-  const totalPageviews = ga4ChartData.reduce((sum, row) => sum + row.pageviews, 0);
-  const totalEngagedSessions = ga4ChartData.reduce((sum, row) => sum + row.engagedSessions, 0);
+  // Top performing queries
+  const topQueries = (gscData?.rows ?? [])
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 10);
 
-  const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
-  const totalImpressions = gscData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
-  const avgCTR = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : '0';
-  const avgPosition = gscData?.rows?.length 
-    ? (gscData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscData.rows.length).toFixed(1)
-    : '0';
+  // Channel colors for donut chart
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-  // Calculate comparison totals from row data (GA4 API doesn't always return totals)
-  const ga4CompareChartData = (ga4CompareData?.rows ?? []).map(row => ({
-    sessions: parseInt(row.metricValues[0]?.value || '0'),
-    users: parseInt(row.metricValues[1]?.value || '0'),
-    pageviews: parseInt(row.metricValues[2]?.value || '0'),
-    engagedSessions: parseInt(row.metricValues[3]?.value || '0'),
-  }));
-  
-  const compareSessionsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.sessions, 0);
-  const compareUsersTotal = ga4CompareChartData.reduce((sum, row) => sum + row.users, 0);
-  const comparePageviewsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.pageviews, 0);
-  const compareEngagedSessionsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.engagedSessions, 0);
-
-  const compareClicksTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
-  const compareImpressionsTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
-  const compareAvgCTR = compareImpressionsTotal > 0 ? ((compareClicksTotal / compareImpressionsTotal) * 100).toFixed(2) : '0';
-  const compareAvgPosition = gscCompareData?.rows?.length 
-    ? (gscCompareData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscCompareData.rows.length).toFixed(1)
-    : '0';
-
-  // Helper to calculate percentage change
   const calcChange = (current: number, previous: number) => {
     if (previous === 0) {
-      // If previous is 0 and current is greater than 0, it's a new metric (infinite growth)
       if (current > 0) return Infinity;
-      // If both are 0, no change
       return 0;
     }
     return ((current - previous) / previous) * 100;
   };
 
-  // Helper to render comparison badge
   const ComparisonBadge = ({ current, previous }: { current: number; previous: number }) => {
     if (!compareEnabled) return null;
     const change = calcChange(current, previous);
@@ -243,10 +183,11 @@ export default function Reports() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Control Bar */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold" data-testid="heading-reports">Analytics Reports</h1>
-          <p className="text-muted-foreground mt-1">Google Analytics 4 and Search Console metrics</p>
+          <p className="text-muted-foreground mt-1">Outcome-focused insights and performance metrics</p>
         </div>
         
         <div className="flex items-center gap-4">
@@ -292,229 +233,214 @@ export default function Reports() {
               </div>
             </PopoverContent>
           </Popover>
+
+          <Button variant="outline" className="gap-2" data-testid="button-looker-studio">
+            <ExternalLink className="h-4 w-4" />
+            View Full Report
+          </Button>
         </div>
       </div>
 
-      {/* Google Analytics 4 Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-semibold">Google Analytics 4</h2>
-        </div>
+      {/* Outcome Scorecards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card data-testid="card-conversions">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Leads/Conversions</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{outcomeLoading ? '...' : (outcomeMetrics?.conversions || 0).toLocaleString()}</div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">Total conversions</p>
+              <ComparisonBadge 
+                current={outcomeMetrics?.conversions || 0} 
+                previous={outcomeCompareMetrics?.conversions || 0} 
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* GA4 Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-sessions">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Sessions</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{ga4Loading ? '...' : totalSessions.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Total user sessions</p>
-                <ComparisonBadge current={totalSessions} previous={compareSessionsTotal} />
-              </div>
-            </CardContent>
-          </Card>
+        <Card data-testid="card-pipeline-value">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Estimated Pipeline Value</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {outcomeLoading ? '...' : `$${(outcomeMetrics?.estimatedPipelineValue || 0).toLocaleString()}`}
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">Projected revenue</p>
+              <ComparisonBadge 
+                current={outcomeMetrics?.estimatedPipelineValue || 0} 
+                previous={outcomeCompareMetrics?.estimatedPipelineValue || 0} 
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card data-testid="card-users">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{ga4Loading ? '...' : totalUsers.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Total unique users</p>
-                <ComparisonBadge current={totalUsers} previous={compareUsersTotal} />
-              </div>
-            </CardContent>
-          </Card>
+        <Card data-testid="card-cpa">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">CPA</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {outcomeLoading ? '...' : `$${(outcomeMetrics?.cpa || 0).toLocaleString()}`}
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">Cost per acquisition</p>
+              <ComparisonBadge 
+                current={outcomeMetrics?.cpa || 0} 
+                previous={outcomeCompareMetrics?.cpa || 0} 
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card data-testid="card-pageviews">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pageviews</CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{ga4Loading ? '...' : totalPageviews.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Total page views</p>
-                <ComparisonBadge current={totalPageviews} previous={comparePageviewsTotal} />
-              </div>
-            </CardContent>
-          </Card>
+        <Card data-testid="card-organic-clicks">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Organic Clicks</CardTitle>
+            <MousePointer className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {outcomeLoading ? '...' : (outcomeMetrics?.organicClicks || 0).toLocaleString()}
+            </div>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">From search results</p>
+              <ComparisonBadge 
+                current={outcomeMetrics?.organicClicks || 0} 
+                previous={outcomeCompareMetrics?.organicClicks || 0} 
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card data-testid="card-engaged-sessions">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Engaged Sessions</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{ga4Loading ? '...' : totalEngagedSessions.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Sessions with engagement</p>
-                <ComparisonBadge current={totalEngagedSessions} previous={compareEngagedSessionsTotal} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* GA4 Chart */}
-        {ga4ChartData.length > 0 ? (
-          <Card data-testid="card-ga4-chart">
+      {/* Two-Column Layout */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left Column: Traffic Story */}
+        <div className="space-y-6">
+          {/* Combined Traffic Chart */}
+          <Card data-testid="card-traffic-overview">
             <CardHeader>
               <CardTitle>Traffic Overview</CardTitle>
-              <CardDescription>Sessions, users, and pageviews over time</CardDescription>
+              <CardDescription>GA4 Sessions and GSC Clicks over time</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={ga4ChartData}>
+                <LineChart data={combinedTrafficData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
                   <Legend />
                   <Line type="monotone" dataKey="sessions" stroke="hsl(var(--primary))" strokeWidth={2} name="Sessions" />
-                  <Line type="monotone" dataKey="users" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Users" />
-                  <Line type="monotone" dataKey="pageviews" stroke="hsl(var(--chart-3))" strokeWidth={2} name="Pageviews" />
+                  <Line type="monotone" dataKey="clicks" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Organic Clicks" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        ) : !ga4Loading && (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No GA4 data available. Make sure your Google Analytics 4 integration is connected.
-            </CardContent>
-          </Card>
-        )}
-        {/* Acquisition Channels Chart */}
-        {channelsChartData.length > 0 ? (
-          <Card data-testid="card-acquisition-channels">
+
+          {/* Traffic by Channel Donut Chart */}
+          <Card data-testid="card-traffic-channels">
             <CardHeader>
-              <CardTitle>Acquisition Channels</CardTitle>
-              <CardDescription>Traffic sources and channel performance</CardDescription>
+              <CardTitle>Traffic by Channel</CardTitle>
+              <CardDescription>Session distribution across sources</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={channelsChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="channel" type="category" width={120} />
+                <PieChart>
+                  <Pie
+                    data={channelsChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(entry) => `${entry.channel}: ${entry.sessions}`}
+                    outerRadius={80}
+                    fill="hsl(var(--primary))"
+                    dataKey="sessions"
+                  >
+                    {channelsChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
                   <Tooltip />
-                  <Legend />
-                  <Bar dataKey="sessions" fill="hsl(var(--primary))" name="Sessions" />
-                  <Bar dataKey="users" fill="hsl(var(--chart-2))" name="Users" />
-                </BarChart>
+                </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        ) : !channelsLoading && (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No acquisition channels data available.
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* Google Search Console Section */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <MousePointer className="h-5 w-5 text-primary" />
-          <h2 className="text-2xl font-semibold">Google Search Console</h2>
         </div>
 
-        {/* GSC Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-clicks">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Clicks</CardTitle>
-              <MousePointer className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{gscLoading ? '...' : totalClicks.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Total search clicks</p>
-                <ComparisonBadge current={totalClicks} previous={compareClicksTotal} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-impressions">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Impressions</CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{gscLoading ? '...' : totalImpressions.toLocaleString()}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Total search impressions</p>
-                <ComparisonBadge current={totalImpressions} previous={compareImpressionsTotal} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-ctr">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">CTR</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{gscLoading ? '...' : avgCTR}%</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Click-through rate</p>
-                <ComparisonBadge current={parseFloat(avgCTR)} previous={parseFloat(compareAvgCTR)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-position">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg Position</CardTitle>
-              <ArrowUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{gscLoading ? '...' : avgPosition}</div>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Average search position</p>
-                <ComparisonBadge current={parseFloat(avgPosition)} previous={parseFloat(compareAvgPosition)} />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* GSC Chart */}
-        {gscChartData.length > 0 ? (
-          <Card data-testid="card-gsc-chart">
+        {/* Right Column: SEO Story */}
+        <div className="space-y-6">
+          {/* GSC Impressions Chart */}
+          <Card data-testid="card-seo-impressions">
             <CardHeader>
-              <CardTitle>Search Performance</CardTitle>
-              <CardDescription>Clicks and impressions over time</CardDescription>
+              <CardTitle>Search Impressions</CardTitle>
+              <CardDescription>Organic visibility over time</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={gscChartData}>
+                <LineChart data={impressionsChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
+                  <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="clicks" stroke="hsl(var(--primary))" strokeWidth={2} name="Clicks" />
-                  <Line yAxisId="right" type="monotone" dataKey="impressions" stroke="hsl(var(--chart-2))" strokeWidth={2} name="Impressions" />
+                  <Line type="monotone" dataKey="impressions" stroke="hsl(var(--chart-3))" strokeWidth={2} name="Impressions" />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        ) : !gscLoading && (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No Search Console data available. Make sure your Google Search Console integration is connected.
+
+          {/* Top Performing Queries Table */}
+          <Card data-testid="card-top-queries">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Top Performing Queries</CardTitle>
+                  <CardDescription>Your best organic search terms</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2" data-testid="button-ask-ai">
+                  <Sparkles className="h-4 w-4" />
+                  Ask AI
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {topQueries.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Query</TableHead>
+                      <TableHead className="text-right">Clicks</TableHead>
+                      <TableHead className="text-right">Impressions</TableHead>
+                      <TableHead className="text-right">CTR</TableHead>
+                      <TableHead className="text-right">Pos.</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topQueries.map((query, index) => (
+                      <TableRow key={index} data-testid={`row-query-${index}`}>
+                        <TableCell className="font-medium">{query.keys[0]}</TableCell>
+                        <TableCell className="text-right">{query.clicks}</TableCell>
+                        <TableCell className="text-right">{query.impressions}</TableCell>
+                        <TableCell className="text-right">{(query.ctr * 100).toFixed(1)}%</TableCell>
+                        <TableCell className="text-right">{query.position.toFixed(1)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground py-8">
+                  {gscLoading ? 'Loading...' : 'No query data available'}
+                </p>
+              )}
             </CardContent>
           </Card>
-        )}
+        </div>
       </div>
     </div>
   );
