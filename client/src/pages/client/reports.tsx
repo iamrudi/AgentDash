@@ -196,6 +196,15 @@ export default function Reports() {
         </div>
         
         <div className="flex items-center gap-4">
+          <Button 
+            className="gap-2" 
+            onClick={() => setIsAiModalOpen(true)}
+            data-testid="button-chat-with-data"
+          >
+            <Sparkles className="h-4 w-4" />
+            Chat with your Data
+          </Button>
+
           <div className="flex items-center gap-2">
             <Label htmlFor="compare-toggle" className="text-sm">Compare to previous period</Label>
             <Switch 
@@ -394,23 +403,8 @@ export default function Reports() {
           {/* Top Performing Queries Table */}
           <Card data-testid="card-top-queries">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Top Performing Queries</CardTitle>
-                  <CardDescription>Your best organic search terms</CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2" 
-                  data-testid="button-ask-ai"
-                  onClick={() => setIsAiModalOpen(true)}
-                  disabled={!topQueries || topQueries.length === 0}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Ask AI
-                </Button>
-              </div>
+              <CardTitle>Top Performing Queries</CardTitle>
+              <CardDescription>Your best organic search terms</CardDescription>
             </CardHeader>
             <CardContent>
               {topQueries.length > 0 ? (
@@ -450,10 +444,13 @@ export default function Reports() {
         isOpen={isAiModalOpen}
         onClose={() => setIsAiModalOpen(false)}
         contextData={{
-          type: "Top Performing Search Queries",
-          data: topQueries,
+          outcomeMetrics,
+          ga4Data,
+          gscData,
+          gscQueries,
+          dateRange: { startDate, endDate }
         }}
-        initialQuestion="Based on my top queries, what is one new blog post I could write to attract more clicks?"
+        initialQuestion="What opportunities do you see in my performance data?"
       />
     </div>
   );
