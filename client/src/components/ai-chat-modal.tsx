@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Send, Loader2, ThumbsUp, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getUserRole } from "@/lib/auth";
 
 interface AIChatModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
   const { toast } = useToast();
   const [question, setQuestion] = useState(initialQuestion);
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
+  const userRole = getUserRole();
 
   const analyzeMutation = useMutation({
     mutationFn: (userQuestion: string) => 
@@ -157,13 +159,18 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
                   size="sm" 
                   onClick={() => {
                     onClose();
-                    setLocation('/client/support');
+                    // Admin/Staff go to agency messages, Client goes to support
+                    if (userRole === "Admin" || userRole === "Staff") {
+                      setLocation('/agency/messages');
+                    } else {
+                      setLocation('/client/support');
+                    }
                   }}
                   disabled={requestActionMutation.isPending || requestActionMutation.isSuccess}
                   data-testid="button-discuss-am"
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
-                  Discuss with My AM
+                  {userRole === "Admin" || userRole === "Staff" ? "Chat with Client" : "Discuss with My AM"}
                 </Button>
                 <Button 
                   size="sm"
