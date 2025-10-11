@@ -69,8 +69,10 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
   }, [initialQuestion]);
 
   const analyzeMutation = useMutation({
-    mutationFn: async (userQuestion: string): Promise<AIAnalysisResult> => 
-      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }) as unknown as Promise<AIAnalysisResult>,
+    mutationFn: async (userQuestion: string): Promise<AIAnalysisResult> => {
+      const response = await apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion });
+      return response.json();
+    },
     onSuccess: (data: AIAnalysisResult) => {
       setAnalysis(data);
     },

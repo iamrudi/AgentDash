@@ -169,7 +169,7 @@ Based on the data and the question, generate a single, actionable recommendation
             triggerMetric: { type: "string" },
             baselineValue: { type: "number" },
           },
-          required: ["title", "observation", "proposedAction", "impact", "estimatedCost", "triggerMetric", "baselineValue"],
+          required: ["title", "observation", "proposedAction", "impact"],
         },
       },
       contents: prompt,
@@ -180,7 +180,18 @@ Based on the data and the question, generate a single, actionable recommendation
       throw new Error("Empty response from Gemini AI");
     }
     
-    return JSON.parse(rawJson) as RecommendationOutput;
+    const result = JSON.parse(rawJson) as RecommendationOutput;
+    
+    // Validate that critical fields are not empty
+    if (!result.observation || result.observation.trim().length === 0) {
+      throw new Error("AI returned empty observation. Please ensure analytics data is available and try again.");
+    }
+    
+    if (!result.proposedAction || result.proposedAction.trim().length === 0) {
+      throw new Error("AI returned empty proposed action. Please ensure analytics data is available and try again.");
+    }
+    
+    return result;
   } catch (error) {
     console.error("Gemini on-demand analysis error:", error);
     throw new Error(`Failed to analyze data on demand: ${error}`);

@@ -1684,12 +1684,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Client not found" });
       }
 
+      console.log("[AI Analysis Request] Client:", client.companyName);
+      console.log("[AI Analysis Request] Question:", question);
+      console.log("[AI Analysis Request] Context Data:", JSON.stringify(contextData, null, 2));
+
       const analysis = await analyzeDataOnDemand(
         client.companyName,
         contextData,
         question
       );
 
+      console.log("[AI Analysis Response]:", JSON.stringify(analysis, null, 2));
       res.json(analysis);
     } catch (error: any) {
       console.error("On-demand AI analysis error:", error);
