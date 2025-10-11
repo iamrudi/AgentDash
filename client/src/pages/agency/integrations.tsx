@@ -30,6 +30,7 @@ import {
 interface IntegrationStatus {
   connected: boolean;
   ga4PropertyId?: string;
+  ga4LeadEventName?: string;
   gscSiteUrl?: string;
   expiresAt?: Date;
 }
@@ -53,6 +54,7 @@ export default function AgencyIntegrationsPage() {
   // Dialog states
   const [ga4DialogOpen, setGa4DialogOpen] = useState(false);
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
+  const [editLeadEventDialogOpen, setEditLeadEventDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
   const [leadEventName, setLeadEventName] = useState("");
@@ -145,6 +147,44 @@ export default function AgencyIntegrationsPage() {
       setSelectedGA4Property("");
       setLeadEventName("");
       setGa4DialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update lead event name mutation (without reconnecting GA4)
+  const updateLeadEventMutation = useMutation({
+    mutationFn: async ({ clientId, leadEventName }: { clientId: string; leadEventName: string | null }) => {
+      const authUser = localStorage.getItem("authUser");
+      const token = authUser ? JSON.parse(authUser).token : null;
+
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`/api/integrations/ga4/${clientId}/lead-event`, {
+        method: "PATCH",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ ga4LeadEventName: leadEventName }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/ga4", variables.clientId] });
+      toast({
+        title: "Success",
+        description: "Lead event configuration updated successfully",
+      });
+      setLeadEventName("");
+      setEditLeadEventDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
@@ -335,7 +375,17 @@ export default function AgencyIntegrationsPage() {
         ) : (
           <div className="space-y-4">
             {filteredClients.map((client) => {
-              return <ClientIntegrationCard key={client.id} client={client} onConnect={handleConnect} onDisconnect={handleDisconnect} />;
+              return <ClientIntegrationCard 
+                key={client.id} 
+                client={client} 
+                onConnect={handleConnect} 
+                onDisconnect={handleDisconnect}
+                onEditLeadEvent={(clientId, currentLeadEvent) => {
+                  setCurrentClientId(clientId);
+                  setLeadEventName(currentLeadEvent);
+                  setEditLeadEventDialogOpen(true);
+                }}
+              />;
             })}
           </div>
         )}
@@ -472,6 +522,59 @@ export default function AgencyIntegrationsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Lead Event Dialog */}
+      <Dialog open={editLeadEventDialogOpen} onOpenChange={(open) => {
+        setEditLeadEventDialogOpen(open);
+        if (!open) setLeadEventName("");
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configure Lead Events</DialogTitle>
+            <DialogDescription>
+              Enter one or more GA4 Key Event names (comma-separated) that represent leads for this client
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-lead-event-name">Lead Event Names</Label>
+              <Input
+                id="edit-lead-event-name"
+                placeholder="e.g., form_submit, generate_lead, Main_Form"
+                value={leadEventName}
+                onChange={(e) => setLeadEventName(e.target.value)}
+                data-testid="input-edit-lead-event-name"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter one or more event names separated by commas. Example: "form_submit, generate_lead, email_click"
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditLeadEventDialogOpen(false)}
+                data-testid="button-cancel-edit-lead-event"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  updateLeadEventMutation.mutate({
+                    clientId: currentClientId,
+                    leadEventName: leadEventName.trim() || null,
+                  });
+                }}
+                disabled={updateLeadEventMutation.isPending}
+                data-testid="button-save-edit-lead-event"
+              >
+                {updateLeadEventMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AgencyLayout>
   );
 }
@@ -479,11 +582,13 @@ export default function AgencyIntegrationsPage() {
 function ClientIntegrationCard({ 
   client, 
   onConnect,
-  onDisconnect
+  onDisconnect,
+  onEditLeadEvent
 }: { 
   client: Client; 
   onConnect: (clientId: string, service: 'GA4' | 'GSC') => void;
   onDisconnect: (clientId: string, service: 'GA4' | 'GSC') => void;
+  onEditLeadEvent: (clientId: string, currentLeadEvent: string) => void;
 }) {
   const { data: ga4Status } = useQuery<IntegrationStatus>({
     queryKey: ["/api/integrations/ga4", client.id],
@@ -522,6 +627,11 @@ function ClientIntegrationCard({
                   Property: {ga4Status.ga4PropertyId}
                 </p>
               )}
+              {ga4Status?.connected && (
+                <p className="text-xs text-muted-foreground">
+                  Lead Events: {(ga4Status as any).ga4LeadEventName || <span className="text-orange-500">Not configured</span>}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -531,6 +641,14 @@ function ClientIntegrationCard({
                   <CheckCircle2 className="h-3 w-3" />
                   Connected
                 </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditLeadEvent(client.id, ga4Status.ga4LeadEventName || "")}
+                  data-testid={`button-edit-lead-event-${client.id}`}
+                >
+                  Edit Lead Events
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

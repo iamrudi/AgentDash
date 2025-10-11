@@ -762,6 +762,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update GA4 lead event name only (Admin only)
+  app.patch("/api/integrations/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { ga4LeadEventName } = req.body;
+
+      // Validate lead event name - allow null/empty to clear, or validate if provided
+      if (ga4LeadEventName !== null && ga4LeadEventName !== undefined && ga4LeadEventName !== '') {
+        if (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 500) {
+          return res.status(400).json({ message: "ga4LeadEventName must be a string with max 500 characters" });
+        }
+      }
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration) {
+        return res.status(404).json({ message: "GA4 integration not found. Please connect GA4 first." });
+      }
+
+      const updated = await storage.updateIntegration(integration.id, {
+        ga4LeadEventName: ga4LeadEventName || null,
+      });
+
+      res.json({
+        message: "Lead event configuration updated successfully",
+        ga4LeadEventName: updated.ga4LeadEventName,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Google Search Console Routes
   
   // Get GSC integration status for a client
@@ -1258,6 +1290,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           // Fetch actual GA4 Key Events data based on configured lead event name
+          if (!integration.accessToken) {
+            throw new Error("Access token not available after refresh");
+          }
+          
           const keyEventsData = await fetchGA4KeyEvents(
             integration.accessToken, 
             integration.ga4PropertyId!, 

@@ -297,9 +297,10 @@ export async function fetchGA4AcquisitionChannels(
 
 /**
  * Fetch GA4 Key Events (conversions) data
+ * Supports multiple event names (comma-separated)
  * @param accessToken - Valid access token
  * @param propertyId - GA4 property ID
- * @param eventName - Event name to filter (e.g., "generate_lead", "form_submission")
+ * @param eventNames - Event name(s) to filter (e.g., "generate_lead" or "form_submit, generate_lead, Main_Form")
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
  * @returns Key Events data with totals
@@ -307,7 +308,7 @@ export async function fetchGA4AcquisitionChannels(
 export async function fetchGA4KeyEvents(
   accessToken: string,
   propertyId: string,
-  eventName: string,
+  eventNames: string,
   startDate: string,
   endDate: string
 ) {
@@ -321,7 +322,41 @@ export async function fetchGA4KeyEvents(
     auth: oauth2Client,
   });
 
+  // Parse comma-separated event names and trim whitespace
+  const eventList = eventNames.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
   try {
+    // Build dimension filter for multiple events
+    let dimensionFilter: any;
+    
+    if (eventList.length === 1) {
+      // Single event: use simple EXACT match
+      dimensionFilter = {
+        filter: {
+          fieldName: 'eventName',
+          stringFilter: {
+            matchType: 'EXACT',
+            value: eventList[0],
+          },
+        },
+      };
+    } else {
+      // Multiple events: use OR filter with EXACT matches
+      dimensionFilter = {
+        orGroup: {
+          expressions: eventList.map(eventName => ({
+            filter: {
+              fieldName: 'eventName',
+              stringFilter: {
+                matchType: 'EXACT',
+                value: eventName,
+              },
+            },
+          })),
+        },
+      };
+    }
+
     const response = await analyticsData.properties.runReport({
       property: `properties/${propertyId}`,
       requestBody: {
@@ -330,19 +365,11 @@ export async function fetchGA4KeyEvents(
           { name: 'eventCount' },
         ],
         dimensions: [{ name: 'eventName' }],
-        dimensionFilter: {
-          filter: {
-            fieldName: 'eventName',
-            stringFilter: {
-              matchType: 'EXACT',
-              value: eventName,
-            },
-          },
-        },
+        dimensionFilter,
       },
     });
 
-    // Calculate total from rows if totals field is missing
+    // Calculate total from all matching events
     let totalEventCount = 0;
     if (response.data.rows && response.data.rows.length > 0) {
       totalEventCount = response.data.rows.reduce((sum, row) => {
@@ -356,6 +383,7 @@ export async function fetchGA4KeyEvents(
       totals: response.data.totals || [{ metricValues: [{ value: totalEventCount.toString() }] }],
       rowCount: response.data.rowCount || 0,
       totalEventCount,
+      eventNames: eventList, // Return the list of events queried
     };
   } catch (error: any) {
     console.error('Error fetching GA4 Key Events data:', error);
