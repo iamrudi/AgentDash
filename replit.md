@@ -1,15 +1,12 @@
 # Agency Client Portal
 
 ## Overview
-
-This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides distinct, secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, ultimately fostering better client relationships and operational effectiveness.
+This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, ultimately fostering better client relationships and operational effectiveness.
 
 ## User Preferences
-
 I prefer concise and direct communication. When making changes, prioritize iterative development and provide clear explanations of the modifications. Before implementing any major architectural changes or introducing new external dependencies, please ask for approval. Ensure that all code adheres to modern JavaScript/TypeScript best practices.
 
 ## System Architecture
-
 The platform is a full-stack JavaScript application using React for the frontend, Express.js for the backend, and PostgreSQL (managed via Supabase) as the database, with Drizzle ORM for interactions. Authentication uses JWT and bcrypt, implementing a robust Role-Based Access Control (RBAC) system for Client, Staff, and Admin roles, ensuring tenant isolation.
 
 ### UI/UX Decisions
@@ -26,191 +23,32 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Authentication**: JWT tokens, bcrypt hashing, no role self-selection on signup.
 - **Authorization**: Role-based access control, tenant isolation.
 - **Forms**: React Hook Form with Zod validation.
-- **Notifications**: Toast notifications, real-time notification badges across portals (client, agency admin, staff) with auto-refresh.
+- **Notifications**: Toast notifications, real-time notification badges.
 - **Data Fetching**: Real-time with TanStack Query.
 - **Security**: AES-256-GCM encryption for sensitive OAuth tokens, HMAC-SHA256 for CSRF protection.
+- **Multi-Event GA4 Tracking**: Supports comma-separated GA4 event names for conversion tracking with OR filter logic.
+- **Invoice Automation**: Node-cron scheduler for monthly retainers, Puppeteer for PDF generation.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat.
-- **Agency Admin Portal**: Dashboard, Client Messages (reply, task creation), Tasks & Projects (all clients), Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments).
-  - **User Management**: Create/edit/delete users (clients, staff, admin), manage roles.
-  - **Invoice Management**: Create, view, update status, generate PDFs for invoices; automated monthly retainer invoicing, on-demand invoicing from approved initiatives.
-  - **Manual Initiative Creation**: Admins can manually create and send initiatives with client filtering.
+- **Agency Admin Portal**: Dashboard, Client Messages, Tasks & Projects, Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments). Includes user management and invoice management (create, view, update, PDF generation, automated monthly retainers, on-demand from initiatives).
 - **Staff Portal**: View assigned tasks, update status, prioritize.
 - **Strategic Initiative Workflow**: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured.
 - **Client-to-Account Manager Chat System**: Real-time messaging.
+- **Analytics Dashboard**: GA4 and GSC metrics visualization (Recharts), date range picker with comparison, acquisition channels visualization.
+- **GA4 Lead Event Configuration**: Admins configure GA4 lead event names (single or multiple comma-separated) for accurate conversion tracking and pipeline value calculation.
+- **Google Search Console Integration**: OAuth for GSC, site selection, and performance metrics.
+- **Pipeline Value Calculation**: Based on GA4 conversions and Lead Value, with a fallback to a legacy formula.
 
 ### System Design Choices
 - **Multi-tenancy**: Strict tenant isolation at database and API levels.
 - **API Structure**: RESTful endpoints with role-based access.
 - **Project Structure**: Separate client (frontend), server (backend), and shared codebases.
-- **Invoice Automation**: Node-cron scheduler for monthly retainers, Puppeteer for PDF generation, local file system for PDF storage.
 
 ## External Dependencies
-
 - **Database**: PostgreSQL (via Supabase)
 - **Authentication**: JWT, bcrypt
-- **Cloud Services**: Supabase
-- **OAuth Integrations**: Google OAuth (for GA4 integration)
+- **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
+- **OAuth Integrations**: Google OAuth (for GA4, Google Search Console)
 - **PDF Generation**: Puppeteer (requires Chromium system package)
 - **Scheduling**: node-cron
-
-## Recent Changes
-
-### 2025-10-10: Strategic Initiatives System Transformation
-**Evolved from Recommendations to Strategic Initiatives**
-- Database migration: Renamed `recommendations` table to `initiatives` with backward compatibility
-- Added impact measurement fields: triggerMetric, baselineValue, startDate, implementationDate, measuredImprovement
-- Added initiativeId foreign key to tasks table for linking tasks to strategic initiatives
-- Updated status workflow: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured
-- Backend API migration: All `/api/recommendations/*` endpoints renamed to `/api/initiatives/*`
-- Frontend updates: Agency and Client portals now use initiatives API endpoints
-- Invoice generation: Seamlessly works with approved initiatives (no changes needed)
-- Storage layer: All recommendation methods renamed to initiative methods for consistency
-
-**Technical Architecture**
-- One initiative → Many tasks relationship via initiativeId
-- Impact tracking: Baseline metrics → Implementation → Measured improvement
-- Maintains full compatibility with existing invoice system
-- Database schema uses ALTER TABLE for safe data preservation
-
-### 2025-10-10: Frictionless Invoicing System
-**Automated Invoice Generation & PDF Creation**
-- Monthly retainer invoicing via node-cron scheduler (runs daily at 9:00 AM)
-- On-demand invoice generation from approved initiatives
-- Professional PDF generation with Puppeteer (resource-safe with guaranteed browser cleanup)
-- PDF storage in local file system with static serving
-- Database schema: retainerAmount/billingDay on clients, totalAmount/issueDate/pdfUrl on invoices, invoice_line_items table
-
-**Client Portal Enhancements**
-- Billing page with invoice table, payment instructions, PDF download
-- Detailed invoice view with line items breakdown at /client/invoices/:id
-- Secure authorization - clients can only view their own invoices
-
-**Agency Portal Enhancements**
-- Master billing dashboard with financial metrics (Total Revenue, Outstanding, Total Invoices, Overdue)
-- Client filter for per-client invoice management
-- PDF generation and view actions in invoice table
-- System dependency: Chromium installed for Puppeteer
-
-### 2025-10-10: Google Search Console Integration
-**Extended OAuth Infrastructure for Multi-Service Support**
-- OAuth library extended to support both GA4 and Search Console with service-specific scopes
-- OAuth state parameter enhanced with service type (GA4/GSC/BOTH) and HMAC-SHA256 signing
-- Database schema: added gscSiteUrl and ga4PropertyId fields to integrations table
-- Backend routes: GET/POST endpoints for GA4/GSC status, properties/sites fetching, and selection
-- Frontend: Agency integrations page supports connecting both GA4 and GSC with dual selection dialogs
-
-**Technical Implementation**
-- Single OAuth flow handles multiple Google services via service parameter
-- Token storage: shared refresh/access tokens for both GA4 and GSC integrations
-- Security: JWT authentication required for all OAuth endpoints
-- Property/Site selection:
-  - fetchGA4Properties retrieves GA4 properties from Google Analytics Admin API
-  - fetchGSCSites retrieves verified sites from Search Console API
-  - POST /api/integrations/ga4/:clientId/property saves selected GA4 property
-  - POST /api/integrations/gsc/:clientId/site saves selected GSC site
-- Property/site persistence: Separate dialogs for GA4 properties and GSC sites with cache invalidation
-
-**Agency Portal Features**
-- Connect Both button for clients without any integration
-- Individual connect/reconnect buttons for each service
-- Real-time integration status display with property/site information (property ID for GA4, site URL for GSC)
-- OAuth callback handling with success/error messaging
-- Property/Site selection dialogs automatically open after successful OAuth
-- Disconnect buttons for GA4 and GSC integrations with service-specific deletion
-- Backend DELETE routes properly filter by clientId and serviceName to ensure only targeted integration is removed
-- Frontend disconnect mutations with proper cache invalidation and toast notifications
-
-**Required Google Cloud Setup**
-- **CRITICAL**: Google Analytics Admin API must be enabled in Google Cloud Console
-- Visit: https://console.developers.google.com/apis/api/analyticsadmin.googleapis.com/overview?project=YOUR_PROJECT_ID
-- Without this API enabled, GA4 property fetching will fail with 403 Forbidden error
-- Search Console API is typically enabled by default with OAuth consent screen setup
-
-### 2025-10-11: GA4 Lead Event Configuration System (Updated)
-**Real Conversion Tracking with GA4 Key Events - Multi-Event Support**
-- Database schema: `ga4_lead_event_name` field in client_integrations table (text type, unlimited length)
-- Agency Portal enhancements: 
-  - Lead event name input field in GA4 property selection dialog
-  - "Edit Lead Events" button for existing GA4 connections (updates without OAuth reconnection)
-  - Edit dialog allows admins to modify lead event names post-setup
-- Backend validation: Lead event name length validation (max 500 chars), trimmed whitespace, empty converts to null
-- GA4 Data API integration: fetchGA4KeyEvents function supports multiple comma-separated event names
-- Outcome metrics upgrade: Real GA4 Key Events data replaces sample data when lead event configured
-
-**Multi-Event Support (Added 2025-10-11)**
-- **Critical Fix**: GA4 API now uses OR filter logic for multiple events instead of single EXACT match
-- **Multiple Events**: Admins can enter comma-separated event names (e.g., "form_submit, generate_lead, Main_Form")
-- **Total Aggregation**: System sums conversions across all specified events for accurate totals
-- **Character Limit**: Extended from 100 to 500 characters to support multiple event names
-- **Edit Functionality**: PATCH /api/integrations/ga4/:clientId/lead-event endpoint for updating lead events
-- **OR Filter Logic**: fetchGA4KeyEvents builds orGroup dimension filter for multiple EXACT matches
-
-**Technical Implementation**
-- Lead event configuration flow:
-  1. Admin connects GA4 for client
-  2. Admin selects GA4 property and optionally enters lead event name(s) - single or comma-separated
-  3. System saves both property ID and lead event name(s) to integration record
-  4. Reports page fetches actual conversions from GA4 using configured event name(s)
-  5. Admin can edit lead event names anytime via Edit button (no reconnection required)
-- Backend endpoints:
-  - GET /api/analytics/ga4/:clientId/conversions returns Key Events data filtered by event name(s)
-  - PATCH /api/integrations/ga4/:clientId/lead-event updates lead event configuration
-- fetchGA4KeyEvents implementation:
-  - Parses comma-separated event names, trims whitespace
-  - Single event: uses simple EXACT match filter
-  - Multiple events: uses orGroup with EXACT matches for each event
-  - Aggregates totalEventCount from all matching rows
-- Fallback logic: Uses dailyMetrics sample data if GA4 not configured or lead event name not set
-- Pipeline Value calculation: Now based on real GA4 conversion data when available
-
-**Agency Portal Features**
-- Lead event name input in GA4 property selection dialog with helpful placeholder text
-- Edit Lead Events button appears next to connected GA4 integrations
-- Edit dialog pre-populates current lead event name(s) for modification
-- Validation feedback for invalid event names (max 500 chars)
-- Persistent storage alongside GA4 property ID
-- Clear indication when lead event is configured vs. not configured
-- Integration status displays configured lead event name(s)
-
-**Reports Page Enhancement**
-- Conversions metric sourced from real GA4 Key Events when lead event name(s) set
-- Supports multiple event types summed together (e.g., form submissions + contact clicks)
-- Pipeline Value automatically calculated from real conversion data
-- CPA (Cost Per Acquisition) reflects actual GA4 conversions across all specified events
-- Graceful degradation to sample data when GA4 unavailable
-
-### 2025-10-11: Advanced Analytics Dashboard with Comparison & Acquisition Channels
-**Date Range Picker & Period Comparison**
-- Custom date range picker with dual calendars (From/To) using react-day-picker
-- "Compare to previous period" toggle for performance comparison
-- Automatic calculation of comparison period (same length, ending day before selected period)
-- Comparison badges on all metric cards showing percentage change with visual indicators
-- Green/red arrows indicating positive/negative changes
-
-**Acquisition Channels Visualization**
-- Horizontal bar chart showing traffic by source (Organic Search, Direct, Referral, Social, etc.)
-- Sessions and Users metrics per channel
-- Backend endpoint: GET /api/analytics/ga4/:clientId/channels
-- fetchGA4AcquisitionChannels function using sessionDefaultChannelGrouping dimension
-
-**Data Fixes & Improvements**
-- Fixed date ordering on Traffic Overview chart (now chronological)
-- Replaced Bounce Rate with Engaged Sessions metric (more meaningful engagement indicator)
-- Proper date parsing for GA4's YYYYMMDD format
-- Route ordering fix: channels endpoint must come before general GA4 endpoint
-
-**Technical Implementation**
-- Comparison data fetched in parallel when toggle enabled
-- ComparisonBadge component for consistent percentage display
-- Date sorting by YYYYMMDD string format for chronological order
-- Express route order optimization for specific vs. general routes
-
-**Previous Implementation (2025-10-10): Analytics Reporting Dashboard**
-- Complete Reports page with GA4 and GSC metrics visualization using Recharts
-- Real-time analytics data fetching from Google Analytics Data API and Search Console API
-- Key metrics cards: Sessions, Users, Pageviews, Engaged Sessions (GA4); Clicks, Impressions, CTR, Average Position (GSC)
-- Line chart visualizations for traffic trends and search performance
-- Authentication enhancement: clientId included in login response for Client users
-- Required APIs: Google Analytics Data API, Google Search Console API

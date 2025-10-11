@@ -63,6 +63,7 @@ export interface IStorage {
   getClientByProfileId(profileId: string): Promise<Client | undefined>;
   getAllClients(): Promise<Client[]>;
   createClient(client: InsertClient): Promise<Client>;
+  updateClient(id: string, data: Partial<Client>): Promise<Client>;
   
   // Projects
   getProjectById(id: string): Promise<Project | undefined>;
@@ -230,6 +231,11 @@ export class DbStorage implements IStorage {
 
   async createClient(client: InsertClient): Promise<Client> {
     const result = await db.insert(clients).values(client).returning();
+    return result[0];
+  }
+
+  async updateClient(id: string, data: Partial<Client>): Promise<Client> {
+    const result = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
     return result[0];
   }
 
