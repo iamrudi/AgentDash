@@ -70,31 +70,31 @@ export default function Reports() {
 
   // Fetch GA4 data
   const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
-    queryKey: ["/api/analytics/ga4", clientId, startDate, endDate],
+    queryKey: [`/api/analytics/ga4/${clientId}?startDate=${startDate}&endDate=${endDate}`],
     enabled: !!clientId && !!token,
   });
 
   // Fetch GSC data
   const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
-    queryKey: ["/api/analytics/gsc", clientId, startDate, endDate],
+    queryKey: [`/api/analytics/gsc/${clientId}?startDate=${startDate}&endDate=${endDate}`],
     enabled: !!clientId && !!token,
   });
 
   // Fetch acquisition channels
   const { data: channelsData } = useQuery<AcquisitionChannelsData>({
-    queryKey: ["/api/analytics/ga4", clientId, "channels", startDate, endDate],
+    queryKey: [`/api/analytics/ga4/${clientId}/channels?startDate=${startDate}&endDate=${endDate}`],
     enabled: !!clientId && !!token,
   });
 
   // Fetch outcome metrics
   const { data: outcomeMetrics, isLoading: outcomeLoading } = useQuery<OutcomeMetrics>({
-    queryKey: ["/api/analytics/outcome-metrics", clientId, startDate, endDate],
+    queryKey: [`/api/analytics/outcome-metrics/${clientId}?startDate=${startDate}&endDate=${endDate}`],
     enabled: !!clientId && !!token,
   });
 
   // Fetch comparison data
   const { data: outcomeCompareMetrics } = useQuery<OutcomeMetrics>({
-    queryKey: ["/api/analytics/outcome-metrics", clientId, compareStartDate, compareEndDate, "compare"],
+    queryKey: [`/api/analytics/outcome-metrics/${clientId}?startDate=${compareStartDate}&endDate=${compareEndDate}`],
     enabled: !!clientId && !!token && compareEnabled,
   });
 
