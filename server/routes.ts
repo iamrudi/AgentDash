@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { requireAuth, requireRole, type AuthRequest } from "./middleware/auth";
+import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from "./middleware/auth";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -705,18 +705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 integration status for a client
-  app.get("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin", "Client"), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const profile = await storage.getProfileByUserId(req.user!.id);
-      
-      // Security: Clients can only view their own integration
-      if (profile!.role === "Client") {
-        const client = await storage.getClientByProfileId(profile!.id);
-        if (!client || client.id !== clientId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
       
@@ -840,18 +831,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google Search Console Routes
   
   // Get GSC integration status for a client
-  app.get("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin", "Client"), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const profile = await storage.getProfileByUserId(req.user!.id);
-      
-      // Security: Clients can only view their own integration
-      if (profile!.role === "Client") {
-        const client = await storage.getClientByProfileId(profile!.id);
-        if (!client || client.id !== clientId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GSC');
       
@@ -1010,7 +992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics Data API
 
   // Get GA4 conversions (Key Events) data for a client (MUST come before the general GA4 route)
-  app.get("/api/analytics/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1065,7 +1047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 acquisition channels data for a client (MUST come before the general GA4 route)
-  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1115,19 +1097,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 analytics data for a client
-  app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
-      const profile = await storage.getProfileByUserId(req.user!.id);
-      
-      // Security: Clients can only view their own analytics
-      if (profile!.role === "Client") {
-        const client = await storage.getClientByProfileId(profile!.id);
-        if (!client || client.id !== clientId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
 
       let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
       
@@ -1180,7 +1153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GSC top queries for a client (MUST come before general GSC route)
-  app.get("/api/analytics/gsc/:clientId/queries", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/gsc/:clientId/queries", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1236,19 +1209,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GSC analytics data for a client
-  app.get("/api/analytics/gsc/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/gsc/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
-      const profile = await storage.getProfileByUserId(req.user!.id);
-      
-      // Security: Clients can only view their own analytics
-      if (profile!.role === "Client") {
-        const client = await storage.getClientByProfileId(profile!.id);
-        if (!client || client.id !== clientId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
 
       let integration = await storage.getIntegrationByClientId(clientId, 'GSC');
       
@@ -1286,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get outcome metrics (Pipeline Value, CPA, conversions, organic clicks) for Reports page
-  app.get("/api/analytics/outcome-metrics/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/outcome-metrics/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
