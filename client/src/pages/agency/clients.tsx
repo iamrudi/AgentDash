@@ -4,7 +4,7 @@ import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Client, createClientUserSchema, type CreateClientUser } from "@shared/schema";
-import { Building2, ChevronRight, Plus } from "lucide-react";
+import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
 import { useState } from "react";
 import {
@@ -21,10 +21,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+type EnrichedClient = Client & {
+  primaryContact: string | null;
+  activeProjectsCount: number;
+  overdueInvoicesCount: number;
+  hasGA4: boolean;
+  hasGSC: boolean;
+};
 
 export default function AgencyClientsPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [isCreating, setIsCreating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
   const { toast } = useToast();
 
   const form = useForm<CreateClientUser>({
@@ -37,7 +51,7 @@ export default function AgencyClientsPage() {
     },
   });
 
-  const { data: clients } = useQuery<Client[]>({
+  const { data: clients } = useQuery<EnrichedClient[]>({
     queryKey: ["/api/agency/clients"],
   });
 
@@ -68,10 +82,22 @@ export default function AgencyClientsPage() {
     createClientMutation.mutate(data);
   };
 
-  // Filter clients based on selection
-  const filteredClients = selectedClientId === "ALL"
-    ? clients
-    : clients?.filter(c => c.id === selectedClientId);
+  // Get initials from company name
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Apply both filters: dropdown selection and search query
+  const filteredClients = clients?.filter(client => {
+    const matchesDropdown = selectedClientId === "ALL" || client.id === selectedClientId;
+    const matchesSearch = client.companyName.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesDropdown && matchesSearch;
+  });
 
   return (
     <AgencyLayout>
@@ -83,119 +109,149 @@ export default function AgencyClientsPage() {
               Manage client information, integrations, and objectives
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <ClientFilter
-              clients={clients}
-              selectedClientId={selectedClientId}
-              onClientChange={setSelectedClientId}
+          <Dialog open={isCreating} onOpenChange={setIsCreating}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-client">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Client
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Client</DialogTitle>
+                <DialogDescription>
+                  Add a new client to the platform
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="companyName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="Acme Corporation"
+                            data-testid="input-company-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Contact Full Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            placeholder="John Smith"
+                            data-testid="input-full-name"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="john@acme.com"
+                            data-testid="input-email"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="Enter password"
+                            data-testid="input-password"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreating(false)}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createClientMutation.isPending}
+                      data-testid="button-submit-client"
+                    >
+                      {createClientMutation.isPending ? "Creating..." : "Create Client"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Search and Filter Controls */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-clients"
             />
-            <Dialog open={isCreating} onOpenChange={setIsCreating}>
-              <DialogTrigger asChild>
-                <Button data-testid="button-create-client">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Client
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New Client</DialogTitle>
-                  <DialogDescription>
-                    Add a new client to the platform
-                  </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                    <FormField
-                      control={form.control}
-                      name="companyName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="Acme Corporation"
-                              data-testid="input-company-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Full Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="John Smith"
-                              data-testid="input-full-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="email"
-                              placeholder="john@acme.com"
-                              data-testid="input-email"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="password"
-                              placeholder="Enter password"
-                              data-testid="input-password"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsCreating(false)}
-                        data-testid="button-cancel"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={createClientMutation.isPending}
-                        data-testid="button-submit-client"
-                      >
-                        {createClientMutation.isPending ? "Creating..." : "Create Client"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+          </div>
+          <ClientFilter
+            clients={clients}
+            selectedClientId={selectedClientId}
+            onClientChange={setSelectedClientId}
+          />
+          <div className="flex items-center gap-1 border rounded-md">
+            <Button
+              variant={viewMode === "card" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("card")}
+              data-testid="button-view-card"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              data-testid="button-view-table"
+            >
+              <List className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -206,29 +262,85 @@ export default function AgencyClientsPage() {
               <p>No clients found</p>
             </CardContent>
           </Card>
-        ) : (
-          <div className="space-y-3">
+        ) : viewMode === "card" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredClients.map((client) => (
               <Card key={client.id} className="hover-elevate">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg" data-testid={`text-client-${client.id}`}>
-                          {client.companyName}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Client ID: {client.id.slice(0, 8)}...
-                        </p>
-                      </div>
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-4 mb-4">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {getInitials(client.companyName)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg truncate" data-testid={`text-client-${client.id}`}>
+                        {client.companyName}
+                      </h3>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {client.primaryContact || "No contact"}
+                      </p>
                     </div>
+                  </div>
+
+                  {/* Metrics Badges */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <Badge variant="secondary" data-testid={`badge-projects-${client.id}`}>
+                      {client.activeProjectsCount} Active Project{client.activeProjectsCount !== 1 ? 's' : ''}
+                    </Badge>
+                    {client.overdueInvoicesCount > 0 && (
+                      <Badge variant="destructive" data-testid={`badge-overdue-${client.id}`}>
+                        {client.overdueInvoicesCount} Overdue
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Integration Status & Actions */}
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <TooltipProvider>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center" data-testid={`integration-ga4-${client.id}`}>
+                              {client.hasGA4 ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                              )}
+                              <span className="ml-1 text-xs text-muted-foreground">GA4</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {client.hasGA4 ? "GA4 Connected" : "GA4 Not Connected"}
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center" data-testid={`integration-gsc-${client.id}`}>
+                              {client.hasGSC ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                              )}
+                              <span className="ml-1 text-xs text-muted-foreground">GSC</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {client.hasGSC ? "Search Console Connected" : "Search Console Not Connected"}
+                          </TooltipContent>
+                        </Tooltip>
+                        {(!client.hasGA4 || !client.hasGSC) && (
+                          <Link href={`/agency/clients/${client.id}?tab=integrations`}>
+                            <Button variant="ghost" size="sm" className="h-6 px-2" data-testid={`button-setup-integrations-${client.id}`}>
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </TooltipProvider>
                     <Link href={`/agency/clients/${client.id}`}>
-                      <Button variant="ghost" data-testid={`button-view-client-${client.id}`}>
-                        Manage Client
-                        <ChevronRight className="ml-1 h-4 w-4" />
+                      <Button variant="outline" size="sm" data-testid={`button-view-client-${client.id}`}>
+                        Manage
                       </Button>
                     </Link>
                   </div>
@@ -236,6 +348,71 @@ export default function AgencyClientsPage() {
               </Card>
             ))}
           </div>
+        ) : (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Primary Contact</TableHead>
+                  <TableHead className="text-center">Projects</TableHead>
+                  <TableHead className="text-center">Integrations</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredClients.map((client) => (
+                  <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                            {getInitials(client.companyName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{client.companyName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{client.primaryContact || "—"}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary">{client.activeProjectsCount}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-2">
+                        {client.hasGA4 ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                        )}
+                        {client.hasGSC ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {client.overdueInvoicesCount > 0 ? (
+                        <Badge variant="destructive">
+                          {client.overdueInvoicesCount} Overdue
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Active</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Link href={`/agency/clients/${client.id}`}>
+                        <Button variant="ghost" size="sm" data-testid={`button-manage-${client.id}`}>
+                          Manage
+                        </Button>
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </div>
     </AgencyLayout>

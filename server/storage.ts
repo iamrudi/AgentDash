@@ -62,6 +62,13 @@ export interface IStorage {
   getClientById(id: string): Promise<Client | undefined>;
   getClientByProfileId(profileId: string): Promise<Client | undefined>;
   getAllClients(): Promise<Client[]>;
+  getAllClientsWithDetails(): Promise<Array<Client & { 
+    primaryContact: string | null; 
+    activeProjectsCount: number;
+    overdueInvoicesCount: number;
+    hasGA4: boolean;
+    hasGSC: boolean;
+  }>>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, data: Partial<Client>): Promise<Client>;
   
@@ -227,6 +234,59 @@ export class DbStorage implements IStorage {
 
   async getAllClients(): Promise<Client[]> {
     return await db.select().from(clients).orderBy(desc(clients.createdAt));
+  }
+
+  async getAllClientsWithDetails(): Promise<Array<Client & { 
+    primaryContact: string | null; 
+    activeProjectsCount: number;
+    overdueInvoicesCount: number;
+    hasGA4: boolean;
+    hasGSC: boolean;
+  }>> {
+    const allClients = await db.select().from(clients).orderBy(desc(clients.createdAt));
+    
+    const enrichedClients = await Promise.all(
+      allClients.map(async (client) => {
+        // Get primary contact name
+        const profile = await db.select().from(profiles).where(eq(profiles.id, client.profileId)).limit(1);
+        const primaryContact = profile[0]?.fullName || null;
+        
+        // Count active projects
+        const projectList = await db.select().from(projects).where(eq(projects.clientId, client.id));
+        const activeProjectsCount = projectList.filter(p => p.status === 'Active').length;
+        
+        // Count overdue invoices
+        const invoiceList = await db.select().from(invoices).where(eq(invoices.clientId, client.id));
+        const overdueInvoicesCount = invoiceList.filter(inv => {
+          if (inv.status !== 'Paid' && inv.dueDate) {
+            return new Date(inv.dueDate) < new Date();
+          }
+          return false;
+        }).length;
+        
+        // Check for GA4 and GSC integrations
+        const ga4Integration = await db.select().from(clientIntegrations)
+          .where(and(eq(clientIntegrations.clientId, client.id), eq(clientIntegrations.serviceName, 'GA4')))
+          .limit(1);
+        const gscIntegration = await db.select().from(clientIntegrations)
+          .where(and(eq(clientIntegrations.clientId, client.id), eq(clientIntegrations.serviceName, 'GSC')))
+          .limit(1);
+        
+        const hasGA4 = ga4Integration.length > 0 && ga4Integration[0].accessToken !== null;
+        const hasGSC = gscIntegration.length > 0 && gscIntegration[0].accessToken !== null;
+        
+        return {
+          ...client,
+          primaryContact,
+          activeProjectsCount,
+          overdueInvoicesCount,
+          hasGA4,
+          hasGSC,
+        };
+      })
+    );
+    
+    return enrichedClients;
   }
 
   async createClient(client: InsertClient): Promise<Client> {

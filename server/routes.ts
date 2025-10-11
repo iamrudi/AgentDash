@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Agency Portal Routes (protected - Admin only)
   app.get("/api/agency/clients", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const clients = await storage.getAllClients();
+      const clients = await storage.getAllClientsWithDetails();
       res.json(clients);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -1,0 +1,51 @@
+e're going to perform a significant UX and UI overhaul on the Agency Clients page located at client/src/pages/agency/clients.tsx. The goal is to make it more user-friendly, information-dense, and efficient for an agency user managing multiple clients.
+
+Please implement the following four enhancements:
+
+1. Enhance the Client List with "At-a-Glance" Info Cards:
+
+The current list item for each client is too basic. I want to transform it into a more informative Card component.
+
+Data Requirement: Modify the data fetching logic to include the primary contact's name (fullName from profiles), a count of active projects, and a flag indicating if there are overdue invoices. You may need to adjust the queries in server/storage.ts and the corresponding API endpoint in server/routes.ts to join this data. A good model is how getAllUsersWithProfiles already joins users, profiles, and clients.
+
+UI Implementation (clients.tsx):
+
+Instead of the current simple list item, use the <Card> component for each client.
+
+Replace the generic file icon with the <Avatar> component, using the <AvatarFallback> to display the initials of the companyName.
+
+Below the company name, display the primary contact's fullName.
+
+Add a section in the card to display key metrics using <Badge> components:
+
+"Active Projects: [Count]"
+
+"Overdue Invoices: [Count]" (Only show this badge, perhaps with a destructive variant, if the count is > 0).
+
+2. Implement a Client Search Bar:
+
+UI Implementation (clients.tsx):
+
+Add an <Input /> component with a Search icon from lucide-react above the client list.
+
+Use React state (useState) to manage the search query.
+
+The existing filteredClients logic should be updated to filter clients based on the search query (matching against companyName). The search should be case-insensitive.
+
+3. Add a Toggle for Card View and Table View:
+
+UI Implementation (clients.tsx):
+
+Introduce a state to manage the current view ('card' or 'table').
+
+Add a toggle button (perhaps using the <Button> component with icons for list and grid) to switch between these two states.
+
+Conditionally render either the new "At-a-Glance" cards (from step 1) or a <Table> component.
+
+The table should display the following columns: Client Name, Primary Contact, Active Projects, and Status (with a badge indicating if invoices are overdue).
+
+4. Combine Filters:
+
+Ensure the existing "Filter by Client" dropdown and the new Search Bar work together. The displayed results (in either card or table view) should reflect both filters applied in combination.
+
+Please start by outlining the necessary changes to the data-fetching layer in server/storage.ts and server/routes.ts, and then proceed with the frontend modifications in client/src/pages/agency/clients.tsx.
