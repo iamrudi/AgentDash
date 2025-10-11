@@ -333,6 +333,8 @@ export default function ClientDetail() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  <FinancialMetrics client={client} />
                 </TabsContent>
               </Tabs>
             </div>
@@ -556,4 +558,191 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
       </Card>
     </div>
   );
+}
+
+// Financial Metrics Component
+function FinancialMetrics({ client }: { client: Client }) {
+  const { toast } = useToast();
+  const [isEditing, setIsEditing] = useState(false);
+  const [leadValue, setLeadValue] = useState(client.leadValue || "");
+  const [retainerAmount, setRetainerAmount] = useState(client.retainerAmount || "");
+  const [billingDay, setBillingDay] = useState(client.billingDay?.toString() || "");
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { leadValue?: number | null; retainerAmount?: number | null; billingDay?: number | null }) => {
+      return await apiRequest("PATCH", `/api/agency/clients/${client.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${client.id}`] });
+      setIsEditing(false);
+      toast({
+        title: "Success",
+        description: "Financial metrics updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update financial metrics",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    const data = {
+      leadValue: leadValue ? parseFloat(leadValue) : null,
+      retainerAmount: retainerAmount ? parseFloat(retainerAmount) : null,
+      billingDay: billingDay ? parseInt(billingDay) : null,
+    };
+    updateMutation.mutate(data);
+  };
+
+  const handleCancel = () => {
+    setLeadValue(client.leadValue || "");
+    setRetainerAmount(client.retainerAmount || "");
+    setBillingDay(client.billingDay?.toString() || "");
+    setIsEditing(false);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Financial Metrics</CardTitle>
+            <CardDescription>
+              Configure pipeline calculations and billing settings
+            </CardDescription>
+          </div>
+          {!isEditing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              data-testid="button-edit-financial-metrics"
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isEditing ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="lead-value" className="text-sm font-medium">
+                Lead Value ($)
+              </label>
+              <Input
+                id="lead-value"
+                type="number"
+                placeholder="e.g., 500"
+                value={leadValue}
+                onChange={(e) => setLeadValue(e.target.value)}
+                data-testid="input-lead-value"
+              />
+              <p className="text-xs text-muted-foreground">
+                Value per lead for pipeline calculation. Pipeline = Conversions × Lead Value
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="retainer-amount" className="text-sm font-medium">
+                Monthly Retainer ($)
+              </label>
+              <Input
+                id="retainer-amount"
+                type="number"
+                placeholder="e.g., 5000"
+                value={retainerAmount}
+                onChange={(e) => setRetainerAmount(e.target.value)}
+                data-testid="input-retainer-amount"
+              />
+              <p className="text-xs text-muted-foreground">
+                Monthly retainer amount for automatic invoicing
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="billing-day" className="text-sm font-medium">
+                Billing Day
+              </label>
+              <Input
+                id="billing-day"
+                type="number"
+                min="1"
+                max="28"
+                placeholder="e.g., 25"
+                value={billingDay}
+                onChange={(e) => setBillingDay(e.target.value)}
+                data-testid="input-billing-day"
+              />
+              <p className="text-xs text-muted-foreground">
+                Day of month for automatic invoicing (1-28)
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                data-testid="button-save-financial-metrics"
+              >
+                {updateMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={updateMutation.isPending}
+                data-testid="button-cancel-financial-metrics"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Lead Value</p>
+                <p className="text-lg font-semibold" data-testid="text-lead-value">
+                  {client.leadValue ? `$${parseFloat(client.leadValue).toLocaleString()}` : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Monthly Retainer</p>
+                <p className="text-lg font-semibold" data-testid="text-retainer-amount">
+                  {client.retainerAmount ? `$${parseFloat(client.retainerAmount).toLocaleString()}` : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Billing Day</p>
+                <p className="text-lg font-semibold" data-testid="text-billing-day">
+                  {client.billingDay ? `${client.billingDay}${getDaySuffix(client.billingDay)} of month` : 'Not set'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function getDaySuffix(day: number): string {
+  if (day >= 11 && day <= 13) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
 }

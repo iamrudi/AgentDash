@@ -241,6 +241,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { leadValue, retainerAmount, billingDay } = req.body;
+      
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      const updates: any = {};
+      if (leadValue !== undefined) updates.leadValue = leadValue;
+      if (retainerAmount !== undefined) updates.retainerAmount = retainerAmount;
+      if (billingDay !== undefined) updates.billingDay = billingDay;
+      
+      const updatedClient = await storage.updateClient(clientId, updates);
+      res.json(updatedClient);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const projects = await storage.getAllProjects();
