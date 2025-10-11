@@ -245,7 +245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const { leadValue, retainerAmount, billingDay } = req.body;
+      const { leadValue, retainerAmount, billingDay, monthlyRetainerHours } = req.body;
       
       const client = await storage.getClientById(clientId);
       if (!client) {
@@ -256,8 +256,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (leadValue !== undefined) updates.leadValue = leadValue;
       if (retainerAmount !== undefined) updates.retainerAmount = retainerAmount;
       if (billingDay !== undefined) updates.billingDay = billingDay;
+      if (monthlyRetainerHours !== undefined) updates.monthlyRetainerHours = monthlyRetainerHours;
       
       const updatedClient = await storage.updateClient(clientId, updates);
+      res.json(updatedClient);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/agency/clients/:clientId/retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const hoursInfo = await storage.checkRetainerHours(clientId);
+      res.json(hoursInfo);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/agency/clients/:clientId/reset-retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const updatedClient = await storage.resetRetainerHours(clientId);
       res.json(updatedClient);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -695,15 +716,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/initiatives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
-      const { title, observation, proposedAction, cost, impact } = req.body;
+      const { title, observation, proposedAction, cost, impact, estimatedHours, billingType } = req.body;
       
-      const initiative = await storage.updateInitiative(id, {
+      const updates: any = {
         title,
         observation,
         proposedAction,
-        cost,
         impact
-      });
+      };
+      
+      // Handle billing type - either cost or hours
+      if (billingType === "hours") {
+        updates.billingType = "hours";
+        updates.estimatedHours = estimatedHours;
+        updates.cost = null; // Clear cost if switching to hours
+      } else if (billingType === "cost") {
+        updates.billingType = "cost";
+        updates.cost = cost;
+        updates.estimatedHours = null; // Clear hours if switching to cost
+      } else if (cost !== undefined || estimatedHours !== undefined) {
+        // Legacy support: if no billingType specified, infer from provided values
+        if (cost !== undefined) {
+          updates.cost = cost;
+          updates.billingType = "cost";
+        }
+        if (estimatedHours !== undefined) {
+          updates.estimatedHours = estimatedHours;
+          updates.billingType = "hours";
+        }
+      }
+      
+      const initiative = await storage.updateInitiative(id, updates);
       
       res.json(initiative);
     } catch (error: any) {
@@ -730,6 +773,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!["approved", "rejected", "discussing"].includes(response)) {
         return res.status(400).json({ message: "Invalid response. Must be 'approved', 'rejected', or 'discussing'" });
+      }
+      
+      // Get initiative to check billing type
+      const existingInitiative = await storage.getInitiativeById(id);
+      if (!existingInitiative) {
+        return res.status(404).json({ message: "Initiative not found" });
+      }
+      
+      // If approving an hours-based initiative, check and deduct retainer hours
+      if (response === "approved" && existingInitiative.billingType === "hours" && existingInitiative.estimatedHours) {
+        const hoursNeeded = parseFloat(existingInitiative.estimatedHours);
+        const hoursInfo = await storage.checkRetainerHours(existingInitiative.clientId);
+        
+        if (hoursInfo.available < hoursNeeded) {
+          return res.status(400).json({ 
+            message: `Insufficient retainer hours. You have ${hoursInfo.available} hours available but need ${hoursNeeded} hours. Please contact your account manager to purchase additional hours.` 
+          });
+        }
+        
+        // Deduct the hours
+        await storage.deductRetainerHours(existingInitiative.clientId, hoursNeeded);
       }
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
