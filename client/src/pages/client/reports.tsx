@@ -146,12 +146,22 @@ export default function Reports() {
   };
 
   // Process GA4 data for charts
-  const ga4ChartData = ga4Data?.rows?.map(row => ({
-    date: parseGA4Date(row.dimensionValues[0]?.value || ''),
-    sessions: parseInt(row.metricValues[0]?.value || '0'),
-    users: parseInt(row.metricValues[1]?.value || '0'),
-    pageviews: parseInt(row.metricValues[2]?.value || '0'),
-  })) || [];
+  const ga4ChartData = (ga4Data?.rows ?? []).map(row => {
+    const dateStr = row.dimensionValues[0]?.value || '';
+    // Parse YYYYMMDD to actual Date for proper sorting
+    const year = dateStr.substring(0, 4);
+    const month = dateStr.substring(4, 6);
+    const day = dateStr.substring(6, 8);
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    
+    return {
+      dateObj,
+      date: parseGA4Date(dateStr),
+      sessions: parseInt(row.metricValues[0]?.value || '0'),
+      users: parseInt(row.metricValues[1]?.value || '0'),
+      pageviews: parseInt(row.metricValues[2]?.value || '0'),
+    };
+  }).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
   // Process GSC data for charts
   const gscChartData = gscData?.rows?.map(row => ({
@@ -199,7 +209,12 @@ export default function Reports() {
 
   // Helper to calculate percentage change
   const calcChange = (current: number, previous: number) => {
-    if (previous === 0) return 0;
+    if (previous === 0) {
+      // If previous is 0 and current is greater than 0, it's a new metric (infinite growth)
+      if (current > 0) return Infinity;
+      // If both are 0, no change
+      return 0;
+    }
     return ((current - previous) / previous) * 100;
   };
 
@@ -209,12 +224,13 @@ export default function Reports() {
     const change = calcChange(current, previous);
     const isPositive = change > 0;
     const isNegative = change < 0;
+    const isInfinite = change === Infinity;
     
     return (
       <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'}`}>
         {isPositive && <ArrowUpRight className="h-3 w-3" />}
         {isNegative && <ArrowDownRight className="h-3 w-3" />}
-        <span>{Math.abs(change).toFixed(1)}%</span>
+        <span>{isInfinite ? 'New' : `${Math.abs(change).toFixed(1)}%`}</span>
       </div>
     );
   };

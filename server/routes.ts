@@ -920,6 +920,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Analytics Data API
 
+  // Get GA4 acquisition channels data for a client (MUST come before the general GA4 route)
+  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { startDate, endDate } = req.query;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own analytics
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration || !integration.ga4PropertyId) {
+        return res.status(404).json({ message: "GA4 integration not configured" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      // Default to last 30 days if not specified
+      const end = endDate as string || new Date().toISOString().split('T')[0];
+      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      if (!integration.accessToken) {
+        return res.status(401).json({ message: "Access token not available" });
+      }
+
+      const data = await fetchGA4AcquisitionChannels(integration.accessToken, integration.ga4PropertyId!, start, end);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Fetch GA4 acquisition channels error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch GA4 acquisition channels" });
+    }
+  });
+
   // Get GA4 analytics data for a client
   app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
@@ -967,56 +1017,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Fetch GA4 analytics error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch GA4 analytics" });
-    }
-  });
-
-  // Get GA4 acquisition channels data for a client
-  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
-    try {
-      const { clientId } = req.params;
-      const { startDate, endDate } = req.query;
-      const profile = await storage.getProfileByUserId(req.user!.id);
-      
-      // Security: Clients can only view their own analytics
-      if (profile!.role === "Client") {
-        const client = await storage.getClientByProfileId(profile!.id);
-        if (!client || client.id !== clientId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
-
-      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
-      
-      if (!integration || !integration.ga4PropertyId) {
-        return res.status(404).json({ message: "GA4 integration not configured" });
-      }
-
-      // Check if token is expired and refresh if needed
-      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
-        if (!integration.refreshToken) {
-          return res.status(401).json({ message: "Token expired and no refresh token available" });
-        }
-
-        const newTokens = await refreshAccessToken(integration.refreshToken);
-        integration = await storage.updateIntegration(integration.id, {
-          accessToken: newTokens.accessToken,
-          expiresAt: newTokens.expiresAt,
-        });
-      }
-
-      // Default to last 30 days if not specified
-      const end = endDate as string || new Date().toISOString().split('T')[0];
-      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-      if (!integration.accessToken) {
-        return res.status(401).json({ message: "Access token not available" });
-      }
-
-      const data = await fetchGA4AcquisitionChannels(integration.accessToken, integration.ga4PropertyId!, start, end);
-      res.json(data);
-    } catch (error: any) {
-      console.error("Fetch GA4 acquisition channels error:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch GA4 acquisition channels" });
     }
   });
 
