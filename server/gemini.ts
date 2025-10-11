@@ -103,12 +103,12 @@ Analyze this data and generate 2-5 strategic recommendations focusing on:
 
     const rawJson = response.text;
 
-    if (rawJson) {
-      const recommendations: RecommendationOutput[] = JSON.parse(rawJson);
-      return recommendations;
-    } else {
+    if (!rawJson) {
       throw new Error("Empty response from Gemini AI");
     }
+
+    const recommendations: RecommendationOutput[] = JSON.parse(rawJson);
+    return recommendations;
   } catch (error) {
     console.error("Gemini AI analysis error:", error);
     throw new Error(`Failed to analyze client metrics: ${error}`);
@@ -169,11 +169,11 @@ Based on the data and the question, generate a single, actionable recommendation
     });
 
     const rawJson = response.text;
-    if (rawJson) {
-      return JSON.parse(rawJson) as RecommendationOutput;
-    } else {
+    if (!rawJson) {
       throw new Error("Empty response from Gemini AI");
     }
+    
+    return JSON.parse(rawJson) as RecommendationOutput;
   } catch (error) {
     console.error("Gemini on-demand analysis error:", error);
     throw new Error(`Failed to analyze data on demand: ${error}`);
