@@ -1,0 +1,101 @@
+A "Lead" isn't a generic metric; it's a specific, valuable action that we need to define.
+
+Definition: A "Lead" is a primary conversion action on the client's website, which is configured as a Key Event (the new name for "Conversions") in Google Analytics 4.
+
+Required Setup:
+
+In GA4: The client's GA4 property must have Key Events configured to track valuable actions like form_submission, demo_request, or phone_number_click.
+
+In the Agency Portal: We need a way for the Account Manager to tell our system which of the client's GA4 events should be counted as a "Lead".
+
+Implementation Steps:
+
+Database (Schema Update):
+
+In your shared/schema.ts file, we need to add a column to the clientIntegrations table to store the name of the lead event.
+
+TypeScript
+
+// In clientIntegrations table
+ga4_lead_event_name: text("ga4_lead_event_name"), // e.g., 'generate_lead'
+Agency Portal UI (Data Input):
+
+On the /agency/integrations page, after an AM successfully connects a client's Google account and selects a GA4 property, an additional input field will appear.
+
+Label: "Primary Lead Event Name"
+
+Action: The AM will enter the exact name of the GA4 Key Event that represents a lead for this client. This value is saved to the new ga4_lead_event_name column.
+
+Backend (Data Ingestion):
+
+The scheduled ETL function that fetches Google data needs to be updated. When it calls the GA4 Data API, it will request the keyEvents metric.
+
+It will then use the ga4_lead_event_name from the database to correctly identify the number of leads and store this value in the daily_metrics.conversions column.
+
+2. Calculating "Pipeline Value"
+Your thinking is spot on. This metric requires input from the agency side to complete the calculation.
+
+Definition: The estimated monetary value of the new business opportunities generated from the leads.
+
+Required Setup:
+
+In the Agency Portal: The AM must input the client-specific business metrics that translate a raw lead into a potential revenue value.
+
+Implementation Steps:
+
+Database (Schema Update):
+
+In your shared/schema.ts file, we must add the columns to the clients table to store this data, as we've previously designed.
+
+TypeScript
+
+// In clients table
+lead_to_opportunity_rate: numeric("lead_to_opportunity_rate"),
+opportunity_to_close_rate: numeric("opportunity_to_close_rate"),
+average_deal_size: numeric("average_deal_size"),
+Agency Portal UI (Data Input):
+
+On the "Single Client View" page (e.g., /agency/clients/[id]), we'll create a new "Business Metrics" tab or section.
+
+This section will have a simple form with fields for the AM to enter the client's "Lead-to-Opportunity Rate (%)" and "Average Deal Size".
+
+Backend (Calculation Logic):
+
+The Express API route that serves the data for the /client/reports page will perform this calculation.
+
+Formula: Pipeline Value = (SUM(daily_metrics.conversions)) * clients.lead_to_opportunity_rate * clients.average_deal_size
+
+This calculation is done on the server each time the report is loaded.
+
+Client Portal UI (Display):
+
+The final calculated value is displayed in the "Estimated Pipeline Value" scorecard on the /client/reports page, as we designed in the optimized layout.
+
+3. Calculating CPA (Cost Per Acquisition)
+This is the final piece of the ROI puzzle, and it uses data we are already collecting.
+
+Definition: The average marketing cost required to generate a single lead (a "Key Event").
+
+Required Setup:
+
+In GA4: The client's GA4 property must be correctly linked to their ad accounts (e.g., Google Ads) so that cost data is imported.
+
+Implementation Steps:
+
+Database: No changes are needed. Our daily_metrics table already has columns for spend and conversions.
+
+Backend (Data Ingestion):
+
+We must ensure our ETL function is pulling the totalAdCost metric from the GA4 API and storing it in the daily_metrics.spend column.
+
+Backend (Calculation Logic):
+
+The same Express API route for the reports page will perform this calculation.
+
+Formula: CPA = SUM(daily_metrics.spend) / SUM(daily_metrics.conversions)
+
+The code must handle the case where conversions are zero to avoid a "divide by zero" error.
+
+Client Portal UI (Display):
+
+The calculated CPA value is displayed in the "CPA" scorecard on the /client/reports page.
