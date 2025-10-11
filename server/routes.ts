@@ -1013,6 +1013,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await fetchGA4Data(integration.accessToken, integration.ga4PropertyId!, start, end);
+      
+      // Log GA4 response details
+      const logData = {
+        propertyId: integration.ga4PropertyId,
+        dateRange: `${start} to ${end}`,
+        rowCount: data.rowCount,
+        totalRows: data.rows?.length || 0,
+        hasTotals: !!data.totals,
+        totalsLength: data.totals?.length || 0,
+        totalMetrics: data.totals?.[0]?.metricValues?.map((m: any) => m.value) || [],
+        sampleRow: data.rows?.[0]?.metricValues?.map((m: any) => m.value) || []
+      };
+      
+      console.error('=== GA4 DATA RESPONSE ===', JSON.stringify(logData, null, 2));
+      
       res.json(data);
     } catch (error: any) {
       console.error("Fetch GA4 analytics error:", error);
