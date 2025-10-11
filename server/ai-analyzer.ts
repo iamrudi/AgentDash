@@ -32,8 +32,25 @@ export async function generateAIRecommendations(
       };
     }
 
-    // 4. Format GA4 metrics (sessions, conversions from all sources)
-    const formattedGA4 = allMetrics.map(m => ({
+    // 4. Separate GA4 and GSC metrics by filtering rows
+    // GA4 metrics: rows with sessions/conversions/spend data (paid channels like Google Ads, Facebook, etc.)
+    const ga4Rows = allMetrics.filter(m => 
+      (m.sessions || 0) > 0 || 
+      (m.conversions || 0) > 0 || 
+      (m.clicks || 0) > 0 || 
+      (m.impressions || 0) > 0 ||
+      (m.spend && parseFloat(m.spend) > 0)
+    );
+    
+    // GSC metrics: rows with organic search data (organicClicks, organicImpressions, avgPosition)
+    const gscRows = allMetrics.filter(m => 
+      (m.organicClicks || 0) > 0 || 
+      (m.organicImpressions || 0) > 0 || 
+      (m.avgPosition !== null && m.avgPosition !== undefined)
+    );
+
+    // 5. Format GA4 metrics for AI analysis
+    const formattedGA4 = ga4Rows.map(m => ({
       date: format(new Date(m.date), 'yyyy-MM-dd'),
       source: m.source,
       sessions: m.sessions || 0,
@@ -43,21 +60,21 @@ export async function generateAIRecommendations(
       spend: m.spend ? parseFloat(m.spend) : 0
     }));
 
-    // 5. Format GSC metrics (organic search data)
-    const formattedGSC = allMetrics.map(m => ({
+    // 6. Format GSC metrics for AI analysis
+    const formattedGSC = gscRows.map(m => ({
       date: format(new Date(m.date), 'yyyy-MM-dd'),
       organicClicks: m.organicClicks || 0,
       organicImpressions: m.organicImpressions || 0,
       avgPosition: m.avgPosition ? parseFloat(m.avgPosition) : 0
     }));
 
-    // 6. Get client objectives if available
+    // 7. Get client objectives if available
     const clientObjectives = await storage.getObjectivesByClientId(clientId);
     const objectives = clientObjectives.filter(o => o.isActive === "true")
       .map(o => o.description)
       .join("; ") || undefined;
 
-    // 7. Call Gemini AI to analyze and generate recommendations
+    // 8. Call Gemini AI to analyze and generate recommendations
     const aiRecommendations = await analyzeClientMetrics(
       client.companyName,
       formattedGA4,
@@ -65,7 +82,7 @@ export async function generateAIRecommendations(
       objectives
     );
 
-    // 8. Create initiative records from AI recommendations
+    // 9. Create initiative records from AI recommendations
     let createdCount = 0;
     for (const rec of aiRecommendations) {
       const initiative: InsertInitiative = {
