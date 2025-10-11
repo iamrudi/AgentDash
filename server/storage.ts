@@ -245,46 +245,69 @@ export class DbStorage implements IStorage {
   }>> {
     const allClients = await db.select().from(clients).orderBy(desc(clients.createdAt));
     
-    const enrichedClients = await Promise.all(
-      allClients.map(async (client) => {
-        // Get primary contact name
-        const profile = await db.select().from(profiles).where(eq(profiles.id, client.profileId)).limit(1);
-        const primaryContact = profile[0]?.fullName || null;
-        
-        // Count active projects
-        const projectList = await db.select().from(projects).where(eq(projects.clientId, client.id));
-        const activeProjectsCount = projectList.filter(p => p.status === 'Active').length;
-        
-        // Count overdue invoices
-        const invoiceList = await db.select().from(invoices).where(eq(invoices.clientId, client.id));
-        const overdueInvoicesCount = invoiceList.filter(inv => {
-          if (inv.status !== 'Paid' && inv.dueDate) {
-            return new Date(inv.dueDate) < new Date();
-          }
-          return false;
-        }).length;
-        
-        // Check for GA4 and GSC integrations
-        const ga4Integration = await db.select().from(clientIntegrations)
-          .where(and(eq(clientIntegrations.clientId, client.id), eq(clientIntegrations.serviceName, 'GA4')))
-          .limit(1);
-        const gscIntegration = await db.select().from(clientIntegrations)
-          .where(and(eq(clientIntegrations.clientId, client.id), eq(clientIntegrations.serviceName, 'GSC')))
-          .limit(1);
-        
-        const hasGA4 = ga4Integration.length > 0 && ga4Integration[0].accessToken !== null;
-        const hasGSC = gscIntegration.length > 0 && gscIntegration[0].accessToken !== null;
-        
-        return {
-          ...client,
-          primaryContact,
-          activeProjectsCount,
-          overdueInvoicesCount,
-          hasGA4,
-          hasGSC,
-        };
-      })
-    );
+    // Fetch all related data in bulk to avoid N+1 queries
+    const [allProfiles, allProjects, allInvoices, allIntegrations] = await Promise.all([
+      db.select().from(profiles),
+      db.select().from(projects),
+      db.select().from(invoices),
+      db.select().from(clientIntegrations),
+    ]);
+    
+    // Create lookup maps for efficient access
+    const profileMap = new Map(allProfiles.map(p => [p.id, p]));
+    const projectsByClient = new Map<string, typeof allProjects>();
+    const invoicesByClient = new Map<string, typeof allInvoices>();
+    const integrationsByClient = new Map<string, typeof allIntegrations>();
+    
+    allProjects.forEach(project => {
+      const existing = projectsByClient.get(project.clientId) || [];
+      projectsByClient.set(project.clientId, [...existing, project]);
+    });
+    
+    allInvoices.forEach(invoice => {
+      const existing = invoicesByClient.get(invoice.clientId) || [];
+      invoicesByClient.set(invoice.clientId, [...existing, invoice]);
+    });
+    
+    allIntegrations.forEach(integration => {
+      const existing = integrationsByClient.get(integration.clientId) || [];
+      integrationsByClient.set(integration.clientId, [...existing, integration]);
+    });
+    
+    const now = new Date();
+    
+    // Enrich clients with data from lookup maps
+    const enrichedClients = allClients.map((client) => {
+      const profile = profileMap.get(client.profileId);
+      const primaryContact = profile?.fullName || null;
+      
+      const clientProjects = projectsByClient.get(client.id) || [];
+      const activeProjectsCount = clientProjects.filter(p => p.status === 'Active').length;
+      
+      const clientInvoices = invoicesByClient.get(client.id) || [];
+      const overdueInvoicesCount = clientInvoices.filter(inv => {
+        if (inv.status !== 'Paid' && inv.dueDate) {
+          return new Date(inv.dueDate) < now;
+        }
+        return false;
+      }).length;
+      
+      const clientIntegrationsList = integrationsByClient.get(client.id) || [];
+      const ga4Integration = clientIntegrationsList.find(i => i.serviceName === 'GA4');
+      const gscIntegration = clientIntegrationsList.find(i => i.serviceName === 'GSC');
+      
+      const hasGA4 = !!ga4Integration && ga4Integration.accessToken !== null;
+      const hasGSC = !!gscIntegration && gscIntegration.accessToken !== null;
+      
+      return {
+        ...client,
+        primaryContact,
+        activeProjectsCount,
+        overdueInvoicesCount,
+        hasGA4,
+        hasGSC,
+      };
+    });
     
     return enrichedClients;
   }
