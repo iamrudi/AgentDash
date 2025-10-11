@@ -22,6 +22,7 @@ import {
   LogOut,
   Building2,
   Users,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,42 @@ export function AppSidebar() {
       title: "Dashboard",
       url: "/agency",
       icon: LayoutDashboard,
+      notificationKey: null,
+    },
+    {
+      title: "Clients",
+      url: "/agency/clients",
+      icon: Building2,
+      notificationKey: null,
+    },
+    {
+      title: "Tasks & Projects",
+      url: "/agency/tasks",
+      icon: FolderKanban,
+      notificationKey: null,
+    },
+    {
+      title: "Messages",
+      url: "/agency/messages",
+      icon: MessageSquare,
+      notificationKey: null,
+    },
+    {
+      title: "Strategic Initiatives",
+      url: "/agency/recommendations",
+      icon: Lightbulb,
+      notificationKey: null,
+    },
+    {
+      title: "Staff",
+      url: "/agency/staff",
+      icon: Users,
+      notificationKey: null,
+    },
+    {
+      title: "Invoices",
+      url: "/agency/invoices",
+      icon: FileText,
       notificationKey: null,
     },
   ];
