@@ -28,7 +28,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Security**: AES-256-GCM encryption for sensitive OAuth tokens, HMAC-SHA256 for CSRF protection.
 - **Multi-Event GA4 Tracking**: Supports comma-separated GA4 event names for conversion tracking with OR filter logic.
 - **Invoice Automation**: Node-cron scheduler for monthly retainers, Puppeteer for PDF generation.
-- **AI Recommendation Engine**: Google Gemini AI (gemini-2.5-pro) analyzes client GA4/GSC metrics to auto-generate strategic initiatives. Properly separates GA4 paid channel data (sessions, conversions, spend) from GSC organic search data (clicks, impressions, avgPosition) to ensure accurate AI analysis.
+- **AI Recommendation Engine**: Google Gemini AI (gemini-2.5-pro) analyzes client GA4/GSC metrics to auto-generate strategic initiatives. Properly separates GA4 paid channel data (sessions, conversions, spend) from GSC organic search data (clicks, impressions, avgPosition) to ensure accurate AI analysis. Validates that at least one integration (GA4 or GSC) is connected before generating recommendations.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat.
