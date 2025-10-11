@@ -227,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const client = await storage.getClientById(clientId);
@@ -242,7 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { leadValue, retainerAmount, billingDay } = req.body;
@@ -264,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agency/clients/:clientId/sync-metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/sync-metrics", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { daysToFetch = 30 } = req.body;
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { generateAIRecommendations } = await import("./ai-analyzer");
@@ -388,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/metrics", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const metrics = await storage.getMetricsByClientId(clientId, 90);
@@ -872,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch available GA4 properties (Admin only)
-  app.get("/api/integrations/ga4/:clientId/properties", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/ga4/:clientId/properties", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       
@@ -904,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GA4 property (Admin only)
-  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4PropertyId, ga4LeadEventName } = req.body;
@@ -940,7 +940,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update GA4 lead event name only (Admin only)
-  app.patch("/api/integrations/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/integrations/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4LeadEventName } = req.body;
@@ -998,7 +998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch available GSC sites (Admin only)
-  app.get("/api/integrations/gsc/:clientId/sites", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/gsc/:clientId/sites", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       
@@ -1030,7 +1030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GSC site (Admin only)
-  app.post("/api/integrations/gsc/:clientId/site", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/gsc/:clientId/site", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { gscSiteUrl } = req.body;
@@ -1059,7 +1059,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GA4 property (Admin only)
-  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4PropertyId, ga4LeadEventName } = req.body;
@@ -1095,7 +1095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Disconnect GA4 integration (Admin only)
-  app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1114,7 +1114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Disconnect GSC integration (Admin only)
-  app.delete("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1555,7 +1555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client Objectives API
 
   // Get objectives for a client (Admin only)
-  app.get("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const objectives = await storage.getObjectivesByClientId(clientId);
@@ -1583,7 +1583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create objective for a client (Admin only)
-  app.post("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { description, targetMetric } = req.body;
@@ -1827,7 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send message from admin to client (legacy route with clientId in URL)
-  app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { message } = req.body;
