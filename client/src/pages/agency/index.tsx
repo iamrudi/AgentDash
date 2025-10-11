@@ -13,6 +13,7 @@ import { AIChatModal } from "@/components/ai-chat-modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState } from "react";
 import { format, subDays } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface GA4Data {
   rows: Array<{
@@ -47,6 +48,7 @@ interface OutcomeMetrics {
 }
 
 export default function AgencyDashboard() {
+  const { toast } = useToast();
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
 
@@ -125,6 +127,24 @@ export default function AgencyDashboard() {
   const avgPosition = gscData?.rows?.length ? 
     gscData.rows.reduce((sum, row) => sum + (parseFloat(row.metricValues?.[3]?.value) || 0), 0) / gscData.rows.length : 0;
 
+  // Validate if there's enough data for AI analysis
+  const handleOpenAIChat = () => {
+    const hasOutcomeData = outcomeMetrics && (outcomeMetrics.conversions > 0 || outcomeMetrics.organicClicks > 0 || outcomeMetrics.spend > 0);
+    const hasGSCData = gscData && gscData.rows && gscData.rows.length > 0;
+    const hasGSCQueries = gscQueries && gscQueries.rows && gscQueries.rows.length > 0;
+
+    if (!hasOutcomeData && !hasGSCData && !hasGSCQueries) {
+      toast({
+        title: "No Analytics Data Available",
+        description: `${selectedClient?.companyName} doesn't have any analytics data yet. Please connect Google Analytics 4 or Google Search Console to enable AI insights.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAiModalOpen(true);
+  };
+
   const MetricCardSkeleton = () => (
     <Card>
       <CardHeader className="pb-3">
@@ -162,7 +182,7 @@ export default function AgencyDashboard() {
             />
             {selectedClientId !== "ALL" && selectedClient && (
               <Button 
-                onClick={() => setIsAiModalOpen(true)}
+                onClick={handleOpenAIChat}
                 className="gap-2"
                 data-testid="button-chat-with-data"
               >

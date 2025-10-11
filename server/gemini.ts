@@ -124,10 +124,16 @@ export async function analyzeDataOnDemand(
     const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.
 The client is asking a question about a specific dataset. Your task is to:
 1. Analyze the provided data in the context of their question.
-2. Provide a clear, concise observation.
+2. Provide a clear, concise observation that DIRECTLY answers their question using specific data points.
 3. Propose a single, actionable next step that the agency could perform for a fee.
 4. Frame this as a single, valuable "Initiative" or "Recommendation".
 5. Estimate the impact and a reasonable one-time cost for this action.
+
+IMPORTANT: 
+- Use SPECIFIC numbers and metrics from the data in your observation (e.g., "Your CTR is 2.3%" not "Your CTR is low")
+- If data is sparse, focus on what IS available and identify data gaps as opportunities
+- NEVER return empty strings - always provide meaningful, data-driven content
+- The observation should be 2-3 sentences minimum with concrete insights
 
 Respond with a single JSON object matching the required schema.`;
 
@@ -139,11 +145,12 @@ ${JSON.stringify(contextData, null, 2)}
 CLIENT'S QUESTION: "${question}"
 
 Based on the data and the question, generate a single, actionable recommendation.
-- The title should be a summary of the proposed action.
-- The observation must directly answer their question using the data.
-- The proposed action should be a clear service the agency can offer.
-- The trigger metric should be the primary data point from the context (e.g., 'Clicks', 'CTR', 'Impressions').
-- The baseline value should be a key value from the data relevant to the observation.
+- The title should be a concise, action-oriented summary (e.g., "Improve Organic Search Visibility")
+- The observation MUST directly answer their question using SPECIFIC data points from the context (e.g., "Your site received 1,234 organic clicks with an average position of 15.7...")
+- The proposed action should be a clear service the agency can offer (e.g., "Conduct comprehensive SEO audit and implement on-page optimization...")
+- The trigger metric should be the primary metric from the context (e.g., 'Organic Clicks', 'CTR', 'Conversions', 'Average Position')
+- The baseline value should be the current value of that metric from the data
+- If data is limited, identify this as an opportunity (e.g., "Limited conversion tracking indicates a need for proper analytics setup")
 `;
 
     const response = await ai.models.generateContent({
