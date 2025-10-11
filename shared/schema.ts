@@ -142,6 +142,7 @@ export const clientIntegrations = pgTable("client_integrations", {
   refreshTokenAuthTag: text("refresh_token_auth_tag"), // Auth tag for refresh token
   expiresAt: timestamp("expires_at"),
   ga4PropertyId: text("ga4_property_id"), // The specific GA4 property ID
+  ga4LeadEventName: text("ga4_lead_event_name"), // The GA4 Key Event name that represents a lead (e.g., 'generate_lead', 'form_submission')
   gscSiteUrl: text("gsc_site_url"), // The specific Search Console site URL
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
