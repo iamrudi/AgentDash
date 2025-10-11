@@ -737,8 +737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate lead event name if provided (optional)
-      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 100)) {
-        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 100 characters" });
+      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 500)) {
+        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 500 characters" });
       }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
@@ -901,8 +901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate lead event name if provided (optional)
-      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 100)) {
-        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 100 characters" });
+      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 500)) {
+        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 500 characters" });
       }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
