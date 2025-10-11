@@ -4,7 +4,7 @@ import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Client, createClientUserSchema, type CreateClientUser } from "@shared/schema";
-import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink, Sparkles } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
 import { useState } from "react";
 import {
@@ -78,8 +78,33 @@ export default function AgencyClientsPage() {
     },
   });
 
+  const generateAIMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      return await apiRequest("POST", `/api/agency/clients/${clientId}/generate-recommendations`, {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
+      toast({
+        title: "AI Analysis Complete",
+        description: data.message || "Recommendations generated successfully",
+      });
+    },
+    onError: (error: any) => {
+      const message = error.message || "Failed to generate recommendations";
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: CreateClientUser) => {
     createClientMutation.mutate(data);
+  };
+
+  const handleGenerateAI = (clientId: string, clientName: string) => {
+    generateAIMutation.mutate(clientId);
   };
 
   // Get initials from company name
@@ -341,11 +366,29 @@ export default function AgencyClientsPage() {
                         )}
                       </div>
                     </TooltipProvider>
-                    <Link href={`/agency/clients/${client.id}`}>
-                      <Button variant="outline" size="sm" data-testid={`button-view-client-${client.id}`}>
-                        Manage
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleGenerateAI(client.id, client.companyName)}
+                            disabled={generateAIMutation.isPending}
+                            data-testid={`button-ai-generate-${client.id}`}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Generate AI Recommendations
+                        </TooltipContent>
+                      </Tooltip>
+                      <Link href={`/agency/clients/${client.id}`}>
+                        <Button variant="outline" size="sm" data-testid={`button-view-client-${client.id}`}>
+                          Manage
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -405,11 +448,22 @@ export default function AgencyClientsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/agency/clients/${client.id}`}>
-                        <Button variant="ghost" size="sm" data-testid={`button-manage-${client.id}`}>
-                          Manage
+                      <div className="flex items-center justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleGenerateAI(client.id, client.companyName)}
+                          disabled={generateAIMutation.isPending}
+                          data-testid={`button-ai-generate-table-${client.id}`}
+                        >
+                          <Sparkles className="h-4 w-4" />
                         </Button>
-                      </Link>
+                        <Link href={`/agency/clients/${client.id}`}>
+                          <Button variant="ghost" size="sm" data-testid={`button-manage-${client.id}`}>
+                            Manage
+                          </Button>
+                        </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
