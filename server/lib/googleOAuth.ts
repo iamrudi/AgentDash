@@ -296,6 +296,74 @@ export async function fetchGA4AcquisitionChannels(
 }
 
 /**
+ * Fetch GA4 Key Events (conversions) data
+ * @param accessToken - Valid access token
+ * @param propertyId - GA4 property ID
+ * @param eventName - Event name to filter (e.g., "generate_lead", "form_submission")
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Key Events data with totals
+ */
+export async function fetchGA4KeyEvents(
+  accessToken: string,
+  propertyId: string,
+  eventName: string,
+  startDate: string,
+  endDate: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const analyticsData = google.analyticsdata({
+    version: 'v1beta',
+    auth: oauth2Client,
+  });
+
+  try {
+    const response = await analyticsData.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        metrics: [
+          { name: 'eventCount' },
+        ],
+        dimensions: [{ name: 'eventName' }],
+        dimensionFilter: {
+          filter: {
+            fieldName: 'eventName',
+            stringFilter: {
+              matchType: 'EXACT',
+              value: eventName,
+            },
+          },
+        },
+      },
+    });
+
+    // Calculate total from rows if totals field is missing
+    let totalEventCount = 0;
+    if (response.data.rows && response.data.rows.length > 0) {
+      totalEventCount = response.data.rows.reduce((sum, row) => {
+        const eventCount = parseInt(row.metricValues?.[0]?.value || '0', 10);
+        return sum + eventCount;
+      }, 0);
+    }
+
+    return {
+      rows: response.data.rows || [],
+      totals: response.data.totals || [{ metricValues: [{ value: totalEventCount.toString() }] }],
+      rowCount: response.data.rowCount || 0,
+      totalEventCount,
+    };
+  } catch (error: any) {
+    console.error('Error fetching GA4 Key Events data:', error);
+    throw new Error('Failed to fetch GA4 Key Events data');
+  }
+}
+
+/**
  * Fetch Google Search Console analytics data
  * @param accessToken - Valid access token
  * @param siteUrl - GSC site URL

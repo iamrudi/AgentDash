@@ -6,7 +6,7 @@ import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema } from "@shared/schema";
-import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
+import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
@@ -934,6 +934,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Analytics Data API
 
+  // Get GA4 conversions (Key Events) data for a client (MUST come before the general GA4 route)
+  app.get("/api/analytics/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { startDate, endDate } = req.query;
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      // Security: Clients can only view their own analytics
+      if (profile!.role === "Client") {
+        const client = await storage.getClientByProfileId(profile!.id);
+        if (!client || client.id !== clientId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration || !integration.ga4PropertyId) {
+        return res.status(404).json({ message: "GA4 integration not configured" });
+      }
+
+      // Check if lead event name is configured
+      if (!integration.ga4LeadEventName) {
+        return res.status(400).json({ message: "Lead event name not configured. Please configure it in the integrations page." });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      // Default to last 30 days if not specified
+      const end = endDate as string || new Date().toISOString().split('T')[0];
+      const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      if (!integration.accessToken) {
+        return res.status(401).json({ message: "Access token not available" });
+      }
+
+      const data = await fetchGA4KeyEvents(integration.accessToken, integration.ga4PropertyId!, integration.ga4LeadEventName!, start, end);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Fetch GA4 conversions error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch GA4 conversions" });
+    }
+  });
+
   // Get GA4 acquisition channels data for a client (MUST come before the general GA4 route)
   app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
@@ -1184,10 +1239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let totalConversions = 0;
       let totalSpend = 0;
       let totalOrganicClicks = 0;
+      let usedGA4Conversions = false;
 
-      // Try to get conversions from GA4
+      // Try to get conversions from GA4 Key Events
       const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
-      if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken) {
+      if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken && ga4Integration.ga4LeadEventName) {
         try {
           // Check if token is expired and refresh if needed
           let integration = ga4Integration;
@@ -1201,26 +1257,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
 
-          // Note: GA4 doesn't have "conversions" metric by default - would need to set up conversion events
-          // For now, we'll rely on dailyMetrics table for conversion data
+          // Fetch actual GA4 Key Events data based on configured lead event name
+          const keyEventsData = await fetchGA4KeyEvents(
+            integration.accessToken, 
+            integration.ga4PropertyId!, 
+            integration.ga4LeadEventName!, 
+            start, 
+            end
+          );
+          
+          // Get total conversions from the response
+          totalConversions = keyEventsData.totalEventCount || 0;
+          usedGA4Conversions = true;
+          
+          console.log(`GA4 Key Events data fetched successfully: ${totalConversions} conversions for event "${integration.ga4LeadEventName}"`);
         } catch (error) {
-          console.error("Error fetching GA4 conversion data:", error);
+          console.error("Error fetching GA4 Key Events data:", error);
         }
       }
 
-      // Get conversions and spend from dailyMetrics table
+      // Fall back to dailyMetrics ONLY if GA4 conversions were not successfully fetched
+      if (!usedGA4Conversions) {
+        const dailyMetrics = await storage.getMetricsByClientId(clientId);
+        if (dailyMetrics && dailyMetrics.length > 0) {
+          const startTimestamp = new Date(start).getTime();
+          const endTimestamp = new Date(end).getTime();
+          const filteredMetrics = dailyMetrics.filter((metric: any) => {
+            const metricTimestamp = new Date(metric.date).getTime();
+            return metricTimestamp >= startTimestamp && metricTimestamp <= endTimestamp;
+          });
+          totalConversions = filteredMetrics.reduce((sum: number, metric: any) => sum + (metric.conversions || 0), 0);
+          console.log(`Using dailyMetrics fallback: ${totalConversions} conversions`);
+        }
+      }
+
+      // Get spend from dailyMetrics table (spend is still tracked there)
       const dailyMetrics = await storage.getMetricsByClientId(clientId);
       if (dailyMetrics && dailyMetrics.length > 0) {
-        // Filter by date range
         const startTimestamp = new Date(start).getTime();
         const endTimestamp = new Date(end).getTime();
-        
         const filteredMetrics = dailyMetrics.filter((metric: any) => {
           const metricTimestamp = new Date(metric.date).getTime();
           return metricTimestamp >= startTimestamp && metricTimestamp <= endTimestamp;
         });
-
-        totalConversions = filteredMetrics.reduce((sum: number, metric: any) => sum + (metric.conversions || 0), 0);
         totalSpend = filteredMetrics.reduce((sum: number, metric: any) => sum + parseFloat(metric.spend || '0'), 0);
       }
 
