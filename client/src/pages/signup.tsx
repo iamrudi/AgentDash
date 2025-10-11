@@ -109,6 +109,7 @@ export default function Signup() {
                     <FormControl>
                       <Input
                         placeholder="John Doe"
+                        autoComplete="name"
                         data-testid="input-fullname"
                         {...field}
                       />
@@ -127,6 +128,7 @@ export default function Signup() {
                       <Input
                         placeholder="you@company.com"
                         type="email"
+                        autoComplete="email"
                         data-testid="input-email"
                         {...field}
                       />
@@ -145,6 +147,7 @@ export default function Signup() {
                       <Input
                         placeholder="Minimum 6 characters"
                         type="password"
+                        autoComplete="new-password"
                         data-testid="input-password"
                         {...field}
                       />
@@ -162,6 +165,7 @@ export default function Signup() {
                     <FormControl>
                       <Input
                         placeholder="Your company name"
+                        autoComplete="organization"
                         data-testid="input-company"
                         {...field}
                       />
@@ -183,7 +187,7 @@ export default function Signup() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <Button
-            variant="link"
+            variant="ghost"
             onClick={() => setLocation("/login")}
             data-testid="link-login"
           >
