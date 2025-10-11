@@ -1581,10 +1581,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // AI Chat & Data Analysis API (Client only)
+  // AI Chat & Data Analysis API (accessible by Client, Admin, and Staff)
   
   // Analyze data on demand
-  app.post("/api/ai/analyze-data", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+  app.post("/api/ai/analyze-data", requireAuth, async (req: AuthRequest, res) => {
     try {
       const analyzeDataSchema = z.object({
         contextData: z.any(),
@@ -1598,7 +1598,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { contextData, question } = validationResult.data;
       const profile = await storage.getProfileByUserId(req.user!.id);
-      const client = await storage.getClientByProfileId(profile!.id);
+      let client;
+
+      // If Admin/Staff, get client from contextData.clientId
+      if (profile?.role === "Admin" || profile?.role === "Staff") {
+        if (!contextData?.clientId) {
+          return res.status(400).json({ message: "Client ID required for Admin/Staff users" });
+        }
+        client = await storage.getClientById(contextData.clientId);
+      } else {
+        // If Client, get their own client data
+        client = await storage.getClientByProfileId(profile!.id);
+      }
 
       if (!client) {
         return res.status(404).json({ message: "Client not found" });
@@ -1617,8 +1628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Request action on AI recommendation
-  app.post("/api/ai/request-action", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+  // Request action on AI recommendation (accessible by Client, Admin, and Staff)
+  app.post("/api/ai/request-action", requireAuth, async (req: AuthRequest, res) => {
     try {
       const recommendationSchema = z.object({
         title: z.string().min(1),
@@ -1628,6 +1639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         estimatedCost: z.number().min(0),
         triggerMetric: z.string().min(1),
         baselineValue: z.number(),
+        clientId: z.string().optional(), // Optional for Admin/Staff users
       });
 
       const validationResult = recommendationSchema.safeParse(req.body);
@@ -1637,7 +1649,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const recommendation = validationResult.data;
       const profile = await storage.getProfileByUserId(req.user!.id);
-      const client = await storage.getClientByProfileId(profile!.id);
+      let client;
+
+      // If Admin/Staff, get client from request body
+      if (profile?.role === "Admin" || profile?.role === "Staff") {
+        if (!recommendation.clientId) {
+          return res.status(400).json({ message: "Client ID required for Admin/Staff users" });
+        }
+        client = await storage.getClientById(recommendation.clientId);
+      } else {
+        // If Client, get their own client data
+        client = await storage.getClientByProfileId(profile!.id);
+      }
 
       if (!client) {
         return res.status(404).json({ message: "Client not found" });

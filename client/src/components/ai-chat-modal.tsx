@@ -50,9 +50,13 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
 
   const requestActionMutation = useMutation({
     mutationFn: (recommendation: AIAnalysisResult) => 
-      apiRequest("POST", "/api/ai/request-action", recommendation),
+      apiRequest("POST", "/api/ai/request-action", { 
+        ...recommendation, 
+        clientId: contextData?.clientId // Include clientId for Admin/Staff users
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/client/initiatives"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
       toast({
         title: "Action Requested!",
         description: "Your request has been sent to the agency for review. Redirecting to Recommendations page...",
