@@ -14,10 +14,11 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Routing**: Wouter
 - **State Management**: TanStack Query
 - **Styling**: Tailwind CSS with Shadcn/UI
-- **Theming**: Full dark mode support, system preference detection
+- **Theming**: Dark-first design with light mode support, automatic time-based system theme (6 AM-6 PM = light, otherwise dark), theme switcher dropdown with Light/Dark/System options
 - **Responsiveness**: Mobile-first design
-- **Typography**: Inter font family
-- **Primary Color**: Professional Blue (HSL 221 83% 53%)
+- **Typography**: Geist Sans for UI text, Geist Mono for code
+- **Primary Color**: Vibrant Green (HSL 150 76% 42%)
+- **Color Palette**: Modern dark theme with deep blue-black background (HSL 224 71% 4%), subtle green accents, card glow effects on hover
 
 ### Technical Implementations
 - **Authentication**: JWT tokens, bcrypt hashing, no role self-selection on signup.
