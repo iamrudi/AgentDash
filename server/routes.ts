@@ -437,6 +437,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/tasks/:id", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
+      
+      // For Staff users, verify they're assigned to this task
+      if (req.user!.role === "Staff") {
+        const user = await storage.getUserById(req.user!.id);
+        if (!user) {
+          return res.status(403).json({ message: "User not found" });
+        }
+        
+        const profile = await storage.getProfileByUserId(user.id);
+        if (!profile) {
+          return res.status(403).json({ message: "Profile not found" });
+        }
+        
+        // Check if staff is assigned to this task
+        const assignments = await storage.getAssignmentsByTaskId(id);
+        const isAssigned = assignments.some(a => a.staffProfileId === profile.id);
+        
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Not authorized to update this task - not assigned" });
+        }
+      }
+      
       const updatedTask = await storage.updateTask(id, req.body);
       res.json(updatedTask);
     } catch (error: any) {
