@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, DollarSign, Users, MousePointer, Sparkles, ExternalLink } from "lucide-react";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Pie, PieChart, Cell } from "recharts";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, BarChart } from "recharts";
 import { format, subDays } from "date-fns";
 
 interface GA4Data {
@@ -159,9 +159,6 @@ export default function Reports() {
   const topQueries = (gscQueries?.rows ?? [])
     .sort((a, b) => b.clicks - a.clicks)
     .slice(0, 10);
-
-  // Channel colors for donut chart
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
   const calcChange = (current: number, previous: number) => {
     if (previous === 0) {
@@ -349,7 +346,7 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          {/* Traffic by Channel Donut Chart */}
+          {/* Traffic by Channel Bar Chart */}
           <Card data-testid="card-traffic-channels">
             <CardHeader>
               <CardTitle>Traffic by Channel</CardTitle>
@@ -357,23 +354,14 @@ export default function Reports() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={channelsChartData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.channel}: ${entry.sessions}`}
-                    outerRadius={80}
-                    fill="hsl(var(--primary))"
-                    dataKey="sessions"
-                  >
-                    {channelsChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
+                <BarChart data={channelsChartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="channel" type="category" width={100} />
                   <Tooltip />
-                </PieChart>
+                  <Legend />
+                  <Bar dataKey="sessions" fill="hsl(var(--primary))" name="Sessions" />
+                </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
