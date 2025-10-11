@@ -11,10 +11,33 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getUserRole } from "@/lib/auth";
 
+interface AnalyticsContextData {
+  clientId?: string;
+  ga4Metrics?: {
+    sessions?: number;
+    conversions?: number;
+    spend?: number;
+  };
+  gscMetrics?: {
+    clicks?: number;
+    impressions?: number;
+    avgPosition?: number;
+  };
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
+  clientInfo?: {
+    id: string;
+    name?: string;
+    objectives?: string[];
+  };
+}
+
 interface AIChatModalProps {
   isOpen: boolean;
   onClose: () => void;
-  contextData: any;
+  contextData: AnalyticsContextData;
   initialQuestion: string;
 }
 
@@ -37,7 +60,7 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
 
   const analyzeMutation = useMutation({
     mutationFn: (userQuestion: string) => 
-      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }).then(res => res.json()),
+      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }),
     onSuccess: (data: AIAnalysisResult) => {
       setAnalysis(data);
     },

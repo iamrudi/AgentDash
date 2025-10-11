@@ -256,10 +256,11 @@ export default function AgencyIntegrationsPage() {
 
       const data = await response.json();
       window.location.href = data.authUrl;
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to initiate OAuth";
       toast({
         title: "Connection Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }

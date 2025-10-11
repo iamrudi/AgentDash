@@ -605,7 +605,7 @@ function FinancialMetrics({ client }: { client: Client }) {
         description: "Financial metrics updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to update financial metrics",

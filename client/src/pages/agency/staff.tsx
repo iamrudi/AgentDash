@@ -64,7 +64,7 @@ export default function AgencyStaffPage() {
         description: "User created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error & { errors?: Array<{ message: string }> }) => {
       const message = error.errors?.[0]?.message || error.message || "Failed to create user";
       toast({
         title: "Error",

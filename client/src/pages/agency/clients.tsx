@@ -68,7 +68,7 @@ export default function AgencyClientsPage() {
         description: "Client created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error & { errors?: Array<{ message: string }> }) => {
       const message = error.errors?.[0]?.message || error.message || "Failed to create client";
       toast({
         title: "Error",
@@ -82,14 +82,14 @@ export default function AgencyClientsPage() {
     mutationFn: async (clientId: string) => {
       return await apiRequest("POST", `/api/agency/clients/${clientId}/generate-recommendations`, {});
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { message?: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
       toast({
         title: "AI Analysis Complete",
         description: data.message || "Recommendations generated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       const message = error.message || "Failed to generate recommendations";
       toast({
         title: "Error",

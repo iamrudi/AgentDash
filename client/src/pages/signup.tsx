@@ -68,7 +68,7 @@ export default function Signup() {
       });
       setLocation("/login");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Signup failed",
         description: error.message || "An error occurred during signup",

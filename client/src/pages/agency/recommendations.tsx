@@ -64,7 +64,7 @@ export default function AgencyRecommendationsPage() {
     : initiatives?.filter(i => i.clientId === selectedClientId);
 
   const editMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: any }) => {
+    mutationFn: async (data: { id: string; updates: Partial<{ title: string; observation: string; proposedAction: string; cost: string; impact: string }> }) => {
       return await apiRequest("PATCH", `/api/initiatives/${data.id}`, data.updates);
     },
     onSuccess: () => {
@@ -91,7 +91,7 @@ export default function AgencyRecommendationsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { title: string; observation: string; proposedAction: string; cost: string; impact: string; clientId: string; status: string; sentToClient: string }) => {
       return await apiRequest("POST", "/api/initiatives", data);
     },
     onSuccess: () => {

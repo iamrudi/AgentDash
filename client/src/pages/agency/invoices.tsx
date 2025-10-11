@@ -81,7 +81,7 @@ export default function AgencyInvoicesPage() {
         description: "Invoice created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create invoice",
@@ -102,7 +102,7 @@ export default function AgencyInvoicesPage() {
         description: "Invoice status updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to update invoice status",
@@ -122,7 +122,7 @@ export default function AgencyInvoicesPage() {
         description: "PDF generated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to generate PDF",

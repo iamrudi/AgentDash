@@ -75,15 +75,16 @@ export default function Login() {
           title: "Welcome back!",
           description: "You have successfully logged in.",
         });
-      } catch (error: any) {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Invalid response from server";
         toast({
           title: "Login failed",
-          description: error.message || "Invalid response from server",
+          description: errorMessage,
           variant: "destructive",
         });
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Login failed",
         description: error.message || "Invalid email or password",
