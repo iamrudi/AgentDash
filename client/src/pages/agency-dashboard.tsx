@@ -70,22 +70,22 @@ export default function AgencyDashboard() {
   const endDate = format(new Date(), 'yyyy-MM-dd');
 
   const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
-    queryKey: [`/api/analytics/ga4/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: ['/api/analytics/ga4', selectedClientId, { startDate, endDate }],
     enabled: !!selectedClientId,
   });
 
   const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
-    queryKey: [`/api/analytics/gsc/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: ['/api/analytics/gsc', selectedClientId, { startDate, endDate }],
     enabled: !!selectedClientId,
   });
 
   const { data: gscQueries } = useQuery<GSCData>({
-    queryKey: [`/api/analytics/gsc/${selectedClientId}/queries?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: ['/api/analytics/gsc', selectedClientId, 'queries', { startDate, endDate }],
     enabled: !!selectedClientId,
   });
 
   const { data: outcomeMetrics } = useQuery<OutcomeMetrics>({
-    queryKey: [`/api/analytics/outcome-metrics/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: ['/api/analytics/outcome-metrics', selectedClientId, { startDate, endDate }],
     enabled: !!selectedClientId,
   });
 

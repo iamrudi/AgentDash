@@ -14,7 +14,7 @@ export default function InvoiceDetail() {
   const invoiceId = params?.id;
 
   const { data: invoice, isLoading: invoiceLoading } = useQuery<InvoiceWithClient>({
-    queryKey: [`/api/client/invoices/${invoiceId}`],
+    queryKey: ['/api/client/invoices', invoiceId],
     enabled: !!invoiceId,
   });
 

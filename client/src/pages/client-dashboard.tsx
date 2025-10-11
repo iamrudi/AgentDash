@@ -52,7 +52,7 @@ export default function ClientDashboard() {
   });
 
   const { data: ga4Integration } = useQuery<GA4Integration>({
-    queryKey: [`/api/integrations/ga4/${clientRecord?.id}`],
+    queryKey: ['/api/integrations/ga4', clientRecord?.id],
     enabled: !!clientRecord?.id,
   });
 

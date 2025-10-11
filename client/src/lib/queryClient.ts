@@ -41,12 +41,35 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
+
+// Helper to build URL from hierarchical query key
+function buildUrlFromQueryKey(queryKey: readonly unknown[]): string {
+  const pathSegments: string[] = [];
+  let queryParams: Record<string, string> = {};
+
+  for (const segment of queryKey) {
+    if (typeof segment === 'string') {
+      pathSegments.push(segment);
+    } else if (typeof segment === 'object' && segment !== null) {
+      // Merge object into query params
+      queryParams = { ...queryParams, ...segment as Record<string, string> };
+    }
+  }
+
+  const basePath = pathSegments.join('/');
+  const searchParams = new URLSearchParams(queryParams);
+  const queryString = searchParams.toString();
+  
+  return queryString ? `${basePath}?${queryString}` : basePath;
+}
+
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = buildUrlFromQueryKey(queryKey);
+    const res = await fetch(url, {
       headers: getAuthHeaders(),
       credentials: "include",
     });

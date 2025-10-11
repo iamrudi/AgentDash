@@ -37,17 +37,17 @@ export default function ClientDetail() {
   const [selectedProperty, setSelectedProperty] = useState<string>("");
 
   const { data: client, isLoading: clientLoading } = useQuery<Client>({
-    queryKey: [`/api/agency/clients/${clientId}`],
+    queryKey: ['/api/agency/clients', clientId],
     enabled: !!clientId,
   });
 
   const { data: ga4Integration, isLoading: integrationLoading } = useQuery<GA4Integration>({
-    queryKey: [`/api/integrations/ga4/${clientId}`],
+    queryKey: ['/api/integrations/ga4', clientId],
     enabled: !!clientId,
   });
 
   const { data: ga4Properties, isLoading: propertiesLoading } = useQuery<GA4Property[]>({
-    queryKey: [`/api/integrations/ga4/${clientId}/properties`],
+    queryKey: ['/api/integrations/ga4', clientId, 'properties'],
     enabled: !!clientId && ga4Integration?.connected === true,
   });
 
@@ -85,7 +85,7 @@ export default function ClientDetail() {
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/integrations/ga4/${clientId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/integrations/ga4', clientId] });
       toast({
         title: "Success",
         description: "GA4 property saved successfully",
@@ -355,7 +355,7 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
   const [targetMetric, setTargetMetric] = useState("");
 
   const { data: objectives = [], isLoading } = useQuery<ClientObjective[]>({
-    queryKey: [`/api/agency/clients/${clientId}/objectives`],
+    queryKey: ['/api/agency/clients', clientId, 'objectives'],
     enabled: !!clientId,
   });
 
@@ -364,7 +364,7 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
       return await apiRequest("POST", `/api/agency/clients/${clientId}/objectives`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'objectives'] });
       setDescription("");
       setTargetMetric("");
       setShowForm(false);
@@ -389,7 +389,7 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'objectives'] });
       toast({
         title: "Success",
         description: "Objective updated successfully",
@@ -402,7 +402,7 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
       return await apiRequest("DELETE", `/api/agency/objectives/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/objectives`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'objectives'] });
       toast({
         title: "Success",
         description: "Objective deleted successfully",
@@ -575,7 +575,7 @@ function FinancialMetrics({ client }: { client: Client }) {
       return await apiRequest("PATCH", `/api/agency/clients/${client.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${client.id}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', client.id] });
       setIsEditing(false);
       toast({
         title: "Success",
@@ -757,7 +757,7 @@ function SyncMetricsCard({ clientId }: { clientId: string }) {
       return await apiRequest("POST", `/api/agency/clients/${clientId}/sync-metrics`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${clientId}/metrics`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/agency/metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/agency/recommendations'] });
       toast({
