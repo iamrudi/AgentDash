@@ -87,6 +87,7 @@ export default function Recommendations() {
       case "Approved": return "default";
       case "Rejected": return "destructive";
       case "Discussing": return "outline";
+      case "Awaiting Approval": return "secondary";
       case "Sent": return "secondary";
       default: return "outline";
     }
@@ -95,7 +96,7 @@ export default function Recommendations() {
   const canRespond = (init: InitiativeWithClient) => {
     return init.sentToClient === "true" && 
            init.clientResponse === "pending" && 
-           init.status === "Sent";
+           init.status === "Awaiting Approval";
   };
 
   return (
