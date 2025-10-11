@@ -1,11 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../lib/jwt";
+import { db } from "../db";
+import { profiles, clients } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: string;
+    clientId?: string; // Client ID for tenant isolation
   };
 }
 
@@ -22,10 +26,31 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   try {
     const payload = verifyToken(token);
     
+    // Get user profile to determine client association
+    const [profile] = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, payload.userId))
+      .limit(1);
+
+    let clientId: string | undefined;
+
+    // If user is a client, get their clientId for tenant isolation
+    if (profile?.role === "Client") {
+      const [client] = await db
+        .select()
+        .from(clients)
+        .where(eq(clients.profileId, profile.id))
+        .limit(1);
+      
+      clientId = client?.id;
+    }
+    
     req.user = {
       id: payload.userId,
       email: payload.email,
-      role: payload.role,
+      role: profile?.role || payload.role,
+      clientId,
     };
 
     next();
@@ -43,6 +68,49 @@ export function requireRole(...roles: string[]) {
 
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
+
+// Tenant isolation helper: verify user can access a client's resources
+export async function verifyClientAccess(
+  req: AuthRequest,
+  resourceClientId: string
+): Promise<boolean> {
+  if (!req.user) {
+    return false;
+  }
+
+  // Admins can access all clients
+  if (req.user.role === "Admin") {
+    return true;
+  }
+
+  // Client users can only access their own data
+  if (req.user.role === "Client") {
+    return req.user.clientId === resourceClientId;
+  }
+
+  // Staff users need to be assigned to tasks related to this client
+  // For now, deny access (can be enhanced to check task assignments)
+  return false;
+}
+
+// Middleware to enforce tenant isolation on client-specific routes
+export function requireClientAccess() {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const clientId = req.params.clientId || req.body.clientId;
+    
+    if (!clientId) {
+      return res.status(400).json({ message: "Client ID required" });
+    }
+
+    const hasAccess = await verifyClientAccess(req, clientId);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this client's resources" });
     }
 
     next();
