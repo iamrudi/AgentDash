@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -24,7 +24,7 @@ export const users = pgTable("users", {
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: text("company_name").notNull(),
-  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
   leadValue: numeric("lead_value"), // Value per lead for pipeline calculation (e.g., 500 = $500 per lead)
@@ -42,7 +42,9 @@ export const projects = pgTable("projects", {
   description: text("description"),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdIdx: index("projects_client_id_idx").on(table.clientId),
+}));
 
 // TASKS
 export const tasks = pgTable("tasks", {
@@ -54,7 +56,9 @@ export const tasks = pgTable("tasks", {
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  projectIdIdx: index("tasks_project_id_idx").on(table.projectId),
+}));
 
 // STAFF ASSIGNMENTS (Links staff to tasks)
 export const staffAssignments = pgTable("staff_assignments", {
@@ -62,7 +66,10 @@ export const staffAssignments = pgTable("staff_assignments", {
   taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
   staffProfileId: uuid("staff_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  taskIdIdx: index("staff_assignments_task_id_idx").on(table.taskId),
+  staffProfileIdIdx: index("staff_assignments_staff_profile_id_idx").on(table.staffProfileId),
+}));
 
 // INVOICES
 export const invoices = pgTable("invoices", {
@@ -75,7 +82,9 @@ export const invoices = pgTable("invoices", {
   pdfUrl: text("pdf_url"),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdIdx: index("invoices_client_id_idx").on(table.clientId),
+}));
 
 // INVOICE LINE ITEMS
 export const invoiceLineItems = pgTable("invoice_line_items", {
@@ -88,7 +97,9 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
   taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  invoiceIdIdx: index("invoice_line_items_invoice_id_idx").on(table.invoiceId),
+}));
 
 // INITIATIVES (Strategic AI-powered recommendations with task breakdown)
 export const initiatives = pgTable("initiatives", {
@@ -111,7 +122,9 @@ export const initiatives = pgTable("initiatives", {
   measuredImprovement: numeric("measured_improvement"), // Final measured improvement percentage
   lastEditedAt: timestamp("last_edited_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdIdx: index("initiatives_client_id_idx").on(table.clientId),
+}));
 
 // DAILY METRICS (12-month rolling data for AI & dashboards)
 export const dailyMetrics = pgTable("daily_metrics", {
@@ -128,7 +141,9 @@ export const dailyMetrics = pgTable("daily_metrics", {
   organicClicks: integer("organic_clicks").default(0),
   avgPosition: numeric("avg_position"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdDateIdx: index("daily_metrics_client_id_date_idx").on(table.clientId, table.date),
+}));
 
 // CLIENT INTEGRATIONS (OAuth tokens for external services)
 export const clientIntegrations = pgTable("client_integrations", {
@@ -160,7 +175,9 @@ export const clientObjectives = pgTable("client_objectives", {
   isActive: text("is_active").default("true"), // Using text for boolean compatibility
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdIdx: index("client_objectives_client_id_idx").on(table.clientId),
+}));
 
 // CLIENT MESSAGES (Chat messages between clients and account managers)
 export const clientMessages = pgTable("client_messages", {
@@ -170,7 +187,9 @@ export const clientMessages = pgTable("client_messages", {
   senderRole: text("sender_role").notNull(), // 'Client' or 'Admin'
   isRead: text("is_read").default("false"), // Using text for boolean compatibility
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  clientIdIdx: index("client_messages_client_id_idx").on(table.clientId),
+}));
 
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
