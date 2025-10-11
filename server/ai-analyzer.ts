@@ -14,20 +14,17 @@ export async function generateAIRecommendations(
   clientId: string
 ): Promise<AIRecommendationResult> {
   try {
-    // 1. Get client info and objectives
+    // 1. Get client info
     const client = await storage.getClientById(clientId);
     if (!client) {
       return { success: false, recommendationsCreated: 0, error: "Client not found" };
     }
 
-    // 2. Get GA4 metrics (last 30 days)
-    const ga4Metrics = await storage.getMetricsByClientId(clientId, 30);
+    // 2. Get all metrics (last 30 days)
+    const allMetrics = await storage.getMetricsByClientId(clientId, 30);
     
-    // 3. Get GSC metrics (last 30 days) 
-    const gscMetrics = await storage.getGSCMetricsByClientId(clientId, 30);
-
-    // 4. Check if we have enough data
-    if (ga4Metrics.length === 0 && gscMetrics.length === 0) {
+    // 3. Check if we have enough data
+    if (allMetrics.length === 0) {
       return { 
         success: false, 
         recommendationsCreated: 0, 
@@ -35,26 +32,30 @@ export async function generateAIRecommendations(
       };
     }
 
-    // 5. Format metrics for AI analysis
-    const formattedGA4 = ga4Metrics.map(m => ({
+    // 4. Format GA4 metrics (sessions, conversions from all sources)
+    const formattedGA4 = allMetrics.map(m => ({
       date: format(new Date(m.date), 'yyyy-MM-dd'),
-      users: m.users || 0,
+      source: m.source,
       sessions: m.sessions || 0,
       conversions: m.conversions || 0,
-      bounceRate: m.bounceRate ? parseFloat(m.bounceRate) : 0,
-      avgSessionDuration: m.avgSessionDuration || 0
-    }));
-
-    const formattedGSC = gscMetrics.map(m => ({
-      date: format(new Date(m.date), 'yyyy-MM-dd'),
       clicks: m.clicks || 0,
       impressions: m.impressions || 0,
-      ctr: m.ctr ? parseFloat(m.ctr) : 0,
-      position: m.position ? parseFloat(m.position) : 0
+      spend: m.spend ? parseFloat(m.spend) : 0
+    }));
+
+    // 5. Format GSC metrics (organic search data)
+    const formattedGSC = allMetrics.map(m => ({
+      date: format(new Date(m.date), 'yyyy-MM-dd'),
+      organicClicks: m.organicClicks || 0,
+      organicImpressions: m.organicImpressions || 0,
+      avgPosition: m.avgPosition ? parseFloat(m.avgPosition) : 0
     }));
 
     // 6. Get client objectives if available
-    const objectives = client.objectives || undefined;
+    const clientObjectives = await storage.getObjectivesByClientId(clientId);
+    const objectives = clientObjectives.filter(o => o.isActive === "true")
+      .map(o => o.description)
+      .join("; ") || undefined;
 
     // 7. Call Gemini AI to analyze and generate recommendations
     const aiRecommendations = await analyzeClientMetrics(

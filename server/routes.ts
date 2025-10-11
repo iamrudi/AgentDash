@@ -263,6 +263,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { generateAIRecommendations } = await import("./ai-analyzer");
+      
+      const result = await generateAIRecommendations(storage, clientId);
+      
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully generated ${result.recommendationsCreated} AI-powered recommendations`,
+        count: result.recommendationsCreated 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const projects = await storage.getAllProjects();
