@@ -1,19 +1,51 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
-import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight, MessageSquare } from "lucide-react";
+import { AIChatModal } from "@/components/ai-chat-modal";
+import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight, MessageSquare, Sparkles, MousePointer, Eye, TrendingDown } from "lucide-react";
 import { Project, Client, DailyMetric, Recommendation, ClientMessage } from "@shared/schema";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+interface GA4Data {
+  rows: Array<{
+    dimensionValues: Array<{ value: string }>;
+    metricValues: Array<{ value: string }>;
+  }>;
+}
+
+interface GSCData {
+  rows: Array<{
+    keys: string[];
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }>;
+}
+
+interface OutcomeMetrics {
+  conversions: number;
+  estimatedPipelineValue: number;
+  cpa: number;
+  organicClicks: number;
+  spend: number;
+}
 
 export default function AgencyDashboard() {
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/agency/projects"],
   });
@@ -34,11 +66,43 @@ export default function AgencyDashboard() {
     queryKey: ["/api/agency/messages"],
   });
 
+  const startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const endDate = format(new Date(), 'yyyy-MM-dd');
+
+  const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
+    queryKey: [`/api/analytics/ga4/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    enabled: !!selectedClientId,
+  });
+
+  const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
+    queryKey: [`/api/analytics/gsc/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    enabled: !!selectedClientId,
+  });
+
+  const { data: gscQueries } = useQuery<GSCData>({
+    queryKey: [`/api/analytics/gsc/${selectedClientId}/queries?startDate=${startDate}&endDate=${endDate}`],
+    enabled: !!selectedClientId,
+  });
+
+  const { data: outcomeMetrics } = useQuery<OutcomeMetrics>({
+    queryKey: [`/api/analytics/outcome-metrics/${selectedClientId}?startDate=${startDate}&endDate=${endDate}`],
+    enabled: !!selectedClientId,
+  });
+
   const activeProjects = projects?.filter(p => p.status === "Active").length || 0;
   const totalClients = clients?.length || 0;
   const recentMetrics = metrics?.slice(0, 30) || [];
   const totalRevenue = recentMetrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0);
   const newRecommendations = recommendations?.filter(r => r.status === "New").length || 0;
+
+  const selectedClient = clients?.find(c => c.id === selectedClientId);
+
+  const topQueries = gscQueries?.rows?.slice(0, 10) || [];
+  const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (parseInt(row.metricValues[0]?.value) || 0), 0) || 0;
+  const totalImpressions = gscData?.rows?.reduce((sum, row) => sum + (parseInt(row.metricValues[1]?.value) || 0), 0) || 0;
+  const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const avgPosition = gscData?.rows?.length ? 
+    gscData.rows.reduce((sum, row) => sum + (parseFloat(row.metricValues[3]?.value) || 0), 0) / gscData.rows.length : 0;
 
   const style = {
     "--sidebar-width": "16rem",
@@ -61,6 +125,216 @@ export default function AgencyDashboard() {
                   Overview of all clients, projects, and performance metrics
                 </p>
               </div>
+
+              {/* Client Selector */}
+              <Card className="bg-card/50">
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex-1 min-w-[200px]">
+                      <CardTitle className="text-sm font-medium mb-2">Select Client to View Analytics</CardTitle>
+                      <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                        <SelectTrigger className="w-full max-w-md" data-testid="select-client">
+                          <SelectValue placeholder="Choose a client..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients?.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.companyName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {selectedClientId && (
+                      <Button 
+                        onClick={() => setIsAiModalOpen(true)}
+                        className="gap-2"
+                        data-testid="button-chat-with-data"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        Chat with Client Data
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* Client-Specific Analytics */}
+              {selectedClient && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-semibold">Analytics for {selectedClient.companyName}</h2>
+                    <Link href={`/agency/clients/${selectedClient.id}`}>
+                      <Button variant="outline" size="sm">
+                        Manage Client
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+
+                  {/* Outcome Metrics */}
+                  {outcomeMetrics && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Conversions
+                            </CardTitle>
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold font-mono" data-testid="text-conversions">
+                            {outcomeMetrics.conversions}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Pipeline Value
+                            </CardTitle>
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold font-mono" data-testid="text-pipeline-value">
+                            ${outcomeMetrics.estimatedPipelineValue.toLocaleString()}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Organic Clicks
+                            </CardTitle>
+                            <MousePointer className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold font-mono" data-testid="text-organic-clicks">
+                            {outcomeMetrics.organicClicks.toLocaleString()}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                              Cost per Acquisition
+                            </CardTitle>
+                            <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold font-mono" data-testid="text-cpa">
+                            ${outcomeMetrics.cpa.toFixed(2)}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
+
+                  {/* GSC Overview */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Total Clicks (GSC)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold font-mono">
+                          {totalClicks.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Total Impressions
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold font-mono">
+                          {totalImpressions.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Average CTR
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold font-mono">
+                          {avgCTR.toFixed(2)}%
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Average Position
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold font-mono">
+                          {avgPosition.toFixed(1)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Top Performing Queries Table */}
+                  <Card data-testid="card-top-queries">
+                    <CardHeader>
+                      <CardTitle>Top Performing Search Queries</CardTitle>
+                      <CardDescription>Best organic search terms from Google Search Console</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {topQueries.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Query</TableHead>
+                              <TableHead className="text-right">Clicks</TableHead>
+                              <TableHead className="text-right">Impressions</TableHead>
+                              <TableHead className="text-right">CTR</TableHead>
+                              <TableHead className="text-right">Avg. Position</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {topQueries.map((query, index) => (
+                              <TableRow key={index}>
+                                <TableCell className="font-medium">{query.keys[0]}</TableCell>
+                                <TableCell className="text-right">{query.clicks}</TableCell>
+                                <TableCell className="text-right">{query.impressions}</TableCell>
+                                <TableCell className="text-right">{(query.ctr * 100).toFixed(1)}%</TableCell>
+                                <TableCell className="text-right">{query.position.toFixed(1)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-center text-muted-foreground py-8">
+                          {gscLoading ? 'Loading...' : 'No query data available'}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
               {/* Key Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -279,6 +553,16 @@ export default function AgencyDashboard() {
           </main>
         </div>
       </div>
+
+      {/* AI Chat Modal */}
+      {selectedClient && (
+        <AIChatModal
+          isOpen={isAiModalOpen}
+          onClose={() => setIsAiModalOpen(false)}
+          clientId={selectedClient.id}
+          clientName={selectedClient.companyName}
+        />
+      )}
     </SidebarProvider>
   );
 }
