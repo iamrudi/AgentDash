@@ -730,10 +730,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const { ga4PropertyId } = req.body;
+      const { ga4PropertyId, ga4LeadEventName } = req.body;
 
       if (!ga4PropertyId) {
         return res.status(400).json({ message: "ga4PropertyId is required" });
+      }
+
+      // Validate lead event name if provided (optional)
+      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 100)) {
+        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 100 characters" });
       }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
@@ -744,11 +749,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateIntegration(integration.id, {
         ga4PropertyId,
+        ga4LeadEventName: ga4LeadEventName || null,
       });
 
       res.json({
-        message: "GA4 property saved successfully",
+        message: "GA4 property and lead event saved successfully",
         ga4PropertyId: updated.ga4PropertyId,
+        ga4LeadEventName: updated.ga4LeadEventName,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -855,10 +862,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const { ga4PropertyId } = req.body;
+      const { ga4PropertyId, ga4LeadEventName } = req.body;
 
       if (!ga4PropertyId) {
         return res.status(400).json({ message: "ga4PropertyId is required" });
+      }
+
+      // Validate lead event name if provided (optional)
+      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 100)) {
+        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 100 characters" });
       }
 
       const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
@@ -869,11 +881,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.updateIntegration(integration.id, {
         ga4PropertyId,
+        ga4LeadEventName: ga4LeadEventName || null,
       });
 
       res.json({
-        message: "GA4 property saved successfully",
+        message: "GA4 property and lead event saved successfully",
         ga4PropertyId: updated.ga4PropertyId,
+        ga4LeadEventName: updated.ga4LeadEventName,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

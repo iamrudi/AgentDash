@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Client } from "@shared/schema";
 import { Building2, CheckCircle2, XCircle, Link as LinkIcon, Loader2 } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +55,7 @@ export default function AgencyIntegrationsPage() {
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
+  const [leadEventName, setLeadEventName] = useState("");
   const [selectedGSCSite, setSelectedGSCSite] = useState("");
   
   // Check for OAuth success/error in URL
@@ -114,7 +117,7 @@ export default function AgencyIntegrationsPage() {
 
   // Save GA4 property mutation
   const saveGA4PropertyMutation = useMutation({
-    mutationFn: async ({ clientId, propertyId }: { clientId: string; propertyId: string }) => {
+    mutationFn: async ({ clientId, propertyId, leadEventName }: { clientId: string; propertyId: string; leadEventName: string | null }) => {
       // Get auth token for Authorization header
       const authUser = localStorage.getItem("authUser");
       const token = authUser ? JSON.parse(authUser).token : null;
@@ -128,7 +131,7 @@ export default function AgencyIntegrationsPage() {
         method: "POST",
         headers,
         credentials: "include",
-        body: JSON.stringify({ ga4PropertyId: propertyId }),
+        body: JSON.stringify({ ga4PropertyId: propertyId, ga4LeadEventName: leadEventName }),
       });
       if (!response.ok) throw new Error(await response.text());
       return response.json();
@@ -137,9 +140,10 @@ export default function AgencyIntegrationsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/ga4", variables.clientId] });
       toast({
         title: "Success",
-        description: "GA4 property saved successfully",
+        description: "GA4 property and lead event saved successfully",
       });
       setSelectedGA4Property("");
+      setLeadEventName("");
       setGa4DialogOpen(false);
     },
     onError: (error: Error) => {
@@ -234,6 +238,7 @@ export default function AgencyIntegrationsPage() {
     saveGA4PropertyMutation.mutate({
       clientId: currentClientId,
       propertyId: selectedGA4Property,
+      leadEventName: leadEventName || null,
     });
   };
 
@@ -339,7 +344,10 @@ export default function AgencyIntegrationsPage() {
       {/* GA4 Property Selection Dialog */}
       <Dialog open={ga4DialogOpen} onOpenChange={(open) => {
         setGa4DialogOpen(open);
-        if (!open) setSelectedGA4Property("");
+        if (!open) {
+          setSelectedGA4Property("");
+          setLeadEventName("");
+        }
       }}>
         <DialogContent>
           <DialogHeader>
@@ -354,18 +362,35 @@ export default function AgencyIntegrationsPage() {
             </div>
           ) : ga4Properties && ga4Properties.length > 0 ? (
             <div className="space-y-4">
-              <Select value={selectedGA4Property} onValueChange={setSelectedGA4Property}>
-                <SelectTrigger data-testid="select-ga4-property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ga4Properties.map((property) => (
-                    <SelectItem key={property.propertyId} value={property.propertyId}>
-                      {property.displayName} ({property.accountName})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <Label htmlFor="ga4-property">GA4 Property</Label>
+                <Select value={selectedGA4Property} onValueChange={setSelectedGA4Property}>
+                  <SelectTrigger data-testid="select-ga4-property" id="ga4-property">
+                    <SelectValue placeholder="Select a property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ga4Properties.map((property) => (
+                      <SelectItem key={property.propertyId} value={property.propertyId}>
+                        {property.displayName} ({property.accountName})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="lead-event-name">Primary Lead Event Name (Optional)</Label>
+                <Input
+                  id="lead-event-name"
+                  placeholder="e.g., generate_lead, form_submission"
+                  value={leadEventName}
+                  onChange={(e) => setLeadEventName(e.target.value)}
+                  data-testid="input-lead-event-name"
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the GA4 Key Event name that represents a lead for this client
+                </p>
+              </div>
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
