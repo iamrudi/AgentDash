@@ -86,21 +86,29 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
   });
 
   const requestActionMutation = useMutation({
-    mutationFn: (recommendation: AIAnalysisResult) => 
-      apiRequest("POST", "/api/ai/request-action", { 
+    mutationFn: async (recommendation: AIAnalysisResult) => {
+      const response = await apiRequest("POST", "/api/ai/request-action", { 
         ...recommendation, 
         clientId: contextData?.clientId // Include clientId for Admin/Staff users
-      }),
-    onSuccess: () => {
+      });
+      return response.json();
+    },
+    onSuccess: (data: { initiativeId: string; message: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/client/initiatives"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
       queryClient.invalidateQueries({ queryKey: ["/api/agency/recommendations"] });
+      
+      const redirectPath = (userRole === "Admin" || userRole === "Staff") 
+        ? "/agency/recommendations" 
+        : "/client/recommendations";
+      
       toast({
-        title: "Action Requested!",
-        description: "Your request has been sent to the agency for review. Redirecting to Recommendations page...",
+        title: "Success!",
+        description: data.message || "Recommendation saved successfully.",
       });
       setTimeout(() => {
         onClose();
-        setLocation("/client/recommendations");
+        setLocation(redirectPath);
       }, 1500);
     },
     onError: (error: Error) => {

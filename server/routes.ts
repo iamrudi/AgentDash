@@ -1740,20 +1740,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Client not found" });
       }
 
+      // Admin/Staff creates as Draft for review and editing, Client creates as Needs Review
+      const status = (profile?.role === "Admin" || profile?.role === "Staff") ? "Draft" : "Needs Review";
+      const sentToClient = (profile?.role === "Admin" || profile?.role === "Staff") ? "false" : "true";
+      
       const initiative = await storage.createInitiative({
         clientId: client.id,
         title: recommendation.title,
         observation: recommendation.observation,
         proposedAction: recommendation.proposedAction,
-        cost: recommendation.estimatedCost.toString(),
+        cost: recommendation.estimatedCost?.toString() || "0",
         impact: recommendation.impact,
-        status: "Needs Review",
-        triggerMetric: recommendation.triggerMetric,
-        baselineValue: recommendation.baselineValue.toString(),
-        sentToClient: "true",
+        status: status,
+        triggerMetric: recommendation.triggerMetric || "",
+        baselineValue: recommendation.baselineValue?.toString() || "0",
+        sentToClient: sentToClient,
       });
 
-      res.status(201).json({ initiativeId: initiative.id, message: "Recommendation submitted for review." });
+      const message = (profile?.role === "Admin" || profile?.role === "Staff") 
+        ? "Recommendation saved as draft. You can edit and send it from the AI Recommendations page."
+        : "Recommendation submitted for review.";
+      
+      res.status(201).json({ initiativeId: initiative.id, message });
     } catch (error: any) {
       console.error("AI request action error:", error);
       res.status(500).json({ message: error.message || "Failed to submit recommendation" });

@@ -318,8 +318,9 @@ export default function AgencyRecommendationsPage() {
           <div className="space-y-4">
             {filteredInitiatives.map((rec) => {
               const client = clients?.find(c => c.id === rec.clientId);
-              const isDraft = rec.status === "Draft";
-              const isSent = rec.sentToClient === "true";
+              const canEdit = rec.status === "Draft" || rec.status === "Needs Review";
+              // Handle both string "true" and boolean true (defensive check for API inconsistencies)
+              const isSent = rec.sentToClient === "true" || (rec.sentToClient as unknown) === true;
               
               return (
                 <Card key={rec.id} data-testid={`recommendation-${rec.id}`}>
@@ -342,7 +343,7 @@ export default function AgencyRecommendationsPage() {
                         <CardTitle className="text-lg">{rec.title}</CardTitle>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isDraft && (
+                        {canEdit && (
                           <Dialog open={editingId === rec.id} onOpenChange={(open) => !open && setEditingId(null)}>
                             <DialogTrigger asChild>
                               <Button
@@ -439,7 +440,7 @@ export default function AgencyRecommendationsPage() {
                             </DialogContent>
                           </Dialog>
                         )}
-                        {isDraft && (
+                        {canEdit && !isSent && (
                           <Button
                             variant="default"
                             size="sm"
