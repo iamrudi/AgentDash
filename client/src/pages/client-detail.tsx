@@ -10,11 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CheckCircle2, XCircle, ExternalLink, Loader2, Plus, Trash2, Target } from "lucide-react";
 import { Client, ClientObjective } from "@shared/schema";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 interface GA4Integration {
   connected: boolean;
@@ -347,12 +351,26 @@ export default function ClientDetail() {
   );
 }
 
+// Form schema for creating objectives
+const objectiveFormSchema = z.object({
+  targetMetric: z.string().min(1, "Target metric is required"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+});
+
+type ObjectiveForm = z.infer<typeof objectiveFormSchema>;
+
 // Objectives Manager Component
 function ObjectivesManager({ clientId }: { clientId: string }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
-  const [description, setDescription] = useState("");
-  const [targetMetric, setTargetMetric] = useState("");
+
+  const form = useForm<ObjectiveForm>({
+    resolver: zodResolver(objectiveFormSchema),
+    defaultValues: {
+      targetMetric: "",
+      description: "",
+    },
+  });
 
   const { data: objectives = [], isLoading } = useQuery<ClientObjective[]>({
     queryKey: ['/api/agency/clients', clientId, 'objectives'],
@@ -360,13 +378,12 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { description: string; targetMetric: string }) => {
+    mutationFn: async (data: ObjectiveForm) => {
       return await apiRequest("POST", `/api/agency/clients/${clientId}/objectives`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'objectives'] });
-      setDescription("");
-      setTargetMetric("");
+      form.reset();
       setShowForm(false);
       toast({
         title: "Success",
@@ -410,16 +427,8 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
     },
   });
 
-  const handleSubmit = () => {
-    if (!description.trim() || !targetMetric.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    createMutation.mutate({ description, targetMetric });
+  const onSubmit = (data: ObjectiveForm) => {
+    createMutation.mutate(data);
   };
 
   return (
@@ -445,59 +454,73 @@ function ObjectivesManager({ clientId }: { clientId: string }) {
         </CardHeader>
         <CardContent>
           {showForm && (
-            <div className="mb-6 p-4 border rounded-lg space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="target-metric" className="text-sm font-medium">
-                  Target Metric
-                </label>
-                <Input
-                  id="target-metric"
-                  placeholder="e.g., conversions, sessions, revenue"
-                  value={targetMetric}
-                  onChange={(e) => setTargetMetric(e.target.value)}
-                  data-testid="input-target-metric"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="description" className="text-sm font-medium">
-                  Description
-                </label>
-                <Textarea
-                  id="description"
-                  placeholder="e.g., Increase qualified organic leads by 20% in Q4"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  data-testid="textarea-objective-description"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={createMutation.isPending}
-                  data-testid="button-save-objective"
-                >
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    "Save Objective"
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowForm(false);
-                    setDescription("");
-                    setTargetMetric("");
-                  }}
-                  data-testid="button-cancel-objective"
-                >
-                  Cancel
-                </Button>
-              </div>
+            <div className="mb-6 p-4 border rounded-lg">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="targetMetric"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Target Metric</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., conversions, sessions, revenue"
+                            data-testid="input-target-metric"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="e.g., Increase qualified organic leads by 20% in Q4"
+                            rows={3}
+                            data-testid="textarea-objective-description"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      disabled={createMutation.isPending}
+                      data-testid="button-save-objective"
+                    >
+                      {createMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Objective"
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowForm(false);
+                        form.reset();
+                      }}
+                      data-testid="button-cancel-objective"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </div>
           )}
 
