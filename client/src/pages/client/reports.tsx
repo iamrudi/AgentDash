@@ -160,6 +160,7 @@ export default function Reports() {
       sessions: parseInt(row.metricValues[0]?.value || '0'),
       users: parseInt(row.metricValues[1]?.value || '0'),
       pageviews: parseInt(row.metricValues[2]?.value || '0'),
+      engagedSessions: parseInt(row.metricValues[3]?.value || '0'),
     };
   }).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
 
@@ -183,10 +184,7 @@ export default function Reports() {
   const totalSessions = ga4ChartData.reduce((sum, row) => sum + row.sessions, 0);
   const totalUsers = ga4ChartData.reduce((sum, row) => sum + row.users, 0);
   const totalPageviews = ga4ChartData.reduce((sum, row) => sum + row.pageviews, 0);
-  
-  // Engaged sessions need to be fetched separately or calculated from row data
-  const ga4Totals = ga4Data?.totals?.[0]?.metricValues || [];
-  const totalEngagedSessions = parseInt(ga4Totals[3]?.value || '0');
+  const totalEngagedSessions = ga4ChartData.reduce((sum, row) => sum + row.engagedSessions, 0);
 
   const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
   const totalImpressions = gscData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
@@ -200,14 +198,13 @@ export default function Reports() {
     sessions: parseInt(row.metricValues[0]?.value || '0'),
     users: parseInt(row.metricValues[1]?.value || '0'),
     pageviews: parseInt(row.metricValues[2]?.value || '0'),
+    engagedSessions: parseInt(row.metricValues[3]?.value || '0'),
   }));
   
   const compareSessionsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.sessions, 0);
   const compareUsersTotal = ga4CompareChartData.reduce((sum, row) => sum + row.users, 0);
   const comparePageviewsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.pageviews, 0);
-  
-  const ga4CompareTotals = ga4CompareData?.totals?.[0]?.metricValues || [];
-  const compareEngagedSessionsTotal = parseInt(ga4CompareTotals[3]?.value || '0');
+  const compareEngagedSessionsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.engagedSessions, 0);
 
   const compareClicksTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
   const compareImpressionsTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
