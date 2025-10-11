@@ -20,19 +20,31 @@ export async function generateAIRecommendations(
       return { success: false, recommendationsCreated: 0, error: "Client not found" };
     }
 
-    // 2. Get all metrics (last 30 days)
+    // 2. Check if at least one integration is connected
+    const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+    const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+    
+    if (!ga4Integration && !gscIntegration) {
+      return { 
+        success: false, 
+        recommendationsCreated: 0, 
+        error: "No analytics integrations connected. Please connect GA4 and/or Google Search Console first." 
+      };
+    }
+
+    // 3. Get all metrics (last 30 days)
     const allMetrics = await storage.getMetricsByClientId(clientId, 30);
     
-    // 3. Check if we have enough data
+    // 4. Check if we have enough data
     if (allMetrics.length === 0) {
       return { 
         success: false, 
         recommendationsCreated: 0, 
-        error: "No metrics data available. Please ensure GA4 and/or GSC integrations are set up and have data." 
+        error: "No metrics data available. Please ensure your integrations have collected data." 
       };
     }
 
-    // 4. Separate GA4 and GSC metrics by filtering rows
+    // 5. Separate GA4 and GSC metrics by filtering rows
     // GA4 metrics: rows with sessions/conversions/spend data (paid channels like Google Ads, Facebook, etc.)
     const ga4Rows = allMetrics.filter(m => 
       (m.sessions || 0) > 0 || 
@@ -49,7 +61,16 @@ export async function generateAIRecommendations(
       (m.avgPosition !== null && m.avgPosition !== undefined)
     );
 
-    // 5. Format GA4 metrics for AI analysis
+    // 6. Validate we have meaningful data from at least one source
+    if (ga4Rows.length === 0 && gscRows.length === 0) {
+      return { 
+        success: false, 
+        recommendationsCreated: 0, 
+        error: "No meaningful analytics data found. Please ensure your integrations are collecting data." 
+      };
+    }
+
+    // 8. Format GA4 metrics for AI analysis
     const formattedGA4 = ga4Rows.map(m => ({
       date: format(new Date(m.date), 'yyyy-MM-dd'),
       source: m.source,
@@ -60,7 +81,7 @@ export async function generateAIRecommendations(
       spend: m.spend ? parseFloat(m.spend) : 0
     }));
 
-    // 6. Format GSC metrics for AI analysis
+    // 9. Format GSC metrics for AI analysis
     const formattedGSC = gscRows.map(m => ({
       date: format(new Date(m.date), 'yyyy-MM-dd'),
       organicClicks: m.organicClicks || 0,
@@ -68,13 +89,13 @@ export async function generateAIRecommendations(
       avgPosition: m.avgPosition ? parseFloat(m.avgPosition) : 0
     }));
 
-    // 7. Get client objectives if available
+    // 10. Get client objectives if available
     const clientObjectives = await storage.getObjectivesByClientId(clientId);
     const objectives = clientObjectives.filter(o => o.isActive === "true")
       .map(o => o.description)
       .join("; ") || undefined;
 
-    // 8. Call Gemini AI to analyze and generate recommendations
+    // 11. Call Gemini AI to analyze and generate recommendations
     const aiRecommendations = await analyzeClientMetrics(
       client.companyName,
       formattedGA4,
@@ -82,7 +103,7 @@ export async function generateAIRecommendations(
       objectives
     );
 
-    // 9. Create initiative records from AI recommendations
+    // 12. Create initiative records from AI recommendations
     let createdCount = 0;
     for (const rec of aiRecommendations) {
       const initiative: InsertInitiative = {
