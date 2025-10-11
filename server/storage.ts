@@ -71,6 +71,9 @@ export interface IStorage {
   }>>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, data: Partial<Client>): Promise<Client>;
+  deductRetainerHours(clientId: string, hours: number): Promise<Client>;
+  resetRetainerHours(clientId: string): Promise<Client>;
+  checkRetainerHours(clientId: string): Promise<{ available: number; used: number; total: number }>;
   
   // Projects
   getProjectById(id: string): Promise<Project | undefined>;
@@ -321,6 +324,46 @@ export class DbStorage implements IStorage {
   async updateClient(id: string, data: Partial<Client>): Promise<Client> {
     const result = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
     return result[0];
+  }
+
+  async deductRetainerHours(clientId: string, hours: number): Promise<Client> {
+    const client = await this.getClientById(clientId);
+    if (!client) throw new Error("Client not found");
+    
+    const usedHours = parseFloat(client.usedRetainerHours || "0");
+    const newUsedHours = usedHours + hours;
+    
+    const result = await db
+      .update(clients)
+      .set({ usedRetainerHours: newUsedHours.toString() })
+      .where(eq(clients.id, clientId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async resetRetainerHours(clientId: string): Promise<Client> {
+    const result = await db
+      .update(clients)
+      .set({ 
+        usedRetainerHours: "0",
+        retainerHoursResetDate: new Date().toISOString().split('T')[0]
+      })
+      .where(eq(clients.id, clientId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async checkRetainerHours(clientId: string): Promise<{ available: number; used: number; total: number }> {
+    const client = await this.getClientById(clientId);
+    if (!client) throw new Error("Client not found");
+    
+    const total = parseFloat(client.monthlyRetainerHours || "0");
+    const used = parseFloat(client.usedRetainerHours || "0");
+    const available = Math.max(0, total - used);
+    
+    return { available, used, total };
   }
 
   // Projects
