@@ -74,9 +74,15 @@ export default function Reports() {
     enabled: !!clientId && !!token,
   });
 
-  // Fetch GSC data
+  // Fetch GSC data (for impressions chart)
   const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
     queryKey: [`/api/analytics/gsc/${clientId}?startDate=${startDate}&endDate=${endDate}`],
+    enabled: !!clientId && !!token,
+  });
+
+  // Fetch GSC top queries (for keywords table)
+  const { data: gscQueries } = useQuery<GSCData>({
+    queryKey: [`/api/analytics/gsc/${clientId}/queries?startDate=${startDate}&endDate=${endDate}`],
     enabled: !!clientId && !!token,
   });
 
@@ -149,8 +155,8 @@ export default function Reports() {
     sessions: parseInt(row.metricValues[0]?.value || '0'),
   })).sort((a, b) => b.sessions - a.sessions);
 
-  // Top performing queries
-  const topQueries = (gscData?.rows ?? [])
+  // Top performing queries (from dedicated queries endpoint)
+  const topQueries = (gscQueries?.rows ?? [])
     .sort((a, b) => b.clicks - a.clicks)
     .slice(0, 10);
 

@@ -338,3 +338,47 @@ export async function fetchGSCData(
     throw new Error('Failed to fetch Search Console data');
   }
 }
+
+/**
+ * Fetch Google Search Console top queries
+ * @param accessToken - Valid access token
+ * @param siteUrl - GSC site URL
+ * @param startDate - Start date (YYYY-MM-DD)
+ * @param endDate - End date (YYYY-MM-DD)
+ * @returns Top performing queries
+ */
+export async function fetchGSCTopQueries(
+  accessToken: string,
+  siteUrl: string,
+  startDate: string,
+  endDate: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const searchconsole = google.searchconsole({
+    version: 'v1',
+    auth: oauth2Client,
+  });
+
+  try {
+    const response = await searchconsole.searchanalytics.query({
+      siteUrl,
+      requestBody: {
+        startDate,
+        endDate,
+        dimensions: ['query'],
+        rowLimit: 25,
+      },
+    });
+
+    return {
+      rows: response.data.rows || [],
+    };
+  } catch (error: any) {
+    console.error('Error fetching GSC top queries:', error);
+    throw new Error('Failed to fetch top queries');
+  }
+}
