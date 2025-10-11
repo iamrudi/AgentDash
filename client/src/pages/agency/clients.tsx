@@ -95,7 +95,10 @@ export default function AgencyClientsPage() {
   // Apply both filters: dropdown selection and search query
   const filteredClients = clients?.filter(client => {
     const matchesDropdown = selectedClientId === "ALL" || client.id === selectedClientId;
-    const matchesSearch = client.companyName.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      client.companyName.toLowerCase().includes(searchLower) ||
+      (client.primaryContact?.toLowerCase().includes(searchLower) ?? false);
     return matchesDropdown && matchesSearch;
   });
 
