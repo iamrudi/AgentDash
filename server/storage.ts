@@ -40,7 +40,7 @@ import {
   clientMessages,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { encryptToken, decryptToken } from "./lib/encryption";
 
@@ -118,6 +118,7 @@ export interface IStorage {
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
   getAllMetrics(limit?: number): Promise<DailyMetric[]>;
   createMetric(metric: InsertDailyMetric): Promise<DailyMetric>;
+  deleteMetricsByClientIdAndDateRange(clientId: string, startDate: string, endDate: string): Promise<void>;
   
   // Client Integrations
   getIntegrationByClientId(clientId: string, serviceName: string): Promise<ClientIntegration | undefined>;
@@ -524,6 +525,15 @@ export class DbStorage implements IStorage {
   async createMetric(metric: InsertDailyMetric): Promise<DailyMetric> {
     const result = await db.insert(dailyMetrics).values(metric).returning();
     return result[0];
+  }
+
+  async deleteMetricsByClientIdAndDateRange(clientId: string, startDate: string, endDate: string): Promise<void> {
+    await db.delete(dailyMetrics)
+      .where(and(
+        eq(dailyMetrics.clientId, clientId),
+        gte(dailyMetrics.date, startDate),
+        lte(dailyMetrics.date, endDate)
+      ));
   }
 
   // Client Integrations

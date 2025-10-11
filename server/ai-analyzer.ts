@@ -40,7 +40,7 @@ export async function generateAIRecommendations(
       return { 
         success: false, 
         recommendationsCreated: 0, 
-        error: "No metrics data available. Please ensure your integrations have collected data." 
+        error: "No metrics data available. Please sync metrics data first using the 'Sync Metrics' button, then try again." 
       };
     }
 

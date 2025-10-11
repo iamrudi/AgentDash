@@ -263,6 +263,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/agency/clients/:clientId/sync-metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { daysToFetch = 30 } = req.body;
+
+      // Get GA4 integration
+      let ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      // Get GSC integration
+      let gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+
+      if (!ga4Integration && !gscIntegration) {
+        return res.status(400).json({ message: "No analytics integrations connected" });
+      }
+
+      const end = new Date().toISOString().split('T')[0];
+      const start = new Date(Date.now() - daysToFetch * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      // Delete existing metrics for this client in the date range to ensure idempotency
+      await storage.deleteMetricsByClientIdAndDateRange(clientId, start, end);
+      
+      let metricsCreated = 0;
+
+      // Fetch and store GA4 data
+      if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken) {
+        const { fetchGA4Data } = await import("./lib/googleOAuth");
+        const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end);
+        
+        // Store GA4 metrics
+        for (const row of ga4Data.rows || []) {
+          const dateValue = row.dimensionValues?.[0]?.value;
+          const sessions = parseInt(row.metricValues?.[0]?.value || '0');
+          
+          if (dateValue) {
+            await storage.createMetric({
+              date: dateValue,
+              clientId: clientId,
+              source: 'GA4',
+              sessions: sessions,
+              conversions: 0,
+              clicks: 0,
+              impressions: 0,
+              spend: '0'
+            });
+            metricsCreated++;
+          }
+        }
+      }
+
+      // Fetch and store GSC data
+      if (gscIntegration && gscIntegration.gscSiteUrl && gscIntegration.accessToken) {
+        const { fetchGSCData } = await import("./lib/googleOAuth");
+        const gscData = await fetchGSCData(gscIntegration.accessToken, gscIntegration.gscSiteUrl, start, end);
+        
+        // Store GSC metrics
+        for (const row of gscData.rows || []) {
+          const dateValue = row.keys?.[0];
+          const clicks = row.clicks || 0;
+          const impressions = row.impressions || 0;
+          const position = row.position || 0;
+          
+          if (dateValue) {
+            await storage.createMetric({
+              date: dateValue,
+              clientId: clientId,
+              source: 'GSC',
+              organicClicks: clicks,
+              organicImpressions: impressions,
+              avgPosition: position.toString()
+            });
+            metricsCreated++;
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Successfully synced ${metricsCreated} metrics for the last ${daysToFetch} days`,
+        metricsCreated
+      });
+    } catch (error: any) {
+      console.error("Sync metrics error:", error);
+      res.status(500).json({ message: error.message || "Failed to sync metrics" });
+    }
+  });
+
   app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
