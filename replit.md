@@ -128,6 +128,37 @@ The platform is a full-stack JavaScript application using React for the frontend
 - Without this API enabled, GA4 property fetching will fail with 403 Forbidden error
 - Search Console API is typically enabled by default with OAuth consent screen setup
 
+### 2025-10-11: GA4 Lead Event Configuration System
+**Real Conversion Tracking with GA4 Key Events**
+- Database schema: Added `ga4_lead_event_name` field to client_integrations table (varchar 100, nullable)
+- Agency Portal enhancement: Lead event name input field in GA4 property selection dialog
+- Backend validation: Lead event name length validation (max 100 chars), trimmed whitespace, empty converts to null
+- GA4 Data API integration: fetchGA4KeyEvents function to retrieve specific event conversions
+- Outcome metrics upgrade: Real GA4 Key Events data replaces sample data when lead event configured
+
+**Technical Implementation**
+- Lead event configuration flow:
+  1. Admin connects GA4 for client
+  2. Admin selects GA4 property and optionally enters lead event name (e.g., "generate_lead", "form_submission")
+  3. System saves both property ID and lead event name to integration record
+  4. Reports page fetches actual conversions from GA4 using configured event name
+- Backend endpoint: GET /api/analytics/ga4/:clientId/conversions returns Key Events data filtered by event name
+- Fallback logic: Uses dailyMetrics sample data if GA4 not configured or lead event name not set
+- Pipeline Value calculation: Now based on real GA4 conversion data when available
+- fetchGA4KeyEvents: Uses eventCount metric, eventName dimension with EXACT match filter, calculates totals from rows
+
+**Agency Portal Features**
+- Lead event name input in GA4 property selection dialog with helpful placeholder text
+- Validation feedback for invalid event names
+- Persistent storage alongside GA4 property ID
+- Clear indication when lead event is configured vs. not configured
+
+**Reports Page Enhancement**
+- Conversions metric sourced from real GA4 Key Events when lead event name is set
+- Pipeline Value automatically calculated from real conversion data
+- CPA (Cost Per Acquisition) reflects actual GA4 conversions
+- Graceful degradation to sample data when GA4 unavailable
+
 ### 2025-10-11: Advanced Analytics Dashboard with Comparison & Acquisition Channels
 **Date Range Picker & Period Comparison**
 - Custom date range picker with dual calendars (From/To) using react-day-picker
