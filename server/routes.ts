@@ -1653,7 +1653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "Needs Review",
         triggerMetric: recommendation.triggerMetric,
         baselineValue: recommendation.baselineValue.toString(),
-        sentToClient: "false",
+        sentToClient: "true",
       });
 
       res.status(201).json({ initiativeId: initiative.id, message: "Recommendation submitted for review." });

@@ -33,11 +33,12 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Metrics Sync Endpoint**: POST `/api/agency/clients/:clientId/sync-metrics` endpoint fetches latest analytics data from GA4/GSC APIs and stores in database. Implements idempotency using date-range deletion (via Drizzle gte/lte helpers) before inserting new metrics to prevent duplicates on repeated syncs.
 
 ### Feature Specifications
-- **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat.
+- **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data AI assistant.
 - **Agency Admin Portal**: Dashboard, Client Messages, Tasks & Projects, Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments). Includes user management and invoice management (create, view, update, PDF generation, automated monthly retainers, on-demand from initiatives).
 - **Staff Portal**: View assigned tasks, update status, prioritize.
 - **Strategic Initiative Workflow**: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured.
 - **Client-to-Account Manager Chat System**: Real-time messaging.
+- **Chat with your Data**: AI-powered feature on Client Reports page allowing clients to ask questions about their analytics data, receive AI-generated recommendations, and request action. Uses Gemini 2.5-flash for cost-effective analysis. Client-initiated recommendations appear with "Needs Review" status for agency approval.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization (Recharts), date range picker with comparison, acquisition channels visualization.
 - **GA4 Lead Event Configuration**: Admins configure GA4 lead event names (single or multiple comma-separated) for accurate conversion tracking and pipeline value calculation.
 - **Google Search Console Integration**: OAuth for GSC, site selection, and performance metrics.
