@@ -23,6 +23,8 @@ import {
   Building2,
   Users,
   MessageSquare,
+  Link2,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,9 +56,9 @@ export function AppSidebar() {
       notificationKey: null,
     },
     {
-      title: "Clients",
-      url: "/agency/clients",
-      icon: Building2,
+      title: "Client Messages",
+      url: "/agency/messages",
+      icon: MessageSquare,
       notificationKey: null,
     },
     {
@@ -66,15 +68,27 @@ export function AppSidebar() {
       notificationKey: null,
     },
     {
-      title: "Messages",
-      url: "/agency/messages",
-      icon: MessageSquare,
+      title: "AI Recommendations",
+      url: "/agency/recommendations",
+      icon: Lightbulb,
       notificationKey: null,
     },
     {
-      title: "Strategic Initiatives",
-      url: "/agency/recommendations",
-      icon: Lightbulb,
+      title: "Clients",
+      url: "/agency/clients",
+      icon: Building2,
+      notificationKey: null,
+    },
+    {
+      title: "Invoices",
+      url: "/agency/invoices",
+      icon: FileText,
+      notificationKey: null,
+    },
+    {
+      title: "Google Integrations",
+      url: "/agency/integrations",
+      icon: Link2,
       notificationKey: null,
     },
     {
@@ -84,9 +98,9 @@ export function AppSidebar() {
       notificationKey: null,
     },
     {
-      title: "Invoices",
-      url: "/agency/invoices",
-      icon: FileText,
+      title: "User Management",
+      url: "/agency/users",
+      icon: UserCog,
       notificationKey: null,
     },
   ];
