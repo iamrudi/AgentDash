@@ -1,0 +1,106 @@
+Your mission is to help me build this application using our specific monorepo stack, writing clean, efficient, and modern TypeScript code for both the frontend and backend.
+
+# 2. CORE TECHNOLOGIES (THE STACK)
+This project is built with the following technologies, as defined in our package.json. Adhere to them strictly:
+
+Frontend (client/): React with Vite. Use wouter for routing.
+
+Backend (server/): Node.js with Express.js. Use node-cron for scheduling tasks. Use nodemailer for sending emails.
+
+Database ORM: Drizzle ORM. All schema is defined in shared/schema.ts.
+
+Database: Supabase (PostgreSQL).
+
+Authentication: Custom-built in our Express server using Passport.js, bcrypt, and JWTs.
+
+External APIs: googleapis library for connecting to Google Analytics 4 and Google Search Console.
+
+UI & Styling: Tailwind CSS is primary. Use Radix UI primitives (as seen in /client/src/components/ui/) for accessible components. Use recharts for charts and framer-motion for animations.
+
+Data Fetching (Frontend): Use @tanstack/react-query for all server state management.
+
+# 3. DATABASE SCHEMA (THE SINGLE SOURCE OF TRUTH)
+Our application is powered by the Drizzle schema in shared/schema.ts. All queries must conform to it.
+
+SQL
+
+// -- USER & CLIENT MANAGEMENT --
+users { id, email, password, created_at }
+profiles { id, user_id, full_name, role, created_at }
+clients { id, company_name, profile_id, created_at, retainer_amount, billing_day, lead_to_opportunity_rate, opportunity_to_close_rate, average_deal_size }
+
+// -- PROJECT MANAGEMENT --
+projects { id, name, status, description, client_id, created_at }
+tasks { id, description, status, due_date, priority, project_id, created_at, initiative_id, parent_task_id, is_approval_required, is_approved }
+task_dependencies { blocking_task_id, dependent_task_id }
+task_comments { id, task_id, profile_id, comment_text, created_at, is_internal }
+task_attachments { id, task_id, file_url, uploaded_by_profile_id }
+
+// -- REPORTING & AI --
+daily_metrics { id, date, client_id, source, sessions, conversions, impressions, clicks, spend, created_at, organic_impressions, organic_clicks, avg_position }
+client_objectives { id, client_id, description, target_metric, is_active, created_at, updatedAt }
+weekly_digests { id, client_id, week_start_date, week_end_date, summary_data, last_viewed }
+client_integrations { id, client_id, service_name, access_token, refresh_token, ..., ga4_property_id, gsc_site_url, status }
+
+// -- STRATEGY & BILLING --
+initiatives { id, client_id, title, observation, proposed_action, status, cost, trigger_metric, baseline_value, start_date, implementation_date, measured_improvement }
+invoices { id, invoice_number, totalAmount, status, issueDate, dueDate, pdf_url, client_id, created_at }
+invoice_line_items { id, invoice_id, description, quantity, unitPrice, lineTotal, project_id, task_id, created_at }
+# 4. APPLICATION ARCHITECTURE
+We are building a full-stack monorepo (client/, server/, shared/). The Express server contains all business logic and is the sole intermediary between the client and the Supabase DB.
+
+Frictionless Google Integration: An agency-initiated OAuth flow allows secure, token-based access to GA4 & GSC.
+
+Automated Data Pipelines (ETL): A scheduled node-cron job in the Express server populates the daily_metrics (18-month rolling window) and weekly_digests tables.
+
+AI Initiative Engine: A scheduled backend process analyzes daily_metrics and client_objectives to generate strategic initiatives with sub-tasks.
+
+Closed-Loop Measurement: A scheduled process measures the impact of completed initiatives and populates measured_improvement.
+
+Frictionless Invoicing: An automated system for recurring and on-demand invoices. (Time tracking is NOT a feature).
+
+# 5. UI/UX BLUEPRINT
+
+## Client Portal
+
+Dashboard (Landing Page): A simple "10-second health check" showing the client's objective, the "Weekly Pulse" widget, top 3-4 outcome-based KPIs (including Pipeline Value), and pending initiatives.
+
+Reports Page (The Deep Dive - /client/reports): This is the main analytics dashboard. The goal is to tell a clear, frictionless story.
+
+Control Bar: A header with a Compare to period toggle, a Date Range selector, and a Button linking to the external Looker Studio report.
+
+Outcome Scorecards: A single row of the most important outcome-focused KPIs: Leads/Conversions, Estimated Pipeline Value, CPA, and Organic Clicks. Each must show a comparison percentage.
+
+Two-Column Layout:
+
+Left Column (Traffic Story): A unified Line Chart for GA4 Sessions & GSC Clicks together, and a Donut Chart for Traffic by Channel.
+
+Right Column (SEO Story): A Line Chart for GSC Impressions, and a Table for Top Performing Queries.
+
+Interactive AI: A ✨ "Ask AI" button must be present next to key data tables (like "Top Queries"). This triggers a backend call to POST /api/ai/analyze-data to generate a contextual, on-demand analysis (observation, insight, suggested_next_step). The modal displaying the result must include two client actions: "Discuss with My AM" and "Request Action on This".
+
+Projects Page: A transparency-focused view with a simplified task list showing sub-tasks, a public comment thread, file attachments, and a clear UI for client approvals.
+
+Initiatives Page: An "Opportunity Hub" presenting initiatives with a summarized "Scope of Work" and an optional "View Full Task List" drill-down.
+
+Billing Page (/client/billing): A frictionless view with a "How to Pay" card, an invoice table, and a dedicated HTML Invoice View for each invoice with clickable line items.
+
+## Agency Portal
+
+Dashboard: A "Command Center" with an AI Recommendations Inbox and a "Weekly Activity Feed".
+
+Initiative Triage: A powerful review modal with an editable, searchable task list, bulk actions ("Select All"), and dynamic cost calculation.
+
+Projects & Tasks: A "Control Panel" with Kanban/Calendar/Gantt views, internal-only comments, and management of dependencies and approvals.
+
+# 6. YOUR RESPONSIBILITIES & RULES OF ENGAGEMENT
+
+Full-Stack Code Generation: Write code for the React frontend in /client and the Express backend in /server.
+
+Schema First: Always reference the Drizzle schema in # 3 as the source of truth.
+
+Security First: Protect all sensitive API routes. Use Replit Secrets for all keys.
+
+Blueprint Driven: Adhere strictly to the architectural and UI/UX blueprints defined above.
+
+Clarity: Comment your code clearly.

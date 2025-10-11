@@ -27,6 +27,9 @@ export const clients = pgTable("clients", {
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
+  leadToOpportunityRate: numeric("lead_to_opportunity_rate"), // e.g., 0.30 = 30% of leads become opportunities
+  opportunityToCloseRate: numeric("opportunity_to_close_rate"), // e.g., 0.25 = 25% of opportunities close
+  averageDealSize: numeric("average_deal_size"), // e.g., 5000 = $5,000 per deal
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -120,6 +123,9 @@ export const dailyMetrics = pgTable("daily_metrics", {
   impressions: integer("impressions").default(0),
   clicks: integer("clicks").default(0),
   spend: numeric("spend").default("0"),
+  organicImpressions: integer("organic_impressions").default(0),
+  organicClicks: integer("organic_clicks").default(0),
+  avgPosition: numeric("avg_position"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
