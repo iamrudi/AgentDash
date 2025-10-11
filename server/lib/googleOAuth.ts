@@ -374,6 +374,15 @@ export async function fetchGSCTopQueries(
       },
     });
 
+    console.log('=== GSC TOP QUERIES API RESPONSE ===', JSON.stringify({
+      siteUrl,
+      dateRange: `${startDate} to ${endDate}`,
+      hasRows: !!response.data.rows,
+      rowCount: response.data.rows?.length || 0,
+      sampleRow: response.data.rows?.[0] || null,
+      fullResponse: response.data
+    }, null, 2));
+
     return {
       rows: response.data.rows || [],
     };

@@ -1078,6 +1078,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await fetchGSCTopQueries(integration.accessToken, integration.gscSiteUrl!, start, end);
+      console.log('=== GSC TOP QUERIES RESPONSE ===', JSON.stringify({
+        siteUrl: integration.gscSiteUrl,
+        dateRange: `${start} to ${end}`,
+        rowCount: data.rows?.length || 0,
+        sampleRow: data.rows?.[0] || null
+      }, null, 2));
       res.json(data);
     } catch (error: any) {
       console.error("Fetch GSC top queries error:", error);
