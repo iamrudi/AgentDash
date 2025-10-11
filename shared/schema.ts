@@ -27,6 +27,9 @@ export const clients = pgTable("clients", {
   profileId: uuid("profile_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
+  monthlyRetainerHours: numeric("monthly_retainer_hours"), // Total hours included in monthly retainer (e.g., 40)
+  usedRetainerHours: numeric("used_retainer_hours").default("0"), // Hours used in current billing cycle
+  retainerHoursResetDate: date("retainer_hours_reset_date"), // When hours last reset (typically matches billing day)
   leadValue: numeric("lead_value"), // Value per lead for pipeline calculation (e.g., 500 = $500 per lead)
   leadToOpportunityRate: numeric("lead_to_opportunity_rate"), // DEPRECATED: e.g., 0.30 = 30% of leads become opportunities
   opportunityToCloseRate: numeric("opportunity_to_close_rate"), // DEPRECATED: e.g., 0.25 = 25% of opportunities close
@@ -109,6 +112,8 @@ export const initiatives = pgTable("initiatives", {
   proposedAction: text("proposed_action").notNull(),
   status: text("status").notNull(), // 'Needs Review', 'Awaiting Approval', 'Approved', 'In Progress', 'Completed', 'Measured'
   cost: numeric("cost"),
+  estimatedHours: numeric("estimated_hours"), // Hours needed if using retainer hours
+  billingType: text("billing_type"), // 'cost' or 'hours' - indicates payment method
   impact: text("impact"), // 'High', 'Medium', 'Low'
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
   sentToClient: text("sent_to_client").default("false"), // Whether sent to client
