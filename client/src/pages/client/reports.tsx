@@ -179,11 +179,13 @@ export default function Reports() {
     users: parseInt(row.metricValues[1]?.value || '0'),
   })).sort((a, b) => b.sessions - a.sessions) || [];
 
-  // Calculate totals
+  // Calculate totals from row data (GA4 API doesn't always return totals)
+  const totalSessions = ga4ChartData.reduce((sum, row) => sum + row.sessions, 0);
+  const totalUsers = ga4ChartData.reduce((sum, row) => sum + row.users, 0);
+  const totalPageviews = ga4ChartData.reduce((sum, row) => sum + row.pageviews, 0);
+  
+  // Engaged sessions need to be fetched separately or calculated from row data
   const ga4Totals = ga4Data?.totals?.[0]?.metricValues || [];
-  const totalSessions = parseInt(ga4Totals[0]?.value || '0');
-  const totalUsers = parseInt(ga4Totals[1]?.value || '0');
-  const totalPageviews = parseInt(ga4Totals[2]?.value || '0');
   const totalEngagedSessions = parseInt(ga4Totals[3]?.value || '0');
 
   const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
@@ -193,11 +195,18 @@ export default function Reports() {
     ? (gscData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscData.rows.length).toFixed(1)
     : '0';
 
-  // Calculate comparison totals
+  // Calculate comparison totals from row data (GA4 API doesn't always return totals)
+  const ga4CompareChartData = (ga4CompareData?.rows ?? []).map(row => ({
+    sessions: parseInt(row.metricValues[0]?.value || '0'),
+    users: parseInt(row.metricValues[1]?.value || '0'),
+    pageviews: parseInt(row.metricValues[2]?.value || '0'),
+  }));
+  
+  const compareSessionsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.sessions, 0);
+  const compareUsersTotal = ga4CompareChartData.reduce((sum, row) => sum + row.users, 0);
+  const comparePageviewsTotal = ga4CompareChartData.reduce((sum, row) => sum + row.pageviews, 0);
+  
   const ga4CompareTotals = ga4CompareData?.totals?.[0]?.metricValues || [];
-  const compareSessionsTotal = parseInt(ga4CompareTotals[0]?.value || '0');
-  const compareUsersTotal = parseInt(ga4CompareTotals[1]?.value || '0');
-  const comparePageviewsTotal = parseInt(ga4CompareTotals[2]?.value || '0');
   const compareEngagedSessionsTotal = parseInt(ga4CompareTotals[3]?.value || '0');
 
   const compareClicksTotal = gscCompareData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
