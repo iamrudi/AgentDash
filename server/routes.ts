@@ -705,7 +705,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/initiatives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const initiative = await storage.createInitiative(req.body);
+      const { billingType, cost, estimatedHours, ...rest } = req.body;
+      
+      const initiativeData: any = { ...rest };
+      
+      // Infer billing type from provided fields if not specified
+      let effectiveBillingType = billingType;
+      if (!billingType) {
+        if (estimatedHours && !cost) {
+          effectiveBillingType = "hours";
+        } else {
+          effectiveBillingType = "cost";
+        }
+      }
+      
+      // Handle billing type - either cost or hours
+      if (effectiveBillingType === "hours") {
+        const hours = estimatedHours ? parseFloat(estimatedHours) : NaN;
+        if (isNaN(hours) || hours <= 0) {
+          return res.status(400).json({ message: "Valid estimated hours (> 0) required for hours-based billing" });
+        }
+        initiativeData.billingType = "hours";
+        initiativeData.estimatedHours = hours;
+        initiativeData.cost = null;
+      } else {
+        // Cost billing - cost is required
+        const costValue = cost ? parseFloat(cost) : NaN;
+        if (isNaN(costValue) || costValue <= 0) {
+          return res.status(400).json({ message: "Valid cost (> 0) required for cost-based billing" });
+        }
+        initiativeData.billingType = "cost";
+        initiativeData.cost = costValue.toString();
+        initiativeData.estimatedHours = null;
+      }
+      
+      const initiative = await storage.createInitiative(initiativeData);
       res.status(201).json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -727,21 +761,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle billing type - either cost or hours
       if (billingType === "hours") {
+        const hours = estimatedHours ? parseFloat(estimatedHours) : NaN;
+        if (isNaN(hours) || hours <= 0) {
+          return res.status(400).json({ message: "Valid estimated hours (> 0) required for hours-based billing" });
+        }
         updates.billingType = "hours";
-        updates.estimatedHours = estimatedHours;
+        updates.estimatedHours = hours;
         updates.cost = null; // Clear cost if switching to hours
       } else if (billingType === "cost") {
+        // Cost is required for cost-based billing
+        const costValue = cost ? parseFloat(cost) : NaN;
+        if (isNaN(costValue) || costValue <= 0) {
+          return res.status(400).json({ message: "Valid cost (> 0) required for cost-based billing" });
+        }
         updates.billingType = "cost";
-        updates.cost = cost;
+        updates.cost = costValue.toString();
         updates.estimatedHours = null; // Clear hours if switching to cost
       } else if (cost !== undefined || estimatedHours !== undefined) {
         // Legacy support: if no billingType specified, infer from provided values
+        // If a field is provided (not undefined), validate it
         if (cost !== undefined) {
-          updates.cost = cost;
+          const costValue = parseFloat(cost);
+          if (isNaN(costValue) || costValue <= 0) {
+            return res.status(400).json({ message: "Valid cost (> 0) required" });
+          }
+          updates.cost = costValue.toString();
           updates.billingType = "cost";
         }
         if (estimatedHours !== undefined) {
-          updates.estimatedHours = estimatedHours;
+          const hours = parseFloat(estimatedHours);
+          if (isNaN(hours) || hours <= 0) {
+            return res.status(400).json({ message: "Valid estimated hours (> 0) required" });
+          }
+          updates.estimatedHours = hours;
           updates.billingType = "hours";
         }
       }
