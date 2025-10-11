@@ -164,11 +164,15 @@ export default function Recommendations() {
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
-                  {recommendation.cost && (
+                  {recommendation.billingType === "hours" && recommendation.estimatedHours ? (
+                    <div className="text-sm">
+                      <span className="font-semibold">Hours:</span> {recommendation.estimatedHours}h
+                    </div>
+                  ) : recommendation.cost ? (
                     <div className="text-sm">
                       <span className="font-semibold">Estimated Cost:</span> ${recommendation.cost}
                     </div>
-                  )}
+                  ) : null}
                   {recommendation.impact && (
                     <Badge variant="secondary" data-testid={`recommendation-impact-${recommendation.id}`}>
                       Impact: {recommendation.impact}

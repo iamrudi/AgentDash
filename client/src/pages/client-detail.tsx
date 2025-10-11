@@ -592,9 +592,10 @@ function FinancialMetrics({ client }: { client: Client }) {
   const [leadValue, setLeadValue] = useState(client.leadValue || "");
   const [retainerAmount, setRetainerAmount] = useState(client.retainerAmount || "");
   const [billingDay, setBillingDay] = useState(client.billingDay?.toString() || "");
+  const [monthlyRetainerHours, setMonthlyRetainerHours] = useState(client.monthlyRetainerHours || "");
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { leadValue?: number | null; retainerAmount?: number | null; billingDay?: number | null }) => {
+    mutationFn: async (data: { leadValue?: number | null; retainerAmount?: number | null; billingDay?: number | null; monthlyRetainerHours?: number | null }) => {
       return await apiRequest("PATCH", `/api/agency/clients/${client.id}`, data);
     },
     onSuccess: () => {
@@ -619,6 +620,7 @@ function FinancialMetrics({ client }: { client: Client }) {
       leadValue: leadValue ? parseFloat(leadValue) : null,
       retainerAmount: retainerAmount ? parseFloat(retainerAmount) : null,
       billingDay: billingDay ? parseInt(billingDay) : null,
+      monthlyRetainerHours: monthlyRetainerHours ? parseFloat(monthlyRetainerHours) : null,
     };
     updateMutation.mutate(data);
   };
@@ -627,6 +629,7 @@ function FinancialMetrics({ client }: { client: Client }) {
     setLeadValue(client.leadValue || "");
     setRetainerAmount(client.retainerAmount || "");
     setBillingDay(client.billingDay?.toString() || "");
+    setMonthlyRetainerHours(client.monthlyRetainerHours || "");
     setIsEditing(false);
   };
 
@@ -705,6 +708,23 @@ function FinancialMetrics({ client }: { client: Client }) {
               />
               <p className="text-xs text-muted-foreground">
                 Day of month for automatic invoicing (1-28)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="monthly-retainer-hours" className="text-sm font-medium">
+                Monthly Retainer Hours
+              </label>
+              <Input
+                id="monthly-retainer-hours"
+                type="number"
+                placeholder="e.g., 40"
+                value={monthlyRetainerHours}
+                onChange={(e) => setMonthlyRetainerHours(e.target.value)}
+                data-testid="input-monthly-retainer-hours"
+              />
+              <p className="text-xs text-muted-foreground">
+                Total hours included in monthly retainer. Hours reset on billing day.
               </p>
             </div>
 

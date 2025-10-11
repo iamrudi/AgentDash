@@ -27,6 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function AgencyRecommendationsPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
@@ -47,6 +48,8 @@ export default function AgencyRecommendationsPage() {
     observation: "",
     proposedAction: "",
     cost: "",
+    estimatedHours: "",
+    billingType: "cost" as "cost" | "hours",
     impact: "Medium"
   });
   const [createForm, setCreateForm] = useState({
@@ -54,6 +57,8 @@ export default function AgencyRecommendationsPage() {
     observation: "",
     proposedAction: "",
     cost: "",
+    estimatedHours: "",
+    billingType: "cost" as "cost" | "hours",
     impact: "Medium",
     clientId: ""
   });
@@ -91,7 +96,7 @@ export default function AgencyRecommendationsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { title: string; observation: string; proposedAction: string; cost: string; impact: string; clientId: string; status: string; sentToClient: string }) => {
+    mutationFn: async (data: { title: string; observation: string; proposedAction: string; cost?: string; estimatedHours?: string; billingType: string; impact: string; clientId: string; status: string; sentToClient: string }) => {
       return await apiRequest("POST", "/api/initiatives", data);
     },
     onSuccess: () => {
@@ -102,6 +107,8 @@ export default function AgencyRecommendationsPage() {
         observation: "",
         proposedAction: "",
         cost: "",
+        estimatedHours: "",
+        billingType: "cost",
         impact: "Medium",
         clientId: ""
       });
@@ -135,12 +142,38 @@ export default function AgencyRecommendationsPage() {
       observation: init.observation,
       proposedAction: init.proposedAction,
       cost: init.cost || "",
+      estimatedHours: init.estimatedHours || "",
+      billingType: init.billingType as "cost" | "hours" || "cost",
       impact: init.impact || "Medium"
     });
   };
 
   const handleSave = () => {
     if (!editingId) return;
+    
+    // Validate billing type requirements
+    if (editForm.billingType === "cost") {
+      const costNum = parseFloat(editForm.cost);
+      if (!editForm.cost || isNaN(costNum) || costNum <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid cost for cost-based billing.",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if (editForm.billingType === "hours") {
+      const hoursNum = parseFloat(editForm.estimatedHours);
+      if (!editForm.estimatedHours || isNaN(hoursNum) || hoursNum <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter valid estimated hours for hours-based billing.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
     editMutation.mutate({
       id: editingId,
       updates: editForm
@@ -153,7 +186,35 @@ export default function AgencyRecommendationsPage() {
 
   const handleCreate = () => {
     if (!createForm.clientId || !createForm.title || !createForm.observation || !createForm.proposedAction) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
       return;
+    }
+    
+    // Validate billing type requirements
+    if (createForm.billingType === "cost") {
+      const costNum = parseFloat(createForm.cost);
+      if (!createForm.cost || isNaN(costNum) || costNum <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid cost for cost-based billing.",
+          variant: "destructive"
+        });
+        return;
+      }
+    } else if (createForm.billingType === "hours") {
+      const hoursNum = parseFloat(createForm.estimatedHours);
+      if (!createForm.estimatedHours || isNaN(hoursNum) || hoursNum <= 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter valid estimated hours for hours-based billing.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
     
     createMutation.mutate({
@@ -261,17 +322,54 @@ export default function AgencyRecommendationsPage() {
                     data-testid="textarea-create-action"
                   />
                 </div>
+                <div>
+                  <Label>Billing Type</Label>
+                  <RadioGroup 
+                    value={createForm.billingType} 
+                    onValueChange={(value: "cost" | "hours") => setCreateForm({ ...createForm, billingType: value })}
+                    className="flex gap-4 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="cost" id="create-billing-cost" data-testid="radio-create-billing-cost" />
+                      <Label htmlFor="create-billing-cost" className="font-normal cursor-pointer">
+                        Estimated Cost ($)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="hours" id="create-billing-hours" data-testid="radio-create-billing-hours" />
+                      <Label htmlFor="create-billing-hours" className="font-normal cursor-pointer">
+                        Retainer Hours
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="create-cost">Estimated Cost</Label>
-                    <Input
-                      id="create-cost"
-                      value={createForm.cost}
-                      onChange={(e) => setCreateForm({ ...createForm, cost: e.target.value })}
-                      placeholder="5000"
-                      data-testid="input-create-cost"
-                    />
-                  </div>
+                  {createForm.billingType === "cost" ? (
+                    <div>
+                      <Label htmlFor="create-cost">Estimated Cost</Label>
+                      <Input
+                        id="create-cost"
+                        type="number"
+                        value={createForm.cost}
+                        onChange={(e) => setCreateForm({ ...createForm, cost: e.target.value })}
+                        placeholder="5000"
+                        data-testid="input-create-cost"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <Label htmlFor="create-hours">Estimated Hours</Label>
+                      <Input
+                        id="create-hours"
+                        type="number"
+                        value={createForm.estimatedHours}
+                        onChange={(e) => setCreateForm({ ...createForm, estimatedHours: e.target.value })}
+                        placeholder="10"
+                        data-testid="input-create-hours"
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="create-impact">Impact Level</Label>
                     <Select value={createForm.impact} onValueChange={(value) => setCreateForm({ ...createForm, impact: value })}>
@@ -396,17 +494,54 @@ export default function AgencyRecommendationsPage() {
                                     data-testid="textarea-edit-action"
                                   />
                                 </div>
+                                <div>
+                                  <Label>Billing Type</Label>
+                                  <RadioGroup 
+                                    value={editForm.billingType} 
+                                    onValueChange={(value: "cost" | "hours") => setEditForm({ ...editForm, billingType: value })}
+                                    className="flex gap-4 mt-2"
+                                  >
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="cost" id="billing-cost" data-testid="radio-billing-cost" />
+                                      <Label htmlFor="billing-cost" className="font-normal cursor-pointer">
+                                        Estimated Cost ($)
+                                      </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="hours" id="billing-hours" data-testid="radio-billing-hours" />
+                                      <Label htmlFor="billing-hours" className="font-normal cursor-pointer">
+                                        Retainer Hours
+                                      </Label>
+                                    </div>
+                                  </RadioGroup>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label htmlFor="cost">Estimated Cost</Label>
-                                    <Input
-                                      id="cost"
-                                      value={editForm.cost}
-                                      onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })}
-                                      placeholder="5000"
-                                      data-testid="input-edit-cost"
-                                    />
-                                  </div>
+                                  {editForm.billingType === "cost" ? (
+                                    <div>
+                                      <Label htmlFor="cost">Estimated Cost</Label>
+                                      <Input
+                                        id="cost"
+                                        type="number"
+                                        value={editForm.cost}
+                                        onChange={(e) => setEditForm({ ...editForm, cost: e.target.value })}
+                                        placeholder="5000"
+                                        data-testid="input-edit-cost"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <Label htmlFor="hours">Estimated Hours</Label>
+                                      <Input
+                                        id="hours"
+                                        type="number"
+                                        value={editForm.estimatedHours}
+                                        onChange={(e) => setEditForm({ ...editForm, estimatedHours: e.target.value })}
+                                        placeholder="10"
+                                        data-testid="input-edit-hours"
+                                      />
+                                    </div>
+                                  )}
                                   <div>
                                     <Label htmlFor="impact">Impact Level</Label>
                                     <Select value={editForm.impact} onValueChange={(value) => setEditForm({ ...editForm, impact: value })}>
@@ -469,11 +604,15 @@ export default function AgencyRecommendationsPage() {
                       </div>
                     )}
                     <div className="flex items-center gap-4 text-sm">
-                      {rec.cost && (
+                      {rec.billingType === "hours" && rec.estimatedHours ? (
+                        <div>
+                          <span className="font-medium">Hours:</span> {rec.estimatedHours}h
+                        </div>
+                      ) : rec.cost ? (
                         <div>
                           <span className="font-medium">Cost:</span> ${rec.cost}
                         </div>
-                      )}
+                      ) : null}
                       {rec.impact && (
                         <div>
                           <span className="font-medium">Impact:</span> {rec.impact}
