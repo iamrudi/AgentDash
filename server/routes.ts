@@ -550,7 +550,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Invoice Line Items
   app.get("/api/invoices/:invoiceId/line-items", requireAuth, async (req: AuthRequest, res) => {
     try {
+      // Restrict to Client and Admin roles only - Staff should not access invoices
+      if (req.user!.role !== "Client" && req.user!.role !== "Admin") {
+        return res.status(403).json({ message: "Not authorized to access invoice line items" });
+      }
+      
       const { invoiceId } = req.params;
+      
+      // First, get the invoice to verify ownership
+      const invoice = await storage.getInvoiceById(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Check authorization - clients can only view their own invoice line items
+      if (req.user!.role === "Client") {
+        const user = await storage.getUserById(req.user!.id);
+        if (!user) {
+          return res.status(403).json({ message: "User not found" });
+        }
+        const profile = await storage.getProfileByUserId(user.id);
+        if (!profile) {
+          return res.status(403).json({ message: "Profile not found" });
+        }
+        const client = await storage.getClientByProfileId(profile.id);
+        
+        if (!client) {
+          return res.status(403).json({ message: "Client not found" });
+        }
+        
+        // Verify the invoice belongs to this client
+        if (invoice.clientId !== client.id) {
+          return res.status(403).json({ message: "Not authorized to view these invoice line items" });
+        }
+      }
+      
       const lineItems = await storage.getInvoiceLineItemsByInvoiceId(invoiceId);
       res.json(lineItems);
     } catch (error: any) {
@@ -562,6 +596,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/invoices/:invoiceId/line-items", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { invoiceId } = req.params;
+      
+      // Verify the invoice exists and belongs to a valid client
+      const invoice = await storage.getInvoiceById(invoiceId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Verify the client exists (tenant validation)
+      const client = await storage.getClientById(invoice.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found for this invoice" });
+      }
+      
       const lineItems = Array.isArray(req.body) ? req.body : [req.body];
       
       // Validate each line item
