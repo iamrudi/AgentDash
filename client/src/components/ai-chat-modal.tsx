@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { getUserRole } from "@/lib/auth";
 
 interface AnalyticsContextData {
   clientId?: string;
+  clientName?: string;
   ga4Metrics?: {
     sessions?: number;
     conversions?: number;
@@ -23,6 +24,9 @@ interface AnalyticsContextData {
     impressions?: number;
     avgPosition?: number;
   };
+  outcomeMetrics?: any;
+  gscData?: any;
+  gscQueries?: any;
   dateRange?: {
     startDate: string;
     endDate: string;
@@ -58,9 +62,15 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const userRole = getUserRole();
 
+  // Update question when initialQuestion changes (e.g., when client changes)
+  useEffect(() => {
+    setQuestion(initialQuestion);
+    setAnalysis(null); // Clear previous analysis
+  }, [initialQuestion]);
+
   const analyzeMutation = useMutation({
-    mutationFn: (userQuestion: string) => 
-      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }),
+    mutationFn: async (userQuestion: string): Promise<AIAnalysisResult> => 
+      apiRequest("POST", "/api/ai/analyze-data", { contextData, question: userQuestion }) as unknown as Promise<AIAnalysisResult>,
     onSuccess: (data: AIAnalysisResult) => {
       setAnalysis(data);
     },
@@ -158,9 +168,15 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
               </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <Badge variant="secondary" data-testid="badge-impact">Impact: {analysis.impact}</Badge>
-                <Badge variant="secondary" data-testid="badge-cost">Cost: ${analysis.estimatedCost.toLocaleString()}</Badge>
-                <Badge variant="secondary" data-testid="badge-trigger-metric">Metric: {analysis.triggerMetric}</Badge>
-                <Badge variant="secondary" data-testid="badge-baseline-value">Baseline: {analysis.baselineValue.toLocaleString()}</Badge>
+                {analysis.estimatedCost != null && (
+                  <Badge variant="secondary" data-testid="badge-cost">Cost: ${analysis.estimatedCost.toLocaleString()}</Badge>
+                )}
+                {analysis.triggerMetric && (
+                  <Badge variant="secondary" data-testid="badge-trigger-metric">Metric: {analysis.triggerMetric}</Badge>
+                )}
+                {analysis.baselineValue != null && (
+                  <Badge variant="secondary" data-testid="badge-baseline-value">Baseline: {analysis.baselineValue.toLocaleString()}</Badge>
+                )}
               </div>
             </div>
           )}
