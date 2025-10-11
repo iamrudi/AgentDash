@@ -381,14 +381,14 @@ export default function AgencyIntegrationsPage() {
                 <Label htmlFor="lead-event-name">Primary Lead Event Name (Optional)</Label>
                 <Input
                   id="lead-event-name"
-                  placeholder="e.g., generate_lead, form_submission"
+                  placeholder="e.g., form_submit or generate_lead (one event only)"
                   value={leadEventName}
                   onChange={(e) => setLeadEventName(e.target.value)}
                   data-testid="input-lead-event-name"
                   className="mt-1"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Enter the GA4 Key Event name that represents a lead for this client
+                  Enter ONE GA4 Key Event name (must match exactly - no commas or multiple events)
                 </p>
               </div>
               <div className="flex justify-end gap-2">
