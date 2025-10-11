@@ -1387,11 +1387,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Calculate Pipeline Value
-      const leadToOpportunityRate = parseFloat(client.leadToOpportunityRate || '0');
-      const opportunityToCloseRate = parseFloat(client.opportunityToCloseRate || '0');
-      const averageDealSize = parseFloat(client.averageDealSize || '0');
+      let estimatedPipelineValue = 0;
+      const leadValue = parseFloat(client.leadValue || '0');
       
-      const estimatedPipelineValue = totalConversions * leadToOpportunityRate * opportunityToCloseRate * averageDealSize;
+      if (leadValue > 0) {
+        // New simple calculation: Pipeline = Conversions × Lead Value
+        estimatedPipelineValue = totalConversions * leadValue;
+      } else {
+        // Fallback to old complex calculation for backward compatibility
+        const leadToOpportunityRate = parseFloat(client.leadToOpportunityRate || '0');
+        const opportunityToCloseRate = parseFloat(client.opportunityToCloseRate || '0');
+        const averageDealSize = parseFloat(client.averageDealSize || '0');
+        estimatedPipelineValue = totalConversions * leadToOpportunityRate * opportunityToCloseRate * averageDealSize;
+      }
 
       // Calculate CPA (Cost Per Acquisition)
       const cpa = totalConversions > 0 ? totalSpend / totalConversions : 0;
@@ -1402,11 +1410,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cpa: Math.round(cpa * 100) / 100, // Round to 2 decimal places
         organicClicks: totalOrganicClicks,
         spend: totalSpend,
-        // Include the rates for transparency
+        leadValue: leadValue > 0 ? leadValue : null,
+        // Include the rates for transparency (deprecated)
         pipelineCalculation: {
-          leadToOpportunityRate,
-          opportunityToCloseRate,
-          averageDealSize,
+          leadToOpportunityRate: parseFloat(client.leadToOpportunityRate || '0'),
+          opportunityToCloseRate: parseFloat(client.opportunityToCloseRate || '0'),
+          averageDealSize: parseFloat(client.averageDealSize || '0'),
         }
       });
     } catch (error: any) {
