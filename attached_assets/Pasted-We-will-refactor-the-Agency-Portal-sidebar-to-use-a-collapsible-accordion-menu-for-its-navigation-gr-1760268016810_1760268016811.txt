@@ -1,3 +1,15 @@
+We will refactor the Agency Portal sidebar to use a collapsible accordion menu for its navigation groups. This will replace the current static list of groups, making the interface cleaner and more organized.
+
+Please execute the following steps precisely.
+
+Step 1: Update the Agency Sidebar Component
+
+Open the file client/src/components/agency-sidebar.tsx. We are going to replace its entire content with an updated version that integrates our existing Accordion components to create the collapsible dropdowns.
+
+Action: Replace the entire content of client/src/components/agency-sidebar.tsx with the following code:
+
+TypeScript
+
 import {
   Home,
   MessageSquare,
@@ -11,7 +23,6 @@ import {
   UserCog,
   FileText,
   BarChartHorizontal,
-  Trash2,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -89,12 +100,6 @@ const menuGroups = [
         notificationKey: null,
       },
       {
-        title: "Trash",
-        url: "/agency/trash",
-        icon: Trash2,
-        notificationKey: null,
-      },
-      {
         title: "Google Integrations",
         url: "/agency/integrations",
         icon: Link2,
@@ -131,13 +136,13 @@ export function AgencySidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
+    <Sidebar>
+      <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
-            <Shield className="h-5 w-5 text-primary group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Shield className="h-5 w-5 text-primary" />
           </div>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+          <div className="flex flex-col">
             <span className="font-semibold text-sm">Agency Portal</span>
             <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
@@ -162,7 +167,6 @@ export function AgencySidebar() {
                         <SidebarMenuButton
                           asChild
                           isActive={location === item.url}
-                          tooltip={item.title}
                           data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                         >
                           <Link href={item.url}>
@@ -192,7 +196,7 @@ export function AgencySidebar() {
       <div className="p-2 mt-auto border-t">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} tooltip="Logout" data-testid="nav-logout">
+            <SidebarMenuButton onClick={handleLogout} data-testid="nav-logout">
               <LogOut className="h-4 w-4" />
               <span>Logout</span>
             </SidebarMenuButton>
