@@ -1,6 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ClientSidebar } from "@/components/client-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -19,7 +19,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <div className="flex flex-col flex-1">
           <header className="flex items-center justify-between p-4 border-b">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
+            <UserProfileDropdown />
           </header>
           <main className="flex-1 overflow-auto">
             {children}
