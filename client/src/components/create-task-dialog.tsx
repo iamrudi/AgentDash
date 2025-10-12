@@ -38,8 +38,9 @@ export function CreateTaskDialog({ open, onOpenChange, defaultProjectId }: Creat
     }) => {
       return await apiRequest("POST", "/api/agency/tasks", data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", variables.projectId] });
       toast({
         title: "Task Created",
         description: "The task has been successfully created.",

@@ -364,9 +364,9 @@ export default function ProjectDetail() {
               <SelectTrigger id="staff-select" data-testid="select-assign-staff">
                 <SelectValue placeholder="Select a staff member" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent position="popper" sideOffset={5} data-testid="select-staff-content">
                 {(staffList as any)?.map((staff: any) => (
-                  <SelectItem key={staff.id} value={staff.id}>
+                  <SelectItem key={staff.id} value={staff.id} data-testid={`select-staff-option-${staff.id}`}>
                     {staff.name}
                   </SelectItem>
                 ))}
