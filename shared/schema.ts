@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -109,7 +109,9 @@ export const initiatives = pgTable("initiatives", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   observation: text("observation").notNull(),
+  observationInsights: jsonb("observation_insights"), // Structured data: [{label, value, context}]
   proposedAction: text("proposed_action").notNull(),
+  actionTasks: jsonb("action_tasks"), // Array of task strings
   status: text("status").notNull(), // 'Needs Review', 'Awaiting Approval', 'Approved', 'In Progress', 'Completed', 'Measured'
   cost: numeric("cost"),
   estimatedHours: numeric("estimated_hours"), // Hours needed if using retainer hours
