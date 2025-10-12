@@ -153,7 +153,7 @@ export function AgencySidebar() {
         <Accordion type="multiple" defaultValue={["Core", "Strategy", "Administration"]} className="w-full">
           {menuGroups.map((group) => (
             <AccordionItem value={group.title} key={group.title} className="border-none">
-              <AccordionTrigger className="text-xs font-medium uppercase text-muted-foreground hover:no-underline py-2 px-2 justify-start gap-2">
+              <AccordionTrigger className="text-xs font-medium uppercase text-muted-foreground hover:no-underline py-2 px-2 justify-start gap-2 border-b border-border/40">
                 <group.icon className="h-4 w-4 shrink-0" />
                 <span className="group-data-[collapsible=icon]:hidden">{group.title}</span>
               </AccordionTrigger>
