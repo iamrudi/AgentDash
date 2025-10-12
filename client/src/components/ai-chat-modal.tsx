@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -127,19 +127,19 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl" data-testid="dialog-ai-chat">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto" data-testid="sheet-ai-chat">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             Ask AI about your Data
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Get instant insights and actionable recommendations based on your performance metrics.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-6">
           <div>
             <Label htmlFor="ai-question">Your Question</Label>
             <Textarea
@@ -193,8 +193,8 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
         </div>
 
         {analysis && (
-          <DialogFooter className="border-t pt-4">
-            <div className="flex w-full justify-between items-center gap-2">
+          <SheetFooter className="border-t pt-4 mt-6">
+            <div className="flex w-full flex-col gap-4">
               <p className="text-sm text-muted-foreground">
                 {requestActionMutation.isPending 
                   ? "Submitting your request..." 
@@ -202,7 +202,7 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
                   ? "Success! Redirecting..."
                   : "Happy with this suggestion?"}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -233,9 +233,9 @@ export function AIChatModal({ isOpen, onClose, contextData, initialQuestion }: A
                 </Button>
               </div>
             </div>
-          </DialogFooter>
+          </SheetFooter>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
