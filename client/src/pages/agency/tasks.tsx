@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { CreateTaskDialog } from "@/components/create-task-dialog";
 import { useState } from "react";
 
 export default function AgencyTasksPage() {
+  const [, setLocation] = useLocation();
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -89,7 +91,12 @@ export default function AgencyTasksPage() {
                 {activeProjects.map((project) => {
                   const client = clients?.find(c => c.id === project.clientId);
                   return (
-                    <Card key={project.id} className="hover-elevate" data-testid={`project-card-${project.id}`}>
+                    <Card 
+                      key={project.id} 
+                      className="hover-elevate cursor-pointer" 
+                      data-testid={`project-card-${project.id}`}
+                      onClick={() => setLocation(`/agency/projects/${project.id}`)}
+                    >
                       <CardHeader>
                         <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-base">{project.name}</CardTitle>
@@ -127,7 +134,12 @@ export default function AgencyTasksPage() {
                 {completedProjects.map((project) => {
                   const client = clients?.find(c => c.id === project.clientId);
                   return (
-                    <Card key={project.id} className="hover-elevate" data-testid={`project-card-${project.id}`}>
+                    <Card 
+                      key={project.id} 
+                      className="hover-elevate cursor-pointer" 
+                      data-testid={`project-card-${project.id}`}
+                      onClick={() => setLocation(`/agency/projects/${project.id}`)}
+                    >
                       <CardHeader>
                         <div className="flex items-start justify-between gap-2">
                           <CardTitle className="text-base">{project.name}</CardTitle>

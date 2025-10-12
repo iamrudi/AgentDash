@@ -27,6 +27,7 @@ import Support from "@/pages/client/support";
 import AgencyDashboard from "@/pages/agency/index";
 import AgencyMessages from "@/pages/agency/messages";
 import AgencyTasks from "@/pages/agency/tasks";
+import AgencyProjectDetail from "@/pages/agency/project-detail";
 import AgencyRecommendations from "@/pages/agency/recommendations";
 import AgencyClients from "@/pages/agency/clients";
 import AgencyStaff from "@/pages/agency/staff";
@@ -124,6 +125,12 @@ function Router() {
       <Route path="/agency/tasks">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyTasks />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/projects/:id">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyProjectDetail />
         </ProtectedRoute>
       </Route>
 
