@@ -184,9 +184,9 @@ export default function Recommendations() {
                     </p>
                     
                     {/* Structured Observation Insights */}
-                    {recommendation.observationInsights && Array.isArray(recommendation.observationInsights) && recommendation.observationInsights.length > 0 && (
+                    {recommendation.observationInsights && recommendation.observationInsights.length > 0 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        {(recommendation.observationInsights as Array<{label: string; value: string; context?: string}>).map((insight, idx) => (
+                        {recommendation.observationInsights.map((insight, idx) => (
                           <div 
                             key={idx} 
                             className="bg-muted/50 rounded-lg p-4 border border-border"
@@ -210,11 +210,11 @@ export default function Recommendations() {
                   </p>
                   
                   {/* Action Tasks List */}
-                  {recommendation.actionTasks && Array.isArray(recommendation.actionTasks) && recommendation.actionTasks.length > 0 && (
+                  {recommendation.actionTasks && recommendation.actionTasks.length > 0 && (
                     <div className="bg-muted/30 rounded-lg p-4 border border-border">
                       <p className="text-xs font-semibold text-muted-foreground mb-3">Implementation Steps</p>
                       <ol className="space-y-2">
-                        {(recommendation.actionTasks as string[]).map((task, idx) => (
+                        {recommendation.actionTasks.map((task, idx) => (
                           <li 
                             key={idx} 
                             className="text-sm flex gap-3"

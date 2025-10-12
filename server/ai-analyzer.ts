@@ -109,7 +109,9 @@ export async function generateAIRecommendations(
       const initiative: InsertInitiative = {
         title: rec.title,
         observation: rec.observation,
+        observationInsights: rec.observationInsights,
         proposedAction: rec.proposedAction,
+        actionTasks: rec.actionTasks,
         status: "Needs Review",
         cost: rec.estimatedCost.toString(),
         impact: rec.impact,

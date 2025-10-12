@@ -104,14 +104,21 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   invoiceIdIdx: index("invoice_line_items_invoice_id_idx").on(table.invoiceId),
 }));
 
+// Type definitions for jsonb fields
+export type ObservationInsight = {
+  label: string;
+  value: string;
+  context?: string;
+};
+
 // INITIATIVES (Strategic AI-powered recommendations with task breakdown)
 export const initiatives = pgTable("initiatives", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   observation: text("observation").notNull(),
-  observationInsights: jsonb("observation_insights"), // Structured data: [{label, value, context}]
+  observationInsights: jsonb("observation_insights").$type<ObservationInsight[]>(), // Structured data: [{label, value, context}]
   proposedAction: text("proposed_action").notNull(),
-  actionTasks: jsonb("action_tasks"), // Array of task strings
+  actionTasks: jsonb("action_tasks").$type<string[]>(), // Array of task strings
   status: text("status").notNull(), // 'Needs Review', 'Awaiting Approval', 'Approved', 'In Progress', 'Completed', 'Measured'
   cost: numeric("cost"),
   estimatedHours: numeric("estimated_hours"), // Hours needed if using retainer hours
