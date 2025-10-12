@@ -75,7 +75,7 @@ export function ClientSidebar() {
   };
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -102,6 +102,7 @@ export function ClientSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={location === item.url}
+                      tooltip={item.title}
                       data-testid={`nav-${item.title.toLowerCase()}`}
                     >
                       <Link href={item.url}>
@@ -129,7 +130,7 @@ export function ClientSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout} data-testid="nav-logout">
+                <SidebarMenuButton onClick={handleLogout} tooltip="Logout" data-testid="nav-logout">
                   <LogOut className="h-4 w-4" />
                   <span>Logout</span>
                 </SidebarMenuButton>
