@@ -24,8 +24,11 @@ interface GA4Data {
 
 interface GSCData {
   rows: Array<{
-    dimensionValues?: Array<{ value: string }>;
-    metricValues: Array<{ value: string }>;
+    keys: string[];
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
   }>;
 }
 
@@ -121,11 +124,11 @@ export default function AgencyDashboard() {
 
   const selectedClient = clients?.find(c => c.id === selectedClientId);
   const topQueries = gscQueries?.rows?.slice(0, 10) || [];
-  const totalClicks = gscData?.rows ? gscData.rows.reduce((sum, row) => sum + (parseInt(row.metricValues?.[0]?.value) || 0), 0) : 0;
-  const totalImpressions = gscData?.rows ? gscData.rows.reduce((sum, row) => sum + (parseInt(row.metricValues?.[1]?.value) || 0), 0) : 0;
+  const totalClicks = gscData?.rows ? gscData.rows.reduce((sum, row) => sum + (row.clicks || 0), 0) : 0;
+  const totalImpressions = gscData?.rows ? gscData.rows.reduce((sum, row) => sum + (row.impressions || 0), 0) : 0;
   const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
   const avgPosition = gscData?.rows?.length ? 
-    gscData.rows.reduce((sum, row) => sum + (parseFloat(row.metricValues?.[3]?.value) || 0), 0) / gscData.rows.length : 0;
+    gscData.rows.reduce((sum, row) => sum + (row.position || 0), 0) / gscData.rows.length : 0;
 
   // Validate if there's enough data for AI analysis
   const handleOpenAIChat = () => {
