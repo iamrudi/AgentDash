@@ -435,6 +435,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get project with tasks
+  app.get("/api/agency/projects/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const projectData = await storage.getProjectWithTasks(req.params.id);
+      
+      if (!projectData) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json(projectData);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update project
+  app.patch("/api/agency/projects/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const updateData = insertProjectSchema.partial().parse(req.body);
+      const updatedProject = await storage.updateProject(req.params.id, updateData);
+
+      res.json(updatedProject);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update task
+  app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const updateData = insertTaskSchema.partial().parse(req.body);
+      const updatedTask = await storage.updateTask(req.params.id, updateData);
+
+      res.json(updatedTask);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete task
+  app.delete("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteTask(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign staff to task
+  app.post("/api/agency/tasks/:taskId/assign", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { staffProfileId } = req.body;
+      
+      if (!staffProfileId) {
+        return res.status(400).json({ message: "Staff profile ID is required" });
+      }
+
+      const assignment = await storage.createStaffAssignment({
+        taskId: req.params.taskId,
+        staffProfileId,
+      });
+
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Remove staff assignment
+  app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      await storage.deleteStaffAssignment(req.params.taskId, req.params.staffProfileId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/agency/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const metrics = await storage.getAllMetrics(90);

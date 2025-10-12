@@ -92,10 +92,18 @@ export interface IStorage {
   getAllTasks(): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task>;
+  deleteTask(id: string): Promise<void>;
   
   // Staff Assignments
   createStaffAssignment(assignment: InsertStaffAssignment): Promise<StaffAssignment>;
   getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]>;
+  deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void>;
+  
+  // Project with Tasks
+  getProjectWithTasks(projectId: string): Promise<{
+    project: Project;
+    tasks: Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>;
+  } | undefined>;
   
   // Invoices
   getInvoiceById(id: string): Promise<Invoice | undefined>;
@@ -438,6 +446,13 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async deleteTask(id: string): Promise<void> {
+    // First delete all staff assignments for this task
+    await db.delete(staffAssignments).where(eq(staffAssignments.taskId, id));
+    // Then delete the task
+    await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
   // Staff Assignments
   async createStaffAssignment(assignment: InsertStaffAssignment): Promise<StaffAssignment> {
     const result = await db.insert(staffAssignments).values(assignment).returning();
@@ -446,6 +461,53 @@ export class DbStorage implements IStorage {
 
   async getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]> {
     return await db.select().from(staffAssignments).where(eq(staffAssignments.taskId, taskId));
+  }
+
+  async deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void> {
+    await db.delete(staffAssignments)
+      .where(
+        and(
+          eq(staffAssignments.taskId, taskId),
+          eq(staffAssignments.staffProfileId, staffProfileId)
+        )
+      );
+  }
+
+  // Project with Tasks
+  async getProjectWithTasks(projectId: string): Promise<{
+    project: Project;
+    tasks: Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>;
+  } | undefined> {
+    // Get the project
+    const project = await this.getProjectById(projectId);
+    if (!project) return undefined;
+
+    // Get all tasks for this project
+    const projectTasks = await db.select().from(tasks).where(eq(tasks.projectId, projectId));
+
+    // For each task, get staff assignments with profile details
+    const tasksWithAssignments = await Promise.all(
+      projectTasks.map(async (task) => {
+        const assignments = await db
+          .select()
+          .from(staffAssignments)
+          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
+          .where(eq(staffAssignments.taskId, task.id));
+
+        return {
+          ...task,
+          assignments: assignments.map(a => ({
+            ...a.staff_assignments,
+            staffProfile: a.profiles!
+          }))
+        };
+      })
+    );
+
+    return {
+      project,
+      tasks: tasksWithAssignments
+    };
   }
 
   // Invoices
