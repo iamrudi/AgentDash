@@ -1,0 +1,50 @@
+Objective: We will perform a UX and copywriting overhaul on the "Observation" section of our "Trust-Building Proposal Card" in client/src/pages/client/recommendations.tsx. The goal is to apply sales psychology principles to make the data more persuasive, create a sense of urgency, and clearly demonstrate the value of our proposed action.
+
+Action: Open client/src/pages/client/recommendations.tsx and replace the current, text-heavy "The Observation" section with the new, structured component detailed below.
+
+New "Observation" Blueprint:
+
+Instead of a single paragraph, the new section will consist of:
+
+A concise, hard-hitting Insight Statement that summarizes the core problem.
+
+A Data Breakdown that visually presents 1-2 key examples as evidence.
+
+A Quantified Opportunity Statement that frames the problem in terms of what the client is losing.
+
+Here is the JSX snippet to replace the existing "Observation" section. Please integrate it into the recommendations.tsx file.
+
+JavaScript
+
+{/* Replace the existing "The Observation" div with this new structure */}
+<div>
+  <h4 className="font-semibold mb-3">The Observation: A Hidden Opportunity</h4>
+  <div className="space-y-4">
+    <p className="text-sm text-muted-foreground italic">
+      "You're ranking at the top of Google for valuable keywords, but competitors are likely capturing the majority of the clicks."
+    </p>
+
+    {/* Data Breakdown Section */}
+    <div className="p-4 border bg-muted/50 rounded-lg space-y-3">
+      <p className="text-xs font-semibold text-muted-foreground">For example, for the keyword "family law solicitors peterborough":</p>
+      <div className="grid grid-cols-3 gap-4 text-center">
+        <div>
+          <p className="text-2xl font-bold">#1.6</p>
+          <p className="text-xs text-muted-foreground">Your Avg. Position</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-destructive">2.36%</p>
+          <p className="text-xs text-muted-foreground">Your Click-Through Rate</p>
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-green-500">~28%</p>
+          <p className="text-xs text-muted-foreground">Industry Avg. for Top 3</p>
+        </div>
+      </div>
+    </div>
+
+    <p className="text-sm text-muted-foreground">
+      This gap between your high ranking and low click-through rate indicates a significant amount of lost traffic. By not capturing these clicks, you are missing out on potential clients who are actively searching for your services.
+    </p>
+  </div>
+</div>
