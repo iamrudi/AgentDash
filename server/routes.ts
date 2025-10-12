@@ -11,7 +11,8 @@ import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
-import { analyzeDataOnDemand } from "./gemini";
+import { analyzeDataOnDemand, summarizeLighthouseReport } from "./gemini";
+import { SeoAuditService } from "./services/seoAuditService";
 import express from "express";
 import path from "path";
 
@@ -2278,6 +2279,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(counts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // SEO Audit endpoint (Admin only)
+  app.post("/api/seo/audit", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { url } = req.body;
+      if (!url) {
+        return res.status(400).json({ message: "URL is required" });
+      }
+
+      const auditService = new SeoAuditService();
+      const lighthouseReport = await auditService.runLighthouseAudit(url);
+
+      // Get AI summary
+      const aiSummary = await summarizeLighthouseReport(url, lighthouseReport);
+
+      res.json({
+        lighthouseReport,
+        aiSummary,
+      });
+    } catch (error: any) {
+      console.error("SEO Audit endpoint error:", error);
+      res.status(500).json({ message: error.message || "Failed to perform SEO audit" });
     }
   });
 
