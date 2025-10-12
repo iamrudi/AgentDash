@@ -12,6 +12,9 @@ import {
   FileText,
   BarChartHorizontal,
   Trash2,
+  Zap,
+  Target,
+  Settings,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -35,6 +38,7 @@ import { getAuthUser, clearAuthUser } from "@/lib/auth";
 const menuGroups = [
   {
     title: "Core",
+    icon: Zap,
     items: [
       {
         title: "Dashboard",
@@ -58,6 +62,7 @@ const menuGroups = [
   },
   {
     title: "Strategy",
+    icon: Target,
     items: [
       {
         title: "AI Recommendations",
@@ -75,6 +80,7 @@ const menuGroups = [
   },
   {
     title: "Administration",
+    icon: Settings,
     items: [
       {
         title: "Clients",
@@ -147,8 +153,9 @@ export function AgencySidebar() {
         <Accordion type="multiple" defaultValue={["Core", "Strategy", "Administration"]} className="w-full">
           {menuGroups.map((group) => (
             <AccordionItem value={group.title} key={group.title} className="border-none">
-              <AccordionTrigger className="text-xs font-medium uppercase text-muted-foreground hover:no-underline py-2 px-2">
-                {group.title}
+              <AccordionTrigger className="text-xs font-medium uppercase text-muted-foreground hover:no-underline py-2 px-2 justify-start gap-2">
+                <group.icon className="h-4 w-4 shrink-0" />
+                <span className="group-data-[collapsible=icon]:hidden">{group.title}</span>
               </AccordionTrigger>
               <AccordionContent className="pb-0">
                 <SidebarMenu>
