@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { InvoiceScheduler } from "./services/invoiceScheduler";
+import { TrashCleanupScheduler } from "./services/trashCleanupScheduler";
 import { storage } from "./storage";
 
 const app = express();
@@ -44,6 +45,10 @@ app.use((req, res, next) => {
   // Start invoice scheduler for automated monthly invoicing
   const invoiceScheduler = new InvoiceScheduler(storage);
   invoiceScheduler.start();
+
+  // Start trash cleanup scheduler for automatic deletion after 30 days
+  const trashCleanupScheduler = new TrashCleanupScheduler(storage);
+  trashCleanupScheduler.start();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
