@@ -98,33 +98,33 @@ Analyze this data and generate 2-5 strategic recommendations focusing on:
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
-          type: "array",
+          type: "ARRAY",
           items: {
-            type: "object",
+            type: "OBJECT",
             properties: {
-              title: { type: "string" },
-              observation: { type: "string" },
+              title: { type: "STRING" },
+              observation: { type: "STRING" },
               observationInsights: {
-                type: "array",
+                type: "ARRAY",
                 items: {
-                  type: "object",
+                  type: "OBJECT",
                   properties: {
-                    label: { type: "string" },
-                    value: { type: "string" },
-                    context: { type: "string" }
+                    label: { type: "STRING" },
+                    value: { type: "STRING" },
+                    context: { type: "STRING" }
                   },
                   required: ["label", "value"]
                 }
               },
-              proposedAction: { type: "string" },
+              proposedAction: { type: "STRING" },
               actionTasks: {
-                type: "array",
-                items: { type: "string" }
+                type: "ARRAY",
+                items: { type: "STRING" }
               },
-              impact: { type: "string", enum: ["High", "Medium", "Low"] },
-              estimatedCost: { type: "number" },
-              triggerMetric: { type: "string" },
-              baselineValue: { type: "number" }
+              impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
+              estimatedCost: { type: "NUMBER" },
+              triggerMetric: { type: "STRING" },
+              baselineValue: { type: "NUMBER" }
             },
             required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact", "estimatedCost", "triggerMetric", "baselineValue"]
           }
@@ -139,7 +139,9 @@ Analyze this data and generate 2-5 strategic recommendations focusing on:
       throw new Error("Empty response from Gemini AI");
     }
 
+    console.log("[Gemini AI Raw Response]:", rawJson);
     const recommendations: RecommendationOutput[] = JSON.parse(rawJson);
+    console.log("[Gemini AI Parsed Recommendations]:", JSON.stringify(recommendations, null, 2));
     return recommendations;
   } catch (error) {
     console.error("Gemini AI analysis error:", error);
@@ -195,31 +197,31 @@ Based on the data and the question, generate a single, actionable recommendation
         systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
-          type: "object",
+          type: "OBJECT",
           properties: {
-            title: { type: "string" },
-            observation: { type: "string" },
+            title: { type: "STRING" },
+            observation: { type: "STRING" },
             observationInsights: {
-              type: "array",
+              type: "ARRAY",
               items: {
-                type: "object",
+                type: "OBJECT",
                 properties: {
-                  label: { type: "string" },
-                  value: { type: "string" },
-                  context: { type: "string" }
+                  label: { type: "STRING" },
+                  value: { type: "STRING" },
+                  context: { type: "STRING" }
                 },
                 required: ["label", "value"]
               }
             },
-            proposedAction: { type: "string" },
+            proposedAction: { type: "STRING" },
             actionTasks: {
-              type: "array",
-              items: { type: "string" }
+              type: "ARRAY",
+              items: { type: "STRING" }
             },
-            impact: { type: "string", enum: ["High", "Medium", "Low"] },
-            estimatedCost: { type: "number" },
-            triggerMetric: { type: "string" },
-            baselineValue: { type: "number" },
+            impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
+            estimatedCost: { type: "NUMBER" },
+            triggerMetric: { type: "STRING" },
+            baselineValue: { type: "NUMBER" },
           },
           required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact"],
         },

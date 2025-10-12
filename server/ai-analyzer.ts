@@ -106,6 +106,8 @@ export async function generateAIRecommendations(
     // 12. Create initiative records from AI recommendations
     let createdCount = 0;
     for (const rec of aiRecommendations) {
+      console.log("[AI Recommendation Debug]:", JSON.stringify(rec, null, 2));
+      
       const initiative: InsertInitiative = {
         title: rec.title,
         observation: rec.observation,
@@ -122,6 +124,7 @@ export async function generateAIRecommendations(
         responseViewedByAdmin: "false"
       };
 
+      console.log("[Initiative to be saved]:", JSON.stringify(initiative, null, 2));
       await storage.createInitiative(initiative);
       createdCount++;
     }
