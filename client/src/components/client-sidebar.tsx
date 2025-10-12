@@ -78,12 +78,17 @@ export function ClientSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Building2 className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-lg group-data-[collapsible=icon]:text-base">
+              <span className="text-primary">mm</span>
+              <span className="group-data-[collapsible=icon]:hidden">agency</span>
+            </span>
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm">Client Portal</span>
-            <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <Badge variant="outline" className="w-fit text-xs px-2 py-0">
+              Client Portal
+            </Badge>
+            <span className="text-xs text-muted-foreground mt-1">{authUser?.profile.fullName}</span>
           </div>
         </div>
       </SidebarHeader>
