@@ -126,6 +126,7 @@ export const initiatives = pgTable("initiatives", {
   implementationDate: date("implementation_date"), // When initiative was completed
   measuredImprovement: numeric("measured_improvement"), // Final measured improvement percentage
   lastEditedAt: timestamp("last_edited_at"),
+  deletedAt: timestamp("deleted_at"), // Soft delete timestamp - items deleted after 30 days
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   clientIdIdx: index("initiatives_client_id_idx").on(table.clientId),

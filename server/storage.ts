@@ -112,10 +112,14 @@ export interface IStorage {
   getInitiativeById(id: string): Promise<Initiative | undefined>;
   getInitiativesByClientId(clientId: string): Promise<Initiative[]>;
   getAllInitiatives(): Promise<Initiative[]>;
+  getDeletedInitiatives(): Promise<Initiative[]>;
   createInitiative(rec: InsertInitiative): Promise<Initiative>;
   updateInitiative(id: string, updates: Partial<InsertInitiative>): Promise<Initiative>;
   sendInitiativeToClient(id: string): Promise<Initiative>;
   updateInitiativeClientResponse(id: string, response: string, feedback?: string): Promise<Initiative>;
+  softDeleteInitiative(id: string): Promise<Initiative>;
+  restoreInitiative(id: string): Promise<Initiative>;
+  permanentlyDeleteInitiative(id: string): Promise<void>;
   
   // Daily Metrics
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
@@ -495,11 +499,18 @@ export class DbStorage implements IStorage {
   }
 
   async getInitiativesByClientId(clientId: string): Promise<Initiative[]> {
-    return await db.select().from(initiatives).where(eq(initiatives.clientId, clientId)).orderBy(desc(initiatives.createdAt));
+    return await db.select().from(initiatives)
+      .where(and(
+        eq(initiatives.clientId, clientId),
+        sql`${initiatives.deletedAt} IS NULL`
+      ))
+      .orderBy(desc(initiatives.createdAt));
   }
 
   async getAllInitiatives(): Promise<Initiative[]> {
-    return await db.select().from(initiatives).orderBy(desc(initiatives.createdAt));
+    return await db.select().from(initiatives)
+      .where(sql`${initiatives.deletedAt} IS NULL`)
+      .orderBy(desc(initiatives.createdAt));
   }
 
   async createInitiative(rec: InsertInitiative): Promise<Initiative> {
@@ -549,6 +560,34 @@ export class DbStorage implements IStorage {
       .where(eq(initiatives.id, id))
       .returning();
     return result[0];
+  }
+
+  async getDeletedInitiatives(): Promise<Initiative[]> {
+    return await db.select().from(initiatives)
+      .where(sql`${initiatives.deletedAt} IS NOT NULL`)
+      .orderBy(desc(initiatives.deletedAt));
+  }
+
+  async softDeleteInitiative(id: string): Promise<Initiative> {
+    const result = await db
+      .update(initiatives)
+      .set({ deletedAt: new Date() })
+      .where(eq(initiatives.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async restoreInitiative(id: string): Promise<Initiative> {
+    const result = await db
+      .update(initiatives)
+      .set({ deletedAt: null })
+      .where(eq(initiatives.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async permanentlyDeleteInitiative(id: string): Promise<void> {
+    await db.delete(initiatives).where(eq(initiatives.id, id));
   }
 
   // Daily Metrics
