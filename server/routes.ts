@@ -812,6 +812,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const initiative = await storage.sendInitiativeToClient(id);
+      
+      // Create notification for client about new initiative (don't let notification failures break sending)
+      try {
+        const client = await storage.getClientById(initiative.clientId);
+        if (client) {
+          const clientProfile = await storage.getProfileById(client.profileId);
+          if (clientProfile) {
+            const clientUser = await storage.getUserById(clientProfile.userId);
+            if (clientUser) {
+              await storage.createNotification({
+                userId: clientUser.id,
+                type: "new_initiative",
+                title: "New Strategic Initiative",
+                message: `Your agency has sent you a new strategic initiative: "${initiative.title}"`,
+                link: "/client/recommendations",
+                isRead: "false",
+                isArchived: "false",
+              });
+            }
+          }
+        }
+      } catch (notificationError) {
+        console.error("Failed to create new initiative notification:", notificationError);
+      }
+      
       res.json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -850,6 +875,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
+      
+      // Create notification for admin users about client response (don't let notification failures break the response)
+      try {
+        const profile = await storage.getProfileByUserId(req.user!.id);
+        if (profile?.role === "Client") {
+          const client = await storage.getClientByProfileId(profile.id);
+          const adminUsers = await storage.getAllUsersWithProfiles();
+          const admins = adminUsers.filter(u => u.profile?.role === "Admin");
+          
+          const responseText = response === "approved" ? "approved" : response === "rejected" ? "rejected" : "wants to discuss";
+          
+          for (const admin of admins) {
+            await storage.createNotification({
+              userId: admin.id,
+              type: "initiative_response",
+              title: "Initiative Response",
+              message: `${profile.fullName} from ${client?.companyName} ${responseText} "${existingInitiative.title}"`,
+              link: `/agency/recommendations`,
+              isRead: "false",
+              isArchived: "false",
+            });
+          }
+        }
+      } catch (notificationError) {
+        console.error("Failed to create initiative response notification:", notificationError);
+      }
+      
       res.json(initiative);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1951,6 +2003,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: message.trim(),
         senderRole: "Client",
       });
+
+      // Create notification for admin users (don't let notification failures break message creation)
+      try {
+        const adminUsers = await storage.getAllUsersWithProfiles();
+        const admins = adminUsers.filter(u => u.profile?.role === "Admin");
+        
+        for (const admin of admins) {
+          await storage.createNotification({
+            userId: admin.id,
+            type: "client_message",
+            title: "New Client Message",
+            message: `${profile!.fullName} from ${client.companyName} sent a new message`,
+            link: "/agency/messages",
+            isRead: "false",
+            isArchived: "false",
+          });
+        }
+      } catch (notificationError) {
+        console.error("Failed to create client message notification:", notificationError);
+      }
 
       res.status(201).json(newMessage);
     } catch (error: any) {
