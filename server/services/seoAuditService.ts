@@ -1,14 +1,35 @@
 import puppeteer from 'puppeteer';
 import lighthouse from 'lighthouse';
 import { URL } from 'url';
+import { execSync } from 'child_process';
 
 export class SeoAuditService {
+  private getChromiumPath(): string {
+    try {
+      // Try to find chromium in PATH
+      const chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
+      return chromiumPath;
+    } catch (error) {
+      // Fallback to common paths if which fails
+      console.warn('Could not find chromium in PATH, using fallback');
+      return '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+    }
+  }
+
   async runLighthouseAudit(url: string): Promise<any> {
     let browser = null;
     try {
+      const chromiumPath = this.getChromiumPath();
+      
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath: chromiumPath,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu'
+        ],
       });
 
       const page = await browser.newPage();
