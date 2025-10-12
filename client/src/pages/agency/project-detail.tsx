@@ -5,30 +5,107 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil, Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
+import { EditTaskDialog } from "@/components/edit-task-dialog";
+import { CreateTaskDialog } from "@/components/create-task-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showEditProject, setShowEditProject] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
+  const [showEditTask, setShowEditTask] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [showDeleteTask, setShowDeleteTask] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<any>(null);
+  const [showAssignStaff, setShowAssignStaff] = useState(false);
+  const [taskToAssign, setTaskToAssign] = useState<any>(null);
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ["/api/agency/projects", id],
     enabled: !!id,
   });
 
-  const { data: allStaff } = useQuery({
+  const { data: staffList } = useQuery({
     queryKey: ["/api/agency/staff"],
   });
 
   const { data: clients } = useQuery({
     queryKey: ["/api/agency/clients"],
   });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      return await apiRequest("DELETE", `/api/agency/tasks/${taskId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", id] });
+      toast({
+        title: "Task Deleted",
+        description: "The task has been successfully deleted.",
+      });
+      setShowDeleteTask(false);
+      setTaskToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignStaffMutation = useMutation({
+    mutationFn: async ({ taskId, staffProfileId }: { taskId: string; staffProfileId: string }) => {
+      return await apiRequest("POST", `/api/agency/tasks/${taskId}/assign`, { staffProfileId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", id] });
+      toast({
+        title: "Staff Assigned",
+        description: "Staff member has been successfully assigned to the task.",
+      });
+      setShowAssignStaff(false);
+      setTaskToAssign(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteTask = () => {
+    if (taskToDelete) {
+      deleteTaskMutation.mutate(taskToDelete.id);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -131,7 +208,7 @@ export default function ProjectDetail() {
                 {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} in this project
               </CardDescription>
             </div>
-            <Button data-testid="button-add-task">
+            <Button onClick={() => setShowCreateTask(true)} data-testid="button-add-task">
               <Plus className="w-4 h-4 mr-2" />
               Add Task
             </Button>
@@ -184,13 +261,37 @@ export default function ProjectDetail() {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" data-testid={`button-assign-staff-${task.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            setTaskToAssign(task);
+                            setShowAssignStaff(true);
+                          }}
+                          data-testid={`button-assign-staff-${task.id}`}
+                        >
                           <UserPlus className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" data-testid={`button-edit-task-${task.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => {
+                            setSelectedTask(task);
+                            setShowEditTask(true);
+                          }}
+                          data-testid={`button-edit-task-${task.id}`}
+                        >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" data-testid={`button-delete-task-${task.id}`}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => {
+                            setTaskToDelete(task);
+                            setShowDeleteTask(true);
+                          }}
+                          data-testid={`button-delete-task-${task.id}`}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -208,6 +309,75 @@ export default function ProjectDetail() {
         onOpenChange={setShowEditProject}
         project={project}
       />
+
+      <CreateTaskDialog 
+        open={showCreateTask}
+        onOpenChange={setShowCreateTask}
+        defaultProjectId={id}
+      />
+
+      <EditTaskDialog 
+        open={showEditTask}
+        onOpenChange={setShowEditTask}
+        task={selectedTask}
+        projectId={id}
+      />
+
+      <AlertDialog open={showDeleteTask} onOpenChange={setShowDeleteTask}>
+        <AlertDialogContent data-testid="dialog-delete-task">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this task? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-task">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTask}
+              className="bg-destructive text-destructive-foreground hover-elevate"
+              data-testid="button-confirm-delete-task"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showAssignStaff} onOpenChange={setShowAssignStaff}>
+        <AlertDialogContent data-testid="dialog-assign-staff">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Assign Staff to Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select a staff member to assign to this task.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="staff-select">Staff Member</Label>
+            <Select 
+              onValueChange={(value) => {
+                if (taskToAssign) {
+                  assignStaffMutation.mutate({ taskId: taskToAssign.id, staffProfileId: value });
+                }
+              }}
+            >
+              <SelectTrigger id="staff-select" data-testid="select-assign-staff">
+                <SelectValue placeholder="Select a staff member" />
+              </SelectTrigger>
+              <SelectContent>
+                {(staffList as any)?.map((staff: any) => (
+                  <SelectItem key={staff.id} value={staff.id}>
+                    {staff.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-assign-staff">Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
