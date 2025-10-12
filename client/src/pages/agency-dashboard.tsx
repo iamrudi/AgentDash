@@ -13,7 +13,7 @@ import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
 import { AIChatModal } from "@/components/ai-chat-modal";
 import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight, MessageSquare, Sparkles, MousePointer, Eye, TrendingDown } from "lucide-react";
-import { Project, Client, DailyMetric, Recommendation, ClientMessage } from "@shared/schema";
+import { Project, Client, DailyMetric, Initiative, ClientMessage } from "@shared/schema";
 import { format, subDays } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -58,7 +58,7 @@ export default function AgencyDashboard() {
     queryKey: ["/api/agency/metrics"],
   });
 
-  const { data: recommendations } = useQuery<Recommendation[]>({
+  const { data: recommendations } = useQuery<Initiative[]>({
     queryKey: ["/api/agency/recommendations"],
   });
 
@@ -559,8 +559,11 @@ export default function AgencyDashboard() {
         <AIChatModal
           isOpen={isAiModalOpen}
           onClose={() => setIsAiModalOpen(false)}
-          clientId={selectedClient.id}
-          clientName={selectedClient.companyName}
+          contextData={{
+            clientId: selectedClient.id,
+            clientName: selectedClient.companyName,
+          }}
+          initialQuestion=""
         />
       )}
     </SidebarProvider>
