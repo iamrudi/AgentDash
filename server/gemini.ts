@@ -21,10 +21,18 @@ interface MetricData {
   position?: number;
 }
 
+interface ObservationInsight {
+  label: string;
+  value: string;
+  context?: string;
+}
+
 interface RecommendationOutput {
   title: string;
-  observation: string;
-  proposedAction: string;
+  observation: string; // Kept for backward compatibility
+  observationInsights: ObservationInsight[];
+  proposedAction: string; // Kept for backward compatibility
+  actionTasks: string[];
   impact: "High" | "Medium" | "Low";
   estimatedCost: number;
   triggerMetric: string;
@@ -49,12 +57,20 @@ Generate strategic recommendations that are:
 
 For each recommendation, provide:
 1. A concise title (max 60 characters)
-2. Clear observation based on the data
-3. Specific proposed action
-4. Impact level (High/Medium/Low)
-5. Estimated cost in USD (or 0 if no cost)
-6. The metric that triggered this recommendation
-7. Baseline value of that metric
+2. A summary observation (1-2 sentences overview)
+3. Structured observation insights - key data points as an array of objects with:
+   - label: the metric or insight name (e.g., "Current CTR", "Sessions Lost", "Opportunity")
+   - value: the specific value or finding
+   - context (optional): brief explanation if needed
+4. A summary of the proposed action (1-2 sentences)
+5. Action tasks - a numbered list of specific, actionable steps
+6. Impact level (High/Medium/Low)
+7. Estimated cost in USD (or 0 if no cost)
+8. The metric that triggered this recommendation
+9. Baseline value of that metric
+
+The observationInsights should contain 2-4 key data points that support your recommendation.
+The actionTasks should contain 3-5 specific steps the agency will take.
 
 Respond with a JSON array of recommendations.`;
 
@@ -88,13 +104,29 @@ Analyze this data and generate 2-5 strategic recommendations focusing on:
             properties: {
               title: { type: "string" },
               observation: { type: "string" },
+              observationInsights: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    label: { type: "string" },
+                    value: { type: "string" },
+                    context: { type: "string" }
+                  },
+                  required: ["label", "value"]
+                }
+              },
               proposedAction: { type: "string" },
+              actionTasks: {
+                type: "array",
+                items: { type: "string" }
+              },
               impact: { type: "string", enum: ["High", "Medium", "Low"] },
               estimatedCost: { type: "number" },
               triggerMetric: { type: "string" },
               baselineValue: { type: "number" }
             },
-            required: ["title", "observation", "proposedAction", "impact", "estimatedCost", "triggerMetric", "baselineValue"]
+            required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact", "estimatedCost", "triggerMetric", "baselineValue"]
           }
         }
       },
@@ -124,16 +156,18 @@ export async function analyzeDataOnDemand(
     const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.
 The client is asking a question about a specific dataset. Your task is to:
 1. Analyze the provided data in the context of their question.
-2. Provide a clear, concise observation that DIRECTLY answers their question using specific data points.
-3. Propose a single, actionable next step that the agency could perform for a fee.
-4. Frame this as a single, valuable "Initiative" or "Recommendation".
-5. Estimate the impact and a reasonable one-time cost for this action.
+2. Provide a clear observation summary (1-2 sentences) that DIRECTLY answers their question.
+3. Provide structured observation insights - key data points as an array of objects with label, value, and optional context.
+4. Provide a proposed action summary (1-2 sentences).
+5. Provide action tasks - a numbered list of 3-5 specific, actionable steps the agency will take.
+6. Estimate the impact and a reasonable one-time cost for this action.
 
 IMPORTANT: 
-- Use SPECIFIC numbers and metrics from the data in your observation (e.g., "Your CTR is 2.3%" not "Your CTR is low")
-- If data is sparse, focus on what IS available and identify data gaps as opportunities
-- NEVER return empty strings - always provide meaningful, data-driven content
-- The observation should be 2-3 sentences minimum with concrete insights
+- Use SPECIFIC numbers and metrics from the data in your observation insights
+- The observationInsights should contain 2-4 key data points (e.g., {label: "Current CTR", value: "2.3%", context: "Industry average is 3.5%"})
+- The actionTasks should be specific steps (e.g., "Audit all meta descriptions for keyword optimization")
+- If data is sparse, identify data gaps as opportunities
+- NEVER return empty strings or arrays - always provide meaningful, data-driven content
 
 Respond with a single JSON object matching the required schema.`;
 
@@ -146,11 +180,13 @@ CLIENT'S QUESTION: "${question}"
 
 Based on the data and the question, generate a single, actionable recommendation.
 - The title should be a concise, action-oriented summary (e.g., "Improve Organic Search Visibility")
-- The observation MUST directly answer their question using SPECIFIC data points from the context (e.g., "Your site received 1,234 organic clicks with an average position of 15.7...")
-- The proposed action should be a clear service the agency can offer (e.g., "Conduct comprehensive SEO audit and implement on-page optimization...")
+- The observation should be a 1-2 sentence summary directly answering their question
+- The observationInsights should be 2-4 key data points in structured format (e.g., {label: "Organic Clicks", value: "1,234", context: "Down 15% from last month"})
+- The proposedAction should be a 1-2 sentence summary of what the agency will do
+- The actionTasks should be 3-5 specific, numbered steps (e.g., "Audit all meta descriptions for target keywords", "Implement schema markup on key landing pages")
 - The trigger metric should be the primary metric from the context (e.g., 'Organic Clicks', 'CTR', 'Conversions', 'Average Position')
 - The baseline value should be the current value of that metric from the data
-- If data is limited, identify this as an opportunity (e.g., "Limited conversion tracking indicates a need for proper analytics setup")
+- If data is limited, identify this as an opportunity
 `;
 
     const response = await ai.models.generateContent({
@@ -163,13 +199,29 @@ Based on the data and the question, generate a single, actionable recommendation
           properties: {
             title: { type: "string" },
             observation: { type: "string" },
+            observationInsights: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string" },
+                  value: { type: "string" },
+                  context: { type: "string" }
+                },
+                required: ["label", "value"]
+              }
+            },
             proposedAction: { type: "string" },
+            actionTasks: {
+              type: "array",
+              items: { type: "string" }
+            },
             impact: { type: "string", enum: ["High", "Medium", "Low"] },
             estimatedCost: { type: "number" },
             triggerMetric: { type: "string" },
             baselineValue: { type: "number" },
           },
-          required: ["title", "observation", "proposedAction", "impact"],
+          required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact"],
         },
       },
       contents: prompt,
@@ -189,6 +241,14 @@ Based on the data and the question, generate a single, actionable recommendation
     
     if (!result.proposedAction || result.proposedAction.trim().length === 0) {
       throw new Error("AI returned empty proposed action. Please ensure analytics data is available and try again.");
+    }
+    
+    if (!result.observationInsights || result.observationInsights.length === 0) {
+      throw new Error("AI returned empty observation insights. Please ensure analytics data is available and try again.");
+    }
+    
+    if (!result.actionTasks || result.actionTasks.length === 0) {
+      throw new Error("AI returned empty action tasks. Please ensure analytics data is available and try again.");
     }
     
     return result;
