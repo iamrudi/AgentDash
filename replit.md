@@ -14,11 +14,13 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Routing**: Wouter
 - **State Management**: TanStack Query
 - **Styling**: Tailwind CSS with Shadcn/UI
-- **Theming**: Dark-first design with light mode support, automatic time-based system theme (6 AM-6 PM = light, otherwise dark), theme switcher dropdown with Light/Dark/System options
+- **Theming**: Dark-first design with light mode support, automatic time-based system theme (6 AM-6 PM = light, otherwise dark), theme switcher in user profile dropdown with Light/Dark/System options
 - **Responsiveness**: Mobile-first design
 - **Typography**: Geist Sans for UI text, Geist Mono for code
 - **Primary Color**: Vibrant Green (HSL 150 76% 42%)
 - **Color Palette**: Modern dark theme with deep blue-black background (HSL 224 71% 4%), subtle green accents, card glow effects on hover
+- **Navigation Layout**: Collapsible sidebar with icon-only mode (Cmd/Ctrl + B shortcut), "mmagency" branding with portal-specific badge below (Client Portal/Agency Portal)
+- **User Profile**: Header-based profile dropdown with avatar (user initials), displays name/email, profile link, theme selector submenu, and logout option
 
 ### Technical Implementations
 - **Authentication**: JWT tokens, bcrypt hashing, no role self-selection on signup.
