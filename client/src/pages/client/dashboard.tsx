@@ -270,7 +270,7 @@ export default function Dashboard() {
         <CardContent>
           {recentTasks.length > 0 ? (
             <div className="space-y-3">
-              {recentTasks.slice(0, 3).map((task) => (
+              {recentTasks.map((task) => (
                 <div
                   key={task.id}
                   className="p-3 rounded-lg border hover-elevate"
@@ -304,7 +304,7 @@ export default function Dashboard() {
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">
-                        Updated {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}
+                        Created {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
                       </p>
                     </div>
                     {task.status === "Completed" && (

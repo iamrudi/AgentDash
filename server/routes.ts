@@ -158,6 +158,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get recent tasks for client dashboard "What's Happening Now" widget
+  app.get("/api/client/tasks/recent", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.json([]);
+      }
+
+      // Get all projects for this client
+      const projects = await storage.getProjectsByClientId(client.id);
+      
+      if (projects.length === 0) {
+        return res.json([]);
+      }
+
+      // Get all tasks for these projects
+      const allTasks = await Promise.all(
+        projects.map(async (project) => {
+          const projectWithTasks = await storage.getProjectWithTasks(project.id);
+          return (projectWithTasks?.tasks || []).map(task => ({
+            ...task,
+            project: {
+              id: project.id,
+              name: project.name
+            }
+          }));
+        })
+      );
+
+      // Flatten and sort by createdAt
+      const tasks = allTasks.flat().sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      // Return most recent 5 tasks
+      res.json(tasks.slice(0, 5));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/client/invoices", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
@@ -1770,6 +1813,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const end = endDate as string || new Date().toISOString().split('T')[0];
       const start = startDate as string || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+      // Calculate comparison period (previous period of same length)
+      const currentPeriodStart = new Date(start);
+      const currentPeriodEnd = new Date(end);
+      const periodLength = currentPeriodEnd.getTime() - currentPeriodStart.getTime();
+      const comparisonPeriodEnd = new Date(currentPeriodStart.getTime() - 24 * 60 * 60 * 1000); // Day before current period
+      const comparisonPeriodStart = new Date(comparisonPeriodEnd.getTime() - periodLength);
+      const comparisonStart = comparisonPeriodStart.toISOString().split('T')[0];
+      const comparisonEnd = comparisonPeriodEnd.toISOString().split('T')[0];
+
       // Initialize metrics
       let totalConversions = 0;
       let totalSpend = 0;
@@ -1885,14 +1937,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate CPA (Cost Per Acquisition)
       const cpa = totalConversions > 0 ? totalSpend / totalConversions : 0;
 
+      // Now fetch comparison period data
+      let comparisonConversions = 0;
+      let comparisonSpend = 0;
+      let comparisonOrganicClicks = 0;
+      let usedGA4ConversionsComparison = false;
+
+      // Try to get comparison conversions from GA4
+      if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken && ga4Integration.ga4LeadEventName) {
+        try {
+          let integration = ga4Integration;
+          if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+            if (integration.refreshToken) {
+              const newTokens = await refreshAccessToken(integration.refreshToken);
+              integration = await storage.updateIntegration(integration.id, {
+                accessToken: newTokens.accessToken,
+                expiresAt: newTokens.expiresAt,
+              });
+            }
+          }
+
+          if (integration.accessToken) {
+            const keyEventsData = await fetchGA4KeyEvents(
+              integration.accessToken,
+              integration.ga4PropertyId!,
+              integration.ga4LeadEventName!,
+              comparisonStart,
+              comparisonEnd
+            );
+            comparisonConversions = keyEventsData.totalEventCount || 0;
+            usedGA4ConversionsComparison = true;
+          }
+        } catch (error) {
+          console.error("Error fetching comparison GA4 data:", error);
+        }
+      }
+
+      // Fallback to dailyMetrics for comparison period
+      if (!usedGA4ConversionsComparison && dailyMetrics && dailyMetrics.length > 0) {
+        const comparisonStartTimestamp = new Date(comparisonStart).getTime();
+        const comparisonEndTimestamp = new Date(comparisonEnd).getTime();
+        const filteredMetrics = dailyMetrics.filter((metric: any) => {
+          const metricTimestamp = new Date(metric.date).getTime();
+          return metricTimestamp >= comparisonStartTimestamp && metricTimestamp <= comparisonEndTimestamp;
+        });
+        comparisonConversions = filteredMetrics.reduce((sum: number, metric: any) => sum + (metric.conversions || 0), 0);
+      }
+
+      // Get comparison spend from dailyMetrics
+      if (dailyMetrics && dailyMetrics.length > 0) {
+        const comparisonStartTimestamp = new Date(comparisonStart).getTime();
+        const comparisonEndTimestamp = new Date(comparisonEnd).getTime();
+        const filteredMetrics = dailyMetrics.filter((metric: any) => {
+          const metricTimestamp = new Date(metric.date).getTime();
+          return metricTimestamp >= comparisonStartTimestamp && metricTimestamp <= comparisonEndTimestamp;
+        });
+        comparisonSpend = filteredMetrics.reduce((sum: number, metric: any) => sum + parseFloat(metric.spend || '0'), 0);
+      }
+
+      // Get comparison organic clicks from GSC
+      if (gscIntegration && gscIntegration.gscSiteUrl && gscIntegration.accessToken) {
+        try {
+          let integration = gscIntegration;
+          if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+            if (integration.refreshToken) {
+              const newTokens = await refreshAccessToken(integration.refreshToken);
+              integration = await storage.updateIntegration(integration.id, {
+                accessToken: newTokens.accessToken,
+                expiresAt: newTokens.expiresAt,
+              });
+            }
+          }
+
+          if (integration.accessToken) {
+            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, comparisonStart, comparisonEnd);
+            comparisonOrganicClicks = gscData.rows?.reduce((sum: number, row: any) => sum + (row.clicks || 0), 0) || 0;
+          }
+        } catch (error) {
+          console.error("Error fetching comparison GSC data:", error);
+        }
+      }
+
+      // Calculate comparison period metrics
+      const comparisonPipelineValue = leadValue > 0
+        ? comparisonConversions * leadValue
+        : comparisonConversions * parseFloat(client.leadToOpportunityRate || '0') * parseFloat(client.opportunityToCloseRate || '0') * parseFloat(client.averageDealSize || '0');
+      const comparisonCPA = comparisonConversions > 0 ? comparisonSpend / comparisonConversions : 0;
+
       res.json({
         conversions: totalConversions,
         estimatedPipelineValue: Math.round(estimatedPipelineValue),
-        cpa: Math.round(cpa * 100) / 100, // Round to 2 decimal places
+        cpa: Math.round(cpa * 100) / 100,
         organicClicks: totalOrganicClicks,
         spend: totalSpend,
         leadValue: leadValue > 0 ? leadValue : null,
-        // Include the rates for transparency (deprecated)
+        comparisonPeriodData: {
+          conversions: comparisonConversions,
+          estimatedPipelineValue: Math.round(comparisonPipelineValue),
+          cpa: Math.round(comparisonCPA * 100) / 100,
+          organicClicks: comparisonOrganicClicks,
+        },
         pipelineCalculation: {
           leadToOpportunityRate: parseFloat(client.leadToOpportunityRate || '0'),
           opportunityToCloseRate: parseFloat(client.opportunityToCloseRate || '0'),
