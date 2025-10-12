@@ -175,20 +175,58 @@ export default function Recommendations() {
                   </div>
                 )}
                 
-                {/* Enhanced Observation with Sales Psychology */}
+                {/* Enhanced Observation with Structured Data */}
                 <div>
                   <h4 className="font-semibold mb-3">The Observation</h4>
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground" data-testid={`recommendation-observation-${recommendation.id}`}>
                       {recommendation.observation}
                     </p>
+                    
+                    {/* Structured Observation Insights */}
+                    {recommendation.observationInsights && Array.isArray(recommendation.observationInsights) && recommendation.observationInsights.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        {(recommendation.observationInsights as Array<{label: string; value: string; context?: string}>).map((insight, idx) => (
+                          <div 
+                            key={idx} 
+                            className="bg-muted/50 rounded-lg p-4 border border-border"
+                            data-testid={`observation-insight-${recommendation.id}-${idx}`}
+                          >
+                            <p className="text-xs font-medium text-muted-foreground mb-1">{insight.label}</p>
+                            <p className="text-lg font-bold font-mono">{insight.value}</p>
+                            {insight.context && (
+                              <p className="text-xs text-muted-foreground mt-1">{insight.context}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2">Our Proposed Action</h4>
-                  <p className="text-sm text-muted-foreground" data-testid={`recommendation-action-${recommendation.id}`}>
+                  <p className="text-sm text-muted-foreground mb-3" data-testid={`recommendation-action-${recommendation.id}`}>
                     {recommendation.proposedAction}
                   </p>
+                  
+                  {/* Action Tasks List */}
+                  {recommendation.actionTasks && Array.isArray(recommendation.actionTasks) && recommendation.actionTasks.length > 0 && (
+                    <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                      <p className="text-xs font-semibold text-muted-foreground mb-3">Implementation Steps</p>
+                      <ol className="space-y-2">
+                        {(recommendation.actionTasks as string[]).map((task, idx) => (
+                          <li 
+                            key={idx} 
+                            className="text-sm flex gap-3"
+                            data-testid={`action-task-${recommendation.id}-${idx}`}
+                          >
+                            <span className="font-semibold text-primary min-w-[1.5rem]">{idx + 1}.</span>
+                            <span className="text-muted-foreground">{task}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Value Proposition */}
