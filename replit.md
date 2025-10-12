@@ -4,6 +4,7 @@
 This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, ultimately fostering better client relationships and operational effectiveness.
 
 ## Recent Updates
+- **Client Portal Notification Center (Oct 12, 2025)**: Added full notification system to Client Portal matching Agency Portal implementation. Clients now see bell icon in header with unread count badge, can view notifications in slide-out sheet with Inbox/Archived tabs, mark as read, archive, and navigate to related content. Automatically refreshes every 10 seconds. Notifications include new initiatives, initiative updates, and messages from agency.
 - **Manual Client Message Initiation (Oct 12, 2025)**: Added "New Message" button to Client Messages page allowing agency admins to manually start conversations with clients. Dialog includes client selector dropdown and message textarea. Messages sent with agency sender role, properly invalidating cache and showing toast confirmations.
 - **Agency Sidebar Accordion Navigation (Oct 12, 2025)**: Refactored Agency Portal sidebar to use collapsible accordion menus for better organization. Navigation is now grouped into three sections: Core (Dashboard, Client Messages, Tasks & Projects), Strategy (AI Recommendations, SEO Audit), and Administration (Clients, Invoices, Trash, Google Integrations, Staff, User Management). All sections expanded by default with Radix Accordion, preserving icon-only collapse mode and notification badges.
 - **SEO Audit to Initiative Conversion (Oct 12, 2025)**: Added ability to convert SEO audit recommendations directly into client initiatives. After running a Lighthouse audit, admins can assign any recommendation to a client with one click. System creates a draft initiative with client-friendly language that admins can review and send for approval. Implements complete workflow: SEO Audit → Assign to Client → Draft Initiative → Send to Client → Client Approve/Reject/Discuss.
@@ -35,7 +36,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Authentication**: JWT tokens, bcrypt hashing, no role self-selection on signup.
 - **Authorization**: Role-based access control, tenant isolation.
 - **Forms**: React Hook Form with Zod validation.
-- **Notifications**: Toast notifications, real-time notification badges.
+- **Notifications**: Unified notification center across Client and Agency portals. Linear-style interface with bell icon, unread count badge, slide-out sheet with Inbox/Archived tabs. Supports mark as read, mark all as read, and archive actions. Auto-refreshes every 10 seconds. Backend uses notifications table with user-specific filtering, notification types include client_message, initiative_response, and new_initiative. Toast notifications for immediate feedback.
 - **Data Fetching**: Real-time with TanStack Query.
 - **Security**: AES-256-GCM encryption for sensitive OAuth tokens, HMAC-SHA256 for CSRF protection.
 - **Multi-Event GA4 Tracking**: Supports comma-separated GA4 event names for conversion tracking with OR filter logic.
