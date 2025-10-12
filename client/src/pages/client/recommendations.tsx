@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Lightbulb, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle } from "lucide-react";
+import { Lightbulb, ThumbsUp, ThumbsDown, MessageSquare, CheckCircle, TrendingUp, TrendingDown, MousePointerClick, BarChart } from "lucide-react";
 import { InitiativeWithClient } from "@shared/schema";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -18,6 +18,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+// Helper function to get an icon for a given metric
+const getMetricIcon = (metric: string | null) => {
+  if (!metric) return <BarChart className="h-6 w-6 text-primary" />;
+  const lowerMetric = metric.toLowerCase();
+  if (lowerMetric.includes('ctr') || lowerMetric.includes('rate')) return <TrendingUp className="h-6 w-6 text-primary" />;
+  if (lowerMetric.includes('clicks')) return <MousePointerClick className="h-6 w-6 text-primary" />;
+  if (lowerMetric.includes('position')) return <TrendingDown className="h-6 w-6 text-destructive" />;
+  return <BarChart className="h-6 w-6 text-primary" />;
+};
 
 export default function Recommendations() {
   const { data: initiatives = [], isLoading } = useQuery<InitiativeWithClient[]>({
@@ -109,24 +119,22 @@ export default function Recommendations() {
       <div className="space-y-4">
         {isLoading ? (
           <Card>
-            <CardContent className="py-8">
-              <div className="text-center text-muted-foreground">Loading initiatives...</div>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Loading initiatives...
             </CardContent>
           </Card>
         ) : initiatives.length === 0 ? (
           <Card>
-            <CardContent className="py-8">
-              <div className="text-center">
-                <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="text-muted-foreground">No initiatives available</p>
-              </div>
+            <CardContent className="py-12 text-center">
+              <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No new recommendations available at this time.</p>
             </CardContent>
           </Card>
         ) : (
           initiatives
             .filter(rec => rec.sentToClient === "true")
             .map((recommendation) => (
-            <Card key={recommendation.id} data-testid={`recommendation-card-${recommendation.id}`} className="hover-elevate">
+            <Card key={recommendation.id} data-testid={`recommendation-card-${recommendation.id}`} className="overflow-hidden hover-elevate">
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
@@ -137,7 +145,7 @@ export default function Recommendations() {
                       </span>
                     </CardTitle>
                     <CardDescription className="mt-1">
-                      {format(new Date(recommendation.createdAt), "MMM d, yyyy")}
+                      Proposed on {format(new Date(recommendation.createdAt), "MMM d, yyyy")}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -150,23 +158,42 @@ export default function Recommendations() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
+                
+                {/* Data-Driven Hook */}
+                {recommendation.triggerMetric && recommendation.baselineValue && (
+                  <div className="p-4 bg-muted rounded-lg flex items-center gap-4" data-testid={`data-hook-${recommendation.id}`}>
+                    {getMetricIcon(recommendation.triggerMetric)}
+                    <div>
+                      <p className="text-2xl font-bold font-mono">
+                        {recommendation.baselineValue}
+                        {(recommendation.triggerMetric.toLowerCase().includes('rate') || 
+                          recommendation.triggerMetric.toLowerCase().includes('ctr')) && '%'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{recommendation.triggerMetric}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Narrative Flow */}
                 <div>
-                  <h4 className="text-sm font-semibold mb-1">Observation</h4>
+                  <h4 className="font-semibold mb-2">The Observation</h4>
                   <p className="text-sm text-muted-foreground" data-testid={`recommendation-observation-${recommendation.id}`}>
                     {recommendation.observation}
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold mb-1">Proposed Action</h4>
+                  <h4 className="font-semibold mb-2">Our Proposed Action</h4>
                   <p className="text-sm text-muted-foreground" data-testid={`recommendation-action-${recommendation.id}`}>
                     {recommendation.proposedAction}
                   </p>
                 </div>
-                <div className="space-y-3">
+                
+                {/* Value Proposition */}
+                <div className="pt-4 border-t space-y-3">
                   <div className="flex items-center gap-4 flex-wrap">
                     {recommendation.impact && (
-                      <Badge variant="secondary" data-testid={`recommendation-impact-${recommendation.id}`}>
+                      <Badge variant="outline" data-testid={`recommendation-impact-${recommendation.id}`}>
                         Impact: {recommendation.impact}
                       </Badge>
                     )}
@@ -179,7 +206,7 @@ export default function Recommendations() {
                         <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold">Estimated Time</span>
-                            <span className="text-sm font-mono">{recommendation.estimatedHours}h</span>
+                            <span className="text-sm font-mono">{recommendation.estimatedHours} Retainer Hours</span>
                           </div>
                           <p className="text-xs text-muted-foreground" data-testid={`recommendation-billing-info-${recommendation.id}`}>
                             Upon approval, {recommendation.estimatedHours} hours will be deducted from your monthly retainer.
