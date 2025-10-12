@@ -33,13 +33,17 @@ export class SeoAuditService {
       });
 
       const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle0' });
+      await page.goto(url, { 
+        waitUntil: 'networkidle0',
+        timeout: 60000 // Increase timeout to 60 seconds
+      });
 
       const port = new URL(browser.wsEndpoint()).port;
       const result = await lighthouse(url, {
         port: parseInt(port, 10),
         output: 'json',
         onlyCategories: ['seo', 'performance', 'accessibility', 'best-practices'],
+        maxWaitForLoad: 60000, // Lighthouse timeout to 60 seconds
       });
 
       return result?.lhr;

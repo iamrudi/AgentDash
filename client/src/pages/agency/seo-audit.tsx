@@ -1,13 +1,18 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { AgencyLayout } from "@/components/agency-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { apiRequest } from "@/lib/queryClient";
-import { Search, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Search, Loader2, Sparkles, AlertCircle, PlusCircle, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { Client } from "@shared/schema";
 
 interface AuditResult {
   lighthouseReport: any;
@@ -20,12 +25,46 @@ interface AuditResult {
 export default function SeoAuditPage() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<AuditResult | null>(null);
+  const [selectedRecommendation, setSelectedRecommendation] = useState<string | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [createdInitiatives, setCreatedInitiatives] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
+
+  const { data: clients } = useQuery<Client[]>({
+    queryKey: ['/api/agency/clients'],
+  });
 
   const auditMutation = useMutation({
     mutationFn: (targetUrl: string) =>
       apiRequest("POST", "/api/seo/audit", { url: targetUrl }).then(res => res.json()),
     onSuccess: (data: AuditResult) => {
       setResult(data);
+      setCreatedInitiatives(new Set());
+    },
+  });
+
+  const createInitiativeMutation = useMutation({
+    mutationFn: (data: { clientId: string; recommendation: string; auditUrl: string }) =>
+      apiRequest("POST", "/api/seo/audit/create-initiative", data).then(res => res.json()),
+    onSuccess: (_, variables) => {
+      const index = result?.aiSummary.recommendations.findIndex(r => r === variables.recommendation);
+      if (index !== undefined && index !== -1) {
+        setCreatedInitiatives(prev => new Set(prev).add(index));
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/initiatives'] });
+      setSelectedRecommendation(null);
+      setSelectedClientId("");
+      toast({
+        title: "Initiative Created",
+        description: "SEO recommendation has been converted to a draft initiative.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Create Initiative",
+        description: error.message || "An error occurred while creating the initiative.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -33,6 +72,15 @@ export default function SeoAuditPage() {
     if (!url.trim()) return;
     setResult(null);
     auditMutation.mutate(url);
+  };
+
+  const handleCreateInitiative = () => {
+    if (!selectedClientId || !selectedRecommendation) return;
+    createInitiativeMutation.mutate({
+      clientId: selectedClientId,
+      recommendation: selectedRecommendation,
+      auditUrl: url,
+    });
   };
 
   const getScoreColor = (score: number) => {
@@ -101,11 +149,31 @@ export default function SeoAuditPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold mb-2">Top Recommendations</h3>
-                  <ul className="list-disc list-inside space-y-2">
+                  <div className="space-y-3">
                     {result.aiSummary.recommendations.map((rec, index) => (
-                      <li key={index} className="text-sm" data-testid={`text-recommendation-${index}`}>{rec}</li>
+                      <div key={index} className="flex items-start gap-3 p-3 rounded-md border bg-card">
+                        <div className="flex-1">
+                          <p className="text-sm" data-testid={`text-recommendation-${index}`}>{rec}</p>
+                        </div>
+                        {createdInitiatives.has(index) ? (
+                          <Button size="sm" variant="ghost" disabled className="shrink-0">
+                            <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                            Created
+                          </Button>
+                        ) : (
+                          <Button 
+                            size="sm" 
+                            onClick={() => setSelectedRecommendation(rec)}
+                            data-testid={`button-assign-${index}`}
+                            className="shrink-0"
+                          >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Assign to Client
+                          </Button>
+                        )}
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -131,6 +199,69 @@ export default function SeoAuditPage() {
             </Card>
           </div>
         )}
+
+        <Dialog open={!!selectedRecommendation} onOpenChange={(open) => !open && setSelectedRecommendation(null)}>
+          <DialogContent data-testid="dialog-create-initiative">
+            <DialogHeader>
+              <DialogTitle>Assign SEO Recommendation to Client</DialogTitle>
+              <DialogDescription>
+                This will create a draft initiative that you can review and send to the client for approval.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Recommendation</Label>
+                <p className="text-sm text-muted-foreground p-3 rounded-md bg-muted">
+                  {selectedRecommendation}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="client-select">Select Client</Label>
+                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <SelectTrigger id="client-select" data-testid="select-client">
+                    <SelectValue placeholder="Choose a client..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.companyName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setSelectedRecommendation(null)}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateInitiative}
+                disabled={!selectedClientId || createInitiativeMutation.isPending}
+                data-testid="button-create-initiative"
+              >
+                {createInitiativeMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Create Initiative
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AgencyLayout>
   );

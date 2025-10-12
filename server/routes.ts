@@ -2306,6 +2306,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create initiative from SEO recommendation (Admin only)
+  app.post("/api/seo/audit/create-initiative", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      // Validate request body with Zod
+      const schema = z.object({
+        clientId: z.string().uuid(),
+        recommendation: z.string().min(1),
+        auditUrl: z.string().url(),
+      });
+      
+      const validation = schema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request data", errors: validation.error.errors });
+      }
+
+      const { clientId, recommendation, auditUrl } = validation.data;
+
+      // Get client to include company name in observation
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Create initiative with client-friendly language including company name
+      const initiative = await storage.createInitiative({
+        title: `SEO Improvement: ${recommendation.substring(0, 80)}${recommendation.length > 80 ? '...' : ''}`,
+        observation: `Based on our SEO audit of ${auditUrl}, we identified an opportunity to improve ${client.companyName}'s website search engine performance and user experience.`,
+        proposedAction: recommendation,
+        status: "Draft",
+        clientId,
+        impact: "Medium",
+      });
+
+      res.json(initiative);
+    } catch (error: any) {
+      console.error("Create initiative from SEO error:", error);
+      res.status(500).json({ message: error.message || "Failed to create initiative" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
