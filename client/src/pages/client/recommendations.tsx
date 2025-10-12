@@ -163,20 +163,40 @@ export default function Recommendations() {
                     {recommendation.proposedAction}
                   </p>
                 </div>
-                <div className="flex items-center gap-4">
-                  {recommendation.billingType === "hours" && recommendation.estimatedHours ? (
-                    <div className="text-sm">
-                      <span className="font-semibold">Hours:</span> {recommendation.estimatedHours}h
-                    </div>
-                  ) : recommendation.cost ? (
-                    <div className="text-sm">
-                      <span className="font-semibold">Estimated Cost:</span> ${recommendation.cost}
-                    </div>
-                  ) : null}
-                  {recommendation.impact && (
-                    <Badge variant="secondary" data-testid={`recommendation-impact-${recommendation.id}`}>
-                      Impact: {recommendation.impact}
-                    </Badge>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    {recommendation.impact && (
+                      <Badge variant="secondary" data-testid={`recommendation-impact-${recommendation.id}`}>
+                        Impact: {recommendation.impact}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {/* Only show pricing for initiatives awaiting client approval */}
+                  {recommendation.status === "Awaiting Approval" && (
+                    <>
+                      {recommendation.billingType === "hours" && recommendation.estimatedHours ? (
+                        <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold">Estimated Time</span>
+                            <span className="text-sm font-mono">{recommendation.estimatedHours}h</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground" data-testid={`recommendation-billing-info-${recommendation.id}`}>
+                            Upon approval, {recommendation.estimatedHours} hours will be deducted from your monthly retainer.
+                          </p>
+                        </div>
+                      ) : recommendation.cost ? (
+                        <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold">Estimated Cost</span>
+                            <span className="text-sm font-mono">${recommendation.cost}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground" data-testid={`recommendation-billing-info-${recommendation.id}`}>
+                            Upon approval, this will generate an invoice for ${recommendation.cost}.
+                          </p>
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
 
