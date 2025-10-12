@@ -19,11 +19,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function AgencyMessagesPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [showNewMessage, setShowNewMessage] = useState(false);
+  const [newMessageClientId, setNewMessageClientId] = useState("");
+  const [newMessageText, setNewMessageText] = useState("");
   const { toast } = useToast();
 
   const { data: messages } = useQuery<ClientMessage[]>({
@@ -62,6 +73,37 @@ export default function AgencyMessagesPage() {
     });
   };
 
+  const newMessageMutation = useMutation({
+    mutationFn: async (data: { clientId: string; message: string }) => {
+      return await apiRequest("POST", `/api/agency/messages/${data.clientId}`, { message: data.message });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/messages"] });
+      setNewMessageText("");
+      setNewMessageClientId("");
+      setShowNewMessage(false);
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent to the client.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendNewMessage = () => {
+    if (!newMessageText.trim() || !newMessageClientId) return;
+    newMessageMutation.mutate({
+      clientId: newMessageClientId,
+      message: newMessageText,
+    });
+  };
+
   const unreadCount = filteredMessages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
 
   return (
@@ -83,6 +125,71 @@ export default function AgencyMessagesPage() {
             <Badge variant="secondary" className="text-lg px-4 py-2">
               {unreadCount} Unread
             </Badge>
+            <Dialog open={showNewMessage} onOpenChange={setShowNewMessage}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-new-message">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Message
+                </Button>
+              </DialogTrigger>
+              <DialogContent data-testid="dialog-new-message">
+                <DialogHeader>
+                  <DialogTitle>Send New Message</DialogTitle>
+                  <DialogDescription>
+                    Start a new conversation with a client
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="client-select">Select Client</Label>
+                    <Select value={newMessageClientId} onValueChange={setNewMessageClientId}>
+                      <SelectTrigger id="client-select" data-testid="select-new-message-client">
+                        <SelectValue placeholder="Choose a client..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients?.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.companyName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="message-text">Message</Label>
+                    <Textarea
+                      id="message-text"
+                      value={newMessageText}
+                      onChange={(e) => setNewMessageText(e.target.value)}
+                      placeholder="Type your message here..."
+                      rows={6}
+                      data-testid="textarea-new-message"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowNewMessage(false);
+                        setNewMessageClientId("");
+                        setNewMessageText("");
+                      }}
+                      data-testid="button-cancel-new-message"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSendNewMessage}
+                      disabled={!newMessageText.trim() || !newMessageClientId || newMessageMutation.isPending}
+                      data-testid="button-send-new-message"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      {newMessageMutation.isPending ? "Sending..." : "Send Message"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
