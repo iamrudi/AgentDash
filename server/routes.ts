@@ -868,6 +868,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Soft delete initiative (move to trash)
+  app.delete("/api/initiatives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const initiative = await storage.softDeleteInitiative(id);
+      res.json({ message: "Initiative moved to trash", initiative });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Restore initiative from trash
+  app.post("/api/initiatives/:id/restore", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const initiative = await storage.restoreInitiative(id);
+      res.json({ message: "Initiative restored", initiative });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get deleted initiatives (trash)
+  app.get("/api/initiatives/trash", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const deletedInitiatives = await storage.getDeletedInitiatives();
+      res.json(deletedInitiatives);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Permanently delete initiative
+  app.delete("/api/initiatives/:id/permanent", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      await storage.permanentlyDeleteInitiative(id);
+      res.json({ message: "Initiative permanently deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const metric = await storage.createMetric(req.body);
