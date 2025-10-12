@@ -1,53 +1,162 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FolderKanban, Calendar, AlertCircle } from "lucide-react";
-import { ProjectWithClient } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
+import { FolderKanban, Calendar, AlertCircle, CheckCircle2, Clock, Circle } from "lucide-react";
+import type { Project, Task } from "@shared/schema";
 import { format } from "date-fns";
 
+interface ProjectWithTasks extends Project {
+  tasks: Task[];
+  taskStats: {
+    total: number;
+    completed: number;
+    inProgress: number;
+    pending: number;
+  };
+}
+
 export default function Projects() {
-  const { data: projects = [], isLoading } = useQuery<ProjectWithClient[]>({
-    queryKey: ["/api/client/projects"],
+  const { data: projects = [], isLoading } = useQuery<ProjectWithTasks[]>({
+    queryKey: ["/api/client/projects-with-tasks"],
   });
 
   const activeProjects = projects.filter(p => p.status !== "Completed");
   const completedProjects = projects.filter(p => p.status === "Completed");
 
-  const ProjectCard = ({ project }: { project: ProjectWithClient }) => (
-    <Card data-testid={`project-card-${project.id}`} className="hover-elevate">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <CardTitle className="text-lg" data-testid={`project-name-${project.id}`}>
-              {project.name}
-            </CardTitle>
-            {project.description && (
-              <CardDescription className="mt-1" data-testid={`project-description-${project.id}`}>
-                {project.description}
-              </CardDescription>
-            )}
-          </div>
-          <Badge 
-            variant={project.status === "Active" ? "default" : project.status === "Completed" ? "secondary" : "outline"}
-            data-testid={`project-status-${project.id}`}
-          >
-            {project.status}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
-            <span data-testid={`project-date-${project.id}`}>
-              {format(new Date(project.createdAt), "MMM d, yyyy")}
-            </span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Completed":
+        return <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />;
+      case "In Progress":
+        return <Clock className="h-4 w-4 text-blue-600 dark:text-blue-500" />;
+      case "Pending":
+        return <Circle className="h-4 w-4 text-muted-foreground" />;
+      default:
+        return <Circle className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "outline" => {
+    switch (status) {
+      case "Completed":
+        return "default";
+      case "In Progress":
+        return "secondary";
+      default:
+        return "outline";
+    }
+  };
+
+  const ProjectCard = ({ project }: { project: ProjectWithTasks }) => {
+    const progressPercentage = project.taskStats.total > 0
+      ? Math.round((project.taskStats.completed / project.taskStats.total) * 100)
+      : 0;
+
+    return (
+      <Card data-testid={`project-card-${project.id}`}>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="project-details" className="border-0">
+            <AccordionTrigger className="hover:no-underline px-6 pt-6 pb-3" data-testid={`accordion-trigger-${project.id}`}>
+              <div className="flex-1 text-left">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg" data-testid={`project-name-${project.id}`}>
+                      {project.name}
+                    </CardTitle>
+                    {project.description && (
+                      <CardDescription className="mt-1" data-testid={`project-description-${project.id}`}>
+                        {project.description}
+                      </CardDescription>
+                    )}
+                  </div>
+                  <Badge 
+                    variant={project.status === "Active" ? "default" : project.status === "Completed" ? "secondary" : "outline"}
+                    data-testid={`project-status-${project.id}`}
+                  >
+                    {project.status}
+                  </Badge>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-medium" data-testid={`progress-percentage-${project.id}`}>
+                      {project.taskStats.completed} / {project.taskStats.total} tasks
+                    </span>
+                  </div>
+                  <Progress 
+                    value={progressPercentage} 
+                    className="h-2"
+                    data-testid={`progress-bar-${project.id}`}
+                  />
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      <span data-testid={`project-date-${project.id}`}>
+                        Started {format(new Date(project.createdAt), "MMM d, yyyy")}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </AccordionTrigger>
+            
+            <AccordionContent className="px-6 pb-6 pt-3" data-testid={`accordion-content-${project.id}`}>
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-sm mb-3">Tasks ({project.taskStats.total})</h4>
+                {project.tasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {project.tasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-start gap-3 p-3 rounded-lg border hover-elevate"
+                        data-testid={`task-item-${task.id}`}
+                      >
+                        <div className="mt-0.5">
+                          {getStatusIcon(task.status)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-medium text-sm" data-testid={`task-title-${task.id}`}>
+                              {task.description}
+                            </p>
+                            <Badge 
+                              variant={getStatusBadgeVariant(task.status)}
+                              className="text-xs shrink-0"
+                              data-testid={`task-status-${task.id}`}
+                            >
+                              {task.status}
+                            </Badge>
+                            {task.priority === "High" && (
+                              <Badge variant="destructive" className="text-xs shrink-0">
+                                High Priority
+                              </Badge>
+                            )}
+                          </div>
+                          {task.dueDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <p className="text-sm">No tasks created yet for this project</p>
+                  </div>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Card>
+    );
+  };
 
   return (
     <div className="p-6 space-y-6">

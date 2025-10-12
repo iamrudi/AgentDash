@@ -201,6 +201,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get client projects with tasks for progress tracking
+  app.get("/api/client/projects-with-tasks", requireAuth, requireRole("Client"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      const client = await storage.getClientByProfileId(profile!.id);
+      
+      if (!client) {
+        return res.json([]);
+      }
+
+      // Get all projects for this client
+      const projects = await storage.getProjectsByClientId(client.id);
+      
+      // Get tasks for each project
+      const projectsWithTasks = await Promise.all(
+        projects.map(async (project) => {
+          const projectData = await storage.getProjectWithTasks(project.id);
+          return {
+            ...project,
+            tasks: projectData?.tasks || [],
+            taskStats: {
+              total: projectData?.tasks.length || 0,
+              completed: projectData?.tasks.filter(t => t.status === "Completed").length || 0,
+              inProgress: projectData?.tasks.filter(t => t.status === "In Progress").length || 0,
+              pending: projectData?.tasks.filter(t => t.status === "Pending").length || 0,
+            }
+          };
+        })
+      );
+
+      res.json(projectsWithTasks);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/client/invoices", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
