@@ -5,7 +5,7 @@ import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from 
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
@@ -404,21 +404,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new project
   app.post("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const { name, description, status, clientId } = req.body;
+      // Validate request body with Zod schema
+      const projectData = insertProjectSchema.parse(req.body);
       
-      if (!name || !clientId) {
-        return res.status(400).json({ message: "Project name and client are required" });
-      }
-
-      const newProject = await storage.createProject({
-        name,
-        description: description || null,
-        status: status || "Active",
-        clientId,
-      });
+      const newProject = await storage.createProject(projectData);
 
       res.status(201).json(newProject);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -426,23 +421,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new task
   app.post("/api/agency/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const { description, projectId, status, dueDate, priority, initiativeId } = req.body;
+      // Validate request body with Zod schema
+      const taskData = insertTaskSchema.parse(req.body);
       
-      if (!description || !projectId) {
-        return res.status(400).json({ message: "Task description and project are required" });
-      }
-
-      const newTask = await storage.createTask({
-        description,
-        projectId,
-        status: status || "Pending",
-        dueDate: dueDate || null,
-        priority: priority || "Medium",
-        initiativeId: initiativeId || null,
-      });
+      const newTask = await storage.createTask(taskData);
 
       res.status(201).json(newTask);
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       res.status(500).json({ message: error.message });
     }
   });
