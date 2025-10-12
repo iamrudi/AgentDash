@@ -197,3 +197,53 @@ Based on the data and the question, generate a single, actionable recommendation
     throw new Error(`Failed to analyze data on demand: ${error}`);
   }
 }
+
+export async function summarizeLighthouseReport(
+  url: string,
+  lighthouseReport: any
+): Promise<{ summary: string; recommendations: string[] }> {
+  try {
+    const systemPrompt = `You are an expert SEO analyst. Your task is to summarize a Google Lighthouse report for an agency account manager. Provide a high-level overview and a prioritized list of actionable recommendations. Focus on the most critical issues found in the SEO, Performance, and Accessibility categories.`;
+
+    const prompt = `
+    Lighthouse Audit Summary for: ${url}
+
+    Here is the raw Lighthouse JSON report data:
+    ${JSON.stringify(lighthouseReport.audits, null, 2)}
+
+    Please provide:
+    1.  A "summary" (2-3 paragraphs) of the website's overall SEO health, performance, and accessibility.
+    2.  A "recommendations" array of the top 5 most impactful, actionable items the agency should focus on to improve the site's scores.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            recommendations: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+          required: ["summary", "recommendations"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (!rawJson) {
+      throw new Error("Empty response from Gemini AI");
+    }
+    return JSON.parse(rawJson);
+
+  } catch (error) {
+    console.error("Gemini AI Lighthouse summary error:", error);
+    throw new Error(`Failed to summarize Lighthouse report: ${error}`);
+  }
+}
