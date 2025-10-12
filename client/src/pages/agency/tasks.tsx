@@ -2,14 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Project, Client } from "@shared/schema";
-import { FolderKanban, Building2 } from "lucide-react";
+import { FolderKanban, Building2, Plus, ListTodo } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
+import { CreateTaskDialog } from "@/components/create-task-dialog";
 import { useState } from "react";
 
 export default function AgencyTasksPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [showCreateTask, setShowCreateTask] = useState(false);
 
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/agency/projects"],
@@ -30,18 +35,35 @@ export default function AgencyTasksPage() {
   return (
     <AgencyLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold mb-2">Tasks & Projects</h1>
             <p className="text-muted-foreground">
               Manage all client projects and task assignments
             </p>
           </div>
-          <ClientFilter
-            clients={clients}
-            selectedClientId={selectedClientId}
-            onClientChange={setSelectedClientId}
-          />
+          <div className="flex items-center gap-3">
+            <ClientFilter
+              clients={clients}
+              selectedClientId={selectedClientId}
+              onClientChange={setSelectedClientId}
+            />
+            <Button 
+              onClick={() => setShowCreateTask(true)}
+              variant="outline"
+              data-testid="button-create-task"
+            >
+              <ListTodo className="h-4 w-4 mr-2" />
+              Create Task
+            </Button>
+            <Button 
+              onClick={() => setShowCreateProject(true)}
+              data-testid="button-create-project"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="active" className="space-y-4">
@@ -131,6 +153,15 @@ export default function AgencyTasksPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <CreateProjectDialog 
+        open={showCreateProject} 
+        onOpenChange={setShowCreateProject} 
+      />
+      <CreateTaskDialog 
+        open={showCreateTask} 
+        onOpenChange={setShowCreateTask} 
+      />
     </AgencyLayout>
   );
 }
