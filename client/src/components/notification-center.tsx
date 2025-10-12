@@ -87,7 +87,7 @@ export function NotificationCenter() {
           variant="ghost"
           size="icon"
           className="relative"
-          data-testid="button-notification-center"
+          data-testid="button-notifications"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (

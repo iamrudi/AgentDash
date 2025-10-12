@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationCenter } from "@/components/notification-center";
+import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
@@ -118,7 +118,7 @@ export default function AgencyDashboard() {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
               <NotificationCenter />
-              <ThemeToggle />
+              <UserProfileDropdown />
             </div>
           </header>
           <main className="flex-1 overflow-auto p-6">
