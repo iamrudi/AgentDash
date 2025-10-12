@@ -2063,6 +2063,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notification Center Endpoints
+  // Get all notifications for current user
+  app.get("/api/notifications", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const isArchived = req.query.archived === 'true';
+      const notifications = await storage.getNotificationsByUserId(req.user!.id, isArchived);
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get unread notification count
+  app.get("/api/notifications/unread-count", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const count = await storage.getUnreadNotificationCount(req.user!.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark notification as read
+  app.post("/api/notifications/:id/mark-read", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await storage.markNotificationAsRead(req.params.id, req.user!.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Archive notification
+  app.post("/api/notifications/:id/archive", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await storage.archiveNotification(req.params.id, req.user!.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      await storage.markAllNotificationsAsRead(req.user!.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create client user (Admin only)
   app.post("/api/agency/clients/create-user", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {

@@ -197,6 +197,24 @@ export const clientMessages = pgTable("client_messages", {
   clientIdIdx: index("client_messages_client_id_idx").on(table.clientId),
 }));
 
+// NOTIFICATIONS (Centralized notification system)
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // 'message', 'initiative_response', 'system', 'task_assigned', etc.
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // Optional URL to navigate to when clicked
+  isRead: text("is_read").default("false"), // Using text for boolean compatibility
+  isArchived: text("is_archived").default("false"), // Using text for boolean compatibility
+  metadata: text("metadata"), // JSON stringified metadata for additional context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("notifications_user_id_idx").on(table.userId),
+  isReadIdx: index("notifications_is_read_idx").on(table.isRead),
+  isArchivedIdx: index("notifications_is_archived_idx").on(table.isArchived),
+}));
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -265,6 +283,11 @@ export const insertClientMessageSchema = createInsertSchema(clientMessages).omit
   createdAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Admin user creation schemas
 export const createClientUserSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -323,6 +346,9 @@ export type InsertClientObjective = z.infer<typeof insertClientObjectiveSchema>;
 
 export type ClientMessage = typeof clientMessages.$inferSelect;
 export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };

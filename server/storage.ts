@@ -25,6 +25,8 @@ import {
   type InsertClientObjective,
   type ClientMessage,
   type InsertClientMessage,
+  type Notification,
+  type InsertNotification,
   users,
   profiles,
   clients,
@@ -38,6 +40,7 @@ import {
   clientIntegrations,
   clientObjectives,
   clientMessages,
+  notifications,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -148,11 +151,19 @@ export interface IStorage {
   getAllMessages(): Promise<ClientMessage[]>;
   markMessageAsRead(id: string): Promise<void>;
   
-  // Notifications
+  // Notifications (Legacy counts for badges)
   getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }>;
   markInitiativeResponsesViewed(): Promise<void>;
   getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }>;
   getStaffNotificationCounts(staffProfileId: string): Promise<{ newTasks: number; highPriorityTasks: number }>;
+  
+  // Notification Center
+  getNotificationsByUserId(userId: string, isArchived?: boolean): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string, userId: string): Promise<void>;
+  archiveNotification(id: string, userId: string): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
 }
 
 export class DbStorage implements IStorage {
@@ -901,6 +912,58 @@ export class DbStorage implements IStorage {
       newTasks: newTasks.length,
       highPriorityTasks: highPriorityTasks.length
     };
+  }
+
+  // Notification Center Implementation
+  async getNotificationsByUserId(userId: string, isArchived: boolean = false): Promise<Notification[]> {
+    return await db.select().from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isArchived, isArchived ? "true" : "false")
+      ))
+      .orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values(notification).returning();
+    return result[0];
+  }
+
+  async markNotificationAsRead(id: string, userId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: "true" })
+      .where(and(
+        eq(notifications.id, id),
+        eq(notifications.userId, userId)
+      ));
+  }
+
+  async archiveNotification(id: string, userId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isArchived: "true" })
+      .where(and(
+        eq(notifications.id, id),
+        eq(notifications.userId, userId)
+      ));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: "true" })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, "false")
+      ));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select().from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, "false"),
+        eq(notifications.isArchived, "false")
+      ));
+    return result.length;
   }
 }
 
