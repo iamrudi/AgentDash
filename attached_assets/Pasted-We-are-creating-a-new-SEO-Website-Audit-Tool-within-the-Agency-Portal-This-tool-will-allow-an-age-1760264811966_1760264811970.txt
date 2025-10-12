@@ -1,0 +1,302 @@
+We are creating a new "SEO Website Audit Tool" within the Agency Portal. This tool will allow an agency user to enter a website URL, receive a comprehensive SEO audit powered by Google Lighthouse, and see an AI-generated summary with actionable recommendations.
+
+Please execute the following steps precisely.
+
+Step 1: Backend Implementation (The Engine)
+Install Dependencies: First, we need to add the lighthouse package to our project. Please run the following command in the shell:
+
+Bash
+
+npm install lighthouse
+Create the SEO Audit Service: Create a new file at server/services/seoAuditService.ts. This service will contain the logic for running the Lighthouse audit. Populate it with the following code:
+
+TypeScript
+
+import puppeteer from 'puppeteer';
+import lighthouse from 'lighthouse';
+import { URL } from 'url';
+
+export class SeoAuditService {
+  async runLighthouseAudit(url: string): Promise<any> {
+    let browser = null;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+
+      const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle0' });
+
+      const { lhr } = await lighthouse(url, {
+        port: (new URL(browser.wsEndpoint())).port,
+        output: 'json',
+        onlyCategories: ['seo', 'performance', 'accessibility', 'best-practices'],
+      });
+
+      return lhr;
+    } catch (error) {
+      console.error('Error running Lighthouse audit:', error);
+      throw new Error('Failed to run Lighthouse audit.');
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
+  }
+}
+Create the AI Summarizer: Open server/gemini.ts and add the following new summarizeLighthouseReport function. This will take the Lighthouse JSON and create a high-level summary.
+
+TypeScript
+
+// Add this at the end of the server/gemini.ts file
+
+export async function summarizeLighthouseReport(
+  url: string,
+  lighthouseReport: any
+): Promise<{ summary: string; recommendations: string[] }> {
+  try {
+    const systemPrompt = `You are an expert SEO analyst. Your task is to summarize a Google Lighthouse report for an agency account manager. Provide a high-level overview and a prioritized list of actionable recommendations. Focus on the most critical issues found in the SEO, Performance, and Accessibility categories.`;
+
+    const prompt = \`
+    Lighthouse Audit Summary for: \${url}
+
+    Here is the raw Lighthouse JSON report data:
+    \${JSON.stringify(lighthouseReport.audits, null, 2)}
+
+    Please provide:
+    1.  A "summary" (2-3 paragraphs) of the website's overall SEO health, performance, and accessibility.
+    2.  A "recommendations" array of the top 5 most impactful, actionable items the agency should focus on to improve the site's scores.
+    \`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            recommendations: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+          required: ["summary", "recommendations"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (!rawJson) {
+      throw new Error("Empty response from Gemini AI");
+    }
+    return JSON.parse(rawJson);
+
+  } catch (error) {
+    console.error("Gemini AI Lighthouse summary error:", error);
+    throw new Error(\`Failed to summarize Lighthouse report: \${error}\`);
+  }
+}
+Create the API Endpoint: Open server/routes.ts and add a new API endpoint to handle the audit requests.
+
+TypeScript
+
+// Add these imports at the top of server/routes.ts
+import { SeoAuditService } from "./services/seoAuditService";
+import { summarizeLighthouseReport } from "./gemini";
+
+// Add this route inside the registerRoutes function
+app.post("/api/seo/audit", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ message: "URL is required" });
+    }
+
+    const auditService = new SeoAuditService();
+    const lighthouseReport = await auditService.runLighthouseAudit(url);
+
+    // Get AI summary
+    const aiSummary = await summarizeLighthouseReport(url, lighthouseReport);
+
+    res.json({
+      lighthouseReport,
+      aiSummary,
+    });
+  } catch (error: any) {
+    console.error("SEO Audit endpoint error:", error);
+    res.status(500).json({ message: error.message || "Failed to perform SEO audit" });
+  }
+});
+Step 2: Frontend Implementation (The User Interface)
+Create the SEO Audit Page: Create a new file at client/src/pages/agency/seo-audit.tsx. This will be the main UI for our new tool. Populate it with the following code:
+
+TypeScript
+
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { AgencyLayout } from "@/components/agency-layout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { apiRequest } from "@/lib/queryClient";
+import { Search, Loader2, Sparkles, CheckCircle, AlertCircle } from "lucide-react";
+
+interface AuditResult {
+  lighthouseReport: any;
+  aiSummary: {
+    summary: string;
+    recommendations: string[];
+  };
+}
+
+export default function SeoAuditPage() {
+  const [url, setUrl] = useState("");
+  const [result, setResult] = useState<AuditResult | null>(null);
+
+  const auditMutation = useMutation({
+    mutationFn: (targetUrl: string) =>
+      apiRequest("POST", "/api/seo/audit", { url: targetUrl }).then(res => res.json()),
+    onSuccess: (data: AuditResult) => {
+      setResult(data);
+    },
+  });
+
+  const handleAudit = () => {
+    if (!url.trim()) return;
+    setResult(null);
+    auditMutation.mutate(url);
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return "bg-green-500";
+    if (score >= 50) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  return (
+    <AgencyLayout>
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-semibold mb-2">SEO Website Audit</h1>
+          <p className="text-muted-foreground">
+            Enter a URL to get a comprehensive SEO, performance, and accessibility report powered by Google Lighthouse.
+          </p>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex w-full max-w-lg items-center space-x-2">
+              <Input
+                type="url"
+                placeholder="https://example.com"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={auditMutation.isPending}
+              />
+              <Button onClick={handleAudit} disabled={auditMutation.isPending}>
+                {auditMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                {auditMutation.isPending ? "Auditing..." : "Audit Website"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {auditMutation.error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Audit Failed</AlertTitle>
+            <AlertDescription>{(auditMutation.error as Error).message}</AlertDescription>
+          </Alert>
+        )}
+
+        {result && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  AI-Powered Summary & Recommendations
+                </CardTitle>
+                <CardDescription>
+                  An AI-generated analysis of the Lighthouse report for quick insights.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Overall Summary</h3>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{result.aiSummary.summary}</p>
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-2">Top Recommendations</h3>
+                  <ul className="list-disc list-inside space-y-2">
+                    {result.aiSummary.recommendations.map((rec, index) => (
+                      <li key={index} className="text-sm">{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Lighthouse Score Summary</CardTitle>
+                <CardDescription>
+                  Detailed scores from the Google Lighthouse audit. Scores are out of 100.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {Object.values(result.lighthouseReport.categories).map((category: any) => (
+                  <div key={category.id}>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium capitalize">{category.title}</span>
+                      <span className="text-lg font-bold">{(category.score * 100).toFixed(0)}</span>
+                    </div>
+                    <Progress value={category.score * 100} className={getScoreColor(category.score * 100)} />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </div>
+    </AgencyLayout>
+  );
+}
+Step 3: Integration
+Add the New Page to the Router: Open client/src/App.tsx and add a new route for our SEO audit tool.
+
+TypeScript
+
+// Add this import at the top
+import AgencySeoAudit from "@/pages/agency/seo-audit";
+
+// Add this new route inside the <Switch> component, within the Agency Portal section
+<Route path="/agency/seo-audit">
+  <ProtectedRoute allowedRoles={["Admin"]}>
+    <AgencySeoAudit />
+  </ProtectedRoute>
+</Route>
+Add Link to Agency Sidebar: Open client/src/components/agency-sidebar.tsx and add a new menu item to the agencyMenuItems array. I recommend placing it after "Google Integrations".
+
+TypeScript
+
+// Add this import at the top
+import { BarChartHorizontal } from "lucide-react"; // Or another suitable icon
+
+// Add this new item to the menuItems array
+{
+  title: "SEO Audit",
+  url: "/agency/seo-audit",
+  icon: BarChartHorizontal, // Or another icon
+  notificationKey: null,
+},
