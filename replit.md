@@ -4,6 +4,8 @@
 This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, ultimately fostering better client relationships and operational effectiveness.
 
 ## Recent Updates
+- **SEO Website Audit Tool (Oct 12, 2025)**: Added comprehensive SEO audit tool for agency admins powered by Google Lighthouse and AI. Admins can enter any URL to receive detailed audit results covering SEO, performance, accessibility, and best practices. Features AI-generated summary and top 5 actionable recommendations using Gemini 2.5-flash. Integrated into agency sidebar with dedicated `/agency/seo-audit` page.
+- **Trash System for Initiatives (Oct 12, 2025)**: Implemented soft delete system for strategic initiatives. Deleted initiatives are moved to trash with 30-day retention period before automatic permanent deletion. Admins can restore or manually delete items from trash. Automated cleanup runs daily at 2:00 AM.
 - **GSC Data Display Fix (Oct 12, 2025)**: Fixed Google Search Console metrics not displaying in Agency Portal Dashboard. The issue was a data structure mismatch where the code tried to access GA4-style `metricValues` arrays instead of GSC's direct properties (`clicks`, `impressions`, `ctr`, `position`). Fixed in both `agency-dashboard.tsx` and `agency/index.tsx`. CTR is now correctly calculated as `(totalClicks / totalImpressions) * 100` to ensure accurate weighted average.
 - **Chat with your Data UI Enhancement (Oct 12, 2025)**: Converted "Chat with your Data" from popup Dialog modal to right-hand Sheet sidebar for improved UX. Sidebar slides in from the right, full width on mobile (max-w-2xl on desktop), with scrollable content.
 
@@ -37,10 +39,12 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Invoice Automation**: Node-cron scheduler for monthly retainers, Puppeteer for PDF generation.
 - **AI Recommendation Engine**: Google Gemini AI (gemini-2.5-pro) analyzes client GA4/GSC metrics to auto-generate strategic initiatives. Properly separates GA4 paid channel data (sessions, conversions, spend) from GSC organic search data (clicks, impressions, avgPosition) to ensure accurate AI analysis. Validates that at least one integration (GA4 or GSC) is connected before generating recommendations.
 - **Metrics Sync Endpoint**: POST `/api/agency/clients/:clientId/sync-metrics` endpoint fetches latest analytics data from GA4/GSC APIs and stores in database. Implements idempotency using date-range deletion (via Drizzle gte/lte helpers) before inserting new metrics to prevent duplicates on repeated syncs.
+- **SEO Website Audit Tool**: Lighthouse-powered SEO audits with AI-generated insights. Analyzes SEO, performance, accessibility, and best practices. Uses Puppeteer + Lighthouse for comprehensive audits and Gemini 2.5-flash for actionable recommendations. Admin-only via POST `/api/seo/audit` endpoint.
+- **Trash System**: Soft delete functionality for strategic initiatives. Deleted items stored with `deletedAt` timestamp, retained for 30 days before automatic permanent deletion. Daily cron job (2:00 AM) purges items older than 30 days. Admins can restore or manually delete from trash view.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data AI assistant.
-- **Agency Admin Portal**: Dashboard, Client Messages, Tasks & Projects, Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments). Includes user management and invoice management (create, view, update, PDF generation, automated monthly retainers, on-demand from initiatives).
+- **Agency Admin Portal**: Dashboard, Client Messages, Tasks & Projects, Strategic Initiatives (draft, send, manage client responses, track impact), Clients (management, GA4/GSC integration, objectives, user management), Staff (assignments). Includes user management, invoice management (create, view, update, PDF generation, automated monthly retainers, on-demand from initiatives), Trash (soft-deleted initiatives with 30-day retention), and SEO Website Audit Tool (Lighthouse-powered audits with AI insights).
 - **Staff Portal**: View assigned tasks, update status, prioritize.
 - **Strategic Initiative Workflow**: Needs Review → Awaiting Approval → Approved → In Progress → Completed → Measured.
 - **Client-to-Account Manager Chat System**: Real-time messaging.
@@ -62,6 +66,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Authentication**: JWT, bcrypt
 - **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
 - **OAuth Integrations**: Google OAuth (for GA4, Google Search Console)
-- **AI Services**: Google Gemini AI (gemini-2.5-pro) for strategic recommendation generation
+- **AI Services**: Google Gemini AI (gemini-2.5-pro for strategic recommendations, gemini-2.5-flash for SEO audit summaries and chat)
+- **SEO Auditing**: Google Lighthouse (via lighthouse npm package)
 - **PDF Generation**: Puppeteer (requires Chromium system package)
-- **Scheduling**: node-cron
+- **Scheduling**: node-cron (invoice automation at 9:00 AM daily, trash cleanup at 2:00 AM daily)
