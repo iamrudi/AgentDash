@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Initiative, Client } from "@shared/schema";
-import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown, Plus } from "lucide-react";
+import { Lightbulb, Send, Building2, Edit, MessageSquare, ThumbsUp, ThumbsDown, Plus, Trash2 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
@@ -20,6 +20,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -115,6 +126,19 @@ export default function AgencyRecommendationsPage() {
       toast({
         title: "Initiative created",
         description: "The manual initiative has been created successfully.",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (initiativeId: string) => {
+      return await apiRequest("DELETE", `/api/initiatives/${initiativeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
+      toast({
+        title: "Initiative deleted",
+        description: "The initiative has been moved to trash.",
       });
     },
   });
@@ -575,6 +599,36 @@ export default function AgencyRecommendationsPage() {
                             </DialogContent>
                           </Dialog>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              data-testid={`button-delete-${rec.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Initiative</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will move the initiative to trash. It will be automatically deleted after 30 days, but you can restore it before then.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(rec.id)}
+                                disabled={deleteMutation.isPending}
+                                data-testid={`button-confirm-delete-${rec.id}`}
+                              >
+                                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                         {canEdit && !isSent && (
                           <Button
                             variant="default"
