@@ -3,6 +3,10 @@
 ## Overview
 This project is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, ultimately fostering better client relationships and operational effectiveness.
 
+## Recent Updates
+- **GSC Data Display Fix (Oct 12, 2025)**: Fixed Google Search Console metrics not displaying in Agency Portal Dashboard. The issue was a data structure mismatch where the code tried to access GA4-style `metricValues` arrays instead of GSC's direct properties (`clicks`, `impressions`, `ctr`, `position`). Fixed in both `agency-dashboard.tsx` and `agency/index.tsx`. CTR is now correctly calculated as `(totalClicks / totalImpressions) * 100` to ensure accurate weighted average.
+- **Chat with your Data UI Enhancement (Oct 12, 2025)**: Converted "Chat with your Data" from popup Dialog modal to right-hand Sheet sidebar for improved UX. Sidebar slides in from the right, full width on mobile (max-w-2xl on desktop), with scrollable content.
+
 ## User Preferences
 I prefer concise and direct communication. When making changes, prioritize iterative development and provide clear explanations of the modifications. Before implementing any major architectural changes or introducing new external dependencies, please ask for approval. Ensure that all code adheres to modern JavaScript/TypeScript best practices.
 
@@ -45,7 +49,7 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **Admin Workflow**: Admin asks question → AI generates recommendation → Admin clicks "Request Action" → Creates initiative with status "Draft" → Admin can edit/review → Admin sends to client → Status changes to "Awaiting Approval" for client response
 - **Analytics Dashboard**: GA4 and GSC metrics visualization (Recharts), date range picker with comparison, acquisition channels visualization.
 - **GA4 Lead Event Configuration**: Admins configure GA4 lead event names (single or multiple comma-separated) for accurate conversion tracking and pipeline value calculation.
-- **Google Search Console Integration**: OAuth for GSC, site selection, and performance metrics.
+- **Google Search Console Integration**: OAuth for GSC, site selection, and performance metrics. GSC API returns data with structure `{rows: [{keys: string[], clicks: number, impressions: number, ctr: number, position: number}]}` - dashboard aggregates using direct property access (not GA4-style metricValues).
 - **Pipeline Value Calculation**: Based on GA4 conversions and Lead Value, with a fallback to a legacy formula.
 
 ### System Design Choices
