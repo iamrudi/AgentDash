@@ -175,12 +175,14 @@ export default function Recommendations() {
                   </div>
                 )}
                 
-                {/* Narrative Flow */}
+                {/* Enhanced Observation with Sales Psychology */}
                 <div>
-                  <h4 className="font-semibold mb-2">The Observation</h4>
-                  <p className="text-sm text-muted-foreground" data-testid={`recommendation-observation-${recommendation.id}`}>
-                    {recommendation.observation}
-                  </p>
+                  <h4 className="font-semibold mb-3">The Observation</h4>
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground" data-testid={`recommendation-observation-${recommendation.id}`}>
+                      {recommendation.observation}
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <h4 className="font-semibold mb-2">Our Proposed Action</h4>
