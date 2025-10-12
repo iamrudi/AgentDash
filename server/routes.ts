@@ -401,6 +401,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new project
+  app.post("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { name, description, status, clientId } = req.body;
+      
+      if (!name || !clientId) {
+        return res.status(400).json({ message: "Project name and client are required" });
+      }
+
+      const newProject = await storage.createProject({
+        name,
+        description: description || null,
+        status: status || "Active",
+        clientId,
+      });
+
+      res.status(201).json(newProject);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new task
+  app.post("/api/agency/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { description, projectId, status, dueDate, priority, initiativeId } = req.body;
+      
+      if (!description || !projectId) {
+        return res.status(400).json({ message: "Task description and project are required" });
+      }
+
+      const newTask = await storage.createTask({
+        description,
+        projectId,
+        status: status || "Pending",
+        dueDate: dueDate || null,
+        priority: priority || "Medium",
+        initiativeId: initiativeId || null,
+      });
+
+      res.status(201).json(newTask);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/agency/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const metrics = await storage.getAllMetrics(90);
