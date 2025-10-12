@@ -9,11 +9,13 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil, Trash2, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
+import { EditProjectDialog } from "@/components/edit-project-dialog";
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [showEditProject, setShowEditProject] = useState(false);
 
   const { data: projectData, isLoading } = useQuery({
     queryKey: ["/api/agency/projects", id],
@@ -87,7 +89,11 @@ export default function ProjectDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" data-testid="button-edit-project">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowEditProject(true)}
+            data-testid="button-edit-project"
+          >
             <Pencil className="w-4 h-4 mr-2" />
             Edit Project
           </Button>
@@ -196,6 +202,12 @@ export default function ProjectDetail() {
           )}
         </CardContent>
       </Card>
+
+      <EditProjectDialog 
+        open={showEditProject}
+        onOpenChange={setShowEditProject}
+        project={project}
+      />
     </div>
   );
 }
