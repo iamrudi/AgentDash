@@ -45,10 +45,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Create client record
+      // TODO: In production, use invitation-based signup with specific agencyId
+      // For now, assign to default agency
       if (companyName) {
+        const defaultAgency = await storage.getDefaultAgency();
+        if (!defaultAgency) {
+          return res.status(500).json({ message: "System configuration error: No default agency found" });
+        }
         await storage.createClient({
           companyName,
           profileId: profile.id,
+          agencyId: defaultAgency.id,
         });
       }
 
@@ -2574,10 +2581,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: "Client",
       });
 
-      // Create client record
+      // Create client record in the admin's agency
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Admin user has no agency association" });
+      }
       const client = await storage.createClient({
         companyName,
         profileId: profile.id,
+        agencyId: req.user!.agencyId,
       });
 
       res.status(201).json({ 
@@ -2719,9 +2730,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Create client record if role is Client and companyName provided
         if (role === "Client" && companyName) {
+          const defaultAgency = await storage.getDefaultAgency();
+          if (!defaultAgency) {
+            return res.status(500).json({ message: "System configuration error: No default agency found" });
+          }
           await storage.createClient({
             companyName,
             profileId: profile.id,
+            agencyId: defaultAgency.id,
           });
         }
 

@@ -27,6 +27,7 @@ import {
   type InsertClientMessage,
   type Notification,
   type InsertNotification,
+  type Agency,
   users,
   profiles,
   clients,
@@ -41,6 +42,7 @@ import {
   clientObjectives,
   clientMessages,
   notifications,
+  agencies,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -249,7 +251,18 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getAllStaff(): Promise<Profile[]> {
+  // Agencies
+  async getDefaultAgency(): Promise<Agency | undefined> {
+    const result = await db.select().from(agencies).orderBy(agencies.createdAt).limit(1);
+    return result[0];
+  }
+
+  async getAllStaff(agencyId?: string): Promise<Profile[]> {
+    if (agencyId) {
+      return await db.select().from(profiles)
+        .where(and(eq(profiles.role, "Staff"), eq(profiles.agencyId, agencyId)))
+        .orderBy(desc(profiles.createdAt));
+    }
     return await db.select().from(profiles).where(eq(profiles.role, "Staff")).orderBy(desc(profiles.createdAt));
   }
 
@@ -264,7 +277,12 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getAllClients(): Promise<Client[]> {
+  async getAllClients(agencyId?: string): Promise<Client[]> {
+    if (agencyId) {
+      return await db.select().from(clients)
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(clients.createdAt));
+    }
     return await db.select().from(clients).orderBy(desc(clients.createdAt));
   }
 
@@ -404,7 +422,24 @@ export class DbStorage implements IStorage {
     return await db.select().from(projects).where(eq(projects.clientId, clientId)).orderBy(desc(projects.createdAt));
   }
 
-  async getAllProjects(): Promise<Project[]> {
+  async getAllProjects(agencyId?: string): Promise<Project[]> {
+    if (agencyId) {
+      // Join with clients table to filter by agencyId
+      const results = await db
+        .select({
+          id: projects.id,
+          name: projects.name,
+          status: projects.status,
+          description: projects.description,
+          clientId: projects.clientId,
+          createdAt: projects.createdAt,
+        })
+        .from(projects)
+        .innerJoin(clients, eq(projects.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(projects.createdAt));
+      return results;
+    }
     return await db.select().from(projects).orderBy(desc(projects.createdAt));
   }
 
