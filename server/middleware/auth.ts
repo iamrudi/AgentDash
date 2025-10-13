@@ -3,6 +3,7 @@ import { verifyToken } from "../lib/jwt";
 import { db } from "../db";
 import { profiles, clients } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import type { IStorage } from "../storage";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -84,14 +85,32 @@ export function requireRole(...roles: string[]) {
 // Tenant isolation helper: verify user can access a client's resources
 export async function verifyClientAccess(
   req: AuthRequest,
-  resourceClientId: string
+  resourceClientId: string,
+  storage: IStorage
 ): Promise<boolean> {
   if (!req.user) {
     return false;
   }
 
-  // Admins can access all clients
+  // Admins can ONLY access clients in their own agency
   if (req.user.role === "Admin") {
+    if (!req.user.agencyId) {
+      console.warn(`Admin user ${req.user.id} has no agencyId - denying client access`);
+      return false;
+    }
+    
+    const client = await storage.getClientById(resourceClientId);
+    if (!client) {
+      console.warn(`Client ${resourceClientId} not found`);
+      return false;
+    }
+    
+    // Critical: Admin can only access clients in their own agency
+    if (client.agencyId !== req.user.agencyId) {
+      console.warn(`Admin ${req.user.id} (agency: ${req.user.agencyId}) attempted to access client ${resourceClientId} (agency: ${client.agencyId})`);
+      return false;
+    }
+    
     return true;
   }
 
@@ -106,7 +125,7 @@ export async function verifyClientAccess(
 }
 
 // Middleware to enforce tenant isolation on client-specific routes
-export function requireClientAccess() {
+export function requireClientAccess(storage: IStorage) {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     const clientId = req.params.clientId || req.body.clientId;
     
@@ -114,7 +133,7 @@ export function requireClientAccess() {
       return res.status(400).json({ message: "Client ID required" });
     }
 
-    const hasAccess = await verifyClientAccess(req, clientId);
+    const hasAccess = await verifyClientAccess(req, clientId, storage);
     
     if (!hasAccess) {
       return res.status(403).json({ message: "Access denied to this client's resources" });

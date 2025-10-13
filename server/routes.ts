@@ -145,8 +145,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client/projects", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
-        // Admins see all projects
-        const allProjects = await storage.getAllProjects();
+        // Admins see all projects in their agency
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        const allProjects = await storage.getAllProjects(req.user!.agencyId);
         const projectsWithClients = await Promise.all(
           allProjects.map(async (project) => {
             const client = await storage.getClientById(project.clientId);
@@ -254,8 +257,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client/invoices", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
-        // Admins see all invoices
-        const allInvoices = await storage.getAllInvoices();
+        // Admins see all invoices in their agency
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        const allInvoices = await storage.getAllInvoices(req.user!.agencyId);
         const invoicesWithClients = await Promise.all(
           allInvoices.map(async (invoice) => {
             const client = await storage.getClientById(invoice.clientId);
@@ -284,8 +290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client/initiatives", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
     try {
       if (req.user!.role === "Admin") {
-        // Admins see all initiatives
-        const allInitiatives = await storage.getAllInitiatives();
+        // Admins see all initiatives in their agency
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        const allInitiatives = await storage.getAllInitiatives(req.user!.agencyId);
         const initsWithClients = await Promise.all(
           allInitiatives.map(async (init) => {
             const client = await storage.getClientById(init.clientId);
@@ -324,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const client = await storage.getClientById(clientId);
@@ -339,7 +348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { leadValue, retainerAmount, billingDay, monthlyRetainerHours } = req.body;
@@ -362,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId/retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const hoursInfo = await storage.checkRetainerHours(clientId);
@@ -372,7 +381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agency/clients/:clientId/reset-retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/reset-retainer-hours", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const updatedClient = await storage.resetRetainerHours(clientId);
@@ -382,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agency/clients/:clientId/sync-metrics", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/sync-metrics", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { daysToFetch = 30 } = req.body;
@@ -467,7 +476,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { generateAIRecommendations } = await import("./ai-analyzer");
@@ -621,14 +630,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/agency/metrics", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const metrics = await storage.getAllMetrics(90);
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const metrics = await storage.getAllMetrics(90, req.user!.agencyId);
       res.json(metrics);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.get("/api/agency/clients/:clientId/metrics", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/metrics", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const metrics = await storage.getMetricsByClientId(clientId, 90);
@@ -638,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId/strategy-card", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/strategy-card", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -698,8 +710,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/agency/integrations", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const integrations = await storage.getAllIntegrations();
-      // Only return safe metadata - no tokens
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const integrations = await storage.getAllIntegrations(req.user!.agencyId);
+      // Only return safe metadata - no tokens (already filtered in storage)
       const safeIntegrations = integrations.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...safe }) => safe);
       res.json(safeIntegrations);
     } catch (error: any) {
@@ -1166,7 +1181,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const profile = await storage.getProfileByUserId(req.user!.id);
         if (profile?.role === "Client") {
           const client = await storage.getClientByProfileId(profile.id);
-          const adminUsers = await storage.getAllUsersWithProfiles();
+          // Only notify admins in the same agency as this client
+          const adminUsers = client?.agencyId 
+            ? await storage.getAllUsersWithProfiles(client.agencyId)
+            : [];
           const admins = adminUsers.filter(u => u.profile?.role === "Admin");
           
           const responseText = response === "approved" ? "approved" : response === "rejected" ? "rejected" : "wants to discuss";
@@ -1367,7 +1385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 integration status for a client
-  app.get("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1391,7 +1409,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch available GA4 properties (Admin only)
-  app.get("/api/integrations/ga4/:clientId/properties", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/ga4/:clientId/properties", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       
@@ -1423,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GA4 property (Admin only)
-  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4PropertyId, ga4LeadEventName } = req.body;
@@ -1459,7 +1477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update GA4 lead event name only (Admin only)
-  app.patch("/api/integrations/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.patch("/api/integrations/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4LeadEventName } = req.body;
@@ -1493,7 +1511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google Search Console Routes
   
   // Get GSC integration status for a client
-  app.get("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin", "Client"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1517,7 +1535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch available GSC sites (Admin only)
-  app.get("/api/integrations/gsc/:clientId/sites", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/integrations/gsc/:clientId/sites", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       
@@ -1549,7 +1567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GSC site (Admin only)
-  app.post("/api/integrations/gsc/:clientId/site", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/gsc/:clientId/site", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { gscSiteUrl } = req.body;
@@ -1578,7 +1596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Save selected GA4 property (Admin only)
-  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { ga4PropertyId, ga4LeadEventName } = req.body;
@@ -1614,7 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Disconnect GA4 integration (Admin only)
-  app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.delete("/api/integrations/ga4/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1633,7 +1651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Disconnect GSC integration (Admin only)
-  app.delete("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.delete("/api/integrations/gsc/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
 
@@ -1654,7 +1672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics Data API
 
   // Get GA4 conversions (Key Events) data for a client (MUST come before the general GA4 route)
-  app.get("/api/analytics/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1709,7 +1727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 acquisition channels data for a client (MUST come before the general GA4 route)
-  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId/channels", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1759,7 +1777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GA4 analytics data for a client
-  app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/ga4/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1815,7 +1833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GSC top queries for a client (MUST come before general GSC route)
-  app.get("/api/analytics/gsc/:clientId/queries", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/gsc/:clientId/queries", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1871,7 +1889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get GSC analytics data for a client
-  app.get("/api/analytics/gsc/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/gsc/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -1912,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get outcome metrics (Pipeline Value, CPA, conversions, organic clicks) for Reports page
-  app.get("/api/analytics/outcome-metrics/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/analytics/outcome-metrics/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { startDate, endDate } = req.query;
@@ -2175,7 +2193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client Objectives API
 
   // Get objectives for a client (Admin only)
-  app.get("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const objectives = await storage.getObjectivesByClientId(clientId);
@@ -2203,7 +2221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create objective for a client (Admin only)
-  app.post("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/agency/clients/:clientId/objectives", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { description, targetMetric } = req.body;
@@ -2392,7 +2410,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create notification for admin users (don't let notification failures break message creation)
       try {
-        const adminUsers = await storage.getAllUsersWithProfiles();
+        // Only notify admins in the same agency as this client
+        const adminUsers = client.agencyId 
+          ? await storage.getAllUsersWithProfiles(client.agencyId)
+          : [];
         const admins = adminUsers.filter(u => u.profile?.role === "Admin");
         
         for (const admin of admins) {
@@ -2483,7 +2504,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send message from admin to client (legacy route with clientId in URL)
-  app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  app.post("/api/agency/messages/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const { message } = req.body;
@@ -2507,7 +2528,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get notification counts (Admin only)
   app.get("/api/agency/notifications/counts", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const counts = await storage.getNotificationCounts();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const counts = await storage.getNotificationCounts(req.user!.agencyId);
       res.json(counts);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2635,7 +2659,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all users (Admin only)
   app.get("/api/agency/users", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const users = await storage.getAllUsersWithProfiles();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const users = await storage.getAllUsersWithProfiles(req.user!.agencyId);
       res.json(users);
     } catch (error: any) {
       console.error("Get users error:", error);

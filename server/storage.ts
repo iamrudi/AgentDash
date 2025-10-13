@@ -54,7 +54,7 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getAllUsersWithProfiles(): Promise<Array<User & { profile: Profile | null; client?: Client | null }>>;
+  getAllUsersWithProfiles(agencyId?: string): Promise<Array<User & { profile: Profile | null; client?: Client | null }>>;
   updateUserRole(userId: string, role: string): Promise<void>;
   deleteUser(userId: string): Promise<void>;
   
@@ -137,14 +137,14 @@ export interface IStorage {
   
   // Daily Metrics
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
-  getAllMetrics(limit?: number): Promise<DailyMetric[]>;
+  getAllMetrics(limit?: number, agencyId?: string): Promise<DailyMetric[]>;
   createMetric(metric: InsertDailyMetric): Promise<DailyMetric>;
   deleteMetricsByClientIdAndDateRange(clientId: string, startDate: string, endDate: string): Promise<void>;
   
   // Client Integrations
   getIntegrationByClientId(clientId: string, serviceName: string): Promise<ClientIntegration | undefined>;
   getAllIntegrationsByClientId(clientId: string): Promise<ClientIntegration[]>;
-  getAllIntegrations(): Promise<ClientIntegration[]>;
+  getAllIntegrations(agencyId?: string): Promise<ClientIntegration[]>;
   createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration>;
   updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration>;
   deleteIntegration(id: string): Promise<void>;
@@ -159,11 +159,11 @@ export interface IStorage {
   // Client Messages
   getMessagesByClientId(clientId: string): Promise<ClientMessage[]>;
   createMessage(message: InsertClientMessage): Promise<ClientMessage>;
-  getAllMessages(): Promise<ClientMessage[]>;
+  getAllMessages(agencyId?: string): Promise<ClientMessage[]>;
   markMessageAsRead(id: string): Promise<void>;
   
   // Notifications (Legacy counts for badges)
-  getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }>;
+  getNotificationCounts(agencyId?: string): Promise<{ unreadMessages: number; unviewedResponses: number }>;
   markInitiativeResponsesViewed(): Promise<void>;
   getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }>;
   getStaffNotificationCounts(staffProfileId: string): Promise<{ newTasks: number; highPriorityTasks: number }>;
@@ -198,7 +198,60 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getAllUsersWithProfiles(): Promise<Array<User & { profile: Profile | null; client?: Client | null }>> {
+  async getAllUsersWithProfiles(agencyId?: string): Promise<Array<User & { profile: Profile | null; client?: Client | null }>> {
+    if (agencyId) {
+      // Get all profiles and clients for this agency
+      const [agencyProfiles, agencyClients] = await Promise.all([
+        db.select().from(profiles).where(eq(profiles.agencyId, agencyId)),
+        db.select().from(clients).where(eq(clients.agencyId, agencyId))
+      ]);
+      
+      // Get unique user IDs from both profiles and clients
+      const profileUserIds = new Set(agencyProfiles.map(p => p.userId));
+      const clientUserIds = new Set(
+        agencyProfiles
+          .filter(p => p.role === "Client")
+          .map(p => p.userId)
+      );
+      
+      // Also need to check clients that belong to this agency via their profileId
+      const clientProfileIds = new Set(agencyClients.map(c => c.profileId));
+      const clientProfiles = agencyProfiles.filter(p => clientProfileIds.has(p.id));
+      clientProfiles.forEach(p => clientUserIds.add(p.userId));
+      
+      const allUserIds = Array.from(new Set([...profileUserIds, ...clientUserIds]));
+      
+      if (allUserIds.length === 0) {
+        return [];
+      }
+      
+      // Fetch users that belong to this agency
+      const agencyUsers = await db.select().from(users)
+        .where(sql`${users.id} IN (${sql.join(allUserIds.map(id => sql`${id}`), sql`, `)})`);
+      
+      // Build lookup maps for efficiency
+      const profileMap = new Map(agencyProfiles.map(p => [p.userId, p]));
+      const clientMap = new Map(agencyClients.map(c => [c.profileId, c]));
+      
+      const usersWithProfiles = agencyUsers.map((user) => {
+        const profile = profileMap.get(user.id) || null;
+        let client = null;
+        if (profile && profile.role === "Client") {
+          client = clientMap.get(profile.id) || null;
+        }
+        return {
+          ...user,
+          profile,
+          client,
+        };
+      });
+      
+      return usersWithProfiles.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+    
+    // Original implementation without agency filtering
     const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
     
     const usersWithProfiles = await Promise.all(
@@ -792,7 +845,32 @@ export class DbStorage implements IStorage {
       .limit(limit);
   }
 
-  async getAllMetrics(limit: number = 365): Promise<DailyMetric[]> {
+  async getAllMetrics(limit: number = 365, agencyId?: string): Promise<DailyMetric[]> {
+    if (agencyId) {
+      // Join with clients to filter by agencyId
+      const results = await db
+        .select({
+          id: dailyMetrics.id,
+          date: dailyMetrics.date,
+          clientId: dailyMetrics.clientId,
+          source: dailyMetrics.source,
+          sessions: dailyMetrics.sessions,
+          conversions: dailyMetrics.conversions,
+          impressions: dailyMetrics.impressions,
+          clicks: dailyMetrics.clicks,
+          spend: dailyMetrics.spend,
+          organicImpressions: dailyMetrics.organicImpressions,
+          organicClicks: dailyMetrics.organicClicks,
+          avgPosition: dailyMetrics.avgPosition,
+          createdAt: dailyMetrics.createdAt,
+        })
+        .from(dailyMetrics)
+        .innerJoin(clients, eq(dailyMetrics.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(dailyMetrics.date))
+        .limit(limit);
+      return results;
+    }
     return await db.select().from(dailyMetrics)
       .orderBy(desc(dailyMetrics.date))
       .limit(limit);
@@ -868,7 +946,44 @@ export class DbStorage implements IStorage {
     });
   }
 
-  async getAllIntegrations(): Promise<ClientIntegration[]> {
+  async getAllIntegrations(agencyId?: string): Promise<ClientIntegration[]> {
+    if (agencyId) {
+      // Join with clients to filter by agency
+      const results = await db
+        .select({
+          id: clientIntegrations.id,
+          clientId: clientIntegrations.clientId,
+          serviceName: clientIntegrations.serviceName,
+          accessToken: clientIntegrations.accessToken,
+          refreshToken: clientIntegrations.refreshToken,
+          accessTokenIv: clientIntegrations.accessTokenIv,
+          refreshTokenIv: clientIntegrations.refreshTokenIv,
+          accessTokenAuthTag: clientIntegrations.accessTokenAuthTag,
+          refreshTokenAuthTag: clientIntegrations.refreshTokenAuthTag,
+          propertyId: clientIntegrations.propertyId,
+          siteUrl: clientIntegrations.siteUrl,
+          leadEventNames: clientIntegrations.leadEventNames,
+          createdAt: clientIntegrations.createdAt,
+          updatedAt: clientIntegrations.updatedAt,
+        })
+        .from(clientIntegrations)
+        .innerJoin(clients, eq(clientIntegrations.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(clientIntegrations.createdAt));
+      
+      // Note: We don't decrypt tokens for the admin list view for security
+      // Remove sensitive fields
+      return results.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...integration }) => ({
+        ...integration,
+        accessToken: null,
+        refreshToken: null,
+        accessTokenIv: null,
+        refreshTokenIv: null,
+        accessTokenAuthTag: null,
+        refreshTokenAuthTag: null,
+      }));
+    }
+    
     const results = await db.select().from(clientIntegrations)
       .orderBy(desc(clientIntegrations.createdAt));
     
@@ -1030,15 +1145,47 @@ export class DbStorage implements IStorage {
   }
 
   // Notifications
-  async getNotificationCounts(): Promise<{ unreadMessages: number; unviewedResponses: number }> {
-    // Count unread messages from clients
+  async getNotificationCounts(agencyId?: string): Promise<{ unreadMessages: number; unviewedResponses: number }> {
+    if (agencyId) {
+      // Count unread messages from clients in this agency
+      const unreadMessagesResult = await db
+        .select({ id: clientMessages.id })
+        .from(clientMessages)
+        .innerJoin(clients, eq(clientMessages.clientId, clients.id))
+        .where(and(
+          eq(clientMessages.senderRole, "Client"),
+          eq(clientMessages.isRead, "false"),
+          eq(clients.agencyId, agencyId)
+        ));
+      
+      // Count initiatives with client responses not yet viewed by admin in this agency
+      const unviewedResponsesResult = await db
+        .select({ id: initiatives.id, clientResponse: initiatives.clientResponse })
+        .from(initiatives)
+        .innerJoin(clients, eq(initiatives.clientId, clients.id))
+        .where(and(
+          eq(initiatives.sentToClient, "true"),
+          eq(initiatives.responseViewedByAdmin, "false"),
+          eq(clients.agencyId, agencyId)
+        ));
+      
+      const unviewedResponses = unviewedResponsesResult.filter(
+        rec => rec.clientResponse && rec.clientResponse !== "pending"
+      );
+      
+      return {
+        unreadMessages: unreadMessagesResult.length,
+        unviewedResponses: unviewedResponses.length
+      };
+    }
+    
+    // Original implementation without agency filtering (for backward compatibility)
     const unreadMessagesResult = await db.select().from(clientMessages)
       .where(and(
         eq(clientMessages.senderRole, "Client"),
         eq(clientMessages.isRead, "false")
       ));
     
-    // Count initiatives with client responses not yet viewed by admin
     const unviewedResponsesResult = await db.select().from(initiatives)
       .where(and(
         eq(initiatives.sentToClient, "true"),
