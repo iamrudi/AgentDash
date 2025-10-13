@@ -3,15 +3,6 @@ import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, unique
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// PROFILES (Master table for all users)
-export const profiles = pgTable("profiles", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  fullName: text("full_name").notNull(),
-  role: text("role").notNull(), // 'Admin', 'Client', 'Staff'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // USERS (Auth table)
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -20,11 +11,31 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// AGENCIES (Tenant isolation - each agency is a separate tenant)
+export const agencies = pgTable("agencies", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// PROFILES (Master table for all users)
+export const profiles = pgTable("profiles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  fullName: text("full_name").notNull(),
+  role: text("role").notNull(), // 'Admin', 'Client', 'Staff'
+  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client users
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("profiles_agency_id_idx").on(table.agencyId),
+}));
+
 // CLIENTS (Company-level information)
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: text("company_name").notNull(),
   profileId: uuid("profile_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }), // Every client belongs to an agency
   businessContext: text("business_context"), // Strategic business context for AI recommendations
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
@@ -36,7 +47,9 @@ export const clients = pgTable("clients", {
   opportunityToCloseRate: numeric("opportunity_to_close_rate"), // DEPRECATED: e.g., 0.25 = 25% of opportunities close
   averageDealSize: numeric("average_deal_size"), // DEPRECATED: e.g., 5000 = $5,000 per deal
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  agencyIdIdx: index("clients_agency_id_idx").on(table.agencyId),
+}));
 
 // PROJECTS
 export const projects = pgTable("projects", {
@@ -232,6 +245,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+export const insertAgencySchema = createInsertSchema(agencies).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({
   id: true,
   createdAt: true,
@@ -321,6 +339,9 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type CreateClientUser = z.infer<typeof createClientUserSchema>;
 export type CreateStaffAdminUser = z.infer<typeof createStaffAdminUserSchema>;
+
+export type Agency = typeof agencies.$inferSelect;
+export type InsertAgency = z.infer<typeof insertAgencySchema>;
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
