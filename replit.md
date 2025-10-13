@@ -25,6 +25,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Notifications**: Unified notification center across portals with real-time updates, including toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
 - **AI Recommendation Engine**: Google Gemini AI analyzes GA4/GSC metrics to auto-generate structured strategic initiatives with actionable task lists.
+- **Client Strategy Card**: AI-powered consolidated view on client detail page displaying business context, strategic goals, AI-analyzed chat insights (pain points, wins, questions), and 30-day performance snapshot.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data.
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI-generated summaries and actionable recommendations, convertible into client initiatives.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention and automated purging.
