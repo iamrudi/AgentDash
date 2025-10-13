@@ -118,15 +118,15 @@ export function ClientStrategyCard({ clientId }: { clientId: string }) {
           <div className="space-y-3" data-testid="performance-snapshot">
             <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="total-sessions">
               <span className="text-sm font-medium">Total Sessions</span>
-              <span className="text-lg font-bold font-mono">{data?.summaryKpis.totalSessions.toLocaleString()}</span>
+              <span className="text-lg font-bold font-mono">{(data?.summaryKpis?.totalSessions ?? 0).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="total-conversions">
               <span className="text-sm font-medium">Total Conversions</span>
-              <span className="text-lg font-bold font-mono">{data?.summaryKpis.totalConversions.toLocaleString()}</span>
+              <span className="text-lg font-bold font-mono">{(data?.summaryKpis?.totalConversions ?? 0).toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between p-3 bg-muted rounded-md" data-testid="total-spend">
               <span className="text-sm font-medium">Total Ad Spend</span>
-              <span className="text-lg font-bold font-mono">${data?.summaryKpis.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-lg font-bold font-mono">${(data?.summaryKpis?.totalSpend ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
