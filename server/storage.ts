@@ -286,14 +286,16 @@ export class DbStorage implements IStorage {
     return await db.select().from(clients).orderBy(desc(clients.createdAt));
   }
 
-  async getAllClientsWithDetails(): Promise<Array<Client & { 
+  async getAllClientsWithDetails(agencyId?: string): Promise<Array<Client & { 
     primaryContact: string | null; 
     activeProjectsCount: number;
     overdueInvoicesCount: number;
     hasGA4: boolean;
     hasGSC: boolean;
   }>> {
-    const allClients = await db.select().from(clients).orderBy(desc(clients.createdAt));
+    const allClients = agencyId 
+      ? await db.select().from(clients).where(eq(clients.agencyId, agencyId)).orderBy(desc(clients.createdAt))
+      : await db.select().from(clients).orderBy(desc(clients.createdAt));
     
     // Fetch all related data in bulk to avoid N+1 queries
     const [allProfiles, allProjects, allInvoices, allIntegrations] = await Promise.all([
@@ -472,7 +474,27 @@ export class DbStorage implements IStorage {
     return await db.select().from(tasks).where(eq(tasks.id, taskIds[0])).orderBy(desc(tasks.createdAt));
   }
 
-  async getAllTasks(): Promise<Task[]> {
+  async getAllTasks(agencyId?: string): Promise<Task[]> {
+    if (agencyId) {
+      // Join through projects -> clients to filter by agencyId
+      const results = await db
+        .select({
+          id: tasks.id,
+          description: tasks.description,
+          status: tasks.status,
+          dueDate: tasks.dueDate,
+          priority: tasks.priority,
+          projectId: tasks.projectId,
+          initiativeId: tasks.initiativeId,
+          createdAt: tasks.createdAt,
+        })
+        .from(tasks)
+        .innerJoin(projects, eq(tasks.projectId, projects.id))
+        .innerJoin(clients, eq(projects.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(tasks.createdAt));
+      return results;
+    }
     return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
   }
 
@@ -560,7 +582,27 @@ export class DbStorage implements IStorage {
     return await db.select().from(invoices).where(eq(invoices.clientId, clientId)).orderBy(desc(invoices.createdAt));
   }
 
-  async getAllInvoices(): Promise<Invoice[]> {
+  async getAllInvoices(agencyId?: string): Promise<Invoice[]> {
+    if (agencyId) {
+      // Join with clients to filter by agencyId
+      const results = await db
+        .select({
+          id: invoices.id,
+          invoiceNumber: invoices.invoiceNumber,
+          totalAmount: invoices.totalAmount,
+          status: invoices.status,
+          issueDate: invoices.issueDate,
+          dueDate: invoices.dueDate,
+          pdfUrl: invoices.pdfUrl,
+          clientId: invoices.clientId,
+          createdAt: invoices.createdAt,
+        })
+        .from(invoices)
+        .innerJoin(clients, eq(invoices.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(invoices.createdAt));
+      return results;
+    }
     return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
   }
 
@@ -620,7 +662,46 @@ export class DbStorage implements IStorage {
       .orderBy(desc(initiatives.createdAt));
   }
 
-  async getAllInitiatives(): Promise<Initiative[]> {
+  async getAllInitiatives(agencyId?: string): Promise<Initiative[]> {
+    if (agencyId) {
+      // Join with clients to filter by agencyId
+      const results = await db
+        .select({
+          id: initiatives.id,
+          title: initiatives.title,
+          observation: initiatives.observation,
+          observationInsights: initiatives.observationInsights,
+          proposedAction: initiatives.proposedAction,
+          actionTasks: initiatives.actionTasks,
+          status: initiatives.status,
+          cost: initiatives.cost,
+          estimatedHours: initiatives.estimatedHours,
+          billingType: initiatives.billingType,
+          impact: initiatives.impact,
+          clientId: initiatives.clientId,
+          objectiveId: initiatives.objectiveId,
+          sentToClient: initiatives.sentToClient,
+          clientResponse: initiatives.clientResponse,
+          clientFeedback: initiatives.clientFeedback,
+          responseViewedByAdmin: initiatives.responseViewedByAdmin,
+          triggerMetric: initiatives.triggerMetric,
+          baselineValue: initiatives.baselineValue,
+          startDate: initiatives.startDate,
+          implementationDate: initiatives.implementationDate,
+          measuredImprovement: initiatives.measuredImprovement,
+          lastEditedAt: initiatives.lastEditedAt,
+          deletedAt: initiatives.deletedAt,
+          createdAt: initiatives.createdAt,
+        })
+        .from(initiatives)
+        .innerJoin(clients, eq(initiatives.clientId, clients.id))
+        .where(and(
+          sql`${initiatives.deletedAt} IS NULL`,
+          eq(clients.agencyId, agencyId)
+        ))
+        .orderBy(desc(initiatives.createdAt));
+      return results;
+    }
     return await db.select().from(initiatives)
       .where(sql`${initiatives.deletedAt} IS NULL`)
       .orderBy(desc(initiatives.createdAt));
@@ -920,7 +1001,24 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getAllMessages(): Promise<ClientMessage[]> {
+  async getAllMessages(agencyId?: string): Promise<ClientMessage[]> {
+    if (agencyId) {
+      // Join with clients to filter by agencyId
+      const results = await db
+        .select({
+          id: clientMessages.id,
+          clientId: clientMessages.clientId,
+          message: clientMessages.message,
+          senderRole: clientMessages.senderRole,
+          isRead: clientMessages.isRead,
+          createdAt: clientMessages.createdAt,
+        })
+        .from(clientMessages)
+        .innerJoin(clients, eq(clientMessages.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId))
+        .orderBy(desc(clientMessages.createdAt));
+      return results;
+    }
     return await db.select().from(clientMessages)
       .orderBy(desc(clientMessages.createdAt));
   }

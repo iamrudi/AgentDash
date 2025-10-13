@@ -314,7 +314,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Agency Portal Routes (protected - Admin only)
   app.get("/api/agency/clients", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const clients = await storage.getAllClientsWithDetails();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const clients = await storage.getAllClientsWithDetails(req.user!.agencyId);
       res.json(clients);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -487,7 +490,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const projects = await storage.getAllProjects();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const projects = await storage.getAllProjects(req.user!.agencyId);
       res.json(projects);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -680,7 +686,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/agency/initiatives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const initiatives = await storage.getAllInitiatives();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const initiatives = await storage.getAllInitiatives(req.user!.agencyId);
       res.json(initiatives);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -701,7 +710,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all staff members (for assignment dropdowns)
   app.get("/api/agency/staff", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const staff = await storage.getAllStaff();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const staff = await storage.getAllStaff(req.user!.agencyId);
       // Return staff with id and name for dropdown
       const staffList = staff.map(s => ({ id: s.id, name: s.fullName }));
       res.json(staffList);
@@ -713,7 +725,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff Portal Routes (protected - Staff only)
   app.get("/api/staff/tasks", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
     try {
-      const allTasks = await storage.getAllTasks();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const allTasks = await storage.getAllTasks(req.user!.agencyId);
       const tasksWithProjects = await Promise.all(
         allTasks.map(async (task) => {
           const project = await storage.getProjectById(task.projectId);
@@ -2421,7 +2436,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all messages (Admin only)
   app.get("/api/agency/messages", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const messages = await storage.getAllMessages();
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+      const messages = await storage.getAllMessages(req.user!.agencyId);
       res.json(messages);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
