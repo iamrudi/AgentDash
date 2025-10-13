@@ -684,6 +684,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all staff members (for assignment dropdowns)
+  app.get("/api/agency/staff", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const staff = await storage.getAllStaff();
+      // Return staff with id and name for dropdown
+      const staffList = staff.map(s => ({ id: s.id, name: s.fullName }));
+      res.json(staffList);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Staff Portal Routes (protected - Staff only)
   app.get("/api/staff/tasks", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
     try {
