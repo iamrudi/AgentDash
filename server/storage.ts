@@ -59,6 +59,7 @@ export interface IStorage {
   // Profiles
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
   getProfileById(id: string): Promise<Profile | undefined>;
+  getAllStaff(): Promise<Profile[]>;
   createProfile(profile: InsertProfile): Promise<Profile>;
   
   // Clients
@@ -246,6 +247,10 @@ export class DbStorage implements IStorage {
   async createProfile(profile: InsertProfile): Promise<Profile> {
     const result = await db.insert(profiles).values(profile).returning();
     return result[0];
+  }
+
+  async getAllStaff(): Promise<Profile[]> {
+    return await db.select().from(profiles).where(eq(profiles.role, "Staff")).orderBy(desc(profiles.createdAt));
   }
 
   // Clients
