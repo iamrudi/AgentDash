@@ -42,9 +42,75 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Google Integrations**: GA4 Lead Event Configuration (multi-event support) and Google Search Console (OAuth, site selection, performance metrics).
 
 ### System Design Choices
-- **Multi-tenancy**: Strict tenant isolation.
+- **Multi-tenancy**: Strict tenant isolation with agency-level scoping.
 - **API Structure**: RESTful endpoints with role-based access.
 - **Project Structure**: Separate frontend, backend, and shared codebases.
+
+### Multi-Tenant Isolation Implementation (Completed)
+
+**Status**: ✅ **Functional tenant isolation implemented** across all critical data paths.
+
+**Architecture Pattern**: Route-level enforcement with optional agencyId parameters
+- All Admin/Staff routes check `req.user.agencyId` and return 403 if missing
+- All storage methods accept optional `agencyId` parameter and filter when provided
+- No routes bypass the filtering - all pass agencyId to storage layer
+
+**Components Implemented**:
+1. **Database Schema**:
+   - `agencies` table with id, name, settings
+   - `profiles.agencyId` (nullable, for Admin/Staff only)
+   - `clients.agencyId` (required, foreign key)
+   - Migration: "Default Agency" created, all existing data migrated
+
+2. **Authentication Layer**:
+   - JWT payload includes `agencyId` for Admin/Staff users
+   - Auth middleware extracts agencyId → `req.user.agencyId`
+   - Login endpoint fetches and embeds agencyId from profile
+
+3. **Storage Layer** (12 agency-scoped methods):
+   - `getAllClients(agencyId?)` - filters clients by agency
+   - `getAllClientsWithDetails(agencyId?)` - includes full details
+   - `getAllProjects(agencyId?)` - via client.agencyId join
+   - `getAllStaff(agencyId?)` - Admin/Staff profiles
+   - `getAllTasks(agencyId?)` - via project → client → agency
+   - `getAllInvoices(agencyId?)` - via client.agencyId
+   - `getAllInitiatives(agencyId?)` - via client.agencyId
+   - `getAllMessages(agencyId?)` - via client.agencyId
+   - `getAllMetrics(limit, agencyId?)` - via client.agencyId
+   - `getNotificationCounts(agencyId?)` - scoped counts
+   - `getAllIntegrations(agencyId?)` - via client.agencyId
+   - `getAllUsersWithProfiles(agencyId?)` - Admin/Staff only
+
+4. **Route Layer** (14 critical endpoints secured):
+   - Agency Portal: clients, projects, initiatives, staff, messages, metrics, notifications, integrations, users
+   - Staff Portal: tasks
+   - Client Portal (admin access): projects, invoices, initiatives
+   - All notification generation: agency-scoped
+
+5. **Critical Security Fix**: `requireClientAccess()` middleware
+   - Validates `admin.agencyId === client.agencyId` before allowing access
+   - Prevents admins from accessing clients in other agencies
+   - Applied to 27 routes (client detail, metrics sync, analytics, integrations, objectives, retainer hours, messaging)
+
+**Test Credentials**:
+- Admin: Agent3@demo.com / Agent1234
+- Client: Jon@mmagency.co.uk / Letmein120
+- All users belong to "Default Agency" (ID: 614d7633-5dd9-4147-a261-ebf8458a2ec4)
+
+**Architect Review Feedback**:
+- ✅ Functional tenant isolation confirmed
+- ✅ No routes bypass agencyId filtering
+- ✅ requireClientAccess() properly enforces agency matching
+- 📋 **Future Enhancement Recommended**: Make `agencyId` REQUIRED (not optional) in storage method signatures for compile-time enforcement and defense-in-depth (documented for future hardening)
+
+**Production Readiness Notes**:
+- ✅ Tenant isolation: Complete for single-agency and ready for multi-agency testing
+- ⚠️ **Security Items for Production** (not implemented yet):
+  1. JWT expiration and refresh token mechanism
+  2. OAuth error handling and rate limiting improvements
+  3. AES-256-GCM IV reuse vulnerability fix (IV should be random per encryption, not derived from data)
+  4. Multi-agency integration tests
+  5. Scheduled tasks (invoices, trash cleanup) are currently global - need agency scoping decision
 
 ## External Dependencies
 - **Database**: PostgreSQL (via Supabase)
