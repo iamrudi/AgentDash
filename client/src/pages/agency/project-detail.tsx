@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, Pencil, Trash2, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Plus, Pencil, Trash2, UserPlus, X } from "lucide-react";
+import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
 import { EditTaskDialog } from "@/components/edit-task-dialog";
@@ -30,6 +30,93 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+interface AssignmentDialogBodyProps {
+  taskToAssign: any;
+  tasks: any[];
+  staffList: Array<{ id: string; name: string }> | undefined;
+  onAssign: (taskId: string, staffProfileId: string) => void;
+  onUnassign: (taskId: string, staffProfileId: string) => void;
+}
+
+function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnassign }: AssignmentDialogBodyProps) {
+  const { toast } = useToast();
+  
+  // Memoize current assignments - will update when tasks array changes
+  const currentAssignments = useMemo(() => {
+    const currentTask = tasks.find((t: any) => t.id === taskToAssign?.id);
+    return currentTask?.assignments || [];
+  }, [tasks, taskToAssign?.id]);
+
+  const handleAssign = (value: string) => {
+    if (!taskToAssign || !value) return;
+    
+    // Check if already assigned using memoized current assignments
+    const alreadyAssigned = currentAssignments.some(
+      (a: any) => a.staffProfile.id === value
+    );
+    
+    if (alreadyAssigned) {
+      toast({
+        title: "Already Assigned",
+        description: "This staff member is already assigned to this task.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    onAssign(taskToAssign.id, value);
+  };
+
+  return (
+    <div className="py-4 space-y-4">
+      {/* Current Assignments */}
+      {currentAssignments.length > 0 && (
+        <div className="space-y-2">
+          <Label>Currently Assigned Staff</Label>
+          <div className="flex flex-wrap gap-2">
+            {currentAssignments.map((assignment: any) => (
+              <Badge
+                key={assignment.id}
+                variant="secondary"
+                className="pl-3 pr-1 py-1 gap-1 flex items-center"
+                data-testid={`badge-assigned-${assignment.staffProfile.id}`}
+              >
+                <span>{assignment.staffProfile.fullName}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-4 w-4 p-0 hover:bg-transparent"
+                  onClick={() => onUnassign(taskToAssign.id, assignment.staffProfile.id)}
+                  data-testid={`button-unassign-${assignment.staffProfile.id}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add Staff Member */}
+      <div className="space-y-2">
+        <Label htmlFor="staff-select">Add Staff Member</Label>
+        <Select value="" onValueChange={handleAssign}>
+          <SelectTrigger id="staff-select" data-testid="select-assign-staff">
+            <SelectValue placeholder="Select a staff member to add" />
+          </SelectTrigger>
+          <SelectContent position="popper" sideOffset={5} data-testid="select-staff-content">
+            {(staffList as any)?.map((staff: any) => (
+              <SelectItem key={staff.id} value={staff.id} data-testid={`select-staff-option-${staff.id}`}>
+                {staff.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -89,8 +176,26 @@ export default function ProjectDetail() {
         title: "Staff Assigned",
         description: "Staff member has been successfully assigned to the task.",
       });
-      setShowAssignStaff(false);
-      setTaskToAssign(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unassignStaffMutation = useMutation({
+    mutationFn: async ({ taskId, staffProfileId }: { taskId: string; staffProfileId: string }) => {
+      return await apiRequest("DELETE", `/api/agency/tasks/${taskId}/assign/${staffProfileId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", id] });
+      toast({
+        title: "Staff Unassigned",
+        description: "Staff member has been successfully removed from the task.",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -251,9 +356,9 @@ export default function ProjectDetail() {
                                 key={assignment.id}
                                 variant="outline"
                                 className="text-xs"
-                                data-testid={`badge-staff-${assignment.staffProfile.id}`}
+                                data-testid={`badge-assigned-${assignment.staffProfile.id}`}
                               >
-                                {assignment.staffProfile.name}
+                                {assignment.staffProfile.fullName}
                               </Badge>
                             ))}
                           </div>
@@ -347,34 +452,22 @@ export default function ProjectDetail() {
       <AlertDialog open={showAssignStaff} onOpenChange={setShowAssignStaff}>
         <AlertDialogContent data-testid="dialog-assign-staff">
           <AlertDialogHeader>
-            <AlertDialogTitle>Assign Staff to Task</AlertDialogTitle>
+            <AlertDialogTitle>Manage Staff Assignment</AlertDialogTitle>
             <AlertDialogDescription>
-              Select a staff member to assign to this task.
+              Assign or remove staff members from this task.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
-            <Label htmlFor="staff-select">Staff Member</Label>
-            <Select 
-              onValueChange={(value) => {
-                if (taskToAssign) {
-                  assignStaffMutation.mutate({ taskId: taskToAssign.id, staffProfileId: value });
-                }
-              }}
-            >
-              <SelectTrigger id="staff-select" data-testid="select-assign-staff">
-                <SelectValue placeholder="Select a staff member" />
-              </SelectTrigger>
-              <SelectContent position="popper" sideOffset={5} data-testid="select-staff-content">
-                {(staffList as any)?.map((staff: any) => (
-                  <SelectItem key={staff.id} value={staff.id} data-testid={`select-staff-option-${staff.id}`}>
-                    {staff.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          
+          <AssignmentDialogBody 
+            taskToAssign={taskToAssign}
+            tasks={tasks}
+            staffList={staffList}
+            onAssign={(taskId, staffProfileId) => assignStaffMutation.mutate({ taskId, staffProfileId })}
+            onUnassign={(taskId, staffProfileId) => unassignStaffMutation.mutate({ taskId, staffProfileId })}
+          />
+          
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-assign-staff">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-assign-staff">Close</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
