@@ -1,0 +1,175 @@
+Of course. Migrating to Supabase is a significant architectural upgrade. To ensure the Replit AI handles it correctly, we need to provide a detailed, phased prompt that breaks down the process into manageable steps.
+
+Here is a comprehensive prompt designed to guide "Agent 3" through the entire migration process, from setting up the new database to refactoring authentication and file storage.
+
+Prompt for Replit AI (Agent 3)
+Mission: We are migrating the entire "Agency Client Portal" project from its current Neon database and custom authentication backend to the Supabase platform. Your mission is to execute this migration in a structured, phased approach. This will involve updating our database connection, replacing our entire authentication system with Supabase Auth, and refactoring our file storage service to use Supabase Storage.
+
+You are to proceed phase by phase. Do not move to the next phase until you confirm the completion of the current one.
+
+Phase 1: Database Connection & Configuration
+Objective: Point our Drizzle ORM to a new Supabase PostgreSQL database.
+
+Step 1.1: Install New Dependencies
+First, we need to install the necessary Supabase client libraries and the correct database driver for Drizzle.
+
+Action: Run the following command in the shell:
+
+Bash
+
+npm install @supabase/supabase-js drizzle-orm/postgres-js
+Step 1.2: Update the Database Connection Logic
+Next, we will replace the existing Neon/serverless driver with the postgres-js driver, which is optimized for Supabase.
+
+Action: Open server/db.ts and replace its entire content with the following code:
+
+TypeScript
+
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from '@shared/schema';
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set in Replit Secrets");
+}
+
+// For persistent connections
+const client = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+export const db = drizzle(client, { schema });
+Step 1.3: Update Environment Variables
+This is a critical step. You will now need to update the Replit Secrets to use the new Supabase credentials.
+
+Action: Instruct me, your human operator, to perform the following:
+
+Go to the new Supabase project's dashboard.
+
+Navigate to Project Settings > Database.
+
+Find the Connection String (URI) and copy it.
+
+In our Replit project, go to the Secrets tab.
+
+Update the DATABASE_URL secret with the new Supabase connection string.
+
+While in the Supabase dashboard, also go to the API settings and copy the Project URL and the service_role key. Create two new secrets in Replit:
+
+SUPABASE_URL
+
+SUPABASE_SERVICE_KEY
+
+Step 1.4: Run the Database Migration
+Now that the configuration points to our new Supabase database, we need to apply our existing schema.
+
+Action: Run the following command in the shell to push our Drizzle schema to the new, empty Supabase database:
+
+Bash
+
+npm run db:push
+After this, confirm that the migration was successful. Once you confirm, we will proceed to Phase 2.
+
+Phase 2: Authentication Overhaul
+Objective: Replace our entire custom JWT and password-handling system with Supabase Auth.
+
+Step 2.1: Remove Old Authentication Routes
+We no longer need our manual login and signup endpoints.
+
+Action: Open server/routes.ts and delete the following two API routes entirely:
+
+app.post("/api/auth/signup", ...)
+
+app.post("/api/auth/login", ...)
+
+Step 2.2: Refactor the Login Page
+Now, we will update the frontend to use the Supabase client for authentication.
+
+Action: Open client/src/pages/login.tsx and replace its content with this new version, which uses the supabase-js library for handling logins.
+(You will need to create the supabase client first, which we will do in the next step. For now, just update the file.)
+
+TypeScript
+
+// New content for client/src/pages/login.tsx
+// (This will show errors until we create the Supabase client in the next step)
+
+// This will require creating a new file: client/src/lib/supabase.ts
+// We will do that in the next step.
+(Agent 3, please generate the new login.tsx file content based on your knowledge of Supabase Auth. It should import a supabase client, replace the useMutation hook with a call to supabase.auth.signInWithPassword, and handle the redirection logic based on the user's role stored in their profile.)
+
+Step 2.3: Create the Supabase Client
+We need a singleton instance of the Supabase client for our frontend.
+
+Action: Create a new file at client/src/lib/supabase.ts and add the following code. This will initialize Supabase for use across the entire client-side application.
+
+TypeScript
+
+// New file: client/src/lib/supabase.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Supabase URL and Anon Key must be provided in environment variables.");
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+Step 2.4: Update Environment for Frontend
+The frontend needs access to the Supabase URL and anon key.
+
+Action: Instruct me to add two new secrets to Replit:
+
+VITE_SUPABASE_URL (the Project URL from the Supabase dashboard)
+
+VITE_SUPABASE_ANON_KEY (the anon public key from the Supabase API settings)
+
+Phase 3: File Storage Migration
+Objective: Replace our local file system storage for invoice PDFs with Supabase Storage.
+
+Action: Open server/services/pdfStorage.ts and replace its entire content with the new version below. This version will use the Supabase client to upload files to a "invoices" bucket.
+
+TypeScript
+
+// New content for server/services/pdfStorage.ts
+import { createClient } from '@supabase/supabase-js';
+import path from 'path';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error("Supabase credentials are required for PDF storage.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export class PDFStorageService {
+  private bucketName = 'invoices';
+
+  async savePDF(invoiceNumber: string, pdfBuffer: Buffer): Promise<string> {
+    try {
+      const filename = `${invoiceNumber.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      
+      const { data, error } = await supabase.storage
+        .from(this.bucketName)
+        .upload(filename, pdfBuffer, {
+          contentType: 'application/pdf',
+          upsert: true, // Overwrite if it already exists
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(this.bucketName)
+        .getPublicUrl(filename);
+        
+      console.log(`PDF saved successfully to Supabase: ${publicUrl}`);
+      return publicUrl;
+    } catch (error) {
+      console.error("Error saving PDF to Supabase:", error);
+      throw error;
+    }
+  }
+
+  // ... (deletePDF and other methods can be updated similarly)
+}
