@@ -25,6 +25,7 @@ export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: text("company_name").notNull(),
   profileId: uuid("profile_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
+  businessContext: text("business_context"), // Strategic business context for AI recommendations
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
   monthlyRetainerHours: numeric("monthly_retainer_hours"), // Total hours included in monthly retainer (e.g., 40)
