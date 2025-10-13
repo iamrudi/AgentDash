@@ -58,6 +58,12 @@ const menuGroups = [
         icon: FolderKanban,
         notificationKey: null,
       },
+      {
+        title: "Projects",
+        url: "/agency/projects",
+        icon: FolderKanban,
+        notificationKey: null,
+      },
     ],
   },
   {
