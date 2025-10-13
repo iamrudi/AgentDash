@@ -9,7 +9,8 @@ export interface AuthRequest extends Request {
     id: string;
     email: string;
     role: string;
-    clientId?: string; // Client ID for tenant isolation
+    clientId?: string; // Client ID for tenant isolation (Client role)
+    agencyId?: string; // Agency ID for tenant isolation (Admin/Staff roles)
   };
 }
 
@@ -26,7 +27,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   try {
     const payload = verifyToken(token);
     
-    // Get user profile to determine client association
+    // Get user profile to determine agency and client association
     const [profile] = await db
       .select()
       .from(profiles)
@@ -34,6 +35,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       .limit(1);
 
     let clientId: string | undefined;
+    let agencyId: string | undefined = payload.agencyId;
 
     // If user is a client, get their clientId for tenant isolation
     if (profile?.role === "Client") {
@@ -44,6 +46,10 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
         .limit(1);
       
       clientId = client?.id;
+      agencyId = client?.agencyId; // Clients also belong to an agency
+    } else if (profile?.role === "Admin" || profile?.role === "Staff") {
+      // For Admin/Staff, get agencyId from profile (prefer JWT payload, fallback to profile)
+      agencyId = payload.agencyId || profile.agencyId || undefined;
     }
     
     req.user = {
@@ -51,6 +57,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       email: payload.email,
       role: profile?.role || payload.role,
       clientId,
+      agencyId,
     };
 
     next();

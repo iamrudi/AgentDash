@@ -15,6 +15,7 @@ export interface JWTPayload {
   userId: string;
   email: string;
   role: string;
+  agencyId?: string; // For Admin/Staff users - provides tenant isolation
 }
 
 export function generateToken(payload: JWTPayload): string {

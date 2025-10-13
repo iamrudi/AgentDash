@@ -78,19 +78,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Profile not found" });
       }
 
-      // Generate JWT token
+      // Get agencyId for tenant isolation
+      let agencyId: string | undefined;
+      let clientId: string | undefined;
+
+      if (profile.role === "Client") {
+        const client = await storage.getClientByProfileId(profile.id);
+        clientId = client?.id;
+        agencyId = client?.agencyId;
+      } else if (profile.role === "Admin" || profile.role === "Staff") {
+        agencyId = profile.agencyId || undefined;
+      }
+
+      // Generate JWT token with agencyId for tenant isolation
       const token = generateToken({
         userId: user.id,
         email: user.email,
         role: profile.role,
+        agencyId,
       });
-
-      // For Client users, include clientId in response
-      let clientId;
-      if (profile.role === "Client") {
-        const client = await storage.getClientByProfileId(profile.id);
-        clientId = client?.id;
-      }
 
       res.json({
         token,
@@ -99,6 +105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           profile,
           clientId,
+          agencyId,
         },
       });
     } catch (error: any) {
