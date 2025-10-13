@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProjectCard } from "@/components/dashboard/project-card";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { Project } from "@shared/schema";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AgencyProjects() {
   const [, setLocation] = useLocation();
+  const [showCreateProject, setShowCreateProject] = useState(false);
 
   const { data: projects, isLoading } = useQuery<Project[]>({
     queryKey: ["/api/agency/projects"],
@@ -38,7 +41,7 @@ export default function AgencyProjects() {
           </p>
         </div>
         <Button 
-          onClick={() => setLocation("/")} 
+          onClick={() => setShowCreateProject(true)} 
           data-testid="button-add-project"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -63,6 +66,11 @@ export default function AgencyProjects() {
           ))}
         </div>
       )}
+
+      <CreateProjectDialog 
+        open={showCreateProject} 
+        onOpenChange={setShowCreateProject}
+      />
     </div>
   );
 }
