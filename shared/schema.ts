@@ -125,6 +125,7 @@ export const initiatives = pgTable("initiatives", {
   billingType: text("billing_type"), // 'cost' or 'hours' - indicates payment method
   impact: text("impact"), // 'High', 'Medium', 'Low'
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  objectiveId: uuid("objective_id").references(() => clientObjectives.id, { onDelete: "set null" }), // Link to a strategic objective
   sentToClient: text("sent_to_client").default("false"), // Whether sent to client
   clientResponse: text("client_response"), // 'pending', 'approved', 'rejected', 'discussing'
   clientFeedback: text("client_feedback"), // Client's comments/feedback

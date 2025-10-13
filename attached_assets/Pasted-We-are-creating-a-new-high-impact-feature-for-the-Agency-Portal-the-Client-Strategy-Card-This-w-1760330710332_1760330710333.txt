@@ -1,0 +1,306 @@
+We are creating a new, high-impact feature for the Agency Portal: the "Client Strategy Card". This will be a comprehensive, at-a-glance data card displayed on the "Client Detail" page. Its purpose is to consolidate all quantitative and qualitative data into a single strategic view, enabling the Account Manager to make smarter, more empathetic decisions.
+
+This is a multi-step implementation involving the database, the AI engine, the backend, and the frontend. Please execute the following steps precisely.
+
+Step 1: Enhance the Database Schema for the "MAP"
+
+To create a "map" of where we're going, we need to track which initiatives are tied to which objectives.
+
+Action: Open shared/schema.ts and add a new objectiveId column to the initiatives table.
+
+TypeScript
+
+// In shared/schema.ts, inside the `initiatives` table definition
+
+export const initiatives = pgTable("initiatives", {
+  // ... (all existing columns)
+  objectiveId: uuid("objective_id").references(() => clientObjectives.id, { onDelete: "set null" }), // Link to a strategic objective
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  // ...
+});
+Step 2: Upgrade the AI Engine with Chat Analysis
+
+Our AI needs the ability to understand conversations.
+
+Action: Open server/gemini.ts and add the following new function. This will allow the AI to read a chat log and extract key insights.
+
+TypeScript
+
+// Add this new function to server/gemini.ts
+
+export async function analyzeChatHistory(
+  chatHistory: string
+): Promise<{ painPoints: string[]; recentWins: string[]; activeQuestions: string[] }> {
+  try {
+    const systemPrompt = `You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights. Identify the client's frustrations, their successes, and any open questions they are waiting on. Be concise and extract only the most important points.`;
+
+    const prompt = \`
+    Here is the recent chat history between the agency and the client:
+    ---
+    \${chatHistory}
+    ---
+    Based on this conversation, please extract the following:
+    1.  "painPoints": A list of specific problems, frustrations, or negative trends the client mentioned.
+    2.  "recentWins": A list of positive outcomes, successes, or happy comments from the client.
+    3.  "activeQuestions": A list of any specific, unanswered questions the client has.
+    \`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            painPoints: { type: "array", items: { type: "string" } },
+            recentWins: { type: "array", items: { type: "string" } },
+            activeQuestions: { type: "array", items: { type: "string" } },
+          },
+          required: ["painPoints", "recentWins", "activeQuestions"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (!rawJson) {
+      throw new Error("Empty response from Gemini AI during chat analysis");
+    }
+    return JSON.parse(rawJson);
+
+  } catch (error) {
+    console.error("Gemini AI chat analysis error:", error);
+    throw new Error(\`Failed to analyze chat history: \${error}\`);
+  }
+}
+Step 3: Build the Backend API Endpoint
+
+We need an endpoint to gather all the data for the card.
+
+Action: Open server/routes.ts and add the new analyzeChatHistory import. Then, add the following new API route inside the registerRoutes function.
+
+TypeScript
+
+// In server/routes.ts, add the new import at the top
+import { analyzeChatHistory } from "./gemini";
+
+// Add this new route inside the registerRoutes function
+app.get("/api/agency/clients/:clientId/strategy-card", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+  try {
+    const { clientId } = req.params;
+
+    // 1. Fetch all raw data in parallel
+    const [client, objectives, metrics, messages] = await Promise.all([
+      storage.getClientById(clientId),
+      storage.getActiveObjectivesByClientId(clientId),
+      storage.getMetricsByClientId(clientId, 30),
+      storage.getMessagesByClientId(clientId),
+    ]);
+
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    // 2. Process Analytical Data
+    const summaryKpis = {
+      totalSessions: metrics.reduce((sum, m) => sum + (m.sessions || 0), 0),
+      totalConversions: metrics.reduce((sum, m) => sum + (m.conversions || 0), 0),
+      totalSpend: metrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0),
+    };
+
+    // 3. Process Chat History with AI
+    const recentMessages = messages.slice(-15);
+    const chatHistoryText = recentMessages.length > 0
+      ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\\n')
+      : "No recent conversations.";
+    
+    const chatAnalysis = await analyzeChatHistory(chatHistoryText);
+
+    // 4. Assemble the final data card object
+    const strategyCardData = {
+      businessContext: client.businessContext,
+      clientObjectives: objectives,
+      summaryKpis,
+      chatAnalysis,
+    };
+
+    res.json(strategyCardData);
+  } catch (error: any) {
+    console.error("Strategy Card endpoint error:", error);
+    res.status(500).json({ message: error.message || "Failed to generate strategy card data" });
+  }
+});
+Step 4: Build the Frontend "Client Strategy Card" Component
+
+This is the UI that will display our consolidated data.
+
+Action: Create a new file at client/src/components/agency/client-strategy-card.tsx and populate it with the following code:
+
+TypeScript
+
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, BrainCircuit, Target, MessageSquare, TrendingUp, TrendingDown, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { ClientObjective } from "@shared/schema";
+
+interface StrategyCardData {
+  businessContext: string | null;
+  clientObjectives: ClientObjective[];
+  summaryKpis: {
+    totalSessions: number;
+    totalConversions: number;
+    totalSpend: number;
+  };
+  chatAnalysis: {
+    painPoints: string[];
+    recentWins: string[];
+    activeQuestions: string[];
+  };
+}
+
+export function ClientStrategyCard({ clientId }: { clientId: string }) {
+  const { data, isLoading, error } = useQuery<StrategyCardData>({
+    queryKey: ['/api/agency/clients', clientId, 'strategy-card'],
+    enabled: !!clientId,
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex justify-center items-center h-48">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{(error as Error).message}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BrainCircuit className="h-6 w-6 text-primary" />
+          AI-Powered Client Strategy Map
+        </CardTitle>
+        <CardDescription>
+          A consolidated overview of this client's strategic context, goals, and recent activity.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Column 1: Qualitative Context */}
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-semibold mb-2">Business Context</h4>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {data?.businessContext || "No business context provided."}
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-2">Active Strategic Goals</h4>
+            {data?.clientObjectives.length ? (
+              <ul className="list-disc list-inside space-y-1">
+                {data.clientObjectives.map(obj => (
+                  <li key={obj.id} className="text-sm flex items-start gap-2">
+                    <Target className="h-4 w-4 mt-1 text-primary shrink-0" />
+                    <span>{obj.description}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-muted-foreground">No active goals set.</p>}
+          </div>
+        </div>
+
+        {/* Column 2: AI-Analyzed Chat Insights */}
+        <div className="space-y-4">
+          <h4 className="font-semibold">Recent Conversation Insights</h4>
+          <div className="space-y-3">
+            {data?.chatAnalysis.painPoints.length ? (
+              <div>
+                <h5 className="text-xs font-semibold text-destructive mb-1 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Client Pain Points</h5>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {data.chatAnalysis.painPoints.map((point, i) => <li key={i}>{point}</li>)}
+                </ul>
+              </div>
+            ) : null}
+            {data?.chatAnalysis.recentWins.length ? (
+              <div>
+                <h5 className="text-xs font-semibold text-green-500 mb-1 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Recent Wins</h5>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {data.chatAnalysis.recentWins.map((win, i) => <li key={i}>{win}</li>)}
+                </ul>
+              </div>
+            ) : null}
+            {data?.chatAnalysis.activeQuestions.length ? (
+              <div>
+                <h5 className="text-xs font-semibold text-yellow-500 mb-1 flex items-center gap-1"><HelpCircle className="h-3 w-3" /> Active Questions</h5>
+                <ul className="list-disc list-inside text-sm text-muted-foreground">
+                  {data.chatAnalysis.activeQuestions.map((q, i) => <li key={i}>{q}</li>)}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Column 3: Analytical Snapshot */}
+        <div className="space-y-4">
+          <h4 className="font-semibold">30-Day Performance Snapshot</h4>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+              <span className="text-sm font-medium">Total Sessions</span>
+              <span className="text-lg font-bold font-mono">{data?.summaryKpis.totalSessions.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+              <span className="text-sm font-medium">Total Conversions</span>
+              <span className="text-lg font-bold font-mono">{data?.summaryKpis.totalConversions.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+              <span className="text-sm font-medium">Total Ad Spend</span>
+              <span className="text-lg font-bold font-mono">${data?.summaryKpis.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+Step 5: Integrate the New Card into the Client Detail Page
+
+Finally, let's display this new component.
+
+Action: Open client/src/pages/client-detail.tsx. Import the new ClientStrategyCard component and place it at the top of the main content area, right after the page title.
+
+TypeScript
+
+// At the top of client/src/pages/client-detail.tsx
+import { ClientStrategyCard } from "@/components/agency/client-strategy-card";
+
+// In the main ClientDetail component's return statement
+// ...
+<main className="flex-1 overflow-auto p-6">
+  <div className="max-w-7xl mx-auto space-y-6">
+    <div>
+      <h1 className="text-3xl font-semibold mb-2" data-testid="text-client-name">
+        {client.companyName}
+      </h1>
+      <p className="text-muted-foreground">
+        Client dashboard, integrations, and strategic map
+      </p>
+    </div>
+
+    {/* ADD THE NEW STRATEGY CARD HERE */}
+    <ClientStrategyCard clientId={clientId!} />
+
+    <Tabs defaultValue="integrations" className="w-full">
+      {/* ... rest of the Tabs component ... */}
