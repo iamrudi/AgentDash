@@ -19,6 +19,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { ClientStrategyCard } from "@/components/agency/client-strategy-card";
 
 interface GA4Integration {
   connected: boolean;
@@ -168,9 +169,12 @@ export default function ClientDetail() {
                   {client.companyName}
                 </h1>
                 <p className="text-muted-foreground">
-                  Manage client details and integrations
+                  Client dashboard, integrations, and strategic map
                 </p>
               </div>
+
+              {/* ADD THE NEW STRATEGY CARD HERE */}
+              <ClientStrategyCard clientId={clientId!} />
 
               <Tabs defaultValue="integrations" className="w-full">
                 <TabsList>
