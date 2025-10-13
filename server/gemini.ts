@@ -309,3 +309,50 @@ export async function summarizeLighthouseReport(
     throw new Error(`Failed to summarize Lighthouse report: ${error}`);
   }
 }
+
+export async function analyzeChatHistory(
+  chatHistory: string
+): Promise<{ painPoints: string[]; recentWins: string[]; activeQuestions: string[] }> {
+  try {
+    const systemPrompt = `You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights. Identify the client's frustrations, their successes, and any open questions they are waiting on. Be concise and extract only the most important points.`;
+
+    const prompt = `
+    Here is the recent chat history between the agency and the client:
+    ---
+    ${chatHistory}
+    ---
+    Based on this conversation, please extract the following:
+    1.  "painPoints": A list of specific problems, frustrations, or negative trends the client mentioned.
+    2.  "recentWins": A list of positive outcomes, successes, or happy comments from the client.
+    3.  "activeQuestions": A list of any specific, unanswered questions the client has.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            painPoints: { type: "ARRAY", items: { type: "STRING" } },
+            recentWins: { type: "ARRAY", items: { type: "STRING" } },
+            activeQuestions: { type: "ARRAY", items: { type: "STRING" } },
+          },
+          required: ["painPoints", "recentWins", "activeQuestions"],
+        },
+      },
+      contents: prompt,
+    });
+
+    const rawJson = response.text;
+    if (!rawJson) {
+      throw new Error("Empty response from Gemini AI during chat analysis");
+    }
+    return JSON.parse(rawJson);
+
+  } catch (error) {
+    console.error("Gemini AI chat analysis error:", error);
+    throw new Error(`Failed to analyze chat history: ${error}`);
+  }
+}
