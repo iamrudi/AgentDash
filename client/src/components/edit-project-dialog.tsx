@@ -8,12 +8,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Client, Project } from "@shared/schema";
+import { Client } from "@shared/schema";
+
+// Type for project from API (dates as strings)
+type ProjectFromAPI = {
+  id: string;
+  name: string;
+  description: string | null;
+  clientId: string;
+  status: string;
+  createdAt: string;
+};
 
 interface EditProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  project: Project | null;
+  project: ProjectFromAPI | null;
 }
 
 export function EditProjectDialog({ open, onOpenChange, project }: EditProjectDialogProps) {

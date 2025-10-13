@@ -30,11 +30,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { Task, Profile, StaffAssignment } from "@shared/schema";
+
+// Type for task with populated assignments
+type TaskWithAssignments = Task & {
+  assignments: Array<StaffAssignment & { staffProfile: Profile }>;
+};
+
+// Type for staff list from API
+type StaffListItem = {
+  id: string;
+  name: string;
+};
 
 interface AssignmentDialogBodyProps {
-  taskToAssign: any;
-  tasks: any[];
-  staffList: Array<{ id: string; name: string }> | undefined;
+  taskToAssign: TaskWithAssignments | null;
+  tasks: TaskWithAssignments[];
+  staffList: StaffListItem[] | undefined;
   onAssign: (taskId: string, staffProfileId: string) => void;
   onUnassign: (taskId: string, staffProfileId: string) => void;
 }
@@ -44,16 +56,17 @@ function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnas
   
   // Memoize current assignments - will update when tasks array changes
   const currentAssignments = useMemo(() => {
-    const currentTask = tasks.find((t: any) => t.id === taskToAssign?.id);
+    if (!taskToAssign) return [];
+    const currentTask = tasks.find(t => t.id === taskToAssign.id);
     return currentTask?.assignments || [];
-  }, [tasks, taskToAssign?.id]);
+  }, [tasks, taskToAssign]);
 
   const handleAssign = (value: string) => {
     if (!taskToAssign || !value) return;
     
     // Check if already assigned using memoized current assignments
     const alreadyAssigned = currentAssignments.some(
-      (a: any) => a.staffProfile.id === value
+      a => a.staffProfile.id === value
     );
     
     if (alreadyAssigned) {
@@ -75,7 +88,7 @@ function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnas
         <div className="space-y-2">
           <Label>Currently Assigned Staff</Label>
           <div className="flex flex-wrap gap-2">
-            {currentAssignments.map((assignment: any) => (
+            {currentAssignments.map(assignment => (
               <Badge
                 key={assignment.id}
                 variant="secondary"
@@ -87,7 +100,7 @@ function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnas
                   variant="ghost"
                   size="icon"
                   className="h-4 w-4 p-0 hover:bg-transparent"
-                  onClick={() => onUnassign(taskToAssign.id, assignment.staffProfile.id)}
+                  onClick={() => taskToAssign && onUnassign(taskToAssign.id, assignment.staffProfile.id)}
                   data-testid={`button-unassign-${assignment.staffProfile.id}`}
                 >
                   <X className="w-3 h-3" />
@@ -106,7 +119,7 @@ function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnas
             <SelectValue placeholder="Select a staff member to add" />
           </SelectTrigger>
           <SelectContent position="popper" sideOffset={5} data-testid="select-staff-content">
-            {(staffList as any)?.map((staff: any) => (
+            {staffList?.map(staff => (
               <SelectItem key={staff.id} value={staff.id} data-testid={`select-staff-option-${staff.id}`}>
                 {staff.name}
               </SelectItem>
@@ -125,22 +138,25 @@ export default function ProjectDetail() {
   const [showEditProject, setShowEditProject] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [selectedTask, setSelectedTask] = useState<TaskWithAssignments | null>(null);
   const [showDeleteTask, setShowDeleteTask] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState<any>(null);
+  const [taskToDelete, setTaskToDelete] = useState<TaskWithAssignments | null>(null);
   const [showAssignStaff, setShowAssignStaff] = useState(false);
-  const [taskToAssign, setTaskToAssign] = useState<any>(null);
+  const [taskToAssign, setTaskToAssign] = useState<TaskWithAssignments | null>(null);
 
-  const { data: projectData, isLoading } = useQuery({
+  const { data: projectData, isLoading} = useQuery<{
+    project: { id: string; name: string; status: string; description: string | null; clientId: string; createdAt: string };
+    tasks: TaskWithAssignments[];
+  }>({
     queryKey: ["/api/agency/projects", id],
     enabled: !!id,
   });
 
-  const { data: staffList } = useQuery({
+  const { data: staffList } = useQuery<StaffListItem[]>({
     queryKey: ["/api/agency/staff"],
   });
 
-  const { data: clients } = useQuery({
+  const { data: clients } = useQuery<Array<{ id: string; companyName: string }>>({
     queryKey: ["/api/agency/clients"],
   });
 
@@ -229,8 +245,8 @@ export default function ProjectDetail() {
     );
   }
 
-  const { project, tasks } = projectData as any;
-  const client = (clients as any)?.find((c: any) => c.id === project?.clientId);
+  const { project, tasks } = projectData;
+  const client = clients?.find(c => c.id === project?.clientId);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -266,7 +282,7 @@ export default function ProjectDetail() {
           <div>
             <h1 className="text-3xl font-bold" data-testid="text-project-name">{project.name}</h1>
             <p className="text-muted-foreground" data-testid="text-project-client">
-              {client?.name || "Unknown Client"}
+              {client?.companyName || "Unknown Client"}
             </p>
           </div>
         </div>
@@ -326,7 +342,7 @@ export default function ProjectDetail() {
             </div>
           ) : (
             <div className="space-y-3">
-              {tasks.map((task: any) => (
+              {tasks.map(task => (
                 <Card key={task.id} className="hover-elevate" data-testid={`card-task-${task.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
@@ -338,8 +354,8 @@ export default function ProjectDetail() {
                           <Badge className={getStatusColor(task.status)} data-testid={`badge-task-status-${task.id}`}>
                             {task.status}
                           </Badge>
-                          <Badge className={getPriorityColor(task.priority)} data-testid={`badge-task-priority-${task.id}`}>
-                            {task.priority}
+                          <Badge className={getPriorityColor(task.priority || 'Medium')} data-testid={`badge-task-priority-${task.id}`}>
+                            {task.priority || 'Medium'}
                           </Badge>
                         </div>
                         
@@ -351,7 +367,7 @@ export default function ProjectDetail() {
 
                         {task.assignments && task.assignments.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {task.assignments.map((assignment: any) => (
+                            {task.assignments.map(assignment => (
                               <Badge
                                 key={assignment.id}
                                 variant="outline"
