@@ -11,7 +11,7 @@ import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
-import { analyzeDataOnDemand, summarizeLighthouseReport } from "./gemini";
+import { analyzeDataOnDemand, summarizeLighthouseReport, analyzeChatHistory } from "./gemini";
 import { SeoAuditService } from "./services/seoAuditService";
 import express from "express";
 import path from "path";
@@ -615,6 +615,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(metrics);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/agency/clients/:clientId/strategy-card", requireAuth, requireRole("Admin"), requireClientAccess(), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      // 1. Fetch all raw data in parallel
+      const [client, objectives, metrics, messages] = await Promise.all([
+        storage.getClientById(clientId),
+        storage.getActiveObjectivesByClientId(clientId),
+        storage.getMetricsByClientId(clientId, 30),
+        storage.getMessagesByClientId(clientId),
+      ]);
+
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // 2. Process Analytical Data
+      const summaryKpis = {
+        totalSessions: metrics.reduce((sum, m) => sum + (m.sessions || 0), 0),
+        totalConversions: metrics.reduce((sum, m) => sum + (m.conversions || 0), 0),
+        totalSpend: metrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0),
+      };
+
+      // 3. Process Chat History with AI
+      const recentMessages = messages.slice(-15);
+      const chatHistoryText = recentMessages.length > 0
+        ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\n')
+        : "No recent conversations.";
+      
+      const chatAnalysis = await analyzeChatHistory(chatHistoryText);
+
+      // 4. Assemble the final data card object
+      const strategyCardData = {
+        businessContext: client.businessContext,
+        clientObjectives: objectives,
+        summaryKpis,
+        chatAnalysis,
+      };
+
+      res.json(strategyCardData);
+    } catch (error: any) {
+      console.error("Strategy Card endpoint error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate strategy card data" });
     }
   });
 
