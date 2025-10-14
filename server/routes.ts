@@ -1201,6 +1201,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
       
+      // If approved, automatically create project and invoice
+      let projectId: string | undefined;
+      let invoiceId: string | undefined;
+      
+      if (response === "approved") {
+        try {
+          // Create project from approved initiative
+          const project = await storage.createProject({
+            name: existingInitiative.title,
+            description: existingInitiative.proposedAction || existingInitiative.observation,
+            status: "Active",
+            clientId: existingInitiative.clientId,
+          });
+          projectId = project.id;
+          
+          console.log(`Created project ${project.id} from approved initiative ${id}`);
+        } catch (projectError) {
+          console.error("Failed to create project from initiative:", projectError);
+          // Don't fail the approval, just log the error
+        }
+        
+        // Generate invoice if needed (fixed cost initiatives or if cost is specified)
+        if (existingInitiative.billingType === "fixed" || (existingInitiative.cost && parseFloat(existingInitiative.cost) > 0)) {
+          try {
+            const invoiceGenerator = new InvoiceGeneratorService(storage);
+            invoiceId = await invoiceGenerator.generateInvoiceFromInitiative(id);
+            console.log(`Generated invoice ${invoiceId} from approved initiative ${id}`);
+          } catch (invoiceError) {
+            console.error("Failed to generate invoice from initiative:", invoiceError);
+            // Don't fail the approval, just log the error
+          }
+        }
+      }
+      
       // Create notification for admin users about client response (don't let notification failures break the response)
       try {
         const profile = await storage.getProfileByUserId(req.user!.id);
@@ -1230,7 +1264,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Failed to create initiative response notification:", notificationError);
       }
       
-      res.json(initiative);
+      res.json({ 
+        ...initiative, 
+        projectId,
+        invoiceId,
+        message: response === "approved" 
+          ? `Initiative approved successfully${projectId ? ', project created' : ''}${invoiceId ? ', invoice generated' : ''}` 
+          : undefined
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
