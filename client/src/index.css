@@ -12,7 +12,7 @@
   --popover: 0 0% 98%;
   --popover-foreground: 0 0% 13%;
   --popover-border: 0 0% 90%;
-  --primary: 211 100% 50%;          /* #0a84ff - Apple Blue */
+  --primary: 210 100% 52%;          /* #0a84ff - Apple Blue */
   --primary-foreground: 0 0% 100%;
   --secondary: 243 75% 59%;         /* #5e5ce6 - Indigo */
   --secondary-foreground: 0 0% 100%;
@@ -24,18 +24,18 @@
   --destructive-foreground: 0 0% 100%;
   --border: 0 0% 90%;
   --input: 0 0% 90%;
-  --ring: 211 100% 50%;
+  --ring: 210 100% 52%;
   --radius: 0.5rem;
 
   /* Sidebar for light mode */
   --sidebar: 0 0% 96%;              /* Light gray sidebar */
   --sidebar-foreground: 0 0% 13%;
   --sidebar-border: 0 0% 88%;
-  --sidebar-primary: 211 100% 50%;
+  --sidebar-primary: 210 100% 52%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 0 0% 92%;
   --sidebar-accent-foreground: 0 0% 13%;
-  --sidebar-ring: 211 100% 50%;
+  --sidebar-ring: 210 100% 52%;
 
   /* Chart colors */
   --chart-1: 150 76% 42%;
@@ -80,7 +80,7 @@
   --popover: 0 0% 24%;
   --popover-foreground: 0 0% 94%;
   --popover-border: 0 0% 33%;
-  --primary: 211 100% 50%;          /* #0a84ff - Apple Blue */
+  --primary: 210 100% 52%;          /* #0a84ff - Apple Blue */
   --primary-foreground: 0 0% 100%;
   --secondary: 243 75% 59%;         /* #5e5ce6 - Indigo */
   --secondary-foreground: 0 0% 100%;
@@ -92,7 +92,7 @@
   --destructive-foreground: 0 0% 100%;
   --border: 0 0% 33%;               /* #545458 */
   --input: 0 0% 33%;                /* #545458 */
-  --ring: 211 100% 50%;             /* #0a84ff */
+  --ring: 210 100% 52%;             /* #0a84ff */
 
   /* Sidebar - Slightly darker for macOS aesthetic */
   --sidebar: 0 0% 13%;              /* #202020 - Darker */
