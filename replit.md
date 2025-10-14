@@ -16,10 +16,11 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Navigation**: Collapsible sidebar with icon-only mode and portal-specific branding.
 
 ### Technical Implementations
-- **Authentication & Authorization**: Supabase Auth with session tokens, RBAC, and tenant isolation, including automatic token refresh.
+- **Authentication & Authorization**: Supabase Auth with session tokens, RBAC, and tenant isolation, including automatic token refresh. Agency ID stored in secure JWT `app_metadata` (immutable by users).
+- **Row-Level Security (RLS)**: Database-level tenant isolation with Postgres RLS policies on all 14 tables. Defense-in-depth security using `auth.get_agency_id()` helper function extracting agency context from JWT.
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
-- **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
+- **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection, RLS for database-level access control.
 - **OAuth Reliability (GA4/GSC)**: Production-ready error handling with user-friendly messages, reserve-and-release rate limiting (per-client hourly/daily quotas preventing concurrent bypass), and retry logic with exponential backoff (3 attempts: 1s→2s→4s delays). All Google API calls use centralized `withRateLimitAndRetry` helper ensuring consistent error parsing, quota enforcement, and transient failure recovery.
 - **AI Recommendation Engine**: Google Gemini AI analyzes GA4/GSC metrics to generate strategic initiatives and task lists.
 - **Client Strategy Card**: AI-powered consolidated client view with business context, goals, chat insights, and performance.
@@ -39,7 +40,10 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console (OAuth, site selection, performance metrics).
 
 ### System Design Choices
-- **Multi-tenancy**: Strict tenant isolation enforced at the route and storage layers, with `req.user.agencyId` used for all data filtering. `requireClientAccess()` middleware prevents cross-agency access.
+- **Multi-tenancy**: Defense-in-depth tenant isolation with two layers:
+  - **Application Layer**: Route middleware (`requireAuth`, `requireClientAccess`) and storage filtering by `req.user.agencyId`
+  - **Database Layer**: Postgres Row-Level Security (RLS) policies on all tables using JWT `app_metadata.agency_id`
+  - Protection against application bugs, direct database access, and compromised service keys
 - **API Structure**: RESTful endpoints with role-based access.
 - **Project Structure**: Separate frontend, backend, and shared codebases.
 
