@@ -38,6 +38,7 @@ import AgencyUsers from "@/pages/agency/users";
 import AgencyInvoices from "@/pages/agency/invoices";
 import AgencyTrash from "@/pages/agency/trash";
 import AgencySeoAudit from "@/pages/agency/seo-audit";
+import AgencySettings from "@/pages/agency/settings";
 
 function Router() {
   return (
@@ -193,6 +194,12 @@ function Router() {
       <Route path="/agency/seo-audit">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencySeoAudit />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/settings">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencySettings />
         </ProtectedRoute>
       </Route>
 

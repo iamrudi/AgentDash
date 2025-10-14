@@ -25,6 +25,10 @@ import {
   MessageSquare,
   Link2,
   UserCog,
+  Settings,
+  PenTool,
+  Search,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,27 +84,21 @@ export function AppSidebar() {
       notificationKey: null,
     },
     {
-      title: "Invoices",
-      url: "/agency/invoices",
-      icon: FileText,
+      title: "SEO Audit",
+      url: "/agency/seo-audit",
+      icon: Search,
       notificationKey: null,
     },
     {
-      title: "Google Integrations",
-      url: "/agency/integrations",
-      icon: Link2,
+      title: "Content Co-pilot",
+      url: "/agency/content-copilot",
+      icon: PenTool,
       notificationKey: null,
     },
     {
-      title: "Staff",
-      url: "/agency/staff",
-      icon: Users,
-      notificationKey: null,
-    },
-    {
-      title: "User Management",
-      url: "/agency/users",
-      icon: UserCog,
+      title: "Settings",
+      url: "/agency/settings",
+      icon: Settings,
       notificationKey: null,
     },
   ];
