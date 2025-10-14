@@ -15,6 +15,7 @@ import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
 import { analyzeDataOnDemand, summarizeLighthouseReport, analyzeChatHistory } from "./gemini";
 import { SeoAuditService } from "./services/seoAuditService";
+import { EnhancedSeoAuditService } from "./services/enhancedSeoAuditService";
 import express from "express";
 import path from "path";
 
@@ -3102,19 +3103,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SEO Audit endpoint (Admin only)
   app.post("/api/seo/audit", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const { url } = req.body;
+      const { url, clientId, targetKeyword } = req.body;
       if (!url) {
         return res.status(400).json({ message: "URL is required" });
       }
 
-      const auditService = new SeoAuditService();
-      const lighthouseReport = await auditService.runLighthouseAudit(url);
+      const enhancedAuditService = new EnhancedSeoAuditService();
+      let dataForSeoCredentials;
 
-      // Get AI summary
-      const aiSummary = await summarizeLighthouseReport(url, lighthouseReport);
+      // If client ID is provided, try to get Data for SEO credentials
+      if (clientId) {
+        const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+        if (integration?.dataForSeoLogin && integration?.dataForSeoPassword) {
+          try {
+            const login = decrypt(
+              integration.dataForSeoLogin,
+              integration.dataForSeoLoginIv!,
+              integration.dataForSeoLoginAuthTag!
+            );
+            const password = decrypt(
+              integration.dataForSeoPassword,
+              integration.dataForSeoPasswordIv!,
+              integration.dataForSeoPasswordAuthTag!
+            );
+            dataForSeoCredentials = { login, password };
+          } catch (error) {
+            console.error('Failed to decrypt Data for SEO credentials:', error);
+          }
+        }
+      }
+
+      // Run enhanced audit
+      const auditResult = await enhancedAuditService.runEnhancedAudit(
+        url,
+        targetKeyword,
+        dataForSeoCredentials
+      );
+
+      // Get AI summary with enhanced data
+      const aiSummary = await summarizeLighthouseReport(url, auditResult.lighthouseReport);
 
       res.json({
-        lighthouseReport,
+        ...auditResult,
         aiSummary,
       });
     } catch (error: any) {
