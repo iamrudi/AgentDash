@@ -882,6 +882,14 @@ export class DbStorage implements IStorage {
       ))
       .limit(1);
     
+    console.error('[Storage] getIntegrationByClientId:', { 
+      clientId, 
+      serviceName, 
+      found: !!result[0],
+      gscSiteUrl: result[0]?.gscSiteUrl,
+      hasAccessToken: !!result[0]?.accessToken
+    });
+    
     // Decrypt tokens before returning
     if (result[0] && result[0].accessToken) {
       const integration = result[0];
