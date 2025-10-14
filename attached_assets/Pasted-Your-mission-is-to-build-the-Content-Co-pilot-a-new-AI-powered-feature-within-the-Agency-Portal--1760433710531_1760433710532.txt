@@ -1,0 +1,101 @@
+Your mission is to build the "Content Co-pilot," a new, AI-powered feature within the Agency Portal. This tool will assist agency staff in creating high-performance content by providing data-driven ideas, generating comprehensive content briefs, and optimizing existing articles.
+
+This mission requires integrating a new third-party API (Data for SEO), creating new backend endpoints, and building a new user interface.
+
+1. Core Feature Requirements
+The Content Co-pilot will have three primary functions accessible through a tabbed interface:
+
+Content Idea Generation: Scans data sources for content opportunities (content gaps, low-hanging fruit) and presents them to the user.
+
+Content Brief Generation: Creates a detailed, structured brief for a new piece of content based on a target keyword.
+
+Content Optimization: Analyzes a user-submitted piece of content and provides specific, actionable SEO recommendations.
+
+2. New API Integration: Data for SEO
+You must add the capability to connect to the "Data for SEO" API.
+
+Integration Management:
+
+Modify the integrations page at client/src/pages/agency/integrations.tsx.
+
+Add a new Card component for "Data for SEO", mirroring the design of the existing Google Analytics 4 and Google Search Console cards.
+
+This card should include a "Connect" button that opens a Dialog prompting the user to enter their "Data for SEO API Login" and "API Password/Key".
+
+Credential Storage:
+
+Create a new backend endpoint POST /api/integrations/dataforseo/:clientId/connect.
+
+This endpoint will receive the client's Data for SEO credentials. These credentials MUST be securely encrypted using the existing encryption service before being saved to the integrations table in the database.
+
+Service Abstraction:
+
+Create a new file at server/lib/dataForSeo.ts. This file will contain all the functions for making requests to the Data for SEO API, abstracting the API logic from the routes.
+
+3. Backend Implementation
+You are to create the necessary API endpoints and business logic to power the Content Co-pilot.
+
+Create New API Routes: In server/routes.ts, add the following protected routes, accessible to "Admin" and "Staff" roles:
+
+TypeScript
+
+// Endpoint to generate content ideas for a client
+app.post("/api/content-copilot/:clientId/ideas", requireAuth, requireRole("Admin", "Staff"), generateContentIdeas);
+
+// Endpoint to generate a detailed content brief from a keyword
+app.post("/api/content-copilot/:clientId/brief", requireAuth, requireRole("Admin", "Staff"), generateContentBrief);
+
+// Endpoint to analyze and provide optimizations for existing content
+app.post("/api/content-copilot/:clientId/optimize", requireAuth, requireRole("Admin", "Staff"), optimizeContent);
+Implement Endpoint Logic:
+
+generateContentIdeas:
+
+Fetch "low-hanging fruit" keywords (high impressions, low CTR, position 11-30) for the clientId using the existing GSC integration (fetchGSCData).
+
+Using the new dataForSeo.ts service, perform a content gap analysis by finding keywords that top competitors rank for but the client does not.
+
+Pass both lists of keywords to a new function in server/gemini.ts. The AI should categorize these ideas, remove duplicates, and return a prioritized list of content topics.
+
+generateContentBrief:
+
+Accept a keyword in the request body.
+
+Use the dataForSeo.ts service to query the SERP for the keyword and analyze the top 10 ranking pages. Extract common subtopics, heading structures, word counts, and questions from "People Also Ask".
+
+Pass this structured data to a new function in server/gemini.ts. The AI should synthesize this into a comprehensive content brief including a suggested title, meta description, H1, heading outline (H2s, H3s), and key questions to answer.
+
+optimizeContent:
+
+Accept content (string) and a keyword in the request body.
+
+Fetch data on the top 10 ranking pages for the keyword using dataForSeo.ts.
+
+Pass the user's content and the competitor data to a new function in server/gemini.ts. The AI should provide specific, actionable feedback on how to improve the content, such as adding semantic keywords, improving heading structure, and better addressing user intent.
+
+4. Frontend Implementation
+You are to build the user interface for the Content Co-pilot.
+
+Create New Page Component:
+
+Create a new file at client/src/pages/agency/content-copilot.tsx.
+
+This page should use the AgencyLayout component.
+
+Implement a client selector dropdown at the top of the page so the user can choose which client to work on.
+
+Build the UI:
+
+Use the <Tabs> component from shadcn/ui to create the three sections: "Ideas," "Briefs," and "Optimization."
+
+Ideas Tab: A simple button to "Generate Ideas." Display the results in a <Table> with columns for "Topic," "Source" (e.g., "Content Gap"), and "Priority."
+
+Briefs Tab: An <Input> for the target keyword and a "Generate Brief" <Button>. Display the resulting brief in a formatted, easy-to-read layout within a <Card>.
+
+Optimization Tab: A <Textarea> for the user to paste their content, an <Input> for the target keyword, and a "Optimize Content" <Button>. Display the AI's suggestions in a separate panel next to the textarea.
+
+Use @tanstack/react-query for all data fetching and mutations, ensuring loading and error states are handled gracefully.
+
+Update Navigation:
+
+Modify the agency sidebar in client/src/components/agency-sidebar.tsx to include a new navigation link to /agency/content-copilot. The link should have an appropriate icon (e.g., a lightbulb or pen).
