@@ -456,7 +456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch and store GA4 data
       if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken) {
         const { fetchGA4Data } = await import("./lib/googleOAuth");
-        const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end);
+        const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end, clientId);
         
         // Store GA4 metrics
         for (const row of ga4Data.rows || []) {
@@ -482,7 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch and store GSC data
       if (gscIntegration && gscIntegration.gscSiteUrl && gscIntegration.accessToken) {
         const { fetchGSCData } = await import("./lib/googleOAuth");
-        const gscData = await fetchGSCData(gscIntegration.accessToken, gscIntegration.gscSiteUrl, start, end);
+        const gscData = await fetchGSCData(gscIntegration.accessToken, gscIntegration.gscSiteUrl, start, end, clientId);
         
         // Store GSC metrics
         for (const row of gscData.rows || []) {
@@ -1457,11 +1457,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const properties = await fetchGA4Properties(integration.accessToken!);
+      const properties = await fetchGA4Properties(integration.accessToken!, clientId);
       res.json(properties);
     } catch (error: any) {
       console.error("Fetch properties error:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch properties" });
+      // Use userMessage if available (from GoogleApiError), otherwise use generic message
+      const message = error.userMessage || error.message || "Failed to fetch properties";
+      res.status(500).json({ message });
     }
   });
 
@@ -1583,11 +1585,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const sites = await fetchGSCSites(integration.accessToken!);
+      const sites = await fetchGSCSites(integration.accessToken!, clientId);
       res.json(sites);
     } catch (error: any) {
       console.error("Fetch sites error:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch sites" });
+      const message = error.userMessage || error.message || "Failed to fetch sites";
+      res.status(500).json({ message });
     }
   });
 
@@ -1743,11 +1746,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Access token not available" });
       }
 
-      const data = await fetchGA4KeyEvents(integration.accessToken, integration.ga4PropertyId!, integration.ga4LeadEventName!, start, end);
+      const data = await fetchGA4KeyEvents(integration.accessToken, integration.ga4PropertyId!, integration.ga4LeadEventName!, start, end, clientId);
       res.json(data);
     } catch (error: any) {
       console.error("Fetch GA4 conversions error:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch GA4 conversions" });
+      const message = error.userMessage || error.message || "Failed to fetch GA4 conversions";
+      res.status(500).json({ message });
     }
   });
 
@@ -1793,7 +1797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Access token not available" });
       }
 
-      const data = await fetchGA4AcquisitionChannels(integration.accessToken, integration.ga4PropertyId!, start, end);
+      const data = await fetchGA4AcquisitionChannels(integration.accessToken, integration.ga4PropertyId!, start, end, clientId);
       res.json(data);
     } catch (error: any) {
       console.error("Fetch GA4 acquisition channels error:", error);
@@ -1834,7 +1838,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Access token not available" });
       }
 
-      const data = await fetchGA4Data(integration.accessToken, integration.ga4PropertyId!, start, end);
+      const data = await fetchGA4Data(integration.accessToken, integration.ga4PropertyId!, start, end, clientId);
       
       // Log GA4 response details
       const logData = {
@@ -1899,7 +1903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Access token not available" });
       }
 
-      const data = await fetchGSCTopQueries(integration.accessToken, integration.gscSiteUrl!, start, end);
+      const data = await fetchGSCTopQueries(integration.accessToken, integration.gscSiteUrl!, start, end, clientId);
       console.log('=== GSC TOP QUERIES RESPONSE ===', JSON.stringify({
         siteUrl: integration.gscSiteUrl,
         dateRange: `${start} to ${end}`,
@@ -1946,7 +1950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Access token not available" });
       }
 
-      const data = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end);
+      const data = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end, clientId);
       res.json(data);
     } catch (error: any) {
       console.error("Fetch GSC analytics error:", error);
@@ -2020,7 +2024,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             integration.ga4PropertyId!, 
             integration.ga4LeadEventName!, 
             start, 
-            end
+            end,
+            clientId
           );
           
           // Get total conversions from the response
@@ -2077,7 +2082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (integration.accessToken) {
-            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end);
+            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, start, end, clientId);
             totalOrganicClicks = gscData.rows?.reduce((sum: number, row: any) => sum + (row.clicks || 0), 0) || 0;
           }
         } catch (error) {
@@ -2129,7 +2134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               integration.ga4PropertyId!,
               integration.ga4LeadEventName!,
               comparisonStart,
-              comparisonEnd
+              comparisonEnd,
+              clientId
             );
             comparisonConversions = keyEventsData.totalEventCount || 0;
             usedGA4ConversionsComparison = true;
@@ -2176,7 +2182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           if (integration.accessToken) {
-            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, comparisonStart, comparisonEnd);
+            const gscData = await fetchGSCData(integration.accessToken, integration.gscSiteUrl!, comparisonStart, comparisonEnd, clientId);
             comparisonOrganicClicks = gscData.rows?.reduce((sum: number, row: any) => sum + (row.clicks || 0), 0) || 0;
           }
         } catch (error) {

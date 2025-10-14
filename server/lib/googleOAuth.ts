@@ -1,4 +1,44 @@
 import { google } from 'googleapis';
+import { googleApiRateLimiter } from './googleApiRateLimiter';
+import { retryWithBackoff } from './googleApiRetry';
+import { parseGoogleApiError, GoogleApiError } from './googleApiErrors';
+
+/**
+ * Helper to execute Google API calls with rate limiting and retry logic
+ * Reserves a slot, executes the function, and releases on failure
+ */
+async function withRateLimitAndRetry<T>(
+  service: 'GA4' | 'GSC',
+  clientId: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  // Reserve a request slot (check and increment atomically)
+  const reservation = googleApiRateLimiter.reserveRequest(service, clientId);
+  if (!reservation.allowed) {
+    const error: GoogleApiError = {
+      type: 'QUOTA_EXCEEDED' as any,
+      message: 'Rate limit exceeded',
+      userMessage: `Rate limit exceeded. Please try again in ${reservation.retryAfter} seconds.`,
+      isRetryable: true,
+    };
+    throw error;
+  }
+
+  try {
+    // Execute with retry logic
+    const result = await retryWithBackoff(fn);
+    // Request succeeded - keep the reservation
+    return result;
+  } catch (error) {
+    // Request failed - release the reserved slot
+    if (reservation.release) {
+      reservation.release();
+    }
+    // Parse and throw the error
+    const apiError = parseGoogleApiError(error);
+    throw apiError;
+  }
+}
 
 // Google OAuth 2.0 configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -113,9 +153,10 @@ export async function refreshAccessToken(refreshToken: string) {
 /**
  * Fetch GA4 properties accessible to the user
  * @param accessToken - Valid access token
+ * @param clientId - Client ID for rate limiting
  * @returns List of GA4 properties
  */
-export async function fetchGA4Properties(accessToken: string) {
+export async function fetchGA4Properties(accessToken: string, clientId: string) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
     access_token: accessToken,
@@ -126,7 +167,7 @@ export async function fetchGA4Properties(accessToken: string) {
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GA4', clientId, async () => {
     // List all accounts
     const accountsResponse = await analyticsAdmin.accounts.list();
     const accounts = accountsResponse.data.accounts || [];
@@ -161,18 +202,16 @@ export async function fetchGA4Properties(accessToken: string) {
     }
 
     return properties;
-  } catch (error) {
-    console.error('Error fetching GA4 properties:', error);
-    throw new Error('Failed to fetch GA4 properties');
-  }
+  });
 }
 
 /**
  * Fetch Google Search Console sites accessible to the user
  * @param accessToken - Valid access token
+ * @param clientId - Client ID for rate limiting
  * @returns List of Search Console sites
  */
-export async function fetchGSCSites(accessToken: string) {
+export async function fetchGSCSites(accessToken: string, clientId: string) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
     access_token: accessToken,
@@ -183,7 +222,7 @@ export async function fetchGSCSites(accessToken: string) {
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GSC', clientId, async () => {
     const sitesResponse = await searchconsole.sites.list();
     const sites = sitesResponse.data.siteEntry || [];
 
@@ -191,10 +230,7 @@ export async function fetchGSCSites(accessToken: string) {
       siteUrl: site.siteUrl || '',
       permissionLevel: site.permissionLevel || 'UNKNOWN',
     }));
-  } catch (error) {
-    console.error('Error fetching Search Console sites:', error);
-    throw new Error('Failed to fetch Search Console sites');
-  }
+  });
 }
 
 /**
@@ -203,13 +239,15 @@ export async function fetchGSCSites(accessToken: string) {
  * @param propertyId - GA4 property ID
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
+ * @param clientId - Client ID for rate limiting
  * @returns Analytics data
  */
 export async function fetchGA4Data(
   accessToken: string,
   propertyId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  clientId: string
 ) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
@@ -221,7 +259,7 @@ export async function fetchGA4Data(
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GA4', clientId, async () => {
     const response = await analyticsData.properties.runReport({
       property: `properties/${propertyId}`,
       requestBody: {
@@ -241,10 +279,7 @@ export async function fetchGA4Data(
       totals: response.data.totals || [],
       rowCount: response.data.rowCount || 0,
     };
-  } catch (error: any) {
-    console.error('Error fetching GA4 data:', error);
-    throw new Error('Failed to fetch GA4 analytics data');
-  }
+  });
 }
 
 /**
@@ -253,13 +288,15 @@ export async function fetchGA4Data(
  * @param propertyId - GA4 property ID
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
+ * @param clientId - Client ID for rate limiting
  * @returns Acquisition channels data
  */
 export async function fetchGA4AcquisitionChannels(
   accessToken: string,
   propertyId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  clientId: string
 ) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
@@ -271,7 +308,7 @@ export async function fetchGA4AcquisitionChannels(
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GA4', clientId, async () => {
     const response = await analyticsData.properties.runReport({
       property: `properties/${propertyId}`,
       requestBody: {
@@ -289,10 +326,7 @@ export async function fetchGA4AcquisitionChannels(
       totals: response.data.totals || [],
       rowCount: response.data.rowCount || 0,
     };
-  } catch (error: any) {
-    console.error('Error fetching GA4 acquisition channels data:', error);
-    throw new Error('Failed to fetch GA4 acquisition channels data');
-  }
+  });
 }
 
 /**
@@ -303,6 +337,7 @@ export async function fetchGA4AcquisitionChannels(
  * @param eventNames - Event name(s) to filter (e.g., "generate_lead" or "form_submit, generate_lead, Main_Form")
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
+ * @param clientId - Client ID for rate limiting
  * @returns Key Events data with totals
  */
 export async function fetchGA4KeyEvents(
@@ -310,7 +345,8 @@ export async function fetchGA4KeyEvents(
   propertyId: string,
   eventNames: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  clientId: string
 ) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
@@ -325,7 +361,7 @@ export async function fetchGA4KeyEvents(
   // Parse comma-separated event names and trim whitespace
   const eventList = eventNames.split(',').map(name => name.trim()).filter(name => name.length > 0);
 
-  try {
+  return withRateLimitAndRetry('GA4', clientId, async () => {
     // Build dimension filter for multiple events
     let dimensionFilter: any;
     
@@ -385,10 +421,7 @@ export async function fetchGA4KeyEvents(
       totalEventCount,
       eventNames: eventList, // Return the list of events queried
     };
-  } catch (error: any) {
-    console.error('Error fetching GA4 Key Events data:', error);
-    throw new Error('Failed to fetch GA4 Key Events data');
-  }
+  });
 }
 
 /**
@@ -397,13 +430,15 @@ export async function fetchGA4KeyEvents(
  * @param siteUrl - GSC site URL
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
+ * @param clientId - Client ID for rate limiting
  * @returns Search Console data
  */
 export async function fetchGSCData(
   accessToken: string,
   siteUrl: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  clientId: string
 ) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
@@ -415,7 +450,7 @@ export async function fetchGSCData(
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GSC', clientId, async () => {
     const response = await searchconsole.searchanalytics.query({
       siteUrl,
       requestBody: {
@@ -429,10 +464,7 @@ export async function fetchGSCData(
     return {
       rows: response.data.rows || [],
     };
-  } catch (error: any) {
-    console.error('Error fetching GSC data:', error);
-    throw new Error('Failed to fetch Search Console data');
-  }
+  });
 }
 
 /**
@@ -441,13 +473,15 @@ export async function fetchGSCData(
  * @param siteUrl - GSC site URL
  * @param startDate - Start date (YYYY-MM-DD)
  * @param endDate - End date (YYYY-MM-DD)
+ * @param clientId - Client ID for rate limiting
  * @returns Top performing queries
  */
 export async function fetchGSCTopQueries(
   accessToken: string,
   siteUrl: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  clientId: string
 ) {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
@@ -459,7 +493,7 @@ export async function fetchGSCTopQueries(
     auth: oauth2Client,
   });
 
-  try {
+  return withRateLimitAndRetry('GSC', clientId, async () => {
     const response = await searchconsole.searchanalytics.query({
       siteUrl,
       requestBody: {
@@ -482,8 +516,5 @@ export async function fetchGSCTopQueries(
     return {
       rows: response.data.rows || [],
     };
-  } catch (error: any) {
-    console.error('Error fetching GSC top queries:', error);
-    throw new Error('Failed to fetch top queries');
-  }
+  });
 }
