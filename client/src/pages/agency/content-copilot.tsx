@@ -118,6 +118,8 @@ export default function ContentCopilot() {
       return response as unknown as ContentBrief;
     },
     onSuccess: (data) => {
+      console.log('[Frontend] Content Brief received:', data);
+      console.log('[Frontend] wordCount:', data.wordCount, 'tone:', data.tone);
       setContentBrief(data);
       toast({
         title: "Success",
