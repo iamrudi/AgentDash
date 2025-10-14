@@ -1848,15 +1848,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       const { primaryKeyword, competitorUrls, locationCode } = req.body;
 
+      console.log('[Content Ideas] Request:', { clientId, primaryKeyword, competitorUrls, locationCode });
+
       // Get client to verify it exists
       const client = await storage.getClientById(clientId);
       if (!client) {
+        console.log('[Content Ideas] Client not found:', clientId);
         return res.status(404).json({ message: "Client not found" });
       }
 
       // Get GSC integration to retrieve domain
       const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      console.log('[Content Ideas] GSC Integration:', { exists: !!gscIntegration, gscSiteUrl: gscIntegration?.gscSiteUrl });
+      
       if (!gscIntegration || !gscIntegration.gscSiteUrl) {
+        console.log('[Content Ideas] GSC not configured');
         return res.status(400).json({ message: "Client website URL not configured. Please configure Google Search Console integration first." });
       }
 
