@@ -22,7 +22,10 @@ export async function createUserWithProfile(
     user_metadata: {
       fullName,
       role,
-      agencyId: agencyId || null
+    },
+    // CRITICAL: Use app_metadata for agencyId (secure, user cannot modify)
+    app_metadata: {
+      agency_id: agencyId || null
     }
   });
 
@@ -110,8 +113,17 @@ export async function updateUserMetadata(
   userId: string,
   updates: { fullName?: string; role?: string; agencyId?: string }
 ): Promise<void> {
+  const userMetadata: Record<string, any> = {};
+  const appMetadata: Record<string, any> = {};
+
+  // Separate updates into user_metadata (display info) and app_metadata (secure tenant info)
+  if (updates.fullName !== undefined) userMetadata.fullName = updates.fullName;
+  if (updates.role !== undefined) userMetadata.role = updates.role;
+  if (updates.agencyId !== undefined) appMetadata.agency_id = updates.agencyId;
+
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    user_metadata: updates
+    user_metadata: Object.keys(userMetadata).length > 0 ? userMetadata : undefined,
+    app_metadata: Object.keys(appMetadata).length > 0 ? appMetadata : undefined
   });
 
   if (error) {
@@ -119,11 +131,14 @@ export async function updateUserMetadata(
   }
 
   // Also update profile
-  await db.update(profiles)
-    .set({
-      fullName: updates.fullName,
-      role: updates.role as any,
-      agencyId: updates.agencyId
-    })
-    .where(eq(profiles.id, userId));
+  const profileUpdates: Record<string, any> = {};
+  if (updates.fullName !== undefined) profileUpdates.fullName = updates.fullName;
+  if (updates.role !== undefined) profileUpdates.role = updates.role;
+  if (updates.agencyId !== undefined) profileUpdates.agencyId = updates.agencyId;
+
+  if (Object.keys(profileUpdates).length > 0) {
+    await db.update(profiles)
+      .set(profileUpdates)
+      .where(eq(profiles.id, userId));
+  }
 }

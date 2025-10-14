@@ -27,21 +27,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password, fullName, companyName } = req.body;
       
-      // Create user in Supabase Auth
+      // Get default agency first
+      const defaultAgency = await storage.getDefaultAgency();
+      if (!defaultAgency) {
+        return res.status(500).json({ message: "System configuration error: No default agency found" });
+      }
+
+      // Create user in Supabase Auth with agencyId in app_metadata
       const { createUserWithProfile } = await import("./lib/supabase-auth");
       
       // SECURITY: Always assign Client role for self-registration
       // Admin and Staff roles must be assigned by existing administrators
-      const authResult = await createUserWithProfile(email, password, fullName, "Client");
+      const authResult = await createUserWithProfile(email, password, fullName, "Client", defaultAgency.id);
 
       // Create client record
-      // TODO: In production, use invitation-based signup with specific agencyId
-      // For now, assign to default agency
       if (companyName) {
-        const defaultAgency = await storage.getDefaultAgency();
-        if (!defaultAgency) {
-          return res.status(500).json({ message: "System configuration error: No default agency found" });
-        }
         await storage.createClient({
           companyName,
           profileId: authResult.profileId, // This is the Supabase Auth user ID
