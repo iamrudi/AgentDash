@@ -174,6 +174,8 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
     });
     const responseText = result.text;
     
+    console.log('[Content Brief] AI Raw Response:', responseText);
+    
     if (!responseText) {
       throw new Error("No response from AI");
     }
@@ -181,10 +183,13 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
     // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('[Content Brief] Failed to extract JSON. Response:', responseText);
       throw new Error("Failed to extract JSON from AI response");
     }
 
+    console.log('[Content Brief] Extracted JSON:', jsonMatch[0]);
     const brief: ContentBrief = JSON.parse(jsonMatch[0]);
+    console.log('[Content Brief] Parsed Brief:', JSON.stringify(brief, null, 2));
     return brief;
   } catch (error: any) {
     console.error("Content brief generation error:", error);
