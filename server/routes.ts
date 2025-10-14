@@ -1912,6 +1912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         competitorUrls || []
       );
 
+      console.log('[Route] Sending brief response:', JSON.stringify(brief, null, 2));
       res.json(brief);
     } catch (error: any) {
       console.error("Content brief generation error:", error);
