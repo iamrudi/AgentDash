@@ -15,7 +15,7 @@ import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
 import { analyzeDataOnDemand, summarizeLighthouseReport, analyzeChatHistory } from "./gemini";
 import { SeoAuditService } from "./services/seoAuditService";
-import { EnhancedSeoAuditService } from "./services/enhancedSeoAuditService";
+import { OnPageSeoAuditService } from "./services/onPageSeoAuditService";
 import express from "express";
 import path from "path";
 
@@ -3103,50 +3103,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SEO Audit endpoint (Admin only)
   app.post("/api/seo/audit", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const { url, clientId, targetKeyword } = req.body;
+      const { url, clientId } = req.body;
       if (!url) {
         return res.status(400).json({ message: "URL is required" });
       }
 
-      const enhancedAuditService = new EnhancedSeoAuditService();
-      let dataForSeoCredentials;
-
-      // If client ID is provided, try to get Data for SEO credentials
-      if (clientId) {
-        const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-        if (integration?.dataForSeoLogin && integration?.dataForSeoPassword) {
-          try {
-            const login = decrypt(
-              integration.dataForSeoLogin,
-              integration.dataForSeoLoginIv!,
-              integration.dataForSeoLoginAuthTag!
-            );
-            const password = decrypt(
-              integration.dataForSeoPassword,
-              integration.dataForSeoPasswordIv!,
-              integration.dataForSeoPasswordAuthTag!
-            );
-            dataForSeoCredentials = { login, password };
-          } catch (error) {
-            console.error('Failed to decrypt Data for SEO credentials:', error);
-          }
-        }
+      if (!clientId) {
+        return res.status(400).json({ message: "Client ID is required" });
       }
 
-      // Run enhanced audit
-      const auditResult = await enhancedAuditService.runEnhancedAudit(
-        url,
-        targetKeyword,
-        dataForSeoCredentials
-      );
+      // Get Data for SEO credentials from client integration
+      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      if (!integration?.dataForSeoLogin || !integration?.dataForSeoPassword) {
+        return res.status(400).json({ 
+          message: "Data for SEO credentials not configured for this client" 
+        });
+      }
 
-      // Get AI summary with enhanced data
-      const aiSummary = await summarizeLighthouseReport(url, auditResult.lighthouseReport);
+      let dataForSeoCredentials;
+      try {
+        const login = decrypt(
+          integration.dataForSeoLogin,
+          integration.dataForSeoLoginIv!,
+          integration.dataForSeoLoginAuthTag!
+        );
+        const password = decrypt(
+          integration.dataForSeoPassword,
+          integration.dataForSeoPasswordIv!,
+          integration.dataForSeoPasswordAuthTag!
+        );
+        dataForSeoCredentials = { login, password };
+      } catch (error) {
+        console.error('Failed to decrypt Data for SEO credentials:', error);
+        return res.status(500).json({ message: "Failed to decrypt credentials" });
+      }
 
-      res.json({
-        ...auditResult,
-        aiSummary,
-      });
+      // Run on-page SEO audit
+      const onPageAuditService = new OnPageSeoAuditService();
+      const auditResult = await onPageAuditService.runOnPageAudit(url, dataForSeoCredentials);
+
+      res.json(auditResult);
     } catch (error: any) {
       console.error("SEO Audit endpoint error:", error);
       res.status(500).json({ message: error.message || "Failed to perform SEO audit" });
