@@ -68,7 +68,7 @@ export default function ContentCopilot() {
   const [optimization, setOptimization] = useState<ContentOptimization | null>(null);
 
   const { data: clients } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
+    queryKey: ["/api/agency/clients"],
   });
 
   const { data: integrationStatus } = useQuery<{ connected: boolean }>({
