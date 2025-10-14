@@ -15,6 +15,7 @@ import {
   Zap,
   Target,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -69,6 +70,12 @@ const menuGroups = [
         url: "/agency/recommendations",
         icon: Lightbulb,
         notificationKey: "unviewedResponses" as const,
+      },
+      {
+        title: "Content Co-pilot",
+        url: "/agency/content-copilot",
+        icon: Sparkles,
+        notificationKey: null,
       },
       {
         title: "SEO Audit",
