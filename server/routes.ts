@@ -2754,43 +2754,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // SSE endpoint for real-time message updates (Admin only)
-  app.get("/api/agency/messages/stream", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-    const agencyId = req.user!.agencyId;
-    
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency association required" });
-    }
-
-    // Set SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-
-    // Send initial connection message
-    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
-
-    // Handler for new messages
-    const messageHandler = (message: any) => {
-      // Only send messages for this agency
-      if (message.agencyId === agencyId) {
-        res.write(`data: ${JSON.stringify({ type: 'message', data: message })}\n\n`);
+  app.get("/api/agency/messages/stream", async (req, res) => {
+    try {
+      // EventSource doesn't support custom headers, so get token from query param
+      const token = req.query.token as string;
+      
+      if (!token) {
+        res.status(401).json({ message: "Authentication token required" });
+        return;
       }
-    };
 
-    // Listen for message events
-    messageEmitter.on('new-message', messageHandler);
+      // Verify token using Supabase
+      const { supabase } = await import("./lib/supabase");
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      
+      if (error || !user) {
+        res.status(401).json({ message: "Invalid or expired token" });
+        return;
+      }
 
-    // Send heartbeat every 30 seconds to keep connection alive
-    const heartbeat = setInterval(() => {
-      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
-    }, 30000);
+      // Get user profile and check role
+      const profile = await storage.getProfileByUserId(user.id);
+      
+      if (!profile || profile.role !== "Admin") {
+        res.status(403).json({ message: "Admin access required" });
+        return;
+      }
 
-    // Cleanup on connection close
-    req.on('close', () => {
-      clearInterval(heartbeat);
-      messageEmitter.off('new-message', messageHandler);
-    });
+      const agencyId = profile.agencyId;
+      
+      if (!agencyId) {
+        res.status(403).json({ message: "Agency association required" });
+        return;
+      }
+
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+      // Handler for new messages
+      const messageHandler = (message: any) => {
+        // Only send messages for this agency
+        if (message.agencyId === agencyId) {
+          res.write(`data: ${JSON.stringify({ type: 'message', data: message })}\n\n`);
+        }
+      };
+
+      // Listen for message events
+      messageEmitter.on('new-message', messageHandler);
+
+      // Send heartbeat every 30 seconds to keep connection alive
+      const heartbeat = setInterval(() => {
+        res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+      }, 30000);
+
+      // Cleanup on connection close
+      req.on('close', () => {
+        clearInterval(heartbeat);
+        messageEmitter.off('new-message', messageHandler);
+      });
+    } catch (error: any) {
+      console.error('[SSE] Error:', error);
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // Mark message as read (Admin only)

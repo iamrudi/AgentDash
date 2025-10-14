@@ -94,8 +94,8 @@ export default function AgencyMessagesPage() {
     const token = localStorage.getItem('auth_token');
     if (!token) return;
 
-    // Create EventSource connection with auth header (using query param)
-    const eventSource = new EventSource(`/api/agency/messages/stream`, {
+    // EventSource doesn't support custom headers, so pass token as query param
+    const eventSource = new EventSource(`/api/agency/messages/stream?token=${encodeURIComponent(token)}`, {
       withCredentials: true,
     });
 
@@ -120,8 +120,8 @@ export default function AgencyMessagesPage() {
     };
 
     eventSource.onerror = (error) => {
-      console.error('[SSE] Connection error:', error);
-      eventSource.close();
+      console.error('[SSE] Connection error, browser will auto-retry:', error);
+      // Don't close() - browser will automatically retry connection
     };
 
     // Cleanup on unmount
