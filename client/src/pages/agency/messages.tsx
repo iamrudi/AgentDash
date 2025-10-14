@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { supabase } from "@/lib/supabase";
 
 type ConversationGroup = {
   client: Client;
@@ -89,28 +88,45 @@ export default function AgencyMessagesPage() {
     }
   }, [selectedConversation?.messages]);
 
-  // Real-time subscription for new messages
+  // Server-Sent Events (SSE) for real-time message updates
   useEffect(() => {
-    const channel = supabase
-      .channel('client_messages_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'client_messages'
-        },
-        () => {
-          // Invalidate queries to refetch messages
+    // Get auth token from localStorage
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    // Create EventSource connection with auth header (using query param)
+    const eventSource = new EventSource(`/api/agency/messages/stream`, {
+      withCredentials: true,
+    });
+
+    eventSource.onopen = () => {
+      console.log('[SSE] Connected to message stream');
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'message') {
+          // New message received - invalidate queries to refetch
           queryClient.invalidateQueries({ queryKey: ["/api/agency/messages"] });
           queryClient.invalidateQueries({ queryKey: ["/api/agency/notifications/counts"] });
+        } else if (data.type === 'connected') {
+          console.log('[SSE] Stream connected');
         }
-      )
-      .subscribe();
+      } catch (error) {
+        console.error('[SSE] Failed to parse message:', error);
+      }
+    };
 
-    // Cleanup subscription on unmount
+    eventSource.onerror = (error) => {
+      console.error('[SSE] Connection error:', error);
+      eventSource.close();
+    };
+
+    // Cleanup on unmount
     return () => {
-      supabase.removeChannel(channel);
+      eventSource.close();
     };
   }, []);
 
