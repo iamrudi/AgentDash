@@ -2807,6 +2807,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark message as read (Admin only)
+  app.post("/api/agency/messages/:messageId/mark-read", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { messageId } = req.params;
+      await storage.markMessageAsRead(messageId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Mark all messages for a client as read (Admin only)
+  app.post("/api/agency/messages/client/:clientId/mark-all-read", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const messages = await storage.getMessagesByClientId(clientId);
+      await Promise.all(
+        messages
+          .filter(m => m.isRead === "false" && m.senderRole === "Client")
+          .map(m => storage.markMessageAsRead(m.id))
+      );
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get notification counts (Admin only)
   app.get("/api/agency/notifications/counts", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
