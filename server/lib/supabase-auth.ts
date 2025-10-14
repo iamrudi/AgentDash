@@ -33,7 +33,6 @@ export async function createUserWithProfile(
   // Create profile in our database
   const [profile] = await db.insert(profiles).values({
     id: data.user.id, // Use Supabase Auth user ID
-    email: email,
     fullName,
     role,
     agencyId: agencyId || null

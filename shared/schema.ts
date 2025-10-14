@@ -3,9 +3,6 @@ import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, unique
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// NOTE: We no longer manage our own users table - Supabase Auth handles this via auth.users
-// Our profiles table now references auth.users directly
-
 // AGENCIES (Tenant isolation - each agency is a separate tenant)
 export const agencies = pgTable("agencies", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -13,10 +10,18 @@ export const agencies = pgTable("agencies", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// PROFILES (Master table for all users - references Supabase auth.users)
+// NOTE: Users are now managed by Supabase Auth (auth.users table)
+// We keep this table definition for backward compatibility but it's not actively used
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// PROFILES (Master table for all users - ID matches Supabase Auth user ID)
 export const profiles = pgTable("profiles", {
-  id: uuid("id").primaryKey(), // This will match auth.users.id exactly (no default, set explicitly)
-  email: text("email").notNull().unique(), // Denormalized from auth.users for query efficiency
+  id: uuid("id").primaryKey(), // This IS the Supabase Auth user ID (no default, set explicitly)
   fullName: text("full_name").notNull(),
   role: text("role").notNull(), // 'Admin', 'Client', 'Staff'
   agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client users
@@ -219,7 +224,7 @@ export const clientMessages = pgTable("client_messages", {
 // NOTIFICATIONS (Centralized notification system)
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: uuid("user_id").notNull(), // References auth.users.id (Supabase Auth)
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // 'message', 'initiative_response', 'system', 'task_assigned', etc.
   title: text("title").notNull(),
   message: text("message").notNull(),
@@ -235,7 +240,10 @@ export const notifications = pgTable("notifications", {
 }));
 
 // Insert Schemas
-// Note: No insertUserSchema - Supabase Auth manages user creation
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
 
 export const insertAgencySchema = createInsertSchema(agencies).omit({
   id: true,
@@ -243,8 +251,7 @@ export const insertAgencySchema = createInsertSchema(agencies).omit({
 });
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({
-  id: true,
-  createdAt: true,
+  createdAt: true, // id is required (Supabase Auth user ID)
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({
@@ -327,7 +334,8 @@ export const createStaffAdminUserSchema = z.object({
 });
 
 // Types
-// Note: No User type - Supabase Auth manages users
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type CreateClientUser = z.infer<typeof createClientUserSchema>;
 export type CreateStaffAdminUser = z.infer<typeof createStaffAdminUserSchema>;
 
