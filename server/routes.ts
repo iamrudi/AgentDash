@@ -1201,32 +1201,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
       
-      // If approved, automatically create project and invoice
-      let projectId: string | undefined;
-      let invoiceId: string | undefined;
+      // If approved, automatically create project and invoice (if not already created)
+      let projectId: string | undefined = existingInitiative.projectId || undefined;
+      let invoiceId: string | undefined = existingInitiative.invoiceId || undefined;
       
       if (response === "approved") {
-        try {
-          // Create project from approved initiative
-          const project = await storage.createProject({
-            name: existingInitiative.title,
-            description: existingInitiative.proposedAction || existingInitiative.observation,
-            status: "Active",
-            clientId: existingInitiative.clientId,
-          });
-          projectId = project.id;
-          
-          console.log(`Created project ${project.id} from approved initiative ${id}`);
-        } catch (projectError) {
-          console.error("Failed to create project from initiative:", projectError);
-          // Don't fail the approval, just log the error
+        // Create project if not already created
+        if (!projectId) {
+          try {
+            const project = await storage.createProject({
+              name: existingInitiative.title,
+              description: existingInitiative.proposedAction || existingInitiative.observation,
+              status: "Active",
+              clientId: existingInitiative.clientId,
+            });
+            projectId = project.id;
+            
+            // Persist project reference in initiative
+            await storage.updateInitiative(id, { projectId: project.id });
+            
+            console.log(`Created project ${project.id} from approved initiative ${id}`);
+          } catch (projectError) {
+            console.error("Failed to create project from initiative:", projectError);
+            // Don't fail the approval, just log the error
+          }
         }
         
-        // Generate invoice if needed (fixed cost initiatives or if cost is specified)
-        if (existingInitiative.billingType === "fixed" || (existingInitiative.cost && parseFloat(existingInitiative.cost) > 0)) {
+        // Generate invoice if needed (fixed cost initiatives or if cost is specified) and not already generated
+        if (!invoiceId && (existingInitiative.billingType === "fixed" || (existingInitiative.cost && parseFloat(existingInitiative.cost) > 0))) {
           try {
             const invoiceGenerator = new InvoiceGeneratorService(storage);
             invoiceId = await invoiceGenerator.generateInvoiceFromInitiative(id);
+            
+            // Persist invoice reference in initiative
+            await storage.updateInitiative(id, { invoiceId });
+            
             console.log(`Generated invoice ${invoiceId} from approved initiative ${id}`);
           } catch (invoiceError) {
             console.error("Failed to generate invoice from initiative:", invoiceError);

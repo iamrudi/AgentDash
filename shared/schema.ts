@@ -149,6 +149,8 @@ export const initiatives = pgTable("initiatives", {
   startDate: date("start_date"), // When initiative tracking began
   implementationDate: date("implementation_date"), // When initiative was completed
   measuredImprovement: numeric("measured_improvement"), // Final measured improvement percentage
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }), // Project created when approved
+  invoiceId: uuid("invoice_id").references(() => invoices.id, { onDelete: "set null" }), // Invoice generated when approved
   lastEditedAt: timestamp("last_edited_at"),
   deletedAt: timestamp("deleted_at"), // Soft delete timestamp - items deleted after 30 days
   createdAt: timestamp("created_at").defaultNow().notNull(),
