@@ -55,10 +55,13 @@ export default function AgencyIntegrationsPage() {
   const [ga4DialogOpen, setGa4DialogOpen] = useState(false);
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [editLeadEventDialogOpen, setEditLeadEventDialogOpen] = useState(false);
+  const [dataForSeoDialogOpen, setDataForSeoDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
   const [leadEventName, setLeadEventName] = useState("");
   const [selectedGSCSite, setSelectedGSCSite] = useState("");
+  const [dataForSeoLogin, setDataForSeoLogin] = useState("");
+  const [dataForSeoPassword, setDataForSeoPassword] = useState("");
   
   // Check for OAuth success/error in URL
   useEffect(() => {
@@ -341,12 +344,84 @@ export default function AgencyIntegrationsPage() {
     },
   });
 
-  const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC') => {
+  // Connect Data for SEO mutation
+  const connectDataForSeoMutation = useMutation({
+    mutationFn: async ({ clientId, login, password }: { clientId: string; login: string; password: string }) => {
+      await apiRequest("POST", `/api/integrations/dataforseo/${clientId}/connect`, {
+        login,
+        password
+      });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/dataforseo", variables.clientId] });
+      toast({
+        title: "Success",
+        description: "Data for SEO integration connected successfully",
+      });
+      setDataForSeoLogin("");
+      setDataForSeoPassword("");
+      setDataForSeoDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect Data for SEO mutation
+  const disconnectDataForSeoMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      await apiRequest("DELETE", `/api/integrations/dataforseo/${clientId}`);
+    },
+    onSuccess: (_, clientId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/dataforseo", clientId] });
+      toast({
+        title: "Disconnected",
+        description: "Data for SEO integration disconnected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC' | 'DataForSEO') => {
     if (service === 'GA4') {
       disconnectGA4Mutation.mutate(clientId);
-    } else {
+    } else if (service === 'GSC') {
       disconnectGSCMutation.mutate(clientId);
+    } else {
+      disconnectDataForSeoMutation.mutate(clientId);
     }
+  };
+
+  const handleDataForSeoConnect = (clientId: string) => {
+    setCurrentClientId(clientId);
+    setDataForSeoDialogOpen(true);
+  };
+
+  const handleDataForSeoSave = () => {
+    if (!dataForSeoLogin || !dataForSeoPassword) {
+      toast({
+        title: "Error",
+        description: "Please provide both login and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    connectDataForSeoMutation.mutate({
+      clientId: currentClientId,
+      login: dataForSeoLogin,
+      password: dataForSeoPassword,
+    });
   };
 
   return (
@@ -354,9 +429,9 @@ export default function AgencyIntegrationsPage() {
       <div className="p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-semibold mb-2">Google Integrations</h1>
+            <h1 className="text-3xl font-semibold mb-2">API Integrations</h1>
             <p className="text-muted-foreground">
-              Manage Google Analytics 4 and Search Console connections for clients
+              Manage Google Analytics 4, Search Console, and Data for SEO connections for clients
             </p>
           </div>
           <ClientFilter
@@ -381,6 +456,7 @@ export default function AgencyIntegrationsPage() {
                 client={client} 
                 onConnect={handleConnect} 
                 onDisconnect={handleDisconnect}
+                onDataForSeoConnect={handleDataForSeoConnect}
                 onEditLeadEvent={(clientId, currentLeadEvent) => {
                   setCurrentClientId(clientId);
                   setLeadEventName(currentLeadEvent);
@@ -576,6 +652,67 @@ export default function AgencyIntegrationsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Data for SEO Connection Dialog */}
+      <Dialog open={dataForSeoDialogOpen} onOpenChange={(open) => {
+        setDataForSeoDialogOpen(open);
+        if (!open) {
+          setDataForSeoLogin("");
+          setDataForSeoPassword("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect Data for SEO</DialogTitle>
+            <DialogDescription>
+              Enter your Data for SEO API credentials
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="dataforseo-login">API Login</Label>
+              <Input
+                id="dataforseo-login"
+                type="text"
+                placeholder="Enter your Data for SEO login"
+                value={dataForSeoLogin}
+                onChange={(e) => setDataForSeoLogin(e.target.value)}
+                data-testid="input-dataforseo-login"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="dataforseo-password">API Password/Key</Label>
+              <Input
+                id="dataforseo-password"
+                type="password"
+                placeholder="Enter your Data for SEO password/key"
+                value={dataForSeoPassword}
+                onChange={(e) => setDataForSeoPassword(e.target.value)}
+                data-testid="input-dataforseo-password"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setDataForSeoDialogOpen(false)}
+                data-testid="button-cancel-dataforseo"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDataForSeoSave}
+                disabled={connectDataForSeoMutation.isPending}
+                data-testid="button-save-dataforseo"
+              >
+                {connectDataForSeoMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Connect
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AgencyLayout>
   );
 }
@@ -584,12 +721,14 @@ function ClientIntegrationCard({
   client, 
   onConnect,
   onDisconnect,
-  onEditLeadEvent
+  onEditLeadEvent,
+  onDataForSeoConnect
 }: { 
   client: Client; 
   onConnect: (clientId: string, service: 'GA4' | 'GSC') => void;
-  onDisconnect: (clientId: string, service: 'GA4' | 'GSC') => void;
+  onDisconnect: (clientId: string, service: 'GA4' | 'GSC' | 'DataForSEO') => void;
   onEditLeadEvent: (clientId: string, currentLeadEvent: string) => void;
+  onDataForSeoConnect: (clientId: string) => void;
 }) {
   const { data: ga4Status } = useQuery<IntegrationStatus>({
     queryKey: ["/api/integrations/ga4", client.id],
@@ -597,6 +736,10 @@ function ClientIntegrationCard({
 
   const { data: gscStatus } = useQuery<IntegrationStatus>({
     queryKey: ["/api/integrations/gsc", client.id],
+  });
+
+  const { data: dataForSeoStatus } = useQuery<IntegrationStatus>({
+    queryKey: ["/api/integrations/dataforseo", client.id],
   });
 
   return (
@@ -736,6 +879,62 @@ function ClientIntegrationCard({
                   size="sm"
                   onClick={() => onConnect(client.id, 'GSC')}
                   data-testid={`button-connect-gsc-${client.id}`}
+                >
+                  Connect
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Data for SEO */}
+        <div className="flex items-center justify-between p-4 border rounded-lg">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-md bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
+              <LinkIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <p className="font-medium">Data for SEO</p>
+              <p className="text-xs text-muted-foreground">
+                Content research & SERP analysis
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {dataForSeoStatus?.connected ? (
+              <>
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Connected
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onDataForSeoConnect(client.id)}
+                  data-testid={`button-reconnect-dataforseo-${client.id}`}
+                >
+                  Reconnect
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => onDisconnect(client.id, 'DataForSEO')}
+                  data-testid={`button-disconnect-dataforseo-${client.id}`}
+                >
+                  Disconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <Badge variant="secondary" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  Not Connected
+                </Badge>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => onDataForSeoConnect(client.id)}
+                  data-testid={`button-connect-dataforseo-${client.id}`}
                 >
                   Connect
                 </Button>

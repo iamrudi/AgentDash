@@ -8,6 +8,7 @@ import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
+import { encrypt } from "./lib/encryption";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
@@ -1742,6 +1743,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteIntegration(integration.id);
 
       res.json({ message: "Search Console integration disconnected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Data for SEO Integration Endpoints
+
+  // Connect Data for SEO integration (Admin only)
+  app.post("/api/integrations/dataforseo/:clientId/connect", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { login, password } = req.body;
+
+      if (!login || !password) {
+        return res.status(400).json({ message: "Login and password are required" });
+      }
+
+      // Encrypt credentials
+      const encryptedLogin = encrypt(login);
+      const encryptedPassword = encrypt(password);
+
+      // Check if integration already exists
+      const existingIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+
+      if (existingIntegration) {
+        // Update existing integration
+        await storage.updateIntegration(existingIntegration.id, {
+          dataForSeoLogin: encryptedLogin.encrypted,
+          dataForSeoLoginIv: encryptedLogin.iv,
+          dataForSeoLoginAuthTag: encryptedLogin.authTag,
+          dataForSeoPassword: encryptedPassword.encrypted,
+          dataForSeoPasswordIv: encryptedPassword.iv,
+          dataForSeoPasswordAuthTag: encryptedPassword.authTag,
+          updatedAt: new Date(),
+        });
+      } else {
+        // Create new integration
+        await storage.createIntegration({
+          clientId,
+          serviceName: 'DataForSEO',
+          dataForSeoLogin: encryptedLogin.encrypted,
+          dataForSeoLoginIv: encryptedLogin.iv,
+          dataForSeoLoginAuthTag: encryptedLogin.authTag,
+          dataForSeoPassword: encryptedPassword.encrypted,
+          dataForSeoPasswordIv: encryptedPassword.iv,
+          dataForSeoPasswordAuthTag: encryptedPassword.authTag,
+        });
+      }
+
+      res.json({ message: "Data for SEO integration connected successfully" });
+    } catch (error: any) {
+      console.error("Data for SEO connect error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get Data for SEO integration status (Admin only)
+  app.get("/api/integrations/dataforseo/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+
+      if (!integration || !integration.dataForSeoLogin) {
+        return res.json({ connected: false });
+      }
+
+      res.json({
+        connected: true,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Disconnect Data for SEO integration (Admin only)
+  app.delete("/api/integrations/dataforseo/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+
+      if (!integration) {
+        return res.status(404).json({ message: "Data for SEO integration not found" });
+      }
+
+      await storage.deleteIntegration(integration.id);
+
+      res.json({ message: "Data for SEO integration disconnected successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
