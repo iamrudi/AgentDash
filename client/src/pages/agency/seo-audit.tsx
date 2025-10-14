@@ -186,7 +186,6 @@ export default function SeoAuditPage() {
                     <SelectValue placeholder="Select client for Data for SEO" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     {clients?.map(client => (
                       <SelectItem key={client.id} value={client.id}>{client.companyName}</SelectItem>
                     ))}
