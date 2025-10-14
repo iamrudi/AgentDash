@@ -8,7 +8,8 @@ import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
-import { encrypt } from "./lib/encryption";
+import { encrypt, decrypt } from "./lib/encryption";
+import { generateContentIdeas, generateContentBrief, optimizeContent } from "./lib/contentGeneration";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
@@ -1835,6 +1836,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Data for SEO integration disconnected successfully" });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Content Co-pilot API
+
+  // Generate content ideas (Admin only)
+  app.post("/api/content/ideas/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { primaryKeyword, competitorUrls, locationCode } = req.body;
+
+      // Get Data for SEO credentials
+      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      if (!integration || !integration.dataForSeoLogin || !integration.dataForSeoPassword) {
+        return res.status(404).json({ message: "Data for SEO integration not configured" });
+      }
+
+      const credentials = {
+        login: decrypt(integration.dataForSeoLogin, integration.dataForSeoIv!, integration.dataForSeoAuthTag!),
+        password: decrypt(integration.dataForSeoPassword, integration.dataForSeoPasswordIv!, integration.dataForSeoPasswordAuthTag!),
+      };
+
+      const ideas = await generateContentIdeas(
+        credentials,
+        primaryKeyword,
+        competitorUrls || [],
+        locationCode
+      );
+
+      res.json(ideas);
+    } catch (error: any) {
+      console.error("Content ideas generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Generate content brief (Admin only)
+  app.post("/api/content/brief/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { topic, targetKeywords, targetAudience, contentType, competitorUrls } = req.body;
+
+      const brief = await generateContentBrief(
+        topic,
+        targetKeywords || [],
+        targetAudience || "General audience",
+        contentType || "Article",
+        competitorUrls || []
+      );
+
+      res.json(brief);
+    } catch (error: any) {
+      console.error("Content brief generation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Optimize existing content (Admin only)
+  app.post("/api/content/optimize/:clientId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { content, targetKeywords, currentUrl } = req.body;
+
+      const optimization = await optimizeContent(
+        content,
+        targetKeywords || [],
+        currentUrl
+      );
+
+      res.json(optimization);
+    } catch (error: any) {
+      console.error("Content optimization error:", error);
       res.status(500).json({ message: error.message });
     }
   });
