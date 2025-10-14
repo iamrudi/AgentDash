@@ -31,13 +31,15 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Client-to-Account Manager Chat**: Real-time messaging initiated by agency admins.
 - **Chat with your Data**: AI-powered analytics data querying and recommendation generation.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization, acquisition channel analysis, and pipeline value calculation.
+- **Content Co-pilot**: AI-powered content creation tool using Data for SEO API (keyword research, content gap analysis) and Gemini AI to generate content ideas, comprehensive briefs, and optimization suggestions. Credentials stored encrypted in clients table with AES-256-GCM.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard (KPIs, action items), Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Comprehensive management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, and SEO Website Audit Tool.
+- **Agency Admin Portal**: Comprehensive management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, SEO Website Audit Tool, and Content Co-pilot.
 - **Staff Portal**: View and update assigned tasks.
 - **Strategic Initiative Workflow**: `Needs Review` → `Awaiting Approval` → `Approved` → `In Progress` → `Completed` → `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console (OAuth, site selection, performance metrics).
+- **SEO Integrations**: Data for SEO API (credential-based auth, stored encrypted in clients table).
 
 ### System Design Choices
 - **Multi-tenancy**: Defense-in-depth tenant isolation with two layers:
@@ -53,6 +55,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
 - **OAuth Integrations**: Google OAuth (for GA4, Google Search Console)
 - **AI Services**: Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash)
+- **SEO APIs**: Data for SEO API (keyword research, content gap analysis, competitor analysis)
 - **SEO Auditing**: Google Lighthouse
 - **PDF Generation**: Puppeteer
 - **Scheduling**: `node-cron`
