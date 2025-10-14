@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -11,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
@@ -35,16 +37,49 @@ import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser, getUserRole } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+type SidebarMode = 'expanded' | 'collapsed' | 'hover';
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
   const role = getUserRole();
+  const { setOpen, open } = useSidebar();
+  
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(
+    () => (localStorage.getItem('sidebarMode') as SidebarMode) || 'expanded'
+  );
 
   const { data: notificationCounts } = useQuery<{ newTasks: number; highPriorityTasks: number }>({
     queryKey: ["/api/staff/notifications/counts"],
     refetchInterval: 10000, // Refresh every 10 seconds
     enabled: role === "Staff", // Only fetch for staff users
   });
+
+  // Listen for sidebar mode changes from Settings
+  useEffect(() => {
+    const handleSidebarModeChange = (event: CustomEvent<SidebarMode>) => {
+      setSidebarMode(event.detail);
+      if (event.detail === 'collapsed') {
+        setOpen(false);
+      } else if (event.detail === 'expanded') {
+        setOpen(true);
+      }
+    };
+
+    window.addEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    return () => {
+      window.removeEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    };
+  }, [setOpen]);
+
+  // Set initial state based on mode
+  useEffect(() => {
+    if (sidebarMode === 'collapsed') {
+      setOpen(false);
+    } else if (sidebarMode === 'expanded') {
+      setOpen(true);
+    }
+  }, [sidebarMode, setOpen]);
 
   const handleLogout = () => {
     clearAuthUser();
@@ -125,7 +160,11 @@ export function AppSidebar() {
     .slice(0, 2);
 
   return (
-    <Sidebar>
+    <Sidebar 
+      collapsible={sidebarMode === 'collapsed' ? 'icon' : sidebarMode === 'hover' ? 'offcanvas' : 'none'}
+      onMouseEnter={() => sidebarMode === 'hover' && setOpen(true)}
+      onMouseLeave={() => sidebarMode === 'hover' && setOpen(false)}
+    >
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
