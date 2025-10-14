@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, Send, Sparkles, CheckCheck, User, Bot, Lightbulb } from "lucide-react";
+import { MessageSquare, Send, Sparkles, CheckCheck, User, Bot, Lightbulb, Plus } from "lucide-react";
 import { ClientMessage, Client } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,6 +14,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type ConversationGroup = {
   client: Client;
@@ -26,6 +34,7 @@ export default function AgencyMessagesPage() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -52,8 +61,19 @@ export default function AgencyMessagesPage() {
   }).filter(conv => conv.lastMessage) // Only show clients with messages
     .sort((a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()) || [];
 
-  // Get selected conversation
-  const selectedConversation = conversations.find(c => c.client.id === selectedClientId);
+  // Get selected conversation (including new chats without messages)
+  const selectedConversation = conversations.find(c => c.client.id === selectedClientId) || 
+    (selectedClientId && clients ? {
+      client: clients.find(c => c.id === selectedClientId)!,
+      messages: [],
+      lastMessage: undefined as any,
+      unreadCount: 0,
+    } : undefined);
+
+  // Get all clients for "Start New Chat" (sorted by company name)
+  const availableClients = clients?.sort((a, b) => 
+    a.companyName.localeCompare(b.companyName)
+  ) || [];
 
   // Auto-select first conversation if none selected
   useEffect(() => {
@@ -185,13 +205,83 @@ export default function AgencyMessagesPage() {
     analyzeConversationMutation.mutate(selectedClientId);
   };
 
+  const handleStartNewChat = (clientId: string) => {
+    const hasExistingConversation = conversations.find(conv => conv.client.id === clientId);
+    const client = clients?.find(c => c.id === clientId);
+    
+    setSelectedClientId(clientId);
+    setNewChatDialogOpen(false);
+    
+    toast({
+      title: hasExistingConversation ? "Conversation opened" : "New chat started",
+      description: hasExistingConversation 
+        ? `Continue your conversation with ${client?.companyName}`
+        : `You can now send a message to ${client?.companyName}`,
+    });
+  };
+
   return (
     <AgencyLayout>
       <div className="h-[calc(100vh-4rem)] flex">
         {/* Conversation List */}
         <div className="w-80 border-r flex flex-col">
           <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold">Conversations</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold">Conversations</h2>
+              <Dialog open={newChatDialogOpen} onOpenChange={setNewChatDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" data-testid="button-start-new-chat">
+                    <Plus className="h-4 w-4 mr-1" />
+                    New Chat
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Start New Chat</DialogTitle>
+                    <DialogDescription>
+                      Select a client to start a new conversation
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[400px] mt-4">
+                    {availableClients.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">
+                        No clients available
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {availableClients.map((client) => {
+                          const hasConversation = conversations.find(conv => conv.client.id === client.id);
+                          return (
+                            <Card
+                              key={client.id}
+                              className="cursor-pointer hover-elevate active-elevate-2"
+                              onClick={() => handleStartNewChat(client.id)}
+                              data-testid={`select-client-${client.id}`}
+                            >
+                              <CardContent className="p-3">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarFallback>
+                                      {client.companyName?.charAt(0) || "C"}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-sm truncate">{client.companyName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {hasConversation ? "Continue conversation" : "Start new conversation"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </div>
             <p className="text-sm text-muted-foreground">Client messages</p>
           </div>
           <ScrollArea className="flex-1">
@@ -259,7 +349,9 @@ export default function AgencyMessagesPage() {
                   <div>
                     <h3 className="font-semibold">{selectedConversation.client.companyName}</h3>
                     <p className="text-xs text-muted-foreground">
-                      {selectedConversation.messages.length} messages
+                      {selectedConversation.messages.length === 0 
+                        ? "New conversation" 
+                        : `${selectedConversation.messages.length} messages`}
                     </p>
                   </div>
                 </div>
