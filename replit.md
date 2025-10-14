@@ -28,7 +28,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI summaries and actionable recommendations.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention.
 - **Invoice Automation**: Node-cron for retainers and Puppeteer for PDF generation.
-- **Client-to-Account Manager Chat**: Real-time messaging initiated by agency admins with Server-Sent Events (SSE) for instant message delivery across browser tabs. Token-based auth via query params (EventSource limitation), multi-tenant filtering, and browser auto-reconnect on connection loss.
+- **Client-to-Account Manager Chat**: Real-time messaging with Server-Sent Events (SSE) for instant message delivery across browser tabs. Features include "Start New Chat" dialog for quick client selection, token-based auth via query params (EventSource limitation), multi-tenant filtering, browser auto-reconnect on connection loss, and AI-powered conversation analysis.
 - **Chat with your Data**: AI-powered analytics data querying and recommendation generation.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization, acquisition channel analysis, and pipeline value calculation.
 - **Content Co-pilot**: AI-powered content creation tool using Data for SEO API (keyword research, content gap analysis) and Gemini AI to generate content ideas, comprehensive briefs, and optimization suggestions. Credentials stored encrypted in clientIntegrations table with AES-256-GCM.
