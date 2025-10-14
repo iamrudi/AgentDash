@@ -1,205 +1,230 @@
 # Agency Client Portal - Design Guidelines
 
-## Design Approach: Modern SaaS Dashboard System
+## Design Approach: macOS-Inspired Interface System
 
-**Selected Framework:** Hybrid approach combining shadcn/ui component patterns with Linear's minimalist aesthetics and Notion's content hierarchy principles. This choice aligns with the data-intensive, productivity-focused nature of agency management tools.
+**Selected Framework:** macOS 2.6 design language integrated with shadcn/ui component architecture. This creates a premium, native-feeling experience that combines Apple's refined aesthetics with the productivity-focused nature of agency management tools.
 
 **Core Principles:**
-- **Clarity over decoration**: Data and functionality take precedence
-- **Purposeful hierarchy**: Clear visual separation between portals and data types
-- **Professional restraint**: Sophisticated, trustworthy appearance for B2B context
+- **Premium simplicity**: Clean, uncluttered interfaces with purposeful use of space
+- **Subtle depth**: Gentle shadows and layering without excessive decoration
+- **Responsive feedback**: Smooth interactions and visual confirmations
+- **System coherence**: Consistent patterns across all portals and features
 
 ---
 
 ## Color Palette
 
-### Light Mode
+### Dark Mode (Default - macOS Dark)
 - **Background Layers**: 
-  - Primary: 0 0% 100% (pure white)
-  - Secondary: 240 5% 96% (subtle gray)
-  - Elevated cards: 0 0% 100% with subtle shadow
+  - Primary: 0 0% 18% (#2d2d2d - Dark Gray)
+  - Cards: 0 0% 24% (#3c3c3c)
+  - Sidebar: 0 0% 13% (#202020 - Darker for depth)
 - **Text**: 
-  - Primary: 240 10% 4% (near-black)
-  - Secondary: 240 5% 45% (muted gray)
-- **Brand/Primary**: 221 83% 53% (professional blue)
-- **Accent (Success)**: 142 76% 36% (green for positive metrics)
-- **Warning**: 38 92% 50% (amber for pending items)
-- **Danger**: 0 84% 60% (red for overdue/critical)
+  - Primary: 0 0% 100% (White)
+  - Secondary: 0 0% 80% (#cccccc)
+  - Muted: 0 0% 56% (#8e8e93)
+- **Brand Colors**:
+  - Primary: 211 100% 50% (#0a84ff - Apple Blue)
+  - Secondary: 243 75% 59% (#5e5ce6 - Indigo)
+  - Accent: 32 100% 52% (#ff9f0a - Orange)
+  - Destructive: 4 100% 60% (#ff453a - Red)
+- **Borders & Inputs**: 0 0% 33% (#545458)
 
-### Dark Mode
+### Light Mode (macOS Light)
 - **Background Layers**: 
-  - Primary: 240 10% 4% (deep slate)
-  - Secondary: 240 6% 10% (elevated slate)
-  - Cards: 240 5% 15% (card background)
+  - Primary: 0 0% 100% (Pure White)
+  - Cards: 0 0% 98% (Very Light Gray)
+  - Sidebar: 0 0% 96% (Light Gray)
 - **Text**: 
-  - Primary: 0 0% 98% (near-white)
-  - Secondary: 240 5% 65% (muted light gray)
-- **Brand/Primary**: 221 83% 63% (brighter blue for dark)
-- **Accent colors remain similar with adjusted lightness for contrast**
+  - Primary: 0 0% 0% (Black)
+  - Secondary: 0 0% 40%
+  - Muted: 0 0% 60%
+- **Brand Colors**: Same as dark mode (optimized for both)
+- **Borders & Inputs**: 0 0% 90%
 
 ---
 
 ## Typography
 
 **Font Stack:**
-- **Primary**: Inter (via Google Fonts CDN) - body text, labels, data
-- **Monospace**: JetBrains Mono - numbers, metrics, invoice amounts
+- **Primary (Sans)**: San Francisco system font stack
+  - `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+  - Provides native macOS feel on Apple devices, graceful fallbacks elsewhere
+- **Monospace**: SF Mono, Monaco, Inconsolata, "Roboto Mono"
+  - For code, numbers, metrics, and data display
 
 **Scale & Weights:**
 - **Headings**: 
-  - H1: text-3xl (30px), font-semibold (600) - portal titles
-  - H2: text-2xl (24px), font-semibold - section headers
-  - H3: text-lg (18px), font-medium (500) - card titles
-- **Body**: text-sm (14px), font-normal (400) - default
-- **Labels**: text-xs (12px), font-medium, uppercase tracking-wide - input labels
-- **Data/Numbers**: text-base (16px), font-mono, font-medium - metrics display
+  - H1: text-3xl (30px), font-semibold (600) - Portal titles
+  - H2: text-2xl (24px), font-semibold - Section headers
+  - H3: text-lg (18px), font-medium (500) - Card titles
+- **Body**: text-sm (14px), font-normal (400) - Default text
+- **Labels**: text-xs (12px), font-medium - Form labels, metadata
+- **Data/Numbers**: text-base (16px), font-mono, font-medium - Metrics
+
+**macOS Typography Principles:**
+- Use system font weights (400, 500, 600) for authenticity
+- Maintain generous line-height (1.5-1.6) for readability
+- Letter-spacing: slightly tighter for headings (-0.01em)
 
 ---
 
 ## Layout System
 
-**Spacing Primitives:** Consistent use of Tailwind units: 2, 4, 6, 8, 12, 16
-- **Component padding**: p-4 to p-6 (cards, panels)
-- **Section spacing**: mb-8, gap-6 (between dashboard widgets)
-- **Page margins**: px-6 lg:px-8 (responsive horizontal spacing)
-- **Grid gaps**: gap-4 to gap-6 (dashboard grid items)
+**Spacing Grid:** 4px base unit (macOS standard)
+- **Micro spacing**: space-1 (4px), space-2 (8px)
+- **Component padding**: p-3 (12px), p-4 (16px), p-6 (24px)
+- **Section spacing**: mb-6, gap-4, gap-6
+- **Page margins**: px-6 lg:px-8
+
+**Border Radius (macOS Values):**
+- **Small**: rounded-sm (4px) - Badges, tags, small buttons
+- **Medium**: rounded-md (8px) - Inputs, standard buttons, cards
+- **Large**: rounded-lg (12px) - Modals, large cards, containers
 
 **Container Strategy:**
 - **Full-width dashboards**: max-w-7xl mx-auto px-6
-- **Centered forms**: max-w-md mx-auto (auth pages)
-- **Data tables**: w-full with horizontal scroll on mobile
+- **Centered content**: max-w-4xl mx-auto
+- **Forms**: max-w-md mx-auto
+- **Modals**: max-w-2xl with centered positioning
 
 **Grid Patterns:**
-- **Agency Dashboard**: 12-column grid (grid-cols-12) for react-grid-layout flexibility
-- **Client Dashboard**: 2-column on desktop (lg:grid-cols-2), single on mobile
-- **Staff Task List**: Single column with card-based layout
+- **Dashboard grids**: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+- **Two-column layouts**: lg:grid-cols-2
+- **Sidebar layouts**: Fixed sidebar (280px) + flex content area
 
 ---
 
-## Component Library
+## Component Patterns
 
-### Navigation
-- **Sidebar** (Agency/Staff): 
-  - Fixed left, 240px width on desktop, collapsible to 64px
-  - Dark background (240 10% 8%) with active state highlight
-  - Icon + label layout, smooth transitions
-- **Top Bar** (Client Portal): 
-  - Horizontal navigation, company logo left, user menu right
-  - Sticky positioning, backdrop blur effect
-  - Height: h-16
+### Buttons (macOS Style)
+- **Primary**: bg-primary with subtle shadow, hover state lifts
+- **Secondary**: bg-muted with border, subdued appearance
+- **Ghost**: Transparent with hover background
+- **Destructive**: bg-destructive for critical actions
 
-### Data Display
-- **Dashboard Cards**:
-  - White/dark card background with rounded-lg borders
-  - Shadow: shadow-sm, hover:shadow-md transition
-  - Header with icon + title, body with primary metric, footer with trend indicator
-  
-- **Charts** (Recharts):
-  - Line charts: Primary blue stroke, 2px width, smooth curves
-  - Bar charts: Rounded tops, primary fill with 0.8 opacity
-  - Area charts: Gradient fill from primary to transparent
-  - Grid: Subtle stroke (240 5% 90% in light mode)
+**Sizing:**
+- sm: h-8 px-3 text-xs
+- md (default): h-9 px-4 text-sm
+- lg: h-10 px-6 text-base
 
-- **Data Tables** (Radix UI):
-  - Striped rows (even: subtle background)
-  - Hover: background highlight with smooth transition
-  - Compact row height: py-2
-  - Sortable headers with arrow indicators
+**Interaction:**
+- Subtle scale on active state (scale-[0.98])
+- Smooth transitions (150ms ease)
+- Focus ring: ring-2 ring-ring ring-offset-2
 
-### Forms & Inputs
-- **Input Fields**:
-  - Height: h-10, rounded-md borders
-  - Border: 2px solid, neutral color, focus:ring-2 ring-primary
-  - Consistent dark mode styling for all text inputs
-  - Placeholder text: muted foreground color
+### Cards
+- **Background**: bg-card with card-foreground text
+- **Border**: 1px solid border color
+- **Shadow**: Subtle drop shadow (shadow-sm)
+- **Padding**: p-6 for content
+- **Hover state**: Slight lift (shadow-md) for interactive cards
 
-- **Buttons**:
-  - Primary: bg-primary text-white, px-4 py-2, rounded-md
-  - Secondary: variant="outline" with border
-  - Ghost: variant="ghost" for sidebar items
-  - Icon buttons: 40x40px touch target
-  - On images: backdrop-blur-md bg-white/20 border border-white/40
+### Inputs & Forms
+- **Base style**: bg-input with border
+- **Focus**: ring-2 ring-ring (Apple Blue)
+- **Padding**: px-3 py-2
+- **Disabled**: opacity-50 with cursor-not-allowed
 
-### Status Indicators
-- **Project Status Pills**:
-  - Active: green background, dark green text
-  - Pending: amber background, dark amber text
-  - Completed: blue background, dark blue text
-  - Rounded-full, px-3 py-1, text-xs font-medium
-
-- **Task Priority**:
-  - Color-coded left border on task cards (4px width)
-  - High: red, Medium: amber, Low: blue
-
-### Modals & Overlays
-- **Dialog** (Radix):
-  - Backdrop: bg-black/50 backdrop-blur-sm
-  - Content: max-w-lg, rounded-lg, p-6
-  - Header with close button (top-right)
-  - Footer with action buttons (right-aligned)
-
-- **Dropdowns** (Radix):
-  - Rounded-md, shadow-lg
-  - Items: px-3 py-2, hover:bg-accent smooth transition
-  - Dividers between logical groups
+### Modals/Dialogs
+- **Overlay**: Semi-transparent black (bg-black/50)
+- **Content**: bg-card, rounded-lg, shadow-xl
+- **Animation**: Smooth fade + scale entrance
+- **Max width**: max-w-2xl
 
 ---
 
-## Portal-Specific Designs
+## Icon System
+
+**Library:** lucide-react (already installed)
+- Clean, line-art style matches macOS aesthetic
+- Consistent 24x24px base size
+- Stroke width: 2px (default) for clarity
+
+**Usage:**
+- **Navigation**: 20x20px icons with 12px gap from text
+- **Action buttons**: 16x16px icons in buttons
+- **Status indicators**: 14x14px with appropriate color
+- **Headers**: 24x24px for emphasis
+
+---
+
+## Interaction & Motion
+
+**Animation Principles (macOS Easing):**
+- **Default duration**: 150-200ms
+- **Easing**: ease-in-out for natural feel
+- **Hover states**: Subtle elevation, no abrupt changes
+- **Loading states**: Smooth skeleton loaders
+
+**Focus & Accessibility:**
+- Always show focus ring on keyboard navigation
+- Minimum touch target: 44x44px (macOS standard)
+- Color contrast: WCAG AA minimum (4.5:1 for text)
+- Screen reader support with proper ARIA labels
+
+---
+
+## Portal-Specific Guidelines
 
 ### Client Portal
-- **Landing**: Clean hero with company logo, gradient background (primary to secondary), centered CTA
-- **Dashboard**: 2-column grid, priority cards (Active Projects, Pending Invoices) top, metrics below
-- **Card emphasis**: Larger headings, generous padding (p-6), welcoming tone
+- Simplified navigation with clear visual hierarchy
+- Large, touch-friendly action buttons
+- Generous whitespace for clarity
+- Prominent CTA for strategic initiatives
 
-### Agency Portal
-- **Dashboard**: Fully customizable react-grid-layout
-- **Widget variety**: Mix of charts, tables, metric cards, AI recommendation panels
-- **Dense information**: Compact spacing, multiple data points per widget
-- **Command center aesthetic**: Dark sidebar, data-rich main area
+### Agency Admin Portal
+- Dense data displays with clear separation
+- Sidebar navigation with collapsible sections
+- Quick actions always accessible
+- Color-coded status indicators
 
 ### Staff Portal
-- **Task-centric**: Card-based task list dominates the view
-- **Filters**: Top bar with status/date filters, clean pill-style toggles
-- **Minimal chrome**: Focus on task content, reduced navigation footprint
+- Task-focused, minimal chrome
+- Clear assignment indicators
+- Progress visualization
+- Quick status updates
 
 ---
 
-## Animations & Interactions
+## Dark/Light Mode
 
-**Lottie Loading States:**
-- Use on data fetch: 200x200px centered spinner with subtle brand color
-- Page transitions: 150ms fade-in for new content
+**Toggle Behavior:**
+- Smooth transition between modes (200ms)
+- Preserve user preference in localStorage
+- Automatically adjust all color tokens
+- Icon adapts (moon/sun indicators)
 
-**Micro-interactions:**
-- Button press: scale-95 transform on active state
-- Card hover: translate-y-[-2px] with shadow increase
-- Chart tooltips: Fade in/out 200ms
-- Tab switching: Smooth content fade (300ms)
-
-**Performance:**
-- Minimize motion: Use prefers-reduced-motion media query
-- CSS transforms over position changes
-- Debounce dashboard grid drag operations
+**Color Adjustments:**
+- Dark mode: Slightly reduce saturation for comfort
+- Light mode: Increase contrast for outdoor readability
+- Both modes: Ensure WCAG AA compliance
 
 ---
 
-## Images
+## Best Practices
 
-This application primarily uses **iconography and data visualization** rather than photography. However, include:
+1. **Consistency**: Always use design tokens from index.css
+2. **Spacing**: Stick to 4px grid system
+3. **Typography**: Use system font stack for native feel
+4. **Colors**: Reference CSS variables, never hardcode
+5. **Icons**: lucide-react only, consistent sizing
+6. **Interactions**: Subtle, purposeful animations
+7. **Accessibility**: Keyboard navigation, screen readers, contrast
+8. **Responsive**: Mobile-first approach, touch-friendly targets
 
-1. **Company Logos**: Client company logos displayed in:
-   - Client portal header (max-h-8)
-   - Agency dashboard client cards (h-10 w-10 rounded)
-   - Invoice headers
+---
 
-2. **Empty States**: Minimal illustrations (not photos) for:
-   - No projects state: Simple line art of folder/checklist
-   - No tasks state: Checkmark icon with supportive text
-   - No data charts: Placeholder chart wireframe
+## Component Checklist
 
-3. **Avatar Placeholders**: User profile images (if uploaded):
-   - Rounded-full, h-10 w-10 standard size
-   - Fallback: Initials in colored circle
-
-**No large hero images** - this is a utility dashboard, not a marketing site. The login page may have a split-screen design with a subtle gradient background pattern instead of photography.
+Before creating/modifying components:
+- [ ] Uses CSS color variables from index.css
+- [ ] Follows macOS border radius (sm: 4px, md: 8px, lg: 12px)
+- [ ] Has proper focus states with ring-2
+- [ ] Includes dark mode support
+- [ ] Has smooth transitions (150-200ms)
+- [ ] Uses lucide-react icons where applicable
+- [ ] Follows 4px spacing grid
+- [ ] Meets WCAG AA contrast requirements
+- [ ] Has appropriate hover/active states
+- [ ] Includes proper data-testid attributes

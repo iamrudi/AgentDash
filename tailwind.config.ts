@@ -6,9 +6,9 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: "0.75rem",  /* 12px - macOS large */
+        md: "0.5rem",   /* 8px - macOS medium */
+        sm: "0.25rem",  /* 4px - macOS small */
       },
       colors: {
         // Flat / base colors (regular buttons)
@@ -83,8 +83,22 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["'Geist Sans'", "sans-serif"],
-        mono: ["'Geist Mono'", "monospace"],
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          '"Helvetica Neue"',
+          "Arial",
+          "sans-serif"
+        ],
+        mono: [
+          "SF Mono",
+          "Monaco",
+          "Inconsolata",
+          '"Roboto Mono"',
+          "monospace"
+        ],
       },
       keyframes: {
         "accordion-down": {

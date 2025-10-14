@@ -3,38 +3,39 @@
 @tailwind utilities;
 
 :root {
-  --background: 224 71% 4%;
-  --foreground: 210 40% 98%;
-  --card: 224 71% 9%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 216 34% 17%;
-  --popover: 224 71% 4%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 216 34% 17%;
-  --primary: 150 76% 42%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 216 34% 17%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 216 34% 17%;
-  --muted-foreground: 216 34% 65%;
-  --accent: 216 34% 17%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 63% 31%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 216 34% 17%;
-  --input: 216 34% 17%;
-  --ring: 150 76% 42%;
+  /* macOS Dark Mode Design Tokens */
+  --background: 0 0% 18%;           /* #2d2d2d - Dark Gray */
+  --foreground: 0 0% 100%;          /* #ffffff - White */
+  --card: 0 0% 24%;                 /* #3c3c3c */
+  --card-foreground: 0 0% 94%;      /* #f0f0f0 */
+  --card-border: 0 0% 33%;          /* #545458 */
+  --popover: 0 0% 24%;
+  --popover-foreground: 0 0% 94%;
+  --popover-border: 0 0% 33%;
+  --primary: 211 100% 50%;          /* #0a84ff - Apple Blue */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 243 75% 59%;         /* #5e5ce6 - Indigo */
+  --secondary-foreground: 0 0% 100%;
+  --muted: 240 2% 56%;              /* #8e8e93 */
+  --muted-foreground: 0 0% 80%;     /* #cccccc */
+  --accent: 32 100% 52%;            /* #ff9f0a - Orange */
+  --accent-foreground: 0 0% 100%;
+  --destructive: 4 100% 60%;        /* #ff453a - Red */
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 33%;               /* #545458 */
+  --input: 0 0% 33%;                /* #545458 */
+  --ring: 211 100% 50%;             /* #0a84ff */
   --radius: 0.5rem;
 
-  /* Sidebar variables for compatibility */
-  --sidebar: 224 71% 4%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 216 34% 17%;
-  --sidebar-primary: 150 76% 42%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 216 34% 17%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 150 76% 42%;
+  /* Sidebar - Slightly darker for macOS aesthetic */
+  --sidebar: 0 0% 13%;              /* #202020 - Darker */
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 28%;
+  --sidebar-primary: 211 100% 50%;  /* Apple Blue */
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 24%;
+  --sidebar-accent-foreground: 0 0% 94%;
+  --sidebar-ring: 211 100% 50%;
 
   /* Chart colors */
   --chart-1: 150 76% 42%;
@@ -70,37 +71,38 @@
 }
 
 .light {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --card-border: 240 5% 92%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --popover-border: 240 5% 92%;
-  --primary: 150 76% 42%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 150 76% 42%;
+  /* macOS Light Mode Design Tokens */
+  --background: 0 0% 100%;          /* Pure white */
+  --foreground: 0 0% 0%;            /* Black */
+  --card: 0 0% 98%;                 /* Very light gray */
+  --card-foreground: 0 0% 13%;
+  --card-border: 0 0% 90%;
+  --popover: 0 0% 98%;
+  --popover-foreground: 0 0% 13%;
+  --popover-border: 0 0% 90%;
+  --primary: 211 100% 50%;          /* #0a84ff - Apple Blue */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 243 75% 59%;         /* #5e5ce6 - Indigo */
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 32 100% 52%;            /* #ff9f0a - Orange */
+  --accent-foreground: 0 0% 0%;
+  --destructive: 4 100% 60%;        /* #ff453a - Red */
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 211 100% 50%;
 
   /* Sidebar for light mode */
-  --sidebar: 0 0% 100%;
-  --sidebar-foreground: 222.2 84% 4.9%;
-  --sidebar-border: 240 5% 92%;
-  --sidebar-primary: 150 76% 42%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 210 40% 96.1%;
-  --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-  --sidebar-ring: 150 76% 42%;
+  --sidebar: 0 0% 96%;              /* Light gray sidebar */
+  --sidebar-foreground: 0 0% 13%;
+  --sidebar-border: 0 0% 88%;
+  --sidebar-primary: 211 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 92%;
+  --sidebar-accent-foreground: 0 0% 13%;
+  --sidebar-ring: 211 100% 50%;
 
   /* Button and badge styles for light mode */
   --button-outline: rgba(0,0,0, .10);
