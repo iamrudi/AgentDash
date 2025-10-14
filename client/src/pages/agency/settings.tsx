@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
 import { 
   Settings as SettingsIcon, 
   Link2, 
@@ -21,9 +22,24 @@ type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 export default function Settings() {
   const [, setLocation] = useLocation();
 
-  const sidebarMode = (localStorage.getItem('sidebarMode') as SidebarMode) || 'expanded';
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(
+    () => (localStorage.getItem('sidebarMode') as SidebarMode) || 'expanded'
+  );
+
+  // Listen for sidebar mode changes from other components
+  useEffect(() => {
+    const handleSidebarModeChange = (event: CustomEvent<SidebarMode>) => {
+      setSidebarMode(event.detail);
+    };
+
+    window.addEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    return () => {
+      window.removeEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    };
+  }, []);
 
   const handleSidebarModeChange = (mode: SidebarMode) => {
+    setSidebarMode(mode);
     localStorage.setItem('sidebarMode', mode);
     window.dispatchEvent(new CustomEvent('sidebarModeChange', { detail: mode }));
   };

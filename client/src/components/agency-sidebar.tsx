@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +27,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   Accordion,
@@ -87,7 +89,7 @@ const menuGroups = [
   },
   {
     title: "Administration",
-    icon: Settings,
+    icon: Shield,
     items: [
       {
         title: "Clients",
@@ -96,47 +98,56 @@ const menuGroups = [
         notificationKey: null,
       },
       {
-        title: "Invoices",
-        url: "/agency/invoices",
-        icon: FileText,
-        notificationKey: null,
-      },
-      {
-        title: "Trash",
-        url: "/agency/trash",
-        icon: Trash2,
-        notificationKey: null,
-      },
-      {
-        title: "Google Integrations",
-        url: "/agency/integrations",
-        icon: Link2,
-        notificationKey: null,
-      },
-      {
-        title: "Staff",
-        url: "/agency/staff",
-        icon: Users,
-        notificationKey: null,
-      },
-      {
-        title: "User Management",
-        url: "/agency/users",
-        icon: UserCog,
+        title: "Settings",
+        url: "/agency/settings",
+        icon: Settings,
         notificationKey: null,
       },
     ],
   },
 ];
 
+type SidebarMode = 'expanded' | 'collapsed' | 'hover';
+
 export function AgencySidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
+  const { setOpen, open } = useSidebar();
+  
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(
+    () => (localStorage.getItem('sidebarMode') as SidebarMode) || 'expanded'
+  );
 
   const { data: notificationCounts } = useQuery<{ unreadMessages: number; unviewedResponses: number }>({
     queryKey: ["/api/agency/notifications/counts"],
     refetchInterval: 10000,
   });
+
+  // Listen for sidebar mode changes from Settings
+  useEffect(() => {
+    const handleSidebarModeChange = (event: CustomEvent<SidebarMode>) => {
+      setSidebarMode(event.detail);
+      if (event.detail === 'collapsed') {
+        setOpen(false);
+      } else if (event.detail === 'expanded') {
+        setOpen(true);
+      }
+    };
+
+    window.addEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    return () => {
+      window.removeEventListener('sidebarModeChange', handleSidebarModeChange as EventListener);
+    };
+  }, [setOpen]);
+
+  // Set initial state based on mode
+  useEffect(() => {
+    if (sidebarMode === 'collapsed') {
+      setOpen(false);
+    } else if (sidebarMode === 'expanded') {
+      setOpen(true);
+    }
+  }, [sidebarMode, setOpen]);
 
   const handleLogout = () => {
     clearAuthUser();
@@ -144,7 +155,11 @@ export function AgencySidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar 
+      collapsible={sidebarMode === 'collapsed' ? 'icon' : sidebarMode === 'hover' ? 'offcanvas' : 'none'}
+      onMouseEnter={() => sidebarMode === 'hover' && setOpen(true)}
+      onMouseLeave={() => sidebarMode === 'hover' && setOpen(false)}
+    >
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
