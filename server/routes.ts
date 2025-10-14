@@ -2834,6 +2834,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analyze conversation with AI (Admin only)
+  app.post("/api/agency/messages/analyze/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      // Get client and messages
+      const client = await storage.getClientById(clientId);
+      const messages = await storage.getMessagesByClientId(clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      if (messages.length === 0) {
+        return res.status(400).json({ message: "No messages to analyze" });
+      }
+
+      // Format conversation for AI
+      const conversationText = messages
+        .map(m => `${m.senderRole === "Client" ? "Client" : "Agency"}: ${m.message}`)
+        .join("\n");
+
+      // Generate AI analysis using GoogleGenAI
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+      
+      const prompt = `Analyze this conversation between an agency and their client (${client.companyName}).
+
+Conversation:
+${conversationText}
+
+Provide a brief analysis covering:
+1. Main topics and concerns discussed
+2. Client sentiment and engagement level
+3. Action items or follow-ups needed
+4. Potential opportunities for strategic initiatives or recommendations
+
+Keep the analysis concise and actionable (2-3 paragraphs).`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-2.0-flash-exp",
+        contents: prompt,
+      });
+      const analysis = result.text;
+
+      res.json({ analysis, suggestions: [] });
+    } catch (error: any) {
+      console.error("Error analyzing conversation:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get notification counts (Admin only)
   app.get("/api/agency/notifications/counts", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
