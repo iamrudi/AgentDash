@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { supabase } from "@/lib/supabase";
 
 type ConversationGroup = {
   client: Client;
@@ -31,7 +32,6 @@ export default function AgencyMessagesPage() {
 
   const { data: messages } = useQuery<ClientMessage[]>({
     queryKey: ["/api/agency/messages"],
-    refetchInterval: 5000, // Refresh every 5 seconds for real-time feel
   });
 
   const { data: clients } = useQuery<Client[]>({
@@ -88,6 +88,31 @@ export default function AgencyMessagesPage() {
       }
     }
   }, [selectedConversation?.messages]);
+
+  // Real-time subscription for new messages
+  useEffect(() => {
+    const channel = supabase
+      .channel('client_messages_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'client_messages'
+        },
+        () => {
+          // Invalidate queries to refetch messages
+          queryClient.invalidateQueries({ queryKey: ["/api/agency/messages"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/agency/notifications/counts"] });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: { clientId: string; message: string }) => {
