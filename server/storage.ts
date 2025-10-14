@@ -1,6 +1,4 @@
 import {
-  type User,
-  type InsertUser,
   type Profile,
   type InsertProfile,
   type Client,
@@ -28,7 +26,6 @@ import {
   type Notification,
   type InsertNotification,
   type Agency,
-  users,
   profiles,
   clients,
   projects,
