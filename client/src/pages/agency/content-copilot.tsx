@@ -120,7 +120,12 @@ export default function ContentCopilot() {
     onSuccess: (data) => {
       console.log('[Frontend] Content Brief received:', data);
       console.log('[Frontend] wordCount:', data.wordCount, 'tone:', data.tone);
+      console.log('[Frontend] Setting contentBrief state with:', JSON.stringify(data, null, 2));
       setContentBrief(data);
+      // Log state after setting (use setTimeout to see updated state)
+      setTimeout(() => {
+        console.log('[Frontend] contentBrief state after setting:', contentBrief);
+      }, 100);
       toast({
         title: "Success",
         description: "Content brief generated successfully",
