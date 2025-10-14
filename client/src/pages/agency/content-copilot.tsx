@@ -85,7 +85,7 @@ export default function ContentCopilot() {
         competitorUrls: urls,
         locationCode: 2840, // United States
       });
-      return response as ContentIdea[];
+      return response as unknown as ContentIdea[];
     },
     onSuccess: (data) => {
       setContentIdeas(data);
@@ -115,7 +115,7 @@ export default function ContentCopilot() {
         contentType,
         competitorUrls: urls,
       });
-      return response as ContentBrief;
+      return response as unknown as ContentBrief;
     },
     onSuccess: (data) => {
       setContentBrief(data);
@@ -142,7 +142,7 @@ export default function ContentCopilot() {
         targetKeywords: keywords,
         currentUrl: currentUrl || undefined,
       });
-      return response as ContentOptimization;
+      return response as unknown as ContentOptimization;
     },
     onSuccess: (data) => {
       setOptimization(data);
@@ -442,52 +442,62 @@ export default function ContentCopilot() {
             {contentBrief && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{contentBrief.title}</CardTitle>
+                  <CardTitle>{contentBrief.title || 'Content Brief'}</CardTitle>
                   <CardDescription>
-                    Recommended Word Count: {contentBrief.wordCount} • Tone: {contentBrief.tone}
+                    Recommended Word Count: {contentBrief.wordCount || 'N/A'} • Tone: {contentBrief.tone || 'N/A'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2">Target Keywords</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {contentBrief.targetKeywords.map((keyword, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {keyword}
-                        </Badge>
-                      ))}
+                  {contentBrief.targetKeywords && contentBrief.targetKeywords.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Target Keywords</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {contentBrief.targetKeywords.map((keyword, idx) => (
+                          <Badge key={idx} variant="secondary">
+                            {keyword}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div>
-                    <h4 className="font-semibold mb-2">Target Audience</h4>
-                    <p className="text-muted-foreground">{contentBrief.targetAudience}</p>
-                  </div>
+                  {contentBrief.targetAudience && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Target Audience</h4>
+                      <p className="text-muted-foreground">{contentBrief.targetAudience}</p>
+                    </div>
+                  )}
 
-                  <div>
-                    <h4 className="font-semibold mb-2">Content Outline</h4>
-                    <ul className="space-y-1">
-                      {contentBrief.outline.map((item, idx) => (
-                        <li key={idx} className={item.startsWith("  ") ? "ml-6 text-muted-foreground" : "font-medium"}>
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  {contentBrief.outline && contentBrief.outline.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Content Outline</h4>
+                      <ul className="space-y-1">
+                        {contentBrief.outline.map((item, idx) => (
+                          <li key={idx} className={item.startsWith("  ") ? "ml-6 text-muted-foreground" : "font-medium"}>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  <div>
-                    <h4 className="font-semibold mb-2">Key Points to Cover</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {contentBrief.keyPoints.map((point, idx) => (
-                        <li key={idx} className="text-muted-foreground">{point}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  {contentBrief.keyPoints && contentBrief.keyPoints.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Key Points to Cover</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {contentBrief.keyPoints.map((point, idx) => (
+                          <li key={idx} className="text-muted-foreground">{point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  <div>
-                    <h4 className="font-semibold mb-2">Competitor Insights</h4>
-                    <p className="text-muted-foreground">{contentBrief.competitorInsights}</p>
-                  </div>
+                  {contentBrief.competitorInsights && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Competitor Insights</h4>
+                      <p className="text-muted-foreground">{contentBrief.competitorInsights}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -552,52 +562,60 @@ export default function ContentCopilot() {
                   <div className="flex items-center gap-4 mt-2">
                     <div>
                       <span className="text-sm text-muted-foreground">Overall Score</span>
-                      <div className="text-2xl font-bold">{optimization.overallScore}/100</div>
+                      <div className="text-2xl font-bold">{optimization.overallScore || 0}/100</div>
                     </div>
                     <div>
                       <span className="text-sm text-muted-foreground">Readability Score</span>
-                      <div className="text-2xl font-bold">{optimization.readabilityScore}/100</div>
+                      <div className="text-2xl font-bold">{optimization.readabilityScore || 0}/100</div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold mb-2 text-green-600 dark:text-green-400">Strengths</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {optimization.strengths.map((strength, idx) => (
-                        <li key={idx} className="text-muted-foreground">{strength}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-2 text-yellow-600 dark:text-yellow-400">Areas for Improvement</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {optimization.improvements.map((improvement, idx) => (
-                        <li key={idx} className="text-muted-foreground">{improvement}</li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold mb-2">Keyword Opportunities</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {optimization.keywordOpportunities.map((keyword, idx) => (
-                        <Badge key={idx} variant="outline">
-                          {keyword}
-                        </Badge>
-                      ))}
+                  {optimization.strengths && optimization.strengths.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-green-600 dark:text-green-400">Strengths</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {optimization.strengths.map((strength, idx) => (
+                          <li key={idx} className="text-muted-foreground">{strength}</li>
+                        ))}
+                      </ul>
                     </div>
-                  </div>
+                  )}
 
-                  <div>
-                    <h4 className="font-semibold mb-2">SEO Recommendations</h4>
-                    <ul className="list-disc list-inside space-y-1">
-                      {optimization.seoRecommendations.map((rec, idx) => (
-                        <li key={idx} className="text-muted-foreground">{rec}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  {optimization.improvements && optimization.improvements.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2 text-yellow-600 dark:text-yellow-400">Areas for Improvement</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {optimization.improvements.map((improvement, idx) => (
+                          <li key={idx} className="text-muted-foreground">{improvement}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {optimization.keywordOpportunities && optimization.keywordOpportunities.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">Keyword Opportunities</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {optimization.keywordOpportunities.map((keyword, idx) => (
+                          <Badge key={idx} variant="outline">
+                            {keyword}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {optimization.seoRecommendations && optimization.seoRecommendations.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-2">SEO Recommendations</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {optimization.seoRecommendations.map((rec, idx) => (
+                          <li key={idx} className="text-muted-foreground">{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
