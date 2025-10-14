@@ -206,41 +206,21 @@ export class DbStorage implements IStorage {
         db.select().from(clients).where(eq(clients.agencyId, agencyId))
       ]);
       
-      // Get unique user IDs from both profiles and clients
-      const profileUserIds = new Set(agencyProfiles.map(p => p.userId));
-      const clientUserIds = new Set(
-        agencyProfiles
-          .filter(p => p.role === "Client")
-          .map(p => p.userId)
-      );
-      
-      // Also need to check clients that belong to this agency via their profileId
-      const clientProfileIds = new Set(agencyClients.map(c => c.profileId));
-      const clientProfiles = agencyProfiles.filter(p => clientProfileIds.has(p.id));
-      clientProfiles.forEach(p => clientUserIds.add(p.userId));
-      
-      const allUserIds = Array.from(new Set([...profileUserIds, ...clientUserIds]));
-      
-      if (allUserIds.length === 0) {
-        return [];
-      }
-      
-      // Fetch users that belong to this agency
-      const agencyUsers = await db.select().from(users)
-        .where(sql`${users.id} IN (${sql.join(allUserIds.map(id => sql`${id}`), sql`, `)})`);
-      
-      // Build lookup maps for efficiency
-      const profileMap = new Map(agencyProfiles.map(p => [p.userId, p]));
+      // Build client map for efficiency
       const clientMap = new Map(agencyClients.map(c => [c.profileId, c]));
       
-      const usersWithProfiles = agencyUsers.map((user) => {
-        const profile = profileMap.get(user.id) || null;
+      // Build user objects from profiles (profile.id IS the Supabase Auth user ID)
+      const usersWithProfiles = agencyProfiles.map((profile) => {
         let client = null;
-        if (profile && profile.role === "Client") {
+        if (profile.role === "Client") {
           client = clientMap.get(profile.id) || null;
         }
+        // Create a compatible User object from profile data
         return {
-          ...user,
+          id: profile.id, // Supabase Auth user ID
+          email: '', // Will be fetched from Supabase Auth if needed
+          password: '', // Not stored locally anymore
+          createdAt: profile.createdAt,
           profile,
           client,
         };
@@ -252,18 +232,20 @@ export class DbStorage implements IStorage {
     }
     
     // Original implementation without agency filtering
-    const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+    const allProfiles = await db.select().from(profiles).orderBy(desc(profiles.createdAt));
     
     const usersWithProfiles = await Promise.all(
-      allUsers.map(async (user) => {
-        const profile = await this.getProfileByUserId(user.id);
+      allProfiles.map(async (profile) => {
         let client = null;
-        if (profile && profile.role === "Client") {
+        if (profile.role === "Client") {
           client = await this.getClientByProfileId(profile.id);
         }
         return {
-          ...user,
-          profile: profile || null,
+          id: profile.id, // Supabase Auth user ID
+          email: '', // Will be fetched from Supabase Auth if needed
+          password: '', // Not stored locally anymore
+          createdAt: profile.createdAt,
+          profile,
           client: client || null,
         };
       })
@@ -280,7 +262,7 @@ export class DbStorage implements IStorage {
     
     await db.update(profiles)
       .set({ role })
-      .where(eq(profiles.userId, userId));
+      .where(eq(profiles.id, userId)); // profile.id IS the user ID
   }
 
   async deleteUser(userId: string): Promise<void> {
@@ -290,7 +272,8 @@ export class DbStorage implements IStorage {
 
   // Profiles
   async getProfileByUserId(userId: string): Promise<Profile | undefined> {
-    const result = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    // With Supabase Auth, profile.id IS the user ID
+    const result = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
     return result[0];
   }
 
@@ -761,14 +744,14 @@ export class DbStorage implements IStorage {
   }
 
   async createInitiative(rec: InsertInitiative): Promise<Initiative> {
-    const result = await db.insert(initiatives).values(rec).returning();
+    const result = await db.insert(initiatives).values(rec as any).returning();
     return result[0];
   }
 
   async updateInitiative(id: string, updates: Partial<InsertInitiative>): Promise<Initiative> {
     const result = await db
       .update(initiatives)
-      .set({ ...updates, lastEditedAt: new Date() })
+      .set({ ...updates, lastEditedAt: new Date() } as any)
       .where(eq(initiatives.id, id))
       .returning();
     return result[0];
@@ -960,9 +943,10 @@ export class DbStorage implements IStorage {
           refreshTokenIv: clientIntegrations.refreshTokenIv,
           accessTokenAuthTag: clientIntegrations.accessTokenAuthTag,
           refreshTokenAuthTag: clientIntegrations.refreshTokenAuthTag,
-          propertyId: clientIntegrations.propertyId,
-          siteUrl: clientIntegrations.siteUrl,
-          leadEventNames: clientIntegrations.leadEventNames,
+          expiresAt: clientIntegrations.expiresAt,
+          ga4PropertyId: clientIntegrations.ga4PropertyId,
+          ga4LeadEventName: clientIntegrations.ga4LeadEventName,
+          gscSiteUrl: clientIntegrations.gscSiteUrl,
           createdAt: clientIntegrations.createdAt,
           updatedAt: clientIntegrations.updatedAt,
         })
