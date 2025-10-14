@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from "./middleware/auth";
+import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from "./middleware/supabase-auth";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -27,22 +27,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password, fullName, companyName } = req.body;
       
-      // Check if user exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User already exists" });
-      }
-
-      // Create user
-      const user = await storage.createUser({ email, password });
-
+      // Create user in Supabase Auth
+      const { signUpWithSupabase } = await import("./lib/supabase-auth");
+      
       // SECURITY: Always assign Client role for self-registration
       // Admin and Staff roles must be assigned by existing administrators
-      const profile = await storage.createProfile({
-        userId: user.id,
-        fullName,
-        role: "Client",
-      });
+      const authResult = await signUpWithSupabase(email, password, fullName, "Client");
 
       // Create client record
       // TODO: In production, use invitation-based signup with specific agencyId
@@ -54,7 +44,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         await storage.createClient({
           companyName,
-          profileId: profile.id,
+          profileId: authResult.profileId, // This is the Supabase Auth user ID
           agencyId: defaultAgency.id,
         });
       }
