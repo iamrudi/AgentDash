@@ -11,8 +11,13 @@ The platform is a full-stack JavaScript application using React for the frontend
 
 ### UI/UX Decisions
 - **Frontend Framework**: React 18, Wouter for routing, TanStack Query for state management.
-- **Styling**: Tailwind CSS with Shadcn/UI, dark-first design with light mode support, and mobile-first responsiveness.
-- **Typography**: Geist Sans for UI text, Geist Mono for code.
+- **Design System**: macOS-inspired design language with Apple's refined aesthetics (October 2025)
+  - **Primary Color**: Apple Blue (#0a84ff / HSL 210 100% 52%)
+  - **Typography**: San Francisco system font stack (-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto)
+  - **Border Radius**: macOS standards (4px/8px/12px for small/medium/large)
+  - **Color Palette**: Semantic macOS colors (Indigo secondary, Orange accent, Red destructive)
+- **Styling**: Tailwind CSS with Shadcn/UI, dark mode with light mode support (Tailwind dark class strategy), mobile-first responsiveness.
+- **Icons**: Lucide React for consistent line-art style matching macOS aesthetic.
 - **Navigation**: Collapsible sidebar with icon-only mode and portal-specific branding.
 
 ### Technical Implementations
