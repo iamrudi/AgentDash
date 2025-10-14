@@ -57,10 +57,10 @@ The platform is a full-stack JavaScript application using React for the frontend
 
 **Components Implemented**:
 1. **Database Schema**:
-   - `agencies` table with id, name, settings
+   - `agencies` table with id, name, createdAt
    - `profiles.agencyId` (nullable, for Admin/Staff only)
    - `clients.agencyId` (required, foreign key)
-   - Migration: "Default Agency" created, all existing data migrated
+   - Migration: "Default Agency" created in Supabase, test users recreated
 
 2. **Authentication Layer**:
    - JWT payload includes `agencyId` for Admin/Staff users
@@ -111,6 +111,39 @@ The platform is a full-stack JavaScript application using React for the frontend
   3. AES-256-GCM IV reuse vulnerability fix (IV should be random per encryption, not derived from data)
   4. Multi-agency integration tests
   5. Scheduled tasks (invoices, trash cleanup) are currently global - need agency scoping decision
+
+### Database Migration to Supabase (Completed)
+
+**Migration Date**: October 14, 2025  
+**Status**: ✅ **Successfully migrated from Replit Neon to Supabase PostgreSQL**
+
+**Migration Details**:
+1. **Database Driver Update**:
+   - Changed from `drizzle-orm/neon-serverless` to `drizzle-orm/postgres-js`
+   - Updated `server/db.ts` to use `postgres` package with SSL required
+   - Connection via `DATABASE_URL` environment variable
+
+2. **Schema Deployment**:
+   - Pushed complete Drizzle schema to Supabase using `npm run db:push`
+   - All tables created successfully (agencies, users, profiles, clients, projects, tasks, invoices, initiatives, messages, metrics, integrations, objectives)
+
+3. **Test Data Recreation**:
+   - Created "Default Agency" (ID: 614d7633-5dd9-4147-a261-ebf8458a2ec4)
+   - Created Admin user: Agent3@demo.com / Agent1234
+   - Created Client user: Jon@mmagency.co.uk / Letmein120
+   - Created Client company: MMA Marketing
+
+4. **Verification**:
+   - ✅ Login functionality tested and working
+   - ✅ Tenant isolation verified (client cannot access admin routes)
+   - ✅ All API endpoints functioning correctly
+   - ✅ Multi-tenant architecture preserved
+
+**Next Steps for Option B (Authentication Migration)**:
+- Replace JWT authentication with Supabase Auth
+- Migrate file storage to Supabase Storage
+- Update all auth middleware to use Supabase sessions
+- Ensure multi-tenant isolation works with Supabase Auth user metadata
 
 ## External Dependencies
 - **Database**: PostgreSQL (via Supabase)
