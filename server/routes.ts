@@ -28,11 +28,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password, fullName, companyName } = req.body;
       
       // Create user in Supabase Auth
-      const { signUpWithSupabase } = await import("./lib/supabase-auth");
+      const { createUserWithProfile } = await import("./lib/supabase-auth");
       
       // SECURITY: Always assign Client role for self-registration
       // Admin and Staff roles must be assigned by existing administrators
-      const authResult = await signUpWithSupabase(email, password, fullName, "Client");
+      const authResult = await createUserWithProfile(email, password, fullName, "Client");
 
       // Create client record
       // TODO: In production, use invitation-based signup with specific agencyId
@@ -61,15 +61,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
 
       // Sign in with Supabase Auth
-      const { signInWithSupabase } = await import("./lib/supabase-auth");
-      const authResult = await signInWithSupabase(email, password);
+      const { signInWithPassword } = await import("./lib/supabase-auth");
+      const authResult = await signInWithPassword(email, password);
 
-      if (!authResult.session) {
+      if (!authResult.data.session) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       // Get profile from our database (profile.id = Supabase Auth user ID)
-      const profile = await storage.getProfileByUserId(authResult.user.id);
+      const profile = await storage.getProfileByUserId(authResult.data.user!.id);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
@@ -88,10 +88,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Return Supabase session token
       res.json({
-        token: authResult.session.access_token,
+        token: authResult.data.session!.access_token,
         user: {
-          id: authResult.user.id,
-          email: authResult.user.email || email,
+          id: authResult.data.user!.id,
+          email: authResult.data.user!.email || email,
           profile,
           clientId,
           agencyId,
@@ -1101,18 +1101,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (client) {
           const clientProfile = await storage.getProfileById(client.profileId);
           if (clientProfile) {
-            const clientUser = await storage.getUserById(clientProfile.userId);
-            if (clientUser) {
-              await storage.createNotification({
-                userId: clientUser.id,
-                type: "new_initiative",
-                title: "New Strategic Initiative",
-                message: `Your agency has sent you a new strategic initiative: "${initiative.title}"`,
-                link: "/client/recommendations",
-                isRead: "false",
-                isArchived: "false",
-              });
-            }
+            // profile.id IS the user ID (Supabase Auth ID)
+            await storage.createNotification({
+              userId: clientProfile.id,
+              type: "new_initiative",
+              title: "New Strategic Initiative",
+              message: `Your agency has sent you a new strategic initiative: "${initiative.title}"`,
+              link: "/client/recommendations",
+              isRead: "false",
+              isArchived: "false",
+            });
           }
         }
       } catch (notificationError) {
@@ -2589,29 +2587,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = createClientUserSchema.parse(req.body);
       const { email, password, fullName, companyName } = validatedData;
 
-      // Check if user exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-
-      // Create user
-      const user = await storage.createUser({ email, password });
-
-      // Create profile with Client role
-      const profile = await storage.createProfile({
-        userId: user.id,
-        fullName,
-        role: "Client",
-      });
-
-      // Create client record in the admin's agency
+      // Create user in Supabase Auth
+      const { createUserWithProfile } = await import("./lib/supabase-auth");
+      
+      // Create user and profile in admin's agency
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Admin user has no agency association" });
       }
+      
+      const authResult = await createUserWithProfile(email, password, fullName, "Client", req.user!.agencyId);
+      
+      // Create client record in the admin's agency
       const client = await storage.createClient({
         companyName,
-        profileId: profile.id,
+        profileId: authResult.profileId, // Supabase Auth user ID
         agencyId: req.user!.agencyId,
       });
 
@@ -2621,8 +2610,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: client.id, 
           companyName: client.companyName,
           user: { 
-            email: user.email,
-            fullName: profile.fullName
+            email: email,
+            fullName: fullName
           }
         }
       });
@@ -2695,29 +2684,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = createStaffAdminUserSchema.parse(req.body);
       const { email, password, fullName, role } = validatedData;
 
-      // Check if user exists
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
+      // Create user in Supabase Auth
+      const { createUserWithProfile } = await import("./lib/supabase-auth");
+      
+      // Ensure admin has agencyId for Staff/Admin users
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Admin user has no agency association" });
       }
-
-      // Create user
-      const user = await storage.createUser({ email, password });
-
-      // Create profile with specified role
-      const profile = await storage.createProfile({
-        userId: user.id,
-        fullName,
-        role,
-      });
+      
+      const authResult = await createUserWithProfile(email, password, fullName, role, req.user!.agencyId);
 
       res.status(201).json({ 
         message: `${role} user created successfully`,
         user: { 
-          id: user.id,
-          email: user.email,
-          fullName: profile.fullName,
-          role: profile.role
+          id: authResult.profileId,
+          email: email,
+          fullName: fullName,
+          role: role
         }
       });
     } catch (error: any) {
@@ -2739,39 +2722,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const { email, password, fullName, role, companyName } = req.body;
         
-        // Check if user exists
-        const existingUser = await storage.getUserByEmail(email);
-        if (existingUser) {
-          return res.status(400).json({ message: "User already exists" });
-        }
-
-        // Create user
-        const user = await storage.createUser({ email, password });
-
-        // Create profile with specified role (bypassing normal security)
-        const profile = await storage.createProfile({
-          userId: user.id,
-          fullName,
-          role: role || "Client",
-        });
-
-        // Create client record if role is Client and companyName provided
-        if (role === "Client" && companyName) {
+        // Create user in Supabase Auth
+        const { createUserWithProfile } = await import("./lib/supabase-auth");
+        
+        // Get default agency for Client users
+        let agencyId: string | undefined;
+        if (role === "Client" || !role) {
           const defaultAgency = await storage.getDefaultAgency();
           if (!defaultAgency) {
             return res.status(500).json({ message: "System configuration error: No default agency found" });
           }
+          agencyId = defaultAgency.id;
+        }
+        
+        const authResult = await createUserWithProfile(
+          email, 
+          password, 
+          fullName, 
+          role || "Client",
+          agencyId
+        );
+
+        // Create client record if role is Client and companyName provided
+        if ((role === "Client" || !role) && companyName && agencyId) {
           await storage.createClient({
             companyName,
-            profileId: profile.id,
-            agencyId: defaultAgency.id,
+            profileId: authResult.profileId,
+            agencyId: agencyId,
           });
         }
 
         res.status(201).json({ 
           message: "Test user created successfully",
-          user: { id: user.id, email: user.email },
-          profile: { id: profile.id, fullName: profile.fullName, role: profile.role }
+          user: { id: authResult.profileId, email: email },
+          profile: { id: authResult.profileId, fullName: fullName, role: role || "Client" }
         });
       } catch (error: any) {
         console.error("Test user creation error:", error);
