@@ -33,6 +33,7 @@ import AgencyRecommendations from "@/pages/agency/recommendations";
 import AgencyClients from "@/pages/agency/clients";
 import AgencyStaff from "@/pages/agency/staff";
 import AgencyIntegrations from "@/pages/agency/integrations";
+import AgencyContentCopilot from "@/pages/agency/content-copilot";
 import AgencyUsers from "@/pages/agency/users";
 import AgencyInvoices from "@/pages/agency/invoices";
 import AgencyTrash from "@/pages/agency/trash";
@@ -168,6 +169,12 @@ function Router() {
       <Route path="/agency/integrations">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyIntegrations />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/content-copilot">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyContentCopilot />
         </ProtectedRoute>
       </Route>
 
