@@ -42,12 +42,36 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **SEO Integrations**: Data for SEO API (credential-based auth, stored encrypted in clientIntegrations table).
 
 ### System Design Choices
-- **Multi-tenancy**: Defense-in-depth tenant isolation with two layers:
-  - **Application Layer**: Route middleware (`requireAuth`, `requireClientAccess`) and storage filtering by `req.user.agencyId`
+- **Multi-tenancy**: Defense-in-depth tenant isolation with three layers:
+  - **Application Layer**: Route middleware (`requireAuth`, `requireClientAccess`, `requireProjectAccess`, `requireTaskAccess`, `requireInitiativeAccess`, `requireInvoiceAccess`) and storage filtering by `req.user.agencyId`
   - **Database Layer**: Postgres Row-Level Security (RLS) policies on all tables using JWT `app_metadata.agency_id`
+  - **Resource-Level Protection**: Tenant isolation middleware on all routes accepting projectId/taskId/initiativeId/invoiceId to prevent cross-agency access
   - Protection against application bugs, direct database access, and compromised service keys
 - **API Structure**: RESTful endpoints with role-based access.
 - **Project Structure**: Separate frontend, backend, and shared codebases.
+
+### Production Readiness & Security (October 2025)
+**Status**: ✅ Production-Ready (All critical security issues resolved)
+
+**Security Fixes Implemented:**
+1. **Tenant Isolation Middleware** - Added resource-level protection to 15+ routes:
+   - `requireProjectAccess(storage)` - Verifies user owns project via client ownership
+   - `requireTaskAccess(storage)` - Verifies user owns task via project → client chain
+   - `requireInitiativeAccess(storage)` - Verifies user owns initiative via client
+   - `requireInvoiceAccess(storage)` - Verifies user owns invoice via client
+   - Protected routes: `/api/agency/projects/:id`, `/api/agency/tasks/:id`, `/api/initiatives/:id/*`, `/api/invoices/:invoiceId/*`
+
+2. **Staff Authorization** - Fixed staff access denial:
+   - Staff users now have agency-scoped read access to clients
+   - `verifyClientAccess` updated to allow staff agency-scoped access
+   - Staff cannot access clients from other agencies
+
+3. **JWT Secret Security** - Fixed shared secret vulnerability:
+   - `JWT_SECRET` now required separate from `SESSION_SECRET` in production
+   - Runtime check blocks production startup if `JWT_SECRET` not set
+   - Development fallback with warning if `JWT_SECRET` missing
+
+**Deployment Documentation**: See `PRODUCTION_DEPLOYMENT.md` for complete deployment checklist, environment variables, security validation steps, and troubleshooting guide.
 
 ## External Dependencies
 - **Database**: PostgreSQL (via Supabase)
