@@ -26,7 +26,6 @@ export default function AgencyMessagesPage() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState("");
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
-  const [analyzingConversation, setAnalyzingConversation] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -67,7 +66,6 @@ export default function AgencyMessagesPage() {
   // Clear AI analysis when conversation changes
   useEffect(() => {
     setAiAnalysis(null);
-    setAnalyzingConversation(false);
   }, [selectedClientId]);
 
   // Mark messages as read when conversation is selected
@@ -120,9 +118,10 @@ export default function AgencyMessagesPage() {
         `/api/agency/messages/analyze/${clientId}`, 
         {}
       );
+      const data = await response.json() as { analysis: string; suggestions: string[] };
       return { 
         clientId, 
-        ...response as unknown as { analysis: string; suggestions: string[] } 
+        ...data
       };
     },
     onSuccess: (data) => {
@@ -142,7 +141,6 @@ export default function AgencyMessagesPage() {
 
   const handleAnalyzeConversation = () => {
     if (!selectedClientId) return;
-    setAnalyzingConversation(true);
     analyzeConversationMutation.mutate(selectedClientId);
   };
 
