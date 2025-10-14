@@ -1,0 +1,129 @@
+Generate a React (Vite) + TypeScript project that implements a component library based on the "macOS 2.6" Figma UI Kit. The project should use Tailwind CSS for styling and Storybook for component documentation and visualization.
+
+Phase 1: Project Scaffolding & Configuration
+
+Initialize Project:
+
+Use the Replit React + TypeScript template.
+
+Initialize Tailwind CSS for this project.
+
+Initialize Storybook for this project.
+
+Configure Tailwind (tailwind.config.js):
+
+Translate the Figma Kit's design tokens into the Tailwind theme.
+
+Colors:
+
+background: #2d2d2d (Dark Gray)
+
+foreground: #ffffff (White)
+
+card: #3c3c3c
+
+card-foreground: #f0f0f0
+
+primary: #0a84ff (Apple Blue)
+
+primary-foreground: #ffffff
+
+secondary: #5e5ce6 (Indigo)
+
+secondary-foreground: #ffffff
+
+destructive: #ff453a (Red)
+
+destructive-foreground: #ffffff
+
+muted: #8e8e93
+
+muted-foreground: #cccccc
+
+accent: #ff9f0a (Orange)
+
+accent-foreground: #ffffff
+
+border: #545458
+
+input: #545458
+
+ring: #0a84ff
+
+Typography:
+
+Font Family: Use a system font stack that defaults to San Francisco on Apple devices: fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'] }.
+
+Spacing & Sizing: Use a standard 4px grid system (spacing: { '0': '0', '1': '4px', '2': '8px', ... }).
+
+Border Radius:
+
+sm: 4px
+
+md: 8px
+
+lg: 12px
+
+Phase 2: Base Component Implementation
+
+For each component below, create the component file in src/components/ui/ and a corresponding story file in src/stories/.
+
+Button (src/components/ui/Button.jsx):
+
+Props: variant ('primary', 'secondary', 'destructive'), size ('sm', 'md', 'lg'), children, ...props.
+
+Styling (Variants):
+
+primary: bg-primary text-primary-foreground
+
+secondary: bg-muted text-muted-foreground
+
+destructive: bg-destructive text-destructive-foreground
+
+Styling (Sizing): Implement padding and font sizes from the Figma kit for each size.
+
+Story: Create stories for all variants and sizes.
+
+Input (src/components/ui/Input.jsx):
+
+Element: Standard <input> element.
+
+Styling: Style it to match the macOS text field: bg-input, border, rounded corners (rounded-md), proper padding, and a blue focus ring (focus:ring-2 focus:ring-ring).
+
+Card (src/components/ui/Card.jsx):
+
+Structure: Create Card, CardHeader, CardTitle, CardDescription, CardContent, and CardFooter components.
+
+Styling: The base Card should have bg-card, text-card-foreground, rounded-lg, and a subtle border. The other components should handle typography and spacing internally.
+
+Dialog/Modal (src/components/ui/Dialog.jsx):
+
+Structure: Create Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, and DialogClose.
+
+Styling: The DialogContent should replicate the macOS modal window appearance: centered, bg-card, rounded corners, and a drop shadow. The overlay should be a semi-transparent black.
+
+Avatar (src/components/ui/Avatar.jsx):
+
+Structure: Create Avatar, AvatarImage, and AvatarFallback.
+
+Styling: The Avatar should be a container that creates a circular shape. AvatarImage is the <img> tag, and AvatarFallback displays initials if the image fails to load.
+
+Phase 3: Composite Components & Layout
+
+Sidebar (src/components/layout/Sidebar.jsx):
+
+Structure: Create a component that mimics the macOS sidebar. It should have a slightly darker background (#202020).
+
+Functionality: Implement a SidebarLink sub-component that shows an icon and text, with a highlighted background for the active link.
+
+Main Layout (src/App.jsx):
+
+Structure: Create a main layout file that uses a two-column grid: a fixed-width Sidebar on the left and a main content area on the right.
+
+Demonstration: In the main content area, create a "Settings" or "Dashboard" view using the Card, Input, and Button components you've built to demonstrate their usage.
+
+Phase 4: Finalization
+
+Storybook Documentation: Ensure every component has a story in Storybook, showcasing all its variants, sizes, and states. Add comments and descriptions where necessary.
+
+Icon Library: Integrate the lucide-react library for icons, as its clean, line-art style closely matches the macOS aesthetic.
