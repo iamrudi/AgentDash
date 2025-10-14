@@ -2720,7 +2720,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot delete your own account" });
       }
 
-      await storage.deleteUser(userId);
+      // Use Supabase Auth delete function (not legacy storage.deleteUser)
+      const { deleteUser } = await import("./lib/supabase-auth");
+      await deleteUser(userId);
+      
       res.json({ message: "User deleted successfully" });
     } catch (error: any) {
       console.error("Delete user error:", error);
