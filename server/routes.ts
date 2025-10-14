@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -27,6 +27,10 @@ import { SeoAuditService } from "./services/seoAuditService";
 import { OnPageSeoAuditService } from "./services/onPageSeoAuditService";
 import express from "express";
 import path from "path";
+import { EventEmitter } from "events";
+
+// SSE event emitter for real-time message updates
+const messageEmitter = new EventEmitter();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Serve static invoice PDFs
@@ -2749,6 +2753,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SSE endpoint for real-time message updates (Admin only)
+  app.get("/api/agency/messages/stream", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "Agency association required" });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
+
+    // Handler for new messages
+    const messageHandler = (message: any) => {
+      // Only send messages for this agency
+      if (message.agencyId === agencyId) {
+        res.write(`data: ${JSON.stringify({ type: 'message', data: message })}\n\n`);
+      }
+    };
+
+    // Listen for message events
+    messageEmitter.on('new-message', messageHandler);
+
+    // Send heartbeat every 30 seconds to keep connection alive
+    const heartbeat = setInterval(() => {
+      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+    }, 30000);
+
+    // Cleanup on connection close
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      messageEmitter.off('new-message', messageHandler);
+    });
+  });
+
   // Mark message as read (Admin only)
   app.patch("/api/agency/messages/:id/read", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
@@ -2779,6 +2823,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         senderRole: senderRole || "Admin",
       });
 
+      // Get client to emit agencyId with the message
+      const client = await storage.getClientById(clientId);
+      if (client) {
+        messageEmitter.emit('new-message', { ...newMessage, agencyId: client.agencyId });
+      }
+
       res.status(201).json(newMessage);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2800,6 +2850,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: message.trim(),
         senderRole: "Admin",
       });
+
+      // Get client to emit agencyId with the message
+      const client = await storage.getClientById(clientId);
+      if (client) {
+        messageEmitter.emit('new-message', { ...newMessage, agencyId: client.agencyId });
+      }
 
       res.status(201).json(newMessage);
     } catch (error: any) {
