@@ -70,6 +70,8 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       agencyId,
     };
 
+    console.log(`[AUTH] User ${user.email} authenticated - Role: ${profile.role}, AgencyId: ${agencyId}, ClientId: ${clientId}`);
+    
     next();
   } catch (error) {
     console.error("Auth error:", error);

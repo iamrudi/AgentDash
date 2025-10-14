@@ -86,9 +86,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agencyId = profile.agencyId || undefined;
       }
 
-      // Return Supabase session token
+      // Return Supabase session tokens (access + refresh)
       res.json({
         token: authResult.data.session!.access_token,
+        refreshToken: authResult.data.session!.refresh_token,
+        expiresAt: authResult.data.session!.expires_at,
         user: {
           id: authResult.data.user!.id,
           email: authResult.data.user!.email || email,
@@ -100,6 +102,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(500).json({ message: error.message || "Login failed" });
+    }
+  });
+
+  // Refresh access token using refresh token
+  app.post("/api/auth/refresh", async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ message: "Refresh token required" });
+      }
+
+      // Refresh session with Supabase
+      const { refreshAccessToken } = await import("./lib/supabase-auth");
+      const authResult = await refreshAccessToken(refreshToken);
+
+      if (!authResult.data.session) {
+        return res.status(401).json({ message: "Invalid or expired refresh token" });
+      }
+
+      // Get profile from our database
+      const profile = await storage.getProfileByUserId(authResult.data.user!.id);
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+
+      // Get agencyId and clientId for tenant isolation
+      let agencyId: string | undefined;
+      let clientId: string | undefined;
+
+      if (profile.role === "Client") {
+        const client = await storage.getClientByProfileId(profile.id);
+        clientId = client?.id;
+        agencyId = client?.agencyId;
+      } else if (profile.role === "Admin" || profile.role === "Staff") {
+        agencyId = profile.agencyId || undefined;
+      }
+
+      // Return new tokens
+      res.json({
+        token: authResult.data.session!.access_token,
+        refreshToken: authResult.data.session!.refresh_token,
+        expiresAt: authResult.data.session!.expires_at,
+        user: {
+          id: authResult.data.user!.id,
+          email: authResult.data.user!.email || "",
+          profile,
+          clientId,
+          agencyId,
+        },
+      });
+    } catch (error: any) {
+      console.error("Token refresh error:", error);
+      res.status(401).json({ message: "Token refresh failed" });
     }
   });
 
@@ -308,7 +364,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Agency association required" });
       }
+      console.log(`[GET /api/agency/clients] User ${req.user!.email} requesting clients for agency: ${req.user!.agencyId}`);
       const clients = await storage.getAllClientsWithDetails(req.user!.agencyId);
+      console.log(`[GET /api/agency/clients] Returned ${clients.length} clients:`, clients.map(c => ({ id: c.id, name: c.companyName, agencyId: c.agencyId })));
       res.json(clients);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2707,19 +2765,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (process.env.NODE_ENV === "development") {
     app.post("/api/test/create-user", async (req, res) => {
       try {
-        const { email, password, fullName, role, companyName } = req.body;
+        const { email, password, fullName, role, companyName, agencyId: requestedAgencyId } = req.body;
+        
+        console.log(`[TEST CREATE USER] Request: email=${email}, role=${role}, requestedAgencyId=${requestedAgencyId}`);
         
         // Create user in Supabase Auth
         const { createUserWithProfile } = await import("./lib/supabase-auth");
         
-        // Get default agency for Client users
-        let agencyId: string | undefined;
-        if (role === "Client" || !role) {
+        // Determine agencyId: use requested if provided, otherwise default for Client users
+        let agencyId: string | undefined = requestedAgencyId;
+        if (!agencyId && (role === "Client" || !role)) {
           const defaultAgency = await storage.getDefaultAgency();
           if (!defaultAgency) {
             return res.status(500).json({ message: "System configuration error: No default agency found" });
           }
           agencyId = defaultAgency.id;
+          console.log(`[TEST CREATE USER] Using default agency: ${agencyId}`);
+        } else {
+          console.log(`[TEST CREATE USER] Using requested agency: ${agencyId}`);
         }
         
         const authResult = await createUserWithProfile(
@@ -2729,6 +2792,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role || "Client",
           agencyId
         );
+        
+        console.log(`[TEST CREATE USER] Profile created with ID: ${authResult.profileId}`);
 
         // Create client record if role is Client and companyName provided
         if ((role === "Client" || !role) && companyName && agencyId) {
@@ -2742,7 +2807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(201).json({ 
           message: "Test user created successfully",
           user: { id: authResult.profileId, email: email },
-          profile: { id: authResult.profileId, fullName: fullName, role: role || "Client" }
+          profile: { id: authResult.profileId, fullName: fullName, role: role || "Client", agencyId }
         });
       } catch (error: any) {
         console.error("Test user creation error:", error);

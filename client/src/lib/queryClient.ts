@@ -1,11 +1,67 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getAuthUser } from "./auth";
+import { getAuthUser, isTokenExpired, updateAuthTokens, clearAuthUser } from "./auth";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
+}
+
+let isRefreshing = false;
+let refreshPromise: Promise<void> | null = null;
+
+async function refreshTokenIfNeeded(): Promise<void> {
+  const authUser = getAuthUser();
+  
+  if (!authUser || !authUser.refreshToken) {
+    return;
+  }
+
+  // Check if token is expired or about to expire
+  if (!isTokenExpired()) {
+    return;
+  }
+
+  // If already refreshing, wait for that to complete
+  if (isRefreshing && refreshPromise) {
+    await refreshPromise;
+    return;
+  }
+
+  // Start refresh process
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: authUser.refreshToken }),
+      });
+
+      if (!res.ok) {
+        // Refresh failed - clear auth and redirect to login
+        clearAuthUser();
+        window.location.href = "/login";
+        throw new Error("Session expired");
+      }
+
+      const data = await res.json();
+      
+      // Update tokens in localStorage
+      updateAuthTokens(data.token, data.refreshToken, data.expiresAt);
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      clearAuthUser();
+      window.location.href = "/login";
+      throw error;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  await refreshPromise;
 }
 
 function getAuthHeaders(): HeadersInit {
@@ -24,6 +80,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Refresh token if needed before making request
+  await refreshTokenIfNeeded();
+  
   const headers = {
     ...getAuthHeaders(),
     ...(data ? { "Content-Type": "application/json" } : {}),
@@ -68,6 +127,9 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    // Refresh token if needed before making query
+    await refreshTokenIfNeeded();
+    
     const url = buildUrlFromQueryKey(queryKey);
     const res = await fetch(url, {
       headers: getAuthHeaders(),

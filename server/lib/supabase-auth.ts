@@ -97,6 +97,13 @@ export async function deleteUser(userId: string): Promise<void> {
 }
 
 /**
+ * Refresh access token using refresh token
+ */
+export async function refreshAccessToken(refreshToken: string): Promise<AuthResponse> {
+  return await supabaseAdmin.auth.refreshSession({ refresh_token: refreshToken });
+}
+
+/**
  * Update user metadata in Supabase Auth
  */
 export async function updateUserMetadata(
