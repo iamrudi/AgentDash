@@ -1765,33 +1765,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const encryptedLogin = encrypt(login);
       const encryptedPassword = encrypt(password);
 
-      // Check if integration already exists
-      const existingIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-
-      if (existingIntegration) {
-        // Update existing integration
-        await storage.updateIntegration(existingIntegration.id, {
-          dataForSeoLogin: encryptedLogin.encrypted,
-          dataForSeoLoginIv: encryptedLogin.iv,
-          dataForSeoLoginAuthTag: encryptedLogin.authTag,
-          dataForSeoPassword: encryptedPassword.encrypted,
-          dataForSeoPasswordIv: encryptedPassword.iv,
-          dataForSeoPasswordAuthTag: encryptedPassword.authTag,
-          updatedAt: new Date(),
-        });
-      } else {
-        // Create new integration
-        await storage.createIntegration({
-          clientId,
-          serviceName: 'DataForSEO',
-          dataForSeoLogin: encryptedLogin.encrypted,
-          dataForSeoLoginIv: encryptedLogin.iv,
-          dataForSeoLoginAuthTag: encryptedLogin.authTag,
-          dataForSeoPassword: encryptedPassword.encrypted,
-          dataForSeoPasswordIv: encryptedPassword.iv,
-          dataForSeoPasswordAuthTag: encryptedPassword.authTag,
-        });
-      }
+      // Update client record with Data for SEO credentials
+      await storage.updateClient(clientId, {
+        dataForSeoLogin: encryptedLogin.encrypted,
+        dataForSeoLoginIv: encryptedLogin.iv,
+        dataForSeoLoginAuthTag: encryptedLogin.authTag,
+        dataForSeoPassword: encryptedPassword.encrypted,
+        dataForSeoPasswordIv: encryptedPassword.iv,
+        dataForSeoPasswordAuthTag: encryptedPassword.authTag,
+      });
 
       res.json({ message: "Data for SEO integration connected successfully" });
     } catch (error: any) {
@@ -1805,16 +1787,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
 
-      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      const client = await storage.getClientById(clientId);
 
-      if (!integration || !integration.dataForSeoLogin) {
+      if (!client || !client.dataForSeoLogin) {
         return res.json({ connected: false });
       }
 
       res.json({
         connected: true,
-        createdAt: integration.createdAt,
-        updatedAt: integration.updatedAt,
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1826,13 +1808,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
 
-      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      const client = await storage.getClientById(clientId);
 
-      if (!integration) {
+      if (!client || !client.dataForSeoLogin) {
         return res.status(404).json({ message: "Data for SEO integration not found" });
       }
 
-      await storage.deleteIntegration(integration.id);
+      // Clear Data for SEO credentials from client record
+      await storage.updateClient(clientId, {
+        dataForSeoLogin: null,
+        dataForSeoLoginIv: null,
+        dataForSeoLoginAuthTag: null,
+        dataForSeoPassword: null,
+        dataForSeoPasswordIv: null,
+        dataForSeoPasswordAuthTag: null,
+      });
 
       res.json({ message: "Data for SEO integration disconnected successfully" });
     } catch (error: any) {
@@ -1848,19 +1838,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       const { primaryKeyword, competitorUrls, locationCode } = req.body;
 
-      // Get Data for SEO credentials
-      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-      if (!integration || !integration.dataForSeoLogin || !integration.dataForSeoPassword) {
+      // Get client data to retrieve domain
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      if (!client.gscSiteUrl) {
+        return res.status(400).json({ message: "Client website URL not configured. Please configure Google Search Console integration first." });
+      }
+
+      // Get Data for SEO credentials from client record (already have client from above)
+      if (!client.dataForSeoLogin || !client.dataForSeoPassword) {
         return res.status(404).json({ message: "Data for SEO integration not configured" });
       }
 
+      // Verify all required decryption fields are present
+      if (!client.dataForSeoLoginIv || !client.dataForSeoLoginAuthTag || !client.dataForSeoPasswordIv || !client.dataForSeoPasswordAuthTag) {
+        return res.status(500).json({ message: "Data for SEO integration data is corrupted. Please reconnect the integration." });
+      }
+
       const credentials = {
-        login: decrypt(integration.dataForSeoLogin, integration.dataForSeoIv!, integration.dataForSeoAuthTag!),
-        password: decrypt(integration.dataForSeoPassword, integration.dataForSeoPasswordIv!, integration.dataForSeoPasswordAuthTag!),
+        login: decrypt(client.dataForSeoLogin, client.dataForSeoLoginIv, client.dataForSeoLoginAuthTag),
+        password: decrypt(client.dataForSeoPassword, client.dataForSeoPasswordIv, client.dataForSeoPasswordAuthTag),
       };
 
       const ideas = await generateContentIdeas(
         credentials,
+        client.gscSiteUrl,
         primaryKeyword,
         competitorUrls || [],
         locationCode

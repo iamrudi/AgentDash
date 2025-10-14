@@ -34,6 +34,7 @@ export interface ContentOptimization {
 
 export async function generateContentIdeas(
   credentials: DataForSeoCredentials,
+  clientDomain: string,
   primaryKeyword: string,
   competitorUrls: string[],
   locationCode: number = 2840 // United States
@@ -42,7 +43,7 @@ export async function generateContentIdeas(
     // Get content gap keywords from Data for SEO
     const contentGaps = await getContentGapKeywords(
       credentials,
-      primaryKeyword,
+      clientDomain,
       competitorUrls.slice(0, 3), // Limit to 3 competitors
       locationCode
     );
