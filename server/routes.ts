@@ -1848,35 +1848,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       const { primaryKeyword, competitorUrls, locationCode } = req.body;
 
-      // Get client data to retrieve domain
+      // Get client to verify it exists
       const client = await storage.getClientById(clientId);
       if (!client) {
         return res.status(404).json({ message: "Client not found" });
       }
 
-      if (!client.gscSiteUrl) {
+      // Get GSC integration to retrieve domain
+      const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      if (!gscIntegration || !gscIntegration.gscSiteUrl) {
         return res.status(400).json({ message: "Client website URL not configured. Please configure Google Search Console integration first." });
       }
 
       // Get Data for SEO credentials
-      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-      if (!integration || !integration.dataForSeoLogin || !integration.dataForSeoPassword) {
+      const dataForSeoIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      if (!dataForSeoIntegration || !dataForSeoIntegration.dataForSeoLogin || !dataForSeoIntegration.dataForSeoPassword) {
         return res.status(404).json({ message: "Data for SEO integration not configured" });
       }
 
       // Verify all required decryption fields are present
-      if (!integration.dataForSeoLoginIv || !integration.dataForSeoLoginAuthTag || !integration.dataForSeoPasswordIv || !integration.dataForSeoPasswordAuthTag) {
+      if (!dataForSeoIntegration.dataForSeoLoginIv || !dataForSeoIntegration.dataForSeoLoginAuthTag || !dataForSeoIntegration.dataForSeoPasswordIv || !dataForSeoIntegration.dataForSeoPasswordAuthTag) {
         return res.status(500).json({ message: "Data for SEO integration data is corrupted. Please reconnect the integration." });
       }
 
       const credentials = {
-        login: decrypt(integration.dataForSeoLogin, integration.dataForSeoLoginIv, integration.dataForSeoLoginAuthTag),
-        password: decrypt(integration.dataForSeoPassword, integration.dataForSeoPasswordIv, integration.dataForSeoPasswordAuthTag),
+        login: decrypt(dataForSeoIntegration.dataForSeoLogin, dataForSeoIntegration.dataForSeoLoginIv, dataForSeoIntegration.dataForSeoLoginAuthTag),
+        password: decrypt(dataForSeoIntegration.dataForSeoPassword, dataForSeoIntegration.dataForSeoPasswordIv, dataForSeoIntegration.dataForSeoPasswordAuthTag),
       };
 
       const ideas = await generateContentIdeas(
         credentials,
-        client.gscSiteUrl,
+        gscIntegration.gscSiteUrl,
         primaryKeyword,
         competitorUrls || [],
         locationCode
