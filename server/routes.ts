@@ -1,7 +1,16 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from "./middleware/supabase-auth";
+import { 
+  requireAuth, 
+  requireRole, 
+  requireClientAccess,
+  requireProjectAccess,
+  requireTaskAccess,
+  requireInitiativeAccess,
+  requireInvoiceAccess,
+  type AuthRequest 
+} from "./middleware/supabase-auth";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -587,7 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get project with tasks
-  app.get("/api/agency/projects/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/projects/:id", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
       const projectData = await storage.getProjectWithTasks(req.params.id);
       
@@ -602,7 +611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update project
-  app.patch("/api/agency/projects/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/projects/:id", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
       const updateData = insertProjectSchema.partial().parse(req.body);
       const updatedProject = await storage.updateProject(req.params.id, updateData);
@@ -617,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update task
-  app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       const updateData = insertTaskSchema.partial().parse(req.body);
       const updatedTask = await storage.updateTask(req.params.id, updateData);
@@ -632,7 +641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete task
-  app.delete("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       await storage.deleteTask(req.params.id);
       res.status(204).send();
@@ -642,7 +651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Assign staff to task
-  app.post("/api/agency/tasks/:taskId/assign", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/tasks/:taskId/assign", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { staffProfileId } = req.body;
       
@@ -662,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove staff assignment
-  app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       await storage.deleteStaffAssignment(req.params.taskId, req.params.staffProfileId);
       res.status(204).send();
@@ -862,7 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/invoices/:invoiceId/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/invoices/:invoiceId/status", requireAuth, requireRole("Admin"), requireInvoiceAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { invoiceId } = req.params;
       const { status } = z.object({ 
@@ -890,7 +899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single invoice by ID
-  app.get("/api/client/invoices/:invoiceId", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/client/invoices/:invoiceId", requireAuth, requireRole("Client", "Admin"), requireInvoiceAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { invoiceId } = req.params;
       const invoice = await storage.getInvoiceById(invoiceId);
@@ -926,7 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoice Line Items
-  app.get("/api/invoices/:invoiceId/line-items", requireAuth, async (req: AuthRequest, res) => {
+  app.get("/api/invoices/:invoiceId/line-items", requireAuth, requireInvoiceAccess(storage), async (req: AuthRequest, res) => {
     try {
       // Restrict to Client and Admin roles only - Staff should not access invoices
       if (req.user!.role !== "Client" && req.user!.role !== "Admin") {
@@ -967,7 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices/:invoiceId/line-items", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/invoices/:invoiceId/line-items", requireAuth, requireRole("Admin"), requireInvoiceAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { invoiceId } = req.params;
       
@@ -1008,7 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate PDF for invoice
-  app.post("/api/invoices/:invoiceId/generate-pdf", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/invoices/:invoiceId/generate-pdf", requireAuth, requireRole("Admin"), requireInvoiceAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { invoiceId } = req.params;
       
@@ -1078,7 +1087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update initiative (edit before sending)
-  app.patch("/api/initiatives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/initiatives/:id", requireAuth, requireRole("Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const { title, observation, proposedAction, cost, impact, estimatedHours, billingType } = req.body;
@@ -1138,7 +1147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Send initiative to client
-  app.post("/api/initiatives/:id/send", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/initiatives/:id/send", requireAuth, requireRole("Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const initiative = await storage.sendInitiativeToClient(id);
@@ -1172,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Client responds to initiative (approve/reject/discuss)
-  app.post("/api/initiatives/:id/respond", requireAuth, requireRole("Client", "Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/initiatives/:id/respond", requireAuth, requireRole("Client", "Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const { response, feedback } = req.body;
@@ -1290,7 +1299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate invoice from approved initiative
-  app.post("/api/initiatives/:id/generate-invoice", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/initiatives/:id/generate-invoice", requireAuth, requireRole("Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const invoiceGenerator = new InvoiceGeneratorService(storage);
@@ -1303,7 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Soft delete initiative (move to trash)
-  app.delete("/api/initiatives/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/initiatives/:id", requireAuth, requireRole("Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const initiative = await storage.softDeleteInitiative(id);
@@ -1314,7 +1323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Restore initiative from trash
-  app.post("/api/initiatives/:id/restore", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/initiatives/:id/restore", requireAuth, requireRole("Admin"), requireInitiativeAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const initiative = await storage.restoreInitiative(id);

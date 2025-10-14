@@ -131,9 +131,116 @@ export async function verifyClientAccess(
     return req.user.clientId === resourceClientId;
   }
 
-  // Staff users need to be assigned to tasks related to this client
-  // For now, deny access (can be enhanced to check task assignments)
+  // Staff users can access clients in their own agency (read-only for now)
+  if (req.user.role === "Staff") {
+    if (!req.user.agencyId) {
+      console.warn(`Staff user ${req.user.id} has no agencyId - denying client access`);
+      return false;
+    }
+    
+    const client = await storage.getClientById(resourceClientId);
+    if (!client) {
+      console.warn(`Client ${resourceClientId} not found`);
+      return false;
+    }
+    
+    // Staff can only access clients in their own agency
+    if (client.agencyId !== req.user.agencyId) {
+      console.warn(`Staff ${req.user.id} (agency: ${req.user.agencyId}) attempted to access client ${resourceClientId} (agency: ${client.agencyId})`);
+      return false;
+    }
+    
+    return true;
+  }
+
   return false;
+}
+
+// Tenant isolation for projects
+export async function verifyProjectAccess(
+  req: AuthRequest,
+  projectId: string,
+  storage: IStorage
+): Promise<boolean> {
+  if (!req.user) {
+    return false;
+  }
+
+  const project = await storage.getProjectById(projectId);
+  if (!project) {
+    console.warn(`Project ${projectId} not found`);
+    return false;
+  }
+
+  // Verify access to the client who owns this project
+  return await verifyClientAccess(req, project.clientId, storage);
+}
+
+// Tenant isolation for tasks
+export async function verifyTaskAccess(
+  req: AuthRequest,
+  taskId: string,
+  storage: IStorage
+): Promise<boolean> {
+  if (!req.user) {
+    return false;
+  }
+
+  const task = await storage.getTaskById(taskId);
+  if (!task) {
+    console.warn(`Task ${taskId} not found`);
+    return false;
+  }
+
+  // Get the project to find the client
+  const project = await storage.getProjectById(task.projectId);
+  if (!project) {
+    console.warn(`Project ${task.projectId} for task ${taskId} not found`);
+    return false;
+  }
+
+  // Verify access to the client who owns this project
+  return await verifyClientAccess(req, project.clientId, storage);
+}
+
+// Tenant isolation for initiatives
+export async function verifyInitiativeAccess(
+  req: AuthRequest,
+  initiativeId: string,
+  storage: IStorage
+): Promise<boolean> {
+  if (!req.user) {
+    return false;
+  }
+
+  const initiative = await storage.getInitiativeById(initiativeId);
+  if (!initiative) {
+    console.warn(`Initiative ${initiativeId} not found`);
+    return false;
+  }
+
+  // Verify access to the client who owns this initiative
+  return await verifyClientAccess(req, initiative.clientId, storage);
+}
+
+// Tenant isolation for invoices
+export async function verifyInvoiceAccess(
+  req: AuthRequest,
+  invoiceId: string,
+  storage: IStorage
+): Promise<boolean> {
+  if (!req.user) {
+    return false;
+  }
+
+  const invoice = await storage.getInvoiceById(invoiceId);
+  if (!invoice) {
+    console.warn(`Invoice ${invoiceId} not found`);
+    return false;
+  }
+
+  // Verify access to the client who owns this invoice
+  return await verifyClientAccess(req, invoice.clientId, storage);
 }
 
 // Middleware to enforce tenant isolation on client-specific routes
@@ -149,6 +256,82 @@ export function requireClientAccess(storage: IStorage) {
     
     if (!hasAccess) {
       return res.status(403).json({ message: "Access denied to this client's resources" });
+    }
+
+    next();
+  };
+}
+
+// Middleware to enforce tenant isolation on project-specific routes
+export function requireProjectAccess(storage: IStorage) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const projectId = req.params.id || req.params.projectId || req.body.projectId;
+    
+    if (!projectId) {
+      return res.status(400).json({ message: "Project ID required" });
+    }
+
+    const hasAccess = await verifyProjectAccess(req, projectId, storage);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this project" });
+    }
+
+    next();
+  };
+}
+
+// Middleware to enforce tenant isolation on task-specific routes
+export function requireTaskAccess(storage: IStorage) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const taskId = req.params.id || req.params.taskId || req.body.taskId;
+    
+    if (!taskId) {
+      return res.status(400).json({ message: "Task ID required" });
+    }
+
+    const hasAccess = await verifyTaskAccess(req, taskId, storage);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this task" });
+    }
+
+    next();
+  };
+}
+
+// Middleware to enforce tenant isolation on initiative-specific routes
+export function requireInitiativeAccess(storage: IStorage) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const initiativeId = req.params.id || req.params.initiativeId || req.body.initiativeId;
+    
+    if (!initiativeId) {
+      return res.status(400).json({ message: "Initiative ID required" });
+    }
+
+    const hasAccess = await verifyInitiativeAccess(req, initiativeId, storage);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this initiative" });
+    }
+
+    next();
+  };
+}
+
+// Middleware to enforce tenant isolation on invoice-specific routes
+export function requireInvoiceAccess(storage: IStorage) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const invoiceId = req.params.id || req.params.invoiceId || req.body.invoiceId;
+    
+    if (!invoiceId) {
+      return res.status(400).json({ message: "Invoice ID required" });
+    }
+
+    const hasAccess = await verifyInvoiceAccess(req, invoiceId, storage);
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: "Access denied to this invoice" });
     }
 
     next();
