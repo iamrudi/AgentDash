@@ -70,22 +70,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { email, password } = req.body;
 
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
+      // Sign in with Supabase Auth
+      const { signInWithSupabase } = await import("./lib/supabase-auth");
+      const authResult = await signInWithSupabase(email, password);
+
+      if (!authResult.session) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-
-      const profile = await storage.getProfileByUserId(user.id);
+      // Get profile from our database (profile.id = Supabase Auth user ID)
+      const profile = await storage.getProfileByUserId(authResult.user.id);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
 
-      // Get agencyId for tenant isolation
+      // Get agencyId and clientId for tenant isolation
       let agencyId: string | undefined;
       let clientId: string | undefined;
 
@@ -97,19 +96,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agencyId = profile.agencyId || undefined;
       }
 
-      // Generate JWT token with agencyId for tenant isolation
-      const token = generateToken({
-        userId: user.id,
-        email: user.email,
-        role: profile.role,
-        agencyId,
-      });
-
+      // Return Supabase session token
       res.json({
-        token,
+        token: authResult.session.access_token,
         user: {
-          id: user.id,
-          email: user.email,
+          id: authResult.user.id,
+          email: authResult.user.email || email,
           profile,
           clientId,
           agencyId,
