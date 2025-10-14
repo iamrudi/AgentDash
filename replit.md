@@ -20,6 +20,7 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
+- **OAuth Reliability (GA4/GSC)**: Production-ready error handling with user-friendly messages, reserve-and-release rate limiting (per-client hourly/daily quotas preventing concurrent bypass), and retry logic with exponential backoff (3 attempts: 1s→2s→4s delays). All Google API calls use centralized `withRateLimitAndRetry` helper ensuring consistent error parsing, quota enforcement, and transient failure recovery.
 - **AI Recommendation Engine**: Google Gemini AI analyzes GA4/GSC metrics to generate strategic initiatives and task lists.
 - **Client Strategy Card**: AI-powered consolidated client view with business context, goals, chat insights, and performance.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data.
