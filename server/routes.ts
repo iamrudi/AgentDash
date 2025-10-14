@@ -142,7 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Clients see only their own projects
-      const profile = await storage.getUserById(req.user!.id).then(u => storage.getProfileByUserId(u!.id));
+      const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
       const client = await storage.getClientByProfileId(profile!.id);
       
       if (!client) {
@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Clients see only their own invoices
-      const profile = await storage.getUserById(req.user!.id).then(u => storage.getProfileByUserId(u!.id));
+      const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
       const client = await storage.getClientByProfileId(profile!.id);
       
       if (!client) {
@@ -287,7 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Clients see only their own initiatives
-      const profile = await storage.getUserById(req.user!.id).then(u => storage.getProfileByUserId(u!.id));
+      const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
       const client = await storage.getClientByProfileId(profile!.id);
       
       if (!client) {
@@ -744,12 +744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For Staff users, verify they're assigned to this task
       if (req.user!.role === "Staff") {
-        const user = await storage.getUserById(req.user!.id);
-        if (!user) {
-          return res.status(403).json({ message: "User not found" });
-        }
-        
-        const profile = await storage.getProfileByUserId(user.id);
+        const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
         if (!profile) {
           return res.status(403).json({ message: "Profile not found" });
         }
@@ -845,11 +840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check authorization - clients can only view their own invoices
       if (req.user!.role === "Client") {
-        const user = await storage.getUserById(req.user!.id);
-        if (!user) {
-          return res.status(403).json({ message: "User not found" });
-        }
-        const profile = await storage.getProfileByUserId(user.id);
+        const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
         if (!profile) {
           return res.status(403).json({ message: "Profile not found" });
         }
@@ -891,11 +882,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check authorization - clients can only view their own invoice line items
       if (req.user!.role === "Client") {
-        const user = await storage.getUserById(req.user!.id);
-        if (!user) {
-          return res.status(403).json({ message: "User not found" });
-        }
-        const profile = await storage.getProfileByUserId(user.id);
+        const profile = await storage.getProfileById(req.user!.id); // req.user.id IS the profile ID
         if (!profile) {
           return res.status(403).json({ message: "Profile not found" });
         }
