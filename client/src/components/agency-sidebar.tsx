@@ -27,14 +27,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
 
@@ -172,50 +167,43 @@ export function AgencySidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
-        <Accordion type="multiple" defaultValue={["Core", "Strategy", "Administration"]} className="w-full">
-          {menuGroups.map((group) => (
-            <AccordionItem value={group.title} key={group.title} className="border-none">
-              <AccordionTrigger className="text-xs font-medium uppercase text-muted-foreground hover:no-underline py-2 px-2 justify-start gap-2 border-b border-border/40">
-                <group.icon className="h-4 w-4 shrink-0" />
-                <span className="group-data-[collapsible=icon]:hidden">{group.title}</span>
-              </AccordionTrigger>
-              <AccordionContent className="pb-0">
-                <SidebarMenu>
-                  {group.items.map((item) => {
-                    const count = item.notificationKey && notificationCounts
-                      ? notificationCounts[item.notificationKey]
-                      : 0;
+        {menuGroups.map((group, index) => (
+          <div key={group.title}>
+            {index > 0 && <SidebarSeparator className="my-3 bg-border" />}
+            <SidebarMenu>
+              {group.items.map((item) => {
+                const count = item.notificationKey && notificationCounts
+                  ? notificationCounts[item.notificationKey]
+                  : 0;
 
-                    return (
-                      <SidebarMenuItem key={item.title}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={location === item.url}
-                          tooltip={item.title}
-                          data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <Link href={item.url}>
-                            <item.icon className="h-4 w-4" />
-                            <span className="flex-1">{item.title}</span>
-                            {count > 0 && (
-                              <Badge
-                                variant="default"
-                                className="ml-auto h-5 min-w-5 px-1 text-xs"
-                                data-testid={`notification-badge-${item.notificationKey}`}
-                              >
-                                {count}
-                              </Badge>
-                            )}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      tooltip={item.title}
+                      data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span className="flex-1">{item.title}</span>
+                        {count > 0 && (
+                          <Badge
+                            variant="default"
+                            className="ml-auto h-5 min-w-5 px-1 text-xs"
+                            data-testid={`notification-badge-${item.notificationKey}`}
+                          >
+                            {count}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </div>
+        ))}
       </SidebarContent>
 
       <div className="p-2 mt-auto border-t">
