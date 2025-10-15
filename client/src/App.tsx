@@ -51,6 +51,7 @@ const CrmCompanies = lazy(() => import("@/pages/agency/crm/companies"));
 const CrmContacts = lazy(() => import("@/pages/agency/crm/contacts"));
 const CrmDeals = lazy(() => import("@/pages/agency/crm/deals"));
 const CrmForms = lazy(() => import("@/pages/agency/crm/forms"));
+const CrmProposals = lazy(() => import("@/pages/agency/crm/proposals"));
 
 // Loading fallback component
 function PageLoader() {
@@ -297,6 +298,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
             <CrmForms />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/crm/deals/:dealId/proposal">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyLayout>
+            <CrmProposals />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

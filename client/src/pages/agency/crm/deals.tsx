@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, DollarSign, Plus, TrendingUp, User, Pencil, Trash2 } from "lucide-react";
+import { Link } from "wouter";
+import { Building2, DollarSign, Plus, TrendingUp, User, Pencil, Trash2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -171,6 +172,16 @@ export default function DealsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          <Link href={`/agency/crm/deals/${deal.id}/proposal`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-proposal-deal-${deal.id}`}
+                              title="Create/View Proposal"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Button
                             variant="ghost"
                             size="icon"
