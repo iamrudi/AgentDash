@@ -1855,6 +1855,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Agency-Level Data for SEO Integration
+  
+  // Get agency-level Data for SEO integration with client access
+  app.get("/api/agency/integrations/dataforseo", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      
+      const integration = await storage.getAgencyIntegration(agencyId, 'DataForSEO');
+      
+      if (!integration) {
+        return res.json({ 
+          connected: false,
+          clientAccess: []
+        });
+      }
+      
+      const clientAccess = await storage.getClientAccessList(integration.id);
+      
+      res.json({
+        connected: true,
+        integrationId: integration.id,
+        clientAccess,
+        createdAt: integration.createdAt,
+        updatedAt: integration.updatedAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create or update agency-level Data for SEO integration
+  app.post("/api/agency/integrations/dataforseo", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      const { login, password } = req.body;
+
+      if (!login || !password) {
+        return res.status(400).json({ message: "Login and password are required" });
+      }
+
+      // Check if integration already exists
+      const existing = await storage.getAgencyIntegration(agencyId, 'DataForSEO');
+
+      let integration;
+      if (existing) {
+        // Update existing integration
+        integration = await storage.updateAgencyIntegration(existing.id, {
+          dataForSeoLogin: login,
+          dataForSeoPassword: password,
+        });
+      } else {
+        // Create new integration
+        integration = await storage.createAgencyIntegration({
+          agencyId,
+          serviceName: 'DataForSEO',
+          dataForSeoLogin: login,
+          dataForSeoPassword: password,
+        });
+      }
+
+      const clientAccess = await storage.getClientAccessList(integration.id);
+
+      res.json({
+        message: existing ? "Agency Data for SEO integration updated successfully" : "Agency Data for SEO integration created successfully",
+        integrationId: integration.id,
+        clientAccess,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update client access for agency-level Data for SEO integration
+  app.post("/api/agency/integrations/dataforseo/client-access", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      const { clientIds } = req.body;
+
+      if (!Array.isArray(clientIds)) {
+        return res.status(400).json({ message: "clientIds must be an array" });
+      }
+
+      const integration = await storage.getAgencyIntegration(agencyId, 'DataForSEO');
+
+      if (!integration) {
+        return res.status(404).json({ message: "Agency Data for SEO integration not found. Please configure credentials first." });
+      }
+
+      // Verify all client IDs belong to this agency
+      const agencyClients = await storage.getAllClients();
+      const validClientIds = agencyClients.filter(c => c.agencyId === agencyId).map(c => c.id);
+      const invalidIds = clientIds.filter((id: string) => !validClientIds.includes(id));
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({ message: `Invalid client IDs: ${invalidIds.join(', ')}` });
+      }
+
+      await storage.setClientAccess(integration.id, clientIds);
+
+      res.json({ 
+        message: "Client access updated successfully",
+        clientAccess: clientIds
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Content Co-pilot API
 
   // Generate content ideas (Admin only)
@@ -1883,21 +1991,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Client website URL not configured. Please configure Google Search Console integration first." });
       }
 
-      // Get Data for SEO credentials
-      const dataForSeoIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-      if (!dataForSeoIntegration || !dataForSeoIntegration.dataForSeoLogin || !dataForSeoIntegration.dataForSeoPassword) {
-        return res.status(404).json({ message: "Data for SEO integration not configured" });
+      // Get Data for SEO credentials (agency-level or client-level)
+      let credentials: { login: string; password: string } | null = null;
+      
+      // First check for agency-level integration
+      const agencyIntegration = await storage.getAgencyIntegration(client.agencyId, 'DataForSEO');
+      if (agencyIntegration && agencyIntegration.dataForSeoLogin && agencyIntegration.dataForSeoPassword) {
+        // Check if this client has access to the agency integration
+        const hasAccess = await storage.hasClientAccess(agencyIntegration.id, clientId);
+        
+        if (hasAccess) {
+          credentials = {
+            login: agencyIntegration.dataForSeoLogin,
+            password: agencyIntegration.dataForSeoPassword,
+          };
+        }
       }
+      
+      // If no agency credentials or no access, check for client-level integration
+      if (!credentials) {
+        const dataForSeoIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+        if (dataForSeoIntegration && dataForSeoIntegration.dataForSeoLogin && dataForSeoIntegration.dataForSeoPassword) {
+          // Verify all required decryption fields are present
+          if (!dataForSeoIntegration.dataForSeoLoginIv || !dataForSeoIntegration.dataForSeoLoginAuthTag || 
+              !dataForSeoIntegration.dataForSeoPasswordIv || !dataForSeoIntegration.dataForSeoPasswordAuthTag) {
+            return res.status(500).json({ message: "Data for SEO integration data is corrupted. Please reconnect the integration." });
+          }
 
-      // Verify all required decryption fields are present
-      if (!dataForSeoIntegration.dataForSeoLoginIv || !dataForSeoIntegration.dataForSeoLoginAuthTag || !dataForSeoIntegration.dataForSeoPasswordIv || !dataForSeoIntegration.dataForSeoPasswordAuthTag) {
-        return res.status(500).json({ message: "Data for SEO integration data is corrupted. Please reconnect the integration." });
+          credentials = {
+            login: decrypt(dataForSeoIntegration.dataForSeoLogin, dataForSeoIntegration.dataForSeoLoginIv, dataForSeoIntegration.dataForSeoLoginAuthTag),
+            password: decrypt(dataForSeoIntegration.dataForSeoPassword, dataForSeoIntegration.dataForSeoPasswordIv, dataForSeoIntegration.dataForSeoPasswordAuthTag),
+          };
+        }
       }
-
-      const credentials = {
-        login: decrypt(dataForSeoIntegration.dataForSeoLogin, dataForSeoIntegration.dataForSeoLoginIv, dataForSeoIntegration.dataForSeoLoginAuthTag),
-        password: decrypt(dataForSeoIntegration.dataForSeoPassword, dataForSeoIntegration.dataForSeoPasswordIv, dataForSeoIntegration.dataForSeoPasswordAuthTag),
-      };
+      
+      if (!credentials) {
+        return res.status(404).json({ message: "Data for SEO integration not configured for this client" });
+      }
 
       const ideas = await generateContentIdeas(
         credentials,
