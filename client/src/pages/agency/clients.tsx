@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AIRecommendationsPanel } from "@/components/ai-recommendations-panel";
 
 type EnrichedClient = Client & {
   primaryContact: string | null;
@@ -39,6 +40,8 @@ export default function AgencyClientsPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiPanelClientId, setAiPanelClientId] = useState<string>("");
   const { toast } = useToast();
 
   const form = useForm<CreateClientUser>({
@@ -78,33 +81,13 @@ export default function AgencyClientsPage() {
     },
   });
 
-  const generateAIMutation = useMutation({
-    mutationFn: async (clientId: string) => {
-      return await apiRequest("POST", `/api/agency/clients/${clientId}/generate-recommendations`, {});
-    },
-    onSuccess: (data: { message?: string }) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
-      toast({
-        title: "AI Analysis Complete",
-        description: data.message || "Recommendations generated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      const message = error.message || "Failed to generate recommendations";
-      toast({
-        title: "Error",
-        description: message,
-        variant: "destructive",
-      });
-    },
-  });
-
   const onSubmit = (data: CreateClientUser) => {
     createClientMutation.mutate(data);
   };
 
   const handleGenerateAI = (clientId: string, clientName: string) => {
-    generateAIMutation.mutate(clientId);
+    setAiPanelClientId(clientId);
+    setAiPanelOpen(true);
   };
 
   // Get initials from company name
@@ -387,7 +370,6 @@ export default function AgencyClientsPage() {
                             variant="ghost" 
                             size="icon"
                             onClick={() => handleGenerateAI(client.id, client.companyName)}
-                            disabled={generateAIMutation.isPending}
                             data-testid={`button-ai-generate-${client.id}`}
                           >
                             <Sparkles className="h-4 w-4" />
@@ -467,7 +449,6 @@ export default function AgencyClientsPage() {
                           variant="ghost" 
                           size="icon"
                           onClick={() => handleGenerateAI(client.id, client.companyName)}
-                          disabled={generateAIMutation.isPending}
                           data-testid={`button-ai-generate-table-${client.id}`}
                         >
                           <Sparkles className="h-4 w-4" />
@@ -485,6 +466,13 @@ export default function AgencyClientsPage() {
             </Table>
           </Card>
         )}
+
+        {/* AI Recommendations Panel */}
+        <AIRecommendationsPanel
+          open={aiPanelOpen}
+          onOpenChange={setAiPanelOpen}
+          preSelectedClientId={aiPanelClientId}
+        />
     </div>
   );
 }

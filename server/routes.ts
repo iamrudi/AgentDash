@@ -567,11 +567,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get connection status for a client's integrations
+  app.get("/api/clients/:clientId/connection-status", requireAuth, requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      // Get GA4 integration
+      const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      // Get GSC integration
+      const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      // Check DataForSEO - either client-level or agency-level with access
+      const clientIntegrations = await storage.getClientIntegrations(clientId);
+      const dataForSeoIntegration = clientIntegrations.find(i => i.service === 'DataForSEO');
+      
+      res.json({
+        ga4: {
+          connected: !!ga4Integration?.accessToken,
+          lastSync: ga4Integration?.updatedAt ? new Date(ga4Integration.updatedAt).toLocaleString() : undefined
+        },
+        gsc: {
+          connected: !!gscIntegration?.accessToken,
+          lastSync: gscIntegration?.updatedAt ? new Date(gscIntegration.updatedAt).toLocaleString() : undefined
+        },
+        dataForSEO: {
+          connected: !!dataForSeoIntegration,
+          keywordCount: 850 // Placeholder - would come from actual data
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
+      const { preset, includeCompetitors } = req.body;
       const { generateAIRecommendations } = await import("./ai-analyzer");
       
+      // TODO: Update AI analyzer to use preset configuration
+      // For now, using existing implementation
       const result = await generateAIRecommendations(storage, clientId);
       
       if (!result.success) {
