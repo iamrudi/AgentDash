@@ -21,6 +21,10 @@ import {
   type InsertDailyMetric,
   type ClientIntegration,
   type InsertClientIntegration,
+  type AgencyIntegration,
+  type InsertAgencyIntegration,
+  type AgencyIntegrationClientAccess,
+  type InsertAgencyIntegrationClientAccess,
   type ClientObjective,
   type InsertClientObjective,
   type ClientMessage,
@@ -39,6 +43,8 @@ import {
   initiatives,
   dailyMetrics,
   clientIntegrations,
+  agencyIntegrations,
+  agencyIntegrationClientAccess,
   clientObjectives,
   clientMessages,
   notifications,
@@ -148,6 +154,14 @@ export interface IStorage {
   createIntegration(integration: InsertClientIntegration): Promise<ClientIntegration>;
   updateIntegration(id: string, data: Partial<ClientIntegration>): Promise<ClientIntegration>;
   deleteIntegration(id: string): Promise<void>;
+  
+  // Agency Integrations
+  getAgencyIntegration(agencyId: string, serviceName: string): Promise<AgencyIntegration | undefined>;
+  createAgencyIntegration(integration: InsertAgencyIntegration): Promise<AgencyIntegration>;
+  updateAgencyIntegration(id: string, data: Partial<AgencyIntegration>): Promise<AgencyIntegration>;
+  getClientAccessList(agencyIntegrationId: string): Promise<string[]>;
+  setClientAccess(agencyIntegrationId: string, clientIds: string[]): Promise<void>;
+  hasClientAccess(agencyIntegrationId: string, clientId: string): Promise<boolean>;
   
   // Client Objectives
   getObjectivesByClientId(clientId: string): Promise<ClientObjective[]>;
@@ -1061,6 +1075,160 @@ export class DbStorage implements IStorage {
 
   async deleteIntegration(id: string): Promise<void> {
     await db.delete(clientIntegrations).where(eq(clientIntegrations.id, id));
+  }
+
+  // Agency Integrations
+  async getAgencyIntegration(agencyId: string, serviceName: string): Promise<AgencyIntegration | undefined> {
+    const result = await db.select().from(agencyIntegrations)
+      .where(and(
+        eq(agencyIntegrations.agencyId, agencyId),
+        eq(agencyIntegrations.serviceName, serviceName)
+      ))
+      .limit(1);
+    
+    if (result.length === 0) return undefined;
+    
+    const integration = result[0];
+    
+    // Decrypt credentials if they exist
+    if (integration.dataForSeoLogin && integration.dataForSeoLoginIv && integration.dataForSeoLoginAuthTag) {
+      integration.dataForSeoLogin = decryptToken(
+        integration.dataForSeoLogin,
+        integration.dataForSeoLoginIv,
+        integration.dataForSeoLoginAuthTag
+      );
+    }
+    
+    if (integration.dataForSeoPassword && integration.dataForSeoPasswordIv && integration.dataForSeoPasswordAuthTag) {
+      integration.dataForSeoPassword = decryptToken(
+        integration.dataForSeoPassword,
+        integration.dataForSeoPasswordIv,
+        integration.dataForSeoPasswordAuthTag
+      );
+    }
+    
+    return integration;
+  }
+
+  async createAgencyIntegration(integration: InsertAgencyIntegration): Promise<AgencyIntegration> {
+    let encryptedData: any = { ...integration };
+    
+    // Encrypt Data for SEO credentials if provided
+    if (integration.dataForSeoLogin) {
+      const encrypted = encryptToken(integration.dataForSeoLogin);
+      encryptedData.dataForSeoLogin = encrypted.encrypted;
+      encryptedData.dataForSeoLoginIv = encrypted.iv;
+      encryptedData.dataForSeoLoginAuthTag = encrypted.authTag;
+    }
+    
+    if (integration.dataForSeoPassword) {
+      const encrypted = encryptToken(integration.dataForSeoPassword);
+      encryptedData.dataForSeoPassword = encrypted.encrypted;
+      encryptedData.dataForSeoPasswordIv = encrypted.iv;
+      encryptedData.dataForSeoPasswordAuthTag = encrypted.authTag;
+    }
+    
+    const result = await db.insert(agencyIntegrations).values(encryptedData).returning();
+    const created = result[0];
+    
+    // Return with decrypted credentials
+    if (created.dataForSeoLogin && created.dataForSeoLoginIv && created.dataForSeoLoginAuthTag) {
+      created.dataForSeoLogin = decryptToken(
+        created.dataForSeoLogin,
+        created.dataForSeoLoginIv,
+        created.dataForSeoLoginAuthTag
+      );
+    }
+    
+    if (created.dataForSeoPassword && created.dataForSeoPasswordIv && created.dataForSeoPasswordAuthTag) {
+      created.dataForSeoPassword = decryptToken(
+        created.dataForSeoPassword,
+        created.dataForSeoPasswordIv,
+        created.dataForSeoPasswordAuthTag
+      );
+    }
+    
+    return created;
+  }
+
+  async updateAgencyIntegration(id: string, data: Partial<AgencyIntegration>): Promise<AgencyIntegration> {
+    let encryptedData: any = { ...data };
+    
+    // Encrypt Data for SEO credentials if provided
+    if (data.dataForSeoLogin) {
+      const encrypted = encryptToken(data.dataForSeoLogin);
+      encryptedData.dataForSeoLogin = encrypted.encrypted;
+      encryptedData.dataForSeoLoginIv = encrypted.iv;
+      encryptedData.dataForSeoLoginAuthTag = encrypted.authTag;
+    }
+    
+    if (data.dataForSeoPassword) {
+      const encrypted = encryptToken(data.dataForSeoPassword);
+      encryptedData.dataForSeoPassword = encrypted.encrypted;
+      encryptedData.dataForSeoPasswordIv = encrypted.iv;
+      encryptedData.dataForSeoPasswordAuthTag = encrypted.authTag;
+    }
+    
+    const result = await db.update(agencyIntegrations)
+      .set({ ...encryptedData, updatedAt: new Date() })
+      .where(eq(agencyIntegrations.id, id))
+      .returning();
+    
+    const updated = result[0];
+    
+    // Return with decrypted credentials
+    if (updated.dataForSeoLogin && updated.dataForSeoLoginIv && updated.dataForSeoLoginAuthTag) {
+      updated.dataForSeoLogin = decryptToken(
+        updated.dataForSeoLogin,
+        updated.dataForSeoLoginIv,
+        updated.dataForSeoLoginAuthTag
+      );
+    }
+    
+    if (updated.dataForSeoPassword && updated.dataForSeoPasswordIv && updated.dataForSeoPasswordAuthTag) {
+      updated.dataForSeoPassword = decryptToken(
+        updated.dataForSeoPassword,
+        updated.dataForSeoPasswordIv,
+        updated.dataForSeoPasswordAuthTag
+      );
+    }
+    
+    return updated;
+  }
+
+  async getClientAccessList(agencyIntegrationId: string): Promise<string[]> {
+    const results = await db.select({ clientId: agencyIntegrationClientAccess.clientId })
+      .from(agencyIntegrationClientAccess)
+      .where(eq(agencyIntegrationClientAccess.agencyIntegrationId, agencyIntegrationId));
+    
+    return results.map(r => r.clientId);
+  }
+
+  async setClientAccess(agencyIntegrationId: string, clientIds: string[]): Promise<void> {
+    // Delete existing access entries
+    await db.delete(agencyIntegrationClientAccess)
+      .where(eq(agencyIntegrationClientAccess.agencyIntegrationId, agencyIntegrationId));
+    
+    // Insert new access entries
+    if (clientIds.length > 0) {
+      await db.insert(agencyIntegrationClientAccess)
+        .values(clientIds.map(clientId => ({
+          agencyIntegrationId,
+          clientId,
+        })));
+    }
+  }
+
+  async hasClientAccess(agencyIntegrationId: string, clientId: string): Promise<boolean> {
+    const result = await db.select()
+      .from(agencyIntegrationClientAccess)
+      .where(and(
+        eq(agencyIntegrationClientAccess.agencyIntegrationId, agencyIntegrationId),
+        eq(agencyIntegrationClientAccess.clientId, clientId)
+      ))
+      .limit(1);
+    
+    return result.length > 0;
   }
 
   // Client Objectives
