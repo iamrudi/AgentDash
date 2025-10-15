@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AIRecommendationsPanel } from "@/components/ai-recommendations-panel";
+import { format, subDays } from "date-fns";
 
 type EnrichedClient = Client & {
   primaryContact: string | null;
@@ -106,6 +107,17 @@ export default function AgencyClientsPage() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  // Prefetch dashboard data on hover
+  const prefetchDashboardData = (clientId: string) => {
+    const startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
+    const endDate = format(new Date(), 'yyyy-MM-dd');
+    
+    queryClient.prefetchQuery({
+      queryKey: ['/api/agency/clients', clientId, 'dashboard-summary', { startDate, endDate }],
+      staleTime: 300000,
+    });
   };
 
   // Apply both filters: dropdown selection and search query
@@ -387,7 +399,10 @@ export default function AgencyClientsPage() {
                           Generate AI Recommendations
                         </TooltipContent>
                       </Tooltip>
-                      <Link href={`/agency/clients/${client.id}`}>
+                      <Link 
+                        href={`/agency/clients/${client.id}`}
+                        onMouseEnter={() => prefetchDashboardData(client.id)}
+                      >
                         <Button variant="outline" size="sm" data-testid={`button-view-client-${client.id}`}>
                           Manage
                         </Button>
@@ -461,7 +476,10 @@ export default function AgencyClientsPage() {
                         >
                           <Sparkles className="h-4 w-4" />
                         </Button>
-                        <Link href={`/agency/clients/${client.id}`}>
+                        <Link 
+                          href={`/agency/clients/${client.id}`}
+                          onMouseEnter={() => prefetchDashboardData(client.id)}
+                        >
                           <Button variant="ghost" size="sm" data-testid={`button-manage-${client.id}`}>
                             Manage
                           </Button>

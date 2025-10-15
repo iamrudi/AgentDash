@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,12 @@ import { UserProfileDropdown } from "@/components/user-profile-dropdown";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { ProjectCard } from "@/components/dashboard/project-card";
 import { RecommendationCard } from "@/components/dashboard/recommendation-card";
-import { AIChatModal } from "@/components/ai-chat-modal";
 import { Building2, FolderKanban, Users, DollarSign, TrendingUp, ChevronRight, MessageSquare, Sparkles, MousePointer, Eye, TrendingDown } from "lucide-react";
 import { Project, Client, DailyMetric, Initiative, ClientMessage } from "@shared/schema";
 import { format, subDays } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const AIChatModal = lazy(() => import("@/components/ai-chat-modal").then(module => ({ default: module.AIChatModal })));
 
 interface GA4Data {
   rows: Array<{
@@ -41,6 +43,14 @@ interface OutcomeMetrics {
   cpa: number;
   organicClicks: number;
   spend: number;
+}
+
+interface DashboardSummary {
+  ga4: GA4Data;
+  gsc: GSCData;
+  gscQueries: GSCData;
+  outcomeMetrics: OutcomeMetrics;
+  cached?: boolean;
 }
 
 export default function AgencyDashboard() {
@@ -70,25 +80,16 @@ export default function AgencyDashboard() {
   const startDate = format(subDays(new Date(), 30), 'yyyy-MM-dd');
   const endDate = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: ga4Data, isLoading: ga4Loading } = useQuery<GA4Data>({
-    queryKey: ['/api/analytics/ga4', selectedClientId, { startDate, endDate }],
+  const { data: dashboardData, isLoading: analyticsLoading } = useQuery<DashboardSummary>({
+    queryKey: ['/api/agency/clients', selectedClientId, 'dashboard-summary', { startDate, endDate }],
     enabled: !!selectedClientId,
+    staleTime: 300000,
   });
 
-  const { data: gscData, isLoading: gscLoading } = useQuery<GSCData>({
-    queryKey: ['/api/analytics/gsc', selectedClientId, { startDate, endDate }],
-    enabled: !!selectedClientId,
-  });
-
-  const { data: gscQueries } = useQuery<GSCData>({
-    queryKey: ['/api/analytics/gsc', selectedClientId, 'queries', { startDate, endDate }],
-    enabled: !!selectedClientId,
-  });
-
-  const { data: outcomeMetrics } = useQuery<OutcomeMetrics>({
-    queryKey: ['/api/analytics/outcome-metrics', selectedClientId, { startDate, endDate }],
-    enabled: !!selectedClientId,
-  });
+  const ga4Data = dashboardData?.ga4;
+  const gscData = dashboardData?.gsc;
+  const gscQueries = dashboardData?.gscQueries;
+  const outcomeMetrics = dashboardData?.outcomeMetrics;
 
   const activeProjects = projects?.filter(p => p.status === "Active").length || 0;
   const totalClients = clients?.length || 0;
@@ -98,7 +99,16 @@ export default function AgencyDashboard() {
 
   const selectedClient = clients?.find(c => c.id === selectedClientId);
 
-  const topQueries = gscQueries?.rows?.slice(0, 10) || [];
+  const allQueries = gscQueries?.rows || [];
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: allQueries.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 45,
+    overscan: 10,
+  });
+
   const totalClicks = gscData?.rows?.reduce((sum, row) => sum + (row.clicks || 0), 0) || 0;
   const totalImpressions = gscData?.rows?.reduce((sum, row) => sum + (row.impressions || 0), 0) || 0;
   const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
@@ -300,39 +310,62 @@ export default function AgencyDashboard() {
                     </Card>
                   </div>
 
-                  {/* Top Performing Queries Table */}
+                  {/* Top Performing Queries Table (Virtualized) */}
                   <Card data-testid="card-top-queries">
                     <CardHeader>
                       <CardTitle>Top Performing Search Queries</CardTitle>
                       <CardDescription>Best organic search terms from Google Search Console</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {topQueries.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Query</TableHead>
-                              <TableHead className="text-right">Clicks</TableHead>
-                              <TableHead className="text-right">Impressions</TableHead>
-                              <TableHead className="text-right">CTR</TableHead>
-                              <TableHead className="text-right">Avg. Position</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {topQueries.map((query, index) => (
-                              <TableRow key={index}>
-                                <TableCell className="font-medium">{query.keys[0]}</TableCell>
-                                <TableCell className="text-right">{query.clicks}</TableCell>
-                                <TableCell className="text-right">{query.impressions}</TableCell>
-                                <TableCell className="text-right">{(query.ctr * 100).toFixed(1)}%</TableCell>
-                                <TableCell className="text-right">{query.position.toFixed(1)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                      {allQueries.length > 0 ? (
+                        <div className="border rounded-md">
+                          <div className="border-b bg-muted/50">
+                            <div className="grid grid-cols-5 gap-4 p-3 font-medium text-sm">
+                              <div>Query</div>
+                              <div className="text-right">Clicks</div>
+                              <div className="text-right">Impressions</div>
+                              <div className="text-right">CTR</div>
+                              <div className="text-right">Avg. Position</div>
+                            </div>
+                          </div>
+                          <div
+                            ref={parentRef}
+                            className="overflow-auto"
+                            style={{ height: '400px' }}
+                          >
+                            <div
+                              style={{
+                                height: `${rowVirtualizer.getTotalSize()}px`,
+                                width: '100%',
+                                position: 'relative',
+                              }}
+                            >
+                              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                                const query = allQueries[virtualRow.index];
+                                return (
+                                  <div
+                                    key={virtualRow.index}
+                                    className="grid grid-cols-5 gap-4 p-3 border-b hover-elevate absolute w-full"
+                                    style={{
+                                      height: `${virtualRow.size}px`,
+                                      transform: `translateY(${virtualRow.start}px)`,
+                                    }}
+                                    data-testid={`row-query-${virtualRow.index}`}
+                                  >
+                                    <div className="font-medium truncate">{query.keys[0]}</div>
+                                    <div className="text-right">{query.clicks}</div>
+                                    <div className="text-right">{query.impressions}</div>
+                                    <div className="text-right">{(query.ctr * 100).toFixed(1)}%</div>
+                                    <div className="text-right">{query.position.toFixed(1)}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <p className="text-center text-muted-foreground py-8">
-                          {gscLoading ? 'Loading...' : 'No query data available'}
+                          {analyticsLoading ? 'Loading...' : 'No query data available'}
                         </p>
                       )}
                     </CardContent>
@@ -558,17 +591,19 @@ export default function AgencyDashboard() {
         </div>
       </div>
 
-      {/* AI Chat Modal */}
-      {selectedClient && (
-        <AIChatModal
-          isOpen={isAiModalOpen}
-          onClose={() => setIsAiModalOpen(false)}
-          contextData={{
-            clientId: selectedClient.id,
-            clientName: selectedClient.companyName,
-          }}
-          initialQuestion=""
-        />
+      {/* AI Chat Modal (Lazy Loaded) */}
+      {selectedClient && isAiModalOpen && (
+        <Suspense fallback={<div />}>
+          <AIChatModal
+            isOpen={isAiModalOpen}
+            onClose={() => setIsAiModalOpen(false)}
+            contextData={{
+              clientId: selectedClient.id,
+              clientName: selectedClient.companyName,
+            }}
+            initialQuestion=""
+          />
+        </Suspense>
       )}
     </SidebarProvider>
   );

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -7,39 +8,53 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ClientLayout } from "@/components/client-layout";
 import { AgencyLayout } from "@/components/agency-layout";
-import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
-import Login from "@/pages/login";
-import Signup from "@/pages/signup";
-import ClientDetail from "@/pages/client-detail";
-import StaffDashboard from "@/pages/staff-dashboard";
 
-// Client Portal Pages
-import Dashboard from "@/pages/client/dashboard";
-import Projects from "@/pages/client/projects";
-import Recommendations from "@/pages/client/recommendations";
-import Billing from "@/pages/client/billing";
-import InvoiceDetail from "@/pages/client/invoice-detail";
-import Reports from "@/pages/client/reports";
-import Profile from "@/pages/client/profile";
-import Support from "@/pages/client/support";
+// Lazy-loaded pages for code splitting
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Home = lazy(() => import("@/pages/home"));
+const Login = lazy(() => import("@/pages/login"));
+const Signup = lazy(() => import("@/pages/signup"));
+const ClientDetail = lazy(() => import("@/pages/client-detail"));
+const StaffDashboard = lazy(() => import("@/pages/staff-dashboard"));
 
-// Agency Portal Pages
-import AgencyDashboard from "@/pages/agency/index";
-import AgencyMessages from "@/pages/agency/messages";
-import AgencyTasks from "@/pages/agency/tasks";
-import AgencyProjects from "@/pages/agency/projects";
-import AgencyProjectDetail from "@/pages/agency/project-detail";
-import AgencyRecommendations from "@/pages/agency/recommendations";
-import AgencyClients from "@/pages/agency/clients";
-import AgencyStaff from "@/pages/agency/staff";
-import AgencyIntegrations from "@/pages/agency/integrations";
-import AgencyContentCopilot from "@/pages/agency/content-copilot";
-import AgencyUsers from "@/pages/agency/users";
-import AgencyInvoices from "@/pages/agency/invoices";
-import AgencyTrash from "@/pages/agency/trash";
-import AgencySeoAudit from "@/pages/agency/seo-audit";
-import AgencySettings from "@/pages/agency/settings";
+// Client Portal Pages (lazy-loaded)
+const Dashboard = lazy(() => import("@/pages/client/dashboard"));
+const Projects = lazy(() => import("@/pages/client/projects"));
+const Recommendations = lazy(() => import("@/pages/client/recommendations"));
+const Billing = lazy(() => import("@/pages/client/billing"));
+const InvoiceDetail = lazy(() => import("@/pages/client/invoice-detail"));
+const Reports = lazy(() => import("@/pages/client/reports"));
+const Profile = lazy(() => import("@/pages/client/profile"));
+const Support = lazy(() => import("@/pages/client/support"));
+
+// Agency Portal Pages (lazy-loaded)
+const AgencyDashboard = lazy(() => import("@/pages/agency/index"));
+const AgencyMessages = lazy(() => import("@/pages/agency/messages"));
+const AgencyTasks = lazy(() => import("@/pages/agency/tasks"));
+const AgencyProjects = lazy(() => import("@/pages/agency/projects"));
+const AgencyProjectDetail = lazy(() => import("@/pages/agency/project-detail"));
+const AgencyRecommendations = lazy(() => import("@/pages/agency/recommendations"));
+const AgencyClients = lazy(() => import("@/pages/agency/clients"));
+const AgencyStaff = lazy(() => import("@/pages/agency/staff"));
+const AgencyIntegrations = lazy(() => import("@/pages/agency/integrations"));
+const AgencyContentCopilot = lazy(() => import("@/pages/agency/content-copilot"));
+const AgencyUsers = lazy(() => import("@/pages/agency/users"));
+const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
+const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
+const AgencySeoAudit = lazy(() => import("@/pages/agency/seo-audit"));
+const AgencySettings = lazy(() => import("@/pages/agency/settings"));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center space-y-4">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -261,7 +276,9 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={<PageLoader />}>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

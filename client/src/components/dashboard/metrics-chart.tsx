@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { DailyMetric } from "@shared/schema";
@@ -9,7 +10,7 @@ interface MetricsChartProps {
   chartType?: "line" | "area" | "bar";
 }
 
-export function MetricsChart({ data, metric, title, chartType = "line" }: MetricsChartProps) {
+export const MetricsChart = memo(function MetricsChart({ data, metric, title, chartType = "line" }: MetricsChartProps) {
   // Transform data for recharts with null safety
   const chartData = data.map((item) => {
     const rawValue = item[metric];
@@ -145,4 +146,4 @@ export function MetricsChart({ data, metric, title, chartType = "line" }: Metric
       </CardContent>
     </Card>
   );
-}
+});
