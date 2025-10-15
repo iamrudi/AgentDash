@@ -1,0 +1,58 @@
+Objective: Perform a full-stack performance overhaul on the application, focusing on the Agency Dashboard. The goal is to make the dashboard load faster, feel more responsive, and use network resources more efficiently.
+
+Please implement the following optimizations across the backend and frontend:
+
+1. Backend & API Performance Enhancements
+1.1. API Route Aggregation:
+
+Create a new, single API endpoint: GET /api/agency/clients/:clientId/dashboard-summary.
+
+This endpoint must aggregate the data currently fetched by the four separate analytics endpoints used in agency-dashboard.tsx:
+
+/api/analytics/ga4
+
+/api/analytics/gsc (for both site-level and query data)
+
+/api/analytics/outcome-metrics
+
+On the server, fetch the data for these sources in parallel to minimize latency.
+
+The new endpoint should return a single JSON object containing all the aggregated data.
+
+Deprecate the four individual routes after the new one is implemented and consumed by the frontend.
+
+1.2. Server-Side Caching:
+
+Integrate a simple in-memory server-side cache for the new /api/agency/clients/:clientId/dashboard-summary endpoint.
+
+Set the cache Time-to-Live (TTL) to 1 hour.
+
+When a request is made to the endpoint, the server must first check the cache. If valid data exists, return it immediately. If not, fetch the data from the sources, return it to the client, and populate the cache for subsequent requests.
+
+2. Frontend Performance Optimizations
+2.1. Refactor Data Fetching:
+
+In client/src/pages/agency-dashboard.tsx, replace the four separate useQuery hooks for analytics with a single useQuery hook that calls the new GET /api/agency/clients/:clientId/dashboard-summary endpoint.
+
+Set the staleTime for this query to 300000 (5 minutes) to reduce unnecessary background refetching.
+
+2.2. Implement Component Virtualization:
+
+The "Top Performing Search Queries" table in client/src/pages/agency-dashboard.tsx can cause performance issues with large datasets. Refactor this table to use the @tanstack/react-virtual library to ensure it can smoothly render thousands of rows.
+
+You will need to add @tanstack/react-virtual as a new dependency.
+
+2.3. Apply Code Splitting:
+
+Implement route-based code splitting using React.lazy() and <Suspense> in client/src/App.tsx. Ensure that the code for each page is only loaded when the user navigates to its route.
+
+Specifically apply lazy loading to the AIChatModal component within the agency-dashboard.tsx page so it's only downloaded when the "Chat with Client Data" button is clicked.
+
+2.4. Memoize Expensive Components:
+
+In client/src/components/dashboard/metrics-chart.tsx, wrap the MetricsChart component in React.memo to prevent it from re-rendering unnecessarily when its props have not changed.
+
+3. Data-Fetching Strategy
+3.1. Implement Prefetching:
+
+In client/src/pages/agency/clients.tsx, implement a prefetching strategy. When a user's mouse hovers over a client's "Manage" button, use TanStack Query's queryClient.prefetchQuery method to start loading the data for that client's dashboard summary in the background.
