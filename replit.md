@@ -37,6 +37,14 @@ The platform is a full-stack JavaScript application using React for the frontend
 - **Chat with your Data**: AI-powered analytics data querying and recommendation generation.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization, acquisition channel analysis, and pipeline value calculation.
 - **Content Co-pilot**: AI-powered content creation tool using Data for SEO API (keyword research, content gap analysis) and Gemini AI to generate content ideas, comprehensive briefs, and optimization suggestions. Credentials stored encrypted in clientIntegrations table with AES-256-GCM.
+- **Performance Optimizations (October 2025)**:
+  - **Server-side Caching**: In-memory cache with 1-hour TTL for expensive API calls (server/lib/cache.ts)
+  - **Aggregated API Endpoint**: Single `/api/agency/clients/:clientId/dashboard-summary` endpoint combining 4 parallel data fetches (GA4, GSC, GSC queries, outcome metrics) with Promise.allSettled
+  - **Frontend Query Optimization**: Single useQuery with 5-minute staleTime replaces 4 separate queries in agency dashboard
+  - **Table Virtualization**: @tanstack/react-virtual for Top Performing Search Queries table (handles 1000+ rows efficiently)
+  - **Code Splitting**: React.lazy() and Suspense for route-based code splitting across all routes
+  - **Component Memoization**: React.memo for MetricsChart to prevent unnecessary re-renders
+  - **Hover-based Prefetching**: Dashboard data prefetched on "Manage" button hover in clients list for instant navigation
 
 ### Feature Specifications
 - **Client Portal**: Dashboard (KPIs, action items), Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data.
