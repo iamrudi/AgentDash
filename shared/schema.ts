@@ -204,6 +204,35 @@ export const clientIntegrations = pgTable("client_integrations", {
   uniqueClientService: uniqueIndex("client_integrations_client_service_idx").on(table.clientId, table.serviceName),
 }));
 
+// AGENCY INTEGRATIONS (Agency-level integrations that can be shared across clients)
+export const agencyIntegrations = pgTable("agency_integrations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  serviceName: text("service_name").notNull(), // 'DataForSEO', etc.
+  dataForSeoLogin: text("dataforseo_login"), // Data for SEO API login (encrypted)
+  dataForSeoPassword: text("dataforseo_password"), // Data for SEO API password (encrypted)
+  dataForSeoLoginIv: text("dataforseo_login_iv"), // IV for login encryption
+  dataForSeoPasswordIv: text("dataforseo_password_iv"), // IV for password encryption
+  dataForSeoLoginAuthTag: text("dataforseo_login_auth_tag"), // Auth tag for login
+  dataForSeoPasswordAuthTag: text("dataforseo_password_auth_tag"), // Auth tag for password
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueAgencyService: uniqueIndex("agency_integrations_agency_service_idx").on(table.agencyId, table.serviceName),
+}));
+
+// AGENCY INTEGRATION CLIENT ACCESS (Controls which clients can use agency integrations)
+export const agencyIntegrationClientAccess = pgTable("agency_integration_client_access", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyIntegrationId: uuid("agency_integration_id").notNull().references(() => agencyIntegrations.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueIntegrationClient: uniqueIndex("agency_integration_client_access_idx").on(table.agencyIntegrationId, table.clientId),
+  agencyIntegrationIdIdx: index("access_agency_integration_id_idx").on(table.agencyIntegrationId),
+  clientIdIdx: index("access_client_id_idx").on(table.clientId),
+}));
+
 // CLIENT OBJECTIVES (Client goals for AI recommendations)
 export const clientObjectives = pgTable("client_objectives", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -308,6 +337,17 @@ export const insertClientIntegrationSchema = createInsertSchema(clientIntegratio
   updatedAt: true,
 });
 
+export const insertAgencyIntegrationSchema = createInsertSchema(agencyIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAgencyIntegrationClientAccessSchema = createInsertSchema(agencyIntegrationClientAccess).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClientObjectiveSchema = createInsertSchema(clientObjectives).omit({
   id: true,
   createdAt: true,
@@ -379,6 +419,12 @@ export type InsertDailyMetric = z.infer<typeof insertDailyMetricSchema>;
 
 export type ClientIntegration = typeof clientIntegrations.$inferSelect;
 export type InsertClientIntegration = z.infer<typeof insertClientIntegrationSchema>;
+
+export type AgencyIntegration = typeof agencyIntegrations.$inferSelect;
+export type InsertAgencyIntegration = z.infer<typeof insertAgencyIntegrationSchema>;
+
+export type AgencyIntegrationClientAccess = typeof agencyIntegrationClientAccess.$inferSelect;
+export type InsertAgencyIntegrationClientAccess = z.infer<typeof insertAgencyIntegrationClientAccessSchema>;
 
 export type ClientObjective = typeof clientObjectives.$inferSelect;
 export type InsertClientObjective = z.infer<typeof insertClientObjectiveSchema>;
