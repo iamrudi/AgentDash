@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getAuthUser } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -178,12 +179,22 @@ export default function FormsPage() {
 
   const handleEdit = async (formToEdit: Form) => {
     try {
+      // Get auth token
+      const authUser = getAuthUser();
+      if (!authUser || !authUser.token) {
+        throw new Error("No authentication token found");
+      }
+
       const response = await fetch(`/api/crm/forms/${formToEdit.id}`, {
-        credentials: 'include', // Ensure cookies are sent
+        headers: {
+          'Authorization': `Bearer ${authUser.token}`,
+        },
+        credentials: 'include',
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch form: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to fetch form: ${response.statusText}`);
       }
       
       const formWithFields: FormWithFields = await response.json();
