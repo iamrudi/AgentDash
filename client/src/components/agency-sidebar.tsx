@@ -43,7 +43,7 @@ const menuGroups = [
     icon: Zap,
     items: [
       {
-        title: "Dashboard",
+        title: "Agency View",
         url: "/agency",
         icon: Home,
         notificationKey: null,
