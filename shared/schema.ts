@@ -210,6 +210,7 @@ export const proposals = pgTable("proposals", {
 export const proposalSections = pgTable("proposal_sections", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   proposalId: uuid("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  title: text("title").notNull(), // Section title
   content: text("content").notNull(), // Final Markdown content
   order: integer("order").notNull(), // Display order
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -61,7 +61,7 @@ interface Proposal {
   id: string;
   agencyId: string;
   dealId: string;
-  title: string;
+  name: string;
   status: "draft" | "sent" | "accepted" | "rejected";
   createdAt: Date;
   updatedAt: Date;
@@ -118,7 +118,7 @@ export default function ProposalBuilderPage() {
 
   // Create proposal mutation
   const createProposalMutation = useMutation({
-    mutationFn: async (data: { dealId: string; title: string; status: string }) => {
+    mutationFn: async (data: { dealId: string; name: string; status: string }) => {
       const user = await getAuthUser();
       if (!user?.token) throw new Error("Not authenticated");
 
@@ -262,10 +262,14 @@ export default function ProposalBuilderPage() {
   });
 
   const handleCreateProposal = () => {
-    if (!dealId || !deal) return;
+    if (!dealId) {
+      toast({ title: "Missing deal ID", variant: "destructive" });
+      return;
+    }
+    
     createProposalMutation.mutate({
       dealId,
-      title: `Proposal for ${deal.name}`,
+      name: deal?.name ? `Proposal for ${deal.name}` : `Proposal`,
       status: "draft",
     });
   };
@@ -390,7 +394,7 @@ export default function ProposalBuilderPage() {
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h2 className="text-xl font-semibold">{proposal.title}</h2>
+              <h2 className="text-xl font-semibold">{proposal.name}</h2>
               <p className="text-sm text-muted-foreground">
                 Status: <Badge variant="outline">{proposal.status}</Badge>
               </p>
