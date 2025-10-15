@@ -17,7 +17,7 @@ import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
-import { encrypt, decrypt } from "./lib/encryption";
+import { encrypt, decrypt, safeDecryptCredential } from "./lib/encryption";
 import { generateContentIdeas, generateContentBrief, optimizeContent } from "./lib/contentGeneration";
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
@@ -2209,17 +2209,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If no agency credentials or no access, check for client-level integration
       if (!credentials) {
         const dataForSeoIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-        if (dataForSeoIntegration && dataForSeoIntegration.dataForSeoLogin && dataForSeoIntegration.dataForSeoPassword) {
-          // Verify all required decryption fields are present
-          if (!dataForSeoIntegration.dataForSeoLoginIv || !dataForSeoIntegration.dataForSeoLoginAuthTag || 
-              !dataForSeoIntegration.dataForSeoPasswordIv || !dataForSeoIntegration.dataForSeoPasswordAuthTag) {
-            return res.status(500).json({ message: "Data for SEO integration data is corrupted. Please reconnect the integration." });
+        if (dataForSeoIntegration) {
+          try {
+            const login = safeDecryptCredential(
+              dataForSeoIntegration.dataForSeoLogin,
+              dataForSeoIntegration.dataForSeoLoginIv,
+              dataForSeoIntegration.dataForSeoLoginAuthTag,
+              'Data for SEO login'
+            );
+            const password = safeDecryptCredential(
+              dataForSeoIntegration.dataForSeoPassword,
+              dataForSeoIntegration.dataForSeoPasswordIv,
+              dataForSeoIntegration.dataForSeoPasswordAuthTag,
+              'Data for SEO password'
+            );
+            credentials = { login, password };
+          } catch (error) {
+            // safeDecryptCredential provides user-friendly error messages
+            return res.status(400).json({ 
+              message: error instanceof Error ? error.message : "Failed to decrypt Data for SEO credentials" 
+            });
           }
-
-          credentials = {
-            login: decrypt(dataForSeoIntegration.dataForSeoLogin, dataForSeoIntegration.dataForSeoLoginIv, dataForSeoIntegration.dataForSeoLoginAuthTag),
-            password: decrypt(dataForSeoIntegration.dataForSeoPassword, dataForSeoIntegration.dataForSeoPasswordIv, dataForSeoIntegration.dataForSeoPasswordAuthTag),
-          };
         }
       }
       
@@ -3618,28 +3628,33 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
 
       // Get Data for SEO credentials from client integration
       const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
-      if (!integration?.dataForSeoLogin || !integration?.dataForSeoPassword) {
+      if (!integration) {
         return res.status(400).json({ 
-          message: "Data for SEO credentials not configured for this client" 
+          message: "Data for SEO integration not configured for this client" 
         });
       }
 
       let dataForSeoCredentials;
       try {
-        const login = decrypt(
+        const login = safeDecryptCredential(
           integration.dataForSeoLogin,
-          integration.dataForSeoLoginIv!,
-          integration.dataForSeoLoginAuthTag!
+          integration.dataForSeoLoginIv,
+          integration.dataForSeoLoginAuthTag,
+          'Data for SEO login'
         );
-        const password = decrypt(
+        const password = safeDecryptCredential(
           integration.dataForSeoPassword,
-          integration.dataForSeoPasswordIv!,
-          integration.dataForSeoPasswordAuthTag!
+          integration.dataForSeoPasswordIv,
+          integration.dataForSeoPasswordAuthTag,
+          'Data for SEO password'
         );
         dataForSeoCredentials = { login, password };
       } catch (error) {
         console.error('Failed to decrypt Data for SEO credentials:', error);
-        return res.status(500).json({ message: "Failed to decrypt credentials" });
+        // safeDecryptCredential provides user-friendly error messages
+        return res.status(400).json({ 
+          message: error instanceof Error ? error.message : "Failed to decrypt Data for SEO credentials" 
+        });
       }
 
       // Run on-page SEO audit

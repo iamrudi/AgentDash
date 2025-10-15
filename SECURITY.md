@@ -162,6 +162,181 @@ We follow **coordinated disclosure**:
 - [ ] Automated security scanning in CI/CD
 - [ ] Security information and event management (SIEM)
 
+## Operational Security Procedures
+
+### ENCRYPTION_KEY Rotation
+
+⚠️ **CRITICAL**: Changing the ENCRYPTION_KEY renders all existing encrypted data unreadable. Follow this procedure carefully to prevent data loss.
+
+#### When to Rotate
+
+Rotate the ENCRYPTION_KEY in these scenarios:
+- Suspected key compromise or exposure
+- Security audit recommendation
+- Quarterly/annual security maintenance
+- Before major production deployment (planned migration)
+- Employee with key access departures
+
+#### Pre-Rotation Checklist
+
+1. **Backup Database**
+   ```bash
+   # Create full database backup
+   pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+   ```
+
+2. **Schedule Maintenance Window**
+   - Notify all users of downtime
+   - Plan for 30-60 minutes of downtime
+   - Schedule during low-traffic hours
+
+3. **Document Current Key**
+   - Store current ENCRYPTION_KEY in secure password manager
+   - Label with date and version (e.g., "ENCRYPTION_KEY_2025_Q4")
+   - Keep until migration is verified successful
+
+4. **Generate New Key**
+   ```bash
+   # Generate new 32-byte key (base64-encoded, 44 chars)
+   node -e "console.log(crypto.randomBytes(32).toString('base64'))"
+   ```
+
+#### Migration Steps
+
+1. **Test in Development First**
+   ```bash
+   # Development environment
+   OLD_KEY="your-old-key-here==" 
+   NEW_KEY="your-new-key-here=="
+   
+   # Run migration script
+   tsx scripts/migrate-encryption-key.ts "$OLD_KEY" "$NEW_KEY"
+   ```
+
+2. **Verify Development Migration**
+   - Test all integrations (GA4, GSC, DataForSEO)
+   - Verify OAuth flows work correctly
+   - Check all encrypted credentials decrypt properly
+   - Run comprehensive test suite
+
+3. **Production Migration**
+   ```bash
+   # PRODUCTION - during maintenance window
+   
+   # Step 1: Stop all application instances
+   # (Replit: stop workflow, VPS: stop services)
+   
+   # Step 2: Run migration with OLD and NEW keys
+   tsx scripts/migrate-encryption-key.ts "$OLD_ENCRYPTION_KEY" "$NEW_ENCRYPTION_KEY"
+   
+   # Step 3: Update environment variable
+   # Set ENCRYPTION_KEY to NEW_ENCRYPTION_KEY
+   
+   # Step 4: Restart application
+   # (Replit: start workflow, VPS: start services)
+   ```
+
+4. **Post-Migration Verification**
+   - [ ] Test user login functionality
+   - [ ] Verify GA4 data sync works
+   - [ ] Verify GSC data sync works
+   - [ ] Test DataForSEO API calls
+   - [ ] Check Content Co-pilot features
+   - [ ] Review application logs for decryption errors
+   - [ ] Monitor for 24 hours
+
+5. **Rollback Procedure (if migration fails)**
+   ```bash
+   # Step 1: Stop application
+   
+   # Step 2: Restore database from backup
+   psql $DATABASE_URL < backup_YYYYMMDD_HHMMSS.sql
+   
+   # Step 3: Restore OLD_ENCRYPTION_KEY
+   # Set ENCRYPTION_KEY back to old value
+   
+   # Step 4: Restart application
+   ```
+
+#### Affected Database Tables
+
+The migration script automatically handles these tables:
+
+| Table | Encrypted Fields |
+|-------|-----------------|
+| `client_integrations` | `access_token`, `refresh_token`, `dataforseo_login`, `dataforseo_password` |
+| `agency_integrations` | `dataforseo_login`, `dataforseo_password` |
+
+Each encrypted field has associated `_iv` and `_auth_tag` fields for AES-256-GCM encryption.
+
+#### Migration Script Usage
+
+```bash
+# Script location: scripts/migrate-encryption-key.ts
+
+# Basic usage
+tsx scripts/migrate-encryption-key.ts <OLD_KEY> <NEW_KEY>
+
+# Example
+tsx scripts/migrate-encryption-key.ts "abc123old==" "xyz789new=="
+
+# What it does:
+# 1. Validates both keys (must be 32 bytes)
+# 2. Decrypts all credentials with OLD_KEY
+# 3. Re-encrypts all credentials with NEW_KEY
+# 4. Updates database records
+# 5. Reports migration statistics
+```
+
+#### Common Issues & Solutions
+
+**Issue**: "Decryption failed: Unsupported state or unable to authenticate data"
+- **Cause**: Wrong OLD_KEY provided or credentials corrupted
+- **Solution**: Verify OLD_KEY matches current ENCRYPTION_KEY, restore from backup if needed
+
+**Issue**: Migration script shows "Failed: X" credentials
+- **Cause**: Some credentials were already corrupted or encrypted with different key
+- **Solution**: These credentials must be manually re-entered via Settings UI
+
+**Issue**: Application shows "credential not configured" after migration
+- **Cause**: NEW_ENCRYPTION_KEY not updated in environment variables
+- **Solution**: Update ENCRYPTION_KEY to NEW_KEY and restart application
+
+#### Security Best Practices
+
+- **Never** commit encryption keys to version control
+- **Never** share encryption keys via email or chat
+- **Always** use secure password managers for key storage
+- **Always** test migration in development first
+- **Always** maintain database backups before rotation
+- **Document** all key rotations in security log
+
+#### Emergency Key Rotation
+
+If key compromise is suspected:
+
+1. **Immediate Actions** (< 1 hour)
+   - Revoke all active sessions
+   - Generate new ENCRYPTION_KEY
+   - Stop application to prevent further exposure
+
+2. **Data Assessment** (< 4 hours)
+   - Identify which credentials were potentially exposed
+   - Contact affected integration providers (Google, DataForSEO)
+   - Rotate all OAuth tokens and API keys
+
+3. **Recovery** (< 24 hours)
+   - Run migration with old (compromised) and new keys
+   - Force all users to re-authenticate
+   - Audit all API access logs
+   - Notify affected clients if required
+
+4. **Post-Incident** (< 1 week)
+   - Document incident in security log
+   - Review and update access controls
+   - Implement additional monitoring
+   - Security team debrief
+
 ## Known Security Considerations
 
 ### Google OAuth Tokens
