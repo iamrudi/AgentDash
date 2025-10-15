@@ -435,19 +435,45 @@ export default function AgencyIntegrationsPage() {
     mutationFn: async (clientIds: string[]) => {
       return await apiRequest("POST", "/api/agency/integrations/dataforseo/client-access", { clientIds });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/integrations/dataforseo"] });
-      toast({
-        title: "Success",
-        description: "Client access updated successfully",
+    onMutate: async (newClientIds) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/agency/integrations/dataforseo"] });
+      
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(["/api/agency/integrations/dataforseo"]);
+      
+      // Optimistically update to the new value
+      queryClient.setQueryData(["/api/agency/integrations/dataforseo"], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          clientAccess: newClientIds,
+        };
       });
+      
+      // Return context with the snapshot
+      return { previousData };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _newClientIds, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(["/api/agency/integrations/dataforseo"], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Client access updated successfully",
+      });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure sync
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/integrations/dataforseo"] });
     },
   });
 
