@@ -7,7 +7,7 @@ beforeAll(() => {
   process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test';
   process.env.SESSION_SECRET = 'test-session-secret-key-for-testing-only';
   process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-different';
-  process.env.ENCRYPTION_KEY = '0'.repeat(64); // 64 char hex string
+  process.env.ENCRYPTION_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='; // 44 char base64 (32 bytes)
   process.env.SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_SERVICE_KEY = 'test-service-key';
   process.env.SUPABASE_ANON_KEY = 'test-anon-key';

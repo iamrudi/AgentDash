@@ -20,7 +20,7 @@ const envSchema = z.object({
   // Security - More lenient in development
   ENCRYPTION_KEY: isDev 
     ? z.string().min(1) 
-    : z.string().length(64, 'ENCRYPTION_KEY must be 64 characters (32 bytes hex)'),
+    : z.string().length(44, 'ENCRYPTION_KEY must be 44 characters (32 bytes base64-encoded)'),
   SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
   JWT_SECRET: isDev 
     ? z.string().min(1).optional()
