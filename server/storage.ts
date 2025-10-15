@@ -38,6 +38,12 @@ import {
   type InsertContact,
   type Deal,
   type InsertDeal,
+  type Form,
+  type InsertForm,
+  type FormField,
+  type InsertFormField,
+  type FormSubmission,
+  type InsertFormSubmission,
   users,
   profiles,
   clients,
@@ -58,6 +64,9 @@ import {
   companies,
   contacts,
   deals,
+  forms,
+  formFields,
+  formSubmissions,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -220,6 +229,17 @@ export interface IStorage {
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: string, data: Partial<Deal>): Promise<Deal>;
   deleteDeal(id: string): Promise<void>;
+  
+  // Forms
+  getFormsByAgencyId(agencyId: string): Promise<Form[]>;
+  getFormById(id: string): Promise<Form | undefined>;
+  getFormByPublicId(publicId: string): Promise<Form | undefined>;
+  getFormFieldsByFormId(formId: string): Promise<FormField[]>;
+  createFormWithFields(formData: InsertForm, fields: Omit<InsertFormField, 'formId'>[]): Promise<Form & { fields: FormField[] }>;
+  updateFormWithFields(id: string, data: { name?: string; description?: string; fields?: Array<Partial<FormField> & { id?: string }> }): Promise<Form & { fields: FormField[] }>;
+  softDeleteForm(id: string): Promise<void>;
+  createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
+  getFormSubmissionsByAgencyId(agencyId: string): Promise<FormSubmission[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1604,6 +1624,102 @@ export class DbStorage implements IStorage {
 
   async deleteDeal(id: string): Promise<void> {
     await db.delete(deals).where(eq(deals.id, id));
+  }
+
+  // Forms
+  async getFormsByAgencyId(agencyId: string): Promise<Form[]> {
+    return await db.select().from(forms)
+      .where(and(eq(forms.agencyId, agencyId), eq(forms.isDeleted, 0)))
+      .orderBy(desc(forms.createdAt));
+  }
+
+  async getFormById(id: string): Promise<Form | undefined> {
+    const result = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getFormByPublicId(publicId: string): Promise<Form | undefined> {
+    const result = await db.select().from(forms)
+      .where(and(eq(forms.publicId, publicId), eq(forms.isDeleted, 0)))
+      .limit(1);
+    return result[0];
+  }
+
+  async getFormFieldsByFormId(formId: string): Promise<FormField[]> {
+    return await db.select().from(formFields)
+      .where(eq(formFields.formId, formId))
+      .orderBy(formFields.sortOrder);
+  }
+
+  async createFormWithFields(formData: InsertForm, fields: Omit<InsertFormField, 'formId'>[]): Promise<Form & { fields: FormField[] }> {
+    // Create the form
+    const [newForm] = await db.insert(forms).values(formData).returning();
+    
+    // Create the fields
+    const fieldValues = fields.map(field => ({
+      ...field,
+      formId: newForm.id,
+    }));
+    
+    const newFields = await db.insert(formFields).values(fieldValues).returning();
+    
+    return { ...newForm, fields: newFields };
+  }
+
+  async updateFormWithFields(
+    id: string, 
+    data: { name?: string; description?: string; fields?: Array<Partial<FormField> & { id?: string }> }
+  ): Promise<Form & { fields: FormField[] }> {
+    // Update form basic info
+    const formUpdateData: any = { updatedAt: new Date() };
+    if (data.name) formUpdateData.name = data.name;
+    if (data.description !== undefined) formUpdateData.description = data.description;
+    
+    const [updatedForm] = await db.update(forms)
+      .set(formUpdateData)
+      .where(eq(forms.id, id))
+      .returning();
+    
+    // If fields are provided, update them
+    if (data.fields) {
+      // Delete existing fields
+      await db.delete(formFields).where(eq(formFields.formId, id));
+      
+      // Insert new fields
+      const fieldValues = data.fields.map((field: any) => ({
+        formId: id,
+        label: field.label,
+        fieldType: field.fieldType,
+        placeholder: field.placeholder || null,
+        required: field.required,
+        sortOrder: field.sortOrder,
+        metadata: field.metadata || null,
+      }));
+      
+      const newFields = await db.insert(formFields).values(fieldValues).returning();
+      return { ...updatedForm, fields: newFields };
+    }
+    
+    // If no fields update, just return existing fields
+    const existingFields = await this.getFormFieldsByFormId(id);
+    return { ...updatedForm, fields: existingFields };
+  }
+
+  async softDeleteForm(id: string): Promise<void> {
+    await db.update(forms)
+      .set({ isDeleted: 1, updatedAt: new Date() })
+      .where(eq(forms.id, id));
+  }
+
+  async createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission> {
+    const result = await db.insert(formSubmissions).values(submission).returning();
+    return result[0];
+  }
+
+  async getFormSubmissionsByAgencyId(agencyId: string): Promise<FormSubmission[]> {
+    return await db.select().from(formSubmissions)
+      .where(eq(formSubmissions.agencyId, agencyId))
+      .orderBy(desc(formSubmissions.submittedAt));
   }
 }
 

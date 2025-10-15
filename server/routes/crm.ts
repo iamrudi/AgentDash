@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/supabase-auth";
 import { z } from "zod";
-import { insertCompanySchema, insertContactSchema, insertDealSchema } from "@shared/schema";
+import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema } from "@shared/schema";
 
 const crmRouter = Router();
 
@@ -540,6 +540,180 @@ crmRouter.delete("/deals/:id", requireAuth, requireRole("Admin"), async (req: Au
   } catch (error: any) {
     console.error("Delete deal error:", error);
     res.status(500).json({ message: error.message || "Failed to delete deal" });
+  }
+});
+
+// ============================================================================
+// FORMS
+// ============================================================================
+
+// Get all forms for the agency
+crmRouter.get("/forms", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const forms = await storage.getFormsByAgencyId(agencyId);
+    res.json(forms);
+  } catch (error: any) {
+    console.error("Get forms error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch forms" });
+  }
+});
+
+// Get a single form by ID with fields
+crmRouter.get("/forms/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const form = await storage.getFormById(id);
+    
+    if (!form) {
+      return res.status(404).json({ message: "Form not found" });
+    }
+    
+    // Verify tenant isolation
+    if (form.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Fetch form fields
+    const fields = await storage.getFormFieldsByFormId(id);
+    
+    res.json({ ...form, fields });
+  } catch (error: any) {
+    console.error("Get form error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch form" });
+  }
+});
+
+// Create a new form with fields
+crmRouter.post("/forms", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Validate request body
+    const createFormSchema = z.object({
+      name: z.string().min(1, "Form name is required"),
+      description: z.string().optional(),
+      fields: z.array(z.object({
+        label: z.string().min(1, "Field label is required"),
+        fieldType: z.enum(["text", "email", "textarea", "phone"]),
+        placeholder: z.string().optional(),
+        required: z.number().int().min(0).max(1).default(0),
+        sortOrder: z.number().int().min(0),
+      })).min(1, "At least one field is required"),
+    });
+
+    const validatedData = createFormSchema.parse(req.body);
+
+    // Create form with fields in a transaction
+    const newForm = await storage.createFormWithFields({
+      name: validatedData.name,
+      description: validatedData.description,
+      agencyId,
+      isDeleted: 0,
+    }, validatedData.fields);
+
+    res.status(201).json(newForm);
+  } catch (error: any) {
+    console.error("Create form error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create form" });
+  }
+});
+
+// Update a form (including fields)
+crmRouter.patch("/forms/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify form exists and belongs to agency
+    const existingForm = await storage.getFormById(id);
+    
+    if (!existingForm) {
+      return res.status(404).json({ message: "Form not found" });
+    }
+    
+    if (existingForm.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Validate request body
+    const updateFormSchema = z.object({
+      name: z.string().min(1).optional(),
+      description: z.string().optional(),
+      fields: z.array(z.object({
+        id: z.string().optional(), // Existing field ID
+        label: z.string().min(1, "Field label is required"),
+        fieldType: z.enum(["text", "email", "textarea", "phone"]),
+        placeholder: z.string().optional(),
+        required: z.number().int().min(0).max(1).default(0),
+        sortOrder: z.number().int().min(0),
+      })).optional(),
+    });
+
+    const validatedData = updateFormSchema.parse(req.body);
+
+    // Update form and fields
+    const updatedForm = await storage.updateFormWithFields(id, validatedData);
+    
+    res.json(updatedForm);
+  } catch (error: any) {
+    console.error("Update form error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update form" });
+  }
+});
+
+// Delete a form (soft delete)
+crmRouter.delete("/forms/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify form exists and belongs to agency
+    const existingForm = await storage.getFormById(id);
+    
+    if (!existingForm) {
+      return res.status(404).json({ message: "Form not found" });
+    }
+    
+    if (existingForm.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Soft delete the form
+    await storage.softDeleteForm(id);
+    res.json({ message: "Form deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete form error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete form" });
   }
 });
 
