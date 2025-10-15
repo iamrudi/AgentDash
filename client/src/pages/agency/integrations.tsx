@@ -55,12 +55,16 @@ export default function AgencyIntegrationsPage() {
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [editLeadEventDialogOpen, setEditLeadEventDialogOpen] = useState(false);
   const [dataForSeoDialogOpen, setDataForSeoDialogOpen] = useState(false);
+  const [agencyDataForSeoDialogOpen, setAgencyDataForSeoDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
   const [leadEventName, setLeadEventName] = useState("");
   const [selectedGSCSite, setSelectedGSCSite] = useState("");
   const [dataForSeoLogin, setDataForSeoLogin] = useState("");
   const [dataForSeoPassword, setDataForSeoPassword] = useState("");
+  const [agencyDataForSeoLogin, setAgencyDataForSeoLogin] = useState("");
+  const [agencyDataForSeoPassword, setAgencyDataForSeoPassword] = useState("");
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   
   // Check for OAuth success/error in URL
   useEffect(() => {
@@ -100,6 +104,17 @@ export default function AgencyIntegrationsPage() {
 
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/agency/clients"],
+  });
+
+  // Fetch agency-level Data for SEO integration
+  const { data: agencyDataForSeo } = useQuery<{
+    connected: boolean;
+    integrationId?: string;
+    clientAccess: string[];
+    createdAt?: string;
+    updatedAt?: string;
+  }>({
+    queryKey: ["/api/agency/integrations/dataforseo"],
   });
 
   // Filter clients based on selection
@@ -391,6 +406,51 @@ export default function AgencyIntegrationsPage() {
     },
   });
 
+  // Save agency-level Data for SEO mutation
+  const saveAgencyDataForSeoMutation = useMutation({
+    mutationFn: async ({ login, password }: { login: string; password: string }) => {
+      return await apiRequest("POST", "/api/agency/integrations/dataforseo", { login, password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/integrations/dataforseo"] });
+      toast({
+        title: "Success",
+        description: "Agency Data for SEO integration saved successfully",
+      });
+      setAgencyDataForSeoLogin("");
+      setAgencyDataForSeoPassword("");
+      setAgencyDataForSeoDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update client access mutation
+  const updateClientAccessMutation = useMutation({
+    mutationFn: async (clientIds: string[]) => {
+      return await apiRequest("POST", "/api/agency/integrations/dataforseo/client-access", { clientIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/integrations/dataforseo"] });
+      toast({
+        title: "Success",
+        description: "Client access updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC' | 'DataForSEO') => {
     if (service === 'GA4') {
       disconnectGA4Mutation.mutate(clientId);
@@ -439,6 +499,66 @@ export default function AgencyIntegrationsPage() {
             onClientChange={setSelectedClientId}
           />
         </div>
+
+        {/* Agency-Level Data for SEO Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Agency-Level Data for SEO</span>
+              {agencyDataForSeo?.connected && (
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Connected
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Configure Data for SEO credentials once for your agency and control which clients can access it
+            </p>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setAgencyDataForSeoDialogOpen(true)}
+                data-testid="button-configure-agency-dataforseo"
+              >
+                {agencyDataForSeo?.connected ? "Update Credentials" : "Configure Credentials"}
+              </Button>
+            </div>
+
+            {agencyDataForSeo?.connected && clients && clients.length > 0 && (
+              <div className="space-y-2 pt-4 border-t">
+                <Label className="text-sm font-medium">Client Access ({agencyDataForSeo.clientAccess.length} of {clients.length})</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {clients.map((client) => {
+                    const hasAccess = agencyDataForSeo.clientAccess.includes(client.id);
+                    return (
+                      <div key={client.id} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id={`client-access-${client.id}`}
+                          checked={hasAccess}
+                          onChange={(e) => {
+                            const newAccess = e.target.checked
+                              ? [...agencyDataForSeo.clientAccess, client.id]
+                              : agencyDataForSeo.clientAccess.filter(id => id !== client.id);
+                            updateClientAccessMutation.mutate(newAccess);
+                          }}
+                          className="h-4 w-4 rounded border-input"
+                          data-testid={`checkbox-client-access-${client.id}`}
+                        />
+                        <Label htmlFor={`client-access-${client.id}`} className="text-sm cursor-pointer">
+                          {client.companyName}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {!filteredClients || filteredClients.length === 0 ? (
           <Card>
@@ -707,6 +827,80 @@ export default function AgencyIntegrationsPage() {
               >
                 {connectDataForSeoMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Connect
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Agency-Level Data for SEO Configuration Dialog */}
+      <Dialog open={agencyDataForSeoDialogOpen} onOpenChange={(open) => {
+        setAgencyDataForSeoDialogOpen(open);
+        if (!open) {
+          setAgencyDataForSeoLogin("");
+          setAgencyDataForSeoPassword("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configure Agency Data for SEO</DialogTitle>
+            <DialogDescription>
+              Enter Data for SEO API credentials for your agency. You can then control which clients have access to it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="agency-dataforseo-login">API Login</Label>
+              <Input
+                id="agency-dataforseo-login"
+                type="text"
+                placeholder="Enter your Data for SEO login"
+                value={agencyDataForSeoLogin}
+                onChange={(e) => setAgencyDataForSeoLogin(e.target.value)}
+                data-testid="input-agency-dataforseo-login"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="agency-dataforseo-password">API Password/Key</Label>
+              <Input
+                id="agency-dataforseo-password"
+                type="password"
+                placeholder="Enter your Data for SEO password/key"
+                value={agencyDataForSeoPassword}
+                onChange={(e) => setAgencyDataForSeoPassword(e.target.value)}
+                data-testid="input-agency-dataforseo-password"
+                className="mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setAgencyDataForSeoDialogOpen(false)}
+                data-testid="button-cancel-agency-dataforseo"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!agencyDataForSeoLogin || !agencyDataForSeoPassword) {
+                    toast({
+                      title: "Error",
+                      description: "Please provide both login and password",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  saveAgencyDataForSeoMutation.mutate({
+                    login: agencyDataForSeoLogin,
+                    password: agencyDataForSeoPassword,
+                  });
+                }}
+                disabled={saveAgencyDataForSeoMutation.isPending}
+                data-testid="button-save-agency-dataforseo"
+              >
+                {saveAgencyDataForSeoMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
               </Button>
             </div>
           </div>

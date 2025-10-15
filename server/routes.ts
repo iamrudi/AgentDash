@@ -1860,7 +1860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get agency-level Data for SEO integration with client access
   app.get("/api/agency/integrations/dataforseo", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const agencyId = req.user!.agencyId;
+      const agencyId = req.user!.agencyId!;
       
       const integration = await storage.getAgencyIntegration(agencyId, 'DataForSEO');
       
@@ -1888,7 +1888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update agency-level Data for SEO integration
   app.post("/api/agency/integrations/dataforseo", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const agencyId = req.user!.agencyId;
+      const agencyId = req.user!.agencyId!;
       const { login, password } = req.body;
 
       if (!login || !password) {
@@ -1930,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update client access for agency-level Data for SEO integration
   app.post("/api/agency/integrations/dataforseo/client-access", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      const agencyId = req.user!.agencyId;
+      const agencyId = req.user!.agencyId!;
       const { clientIds } = req.body;
 
       if (!Array.isArray(clientIds)) {
