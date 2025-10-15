@@ -64,8 +64,8 @@ crmRouter.post("/companies", requireAuth, requireRole("Admin"), async (req: Auth
       return res.status(403).json({ message: "No agency access" });
     }
 
-    // Validate request body
-    const createCompanySchema = insertCompanySchema.extend({
+    // Validate request body - exclude agencyId as it comes from authenticated user
+    const createCompanySchema = insertCompanySchema.omit({ agencyId: true }).extend({
       name: z.string().min(1, "Company name is required"),
       website: z.string().url("Please enter a valid URL").optional().or(z.literal("")),
       phone: z.string().optional(),
