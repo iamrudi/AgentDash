@@ -612,7 +612,11 @@ crmRouter.post("/forms", requireAuth, requireRole("Admin"), async (req: AuthRequ
         label: z.string().min(1, "Field label is required"),
         fieldType: z.enum(["text", "email", "textarea", "phone"]),
         placeholder: z.string().optional(),
-        required: z.number().int().min(0).max(1).default(0),
+        // Accept boolean from frontend and coerce to number (0 or 1) for database
+        required: z.union([
+          z.boolean().transform((val) => val ? 1 : 0),
+          z.number().int().min(0).max(1)
+        ]).default(0),
         sortOrder: z.number().int().min(0),
       })).min(1, "At least one field is required"),
     });

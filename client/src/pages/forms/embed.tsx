@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRoute } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,6 +35,9 @@ export default function EmbedFormPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  
+  // Honeypot field ref (for bot detection)
+  const honeypotRef = useRef<HTMLInputElement>(null);
 
   // Build dynamic schema from form fields
   const buildSchema = (fields: FormField[]) => {
@@ -114,6 +117,9 @@ export default function EmbedFormPage() {
     setError(null);
 
     try {
+      // Get honeypot value (should be empty for real users)
+      const honeypotValue = honeypotRef.current?.value || "";
+      
       const response = await fetch(`/api/public/forms/${publicId}/submit`, {
         method: "POST",
         headers: {
@@ -121,7 +127,7 @@ export default function EmbedFormPage() {
         },
         body: JSON.stringify({
           formData: data,
-          honeypot: "", // Always empty for real users
+          honeypot: honeypotValue,
         }),
       });
 
@@ -218,13 +224,16 @@ export default function EmbedFormPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Honeypot field (hidden) */}
+              {/* Honeypot field (hidden from real users, visible to bots) */}
               <input
+                ref={honeypotRef}
                 type="text"
                 name="honeypot"
-                style={{ position: "absolute", left: "-9999px" }}
+                aria-hidden="true"
+                style={{ position: "absolute", left: "-9999px", width: "1px", height: "1px" }}
                 tabIndex={-1}
                 autoComplete="off"
+                data-testid="input-honeypot"
               />
 
               {formMetadata.fields
