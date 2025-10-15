@@ -169,10 +169,83 @@ crmRouter.get("/contacts", requireAuth, requireRole("Admin"), async (req: AuthRe
     }
 
     const contacts = await storage.getContactsByAgencyId(agencyId);
-    res.json(contacts);
+    
+    // Join with companies data - verify tenant isolation
+    const contactsWithCompanies = await Promise.all(
+      contacts.map(async (contact) => {
+        if (contact.companyId) {
+          const company = await storage.getCompanyById(contact.companyId);
+          
+          // Only return company if it belongs to the caller's agency (tenant isolation)
+          if (company && company.agencyId === agencyId) {
+            return { ...contact, company };
+          }
+          
+          // Company doesn't belong to this agency - return null
+          return { ...contact, company: null };
+        }
+        return { ...contact, company: null };
+      })
+    );
+    
+    res.json(contactsWithCompanies);
   } catch (error: any) {
     console.error("Get contacts error:", error);
     res.status(500).json({ message: error.message || "Failed to fetch contacts" });
+  }
+});
+
+// Create a new contact
+crmRouter.post("/contacts", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Validate request body - exclude agencyId, clientId as they come from server
+    const createContactSchema = insertContactSchema.omit({ 
+      agencyId: true, 
+      clientId: true 
+    }).extend({
+      firstName: z.string().min(1, "First name is required"),
+      lastName: z.string().min(1, "Last name is required"),
+      email: z.string().email("Please enter a valid email address"),
+      phone: z.string().optional(),
+      companyId: z.string().uuid().optional().nullable(),
+    });
+
+    const validatedData = createContactSchema.parse(req.body);
+
+    // Verify companyId belongs to caller's agency (tenant isolation)
+    if (validatedData.companyId) {
+      const company = await storage.getCompanyById(validatedData.companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      if (company.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied: Company belongs to different agency" });
+      }
+    }
+
+    const contactData = {
+      ...validatedData,
+      agencyId,
+      clientId: null,
+    };
+
+    const newContact = await storage.createContact(contactData);
+
+    res.status(201).json(newContact);
+  } catch (error: any) {
+    console.error("Create contact error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create contact" });
   }
 });
 
