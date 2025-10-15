@@ -147,6 +147,7 @@ export function AIRecommendationsPanel({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/clients"] });
       toast({
         title: "Success",
         description: "AI recommendations generated successfully",
