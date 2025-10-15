@@ -114,20 +114,19 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     log('✅ Trash cleanup scheduler started');
   }
 
-  // 404 handler
-  app.use(notFoundHandler);
-
-  // Error handling middleware (must be last)
-  app.use(errorHandler);
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // Serve frontend (must be after API routes but before 404 handler)
+  // This catch-all serves index.html for all non-API GET requests
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
+
+  // 404 handler for unmatched routes (after frontend serving)
+  app.use(notFoundHandler);
+
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
