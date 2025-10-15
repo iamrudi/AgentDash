@@ -1,0 +1,115 @@
+Objective: Your mission is to populate the database with a set of high-quality, reusable proposal templates. You will achieve this by adding logic to the existing database seed script. These templates should be well-written, use Markdown for formatting, and include dynamic {{merge_tags}} where appropriate.
+
+File to Modify: server/seed.ts
+
+Instructions:
+
+Open the server/seed.ts file.
+
+Inside the main seed() function, add the code provided below.
+
+This code will define an array of template objects.
+
+It will then loop through the array and use Drizzle ORM to insert each template into the proposalTemplates table, linking them to the first agency it finds in the database.
+
+The use of .onConflictDoNothing() ensures that running the seed script multiple times will not create duplicate templates.
+
+Code to Add into server/seed.ts
+TypeScript
+
+// server/seed.ts
+
+// ... (existing imports)
+import * as schema from '../shared/schema';
+import { db } from './db';
+import { sql } from 'drizzle-orm';
+
+// ... (inside the async function seed())
+
+async function seed() {
+  console.log('Seeding database...');
+  
+  // ... (any existing seed logic)
+
+  // =================================================================
+  // START: Add Proposal Template Seeding Logic
+  // =================================================================
+  console.log('Seeding proposal templates...');
+
+  // Find the first agency to associate the templates with
+  const agencies = await db.select().from(schema.agencies).limit(1);
+  if (agencies.length === 0) {
+    console.log('No agencies found. Skipping proposal template seeding.');
+    // Or you could create a default agency here if needed
+  } else {
+    const agencyId = agencies[0].id;
+
+    const templates = [
+      // --- Core Templates ---
+      {
+        name: 'Introduction',
+        category: 'Core',
+        content: `## Introduction\n\nHello {{contact.firstName}},\n\nThank you for the opportunity to present this proposal. Based on our recent discussions, we've developed a comprehensive strategy designed to help {{client.name}} achieve its digital marketing objectives. We are confident that our partnership will drive significant growth and a strong return on investment.`,
+      },
+      {
+        name: 'Our Understanding of Your Needs',
+        category: 'Core',
+        content: `## Our Understanding of Your Needs\n\nWe understand that {{client.name}} is looking to achieve the following key goals:\n\n- **Goal 1:** [Describe the client's primary goal]\n- **Goal 2:** [Describe the client's secondary goal]\n- **Goal 3:** [Describe another client objective]\n\nThis proposal directly addresses these objectives with a targeted, data-driven approach.`,
+      },
+      {
+        name: 'Executive Summary',
+        category: 'Core',
+        content: `## Executive Summary\n\nThis proposal outlines a strategic partnership with {{client.name}} to enhance online visibility and lead generation through a targeted digital marketing campaign. The total investment for this scope of work is **{{deal.value}}**. We project that these efforts will lead to measurable improvements in key performance indicators within the first quarter.`,
+      },
+
+      // --- Service Templates ---
+      {
+        name: 'Scope of Work: SEO',
+        category: 'Services',
+        content: `## Scope of Work: Search Engine Optimization (SEO)\n\nOur SEO strategy is designed to increase organic traffic and improve search engine rankings for your most valuable keywords.\n\n### Phase 1: Technical Audit & On-Page Optimization\n- Comprehensive website audit to identify technical issues.\n- Keyword research and mapping.\n- On-page optimization of meta titles, descriptions, and headers.\n- Schema markup implementation.\n\n### Phase 2: Content & Link Building\n- Development of a content calendar.\n- Creation of 2 high-quality blog posts per month.\n- Strategic outreach for backlink acquisition.`,
+      },
+      {
+        name: 'Scope of Work: PPC',
+        category: 'Services',
+        content: `## Scope of Work: Pay-Per-Click (PPC)\n\nOur PPC campaign will focus on driving immediate, qualified traffic to your website to generate leads.\n\n- **Campaign Setup:** Creation of campaigns on Google Ads and LinkedIn.\n- **Ad Copy & Creatives:** A/B testing of ad copy and visuals.\n- **Management:** Daily monitoring, bid management, and budget optimization.\n- **Reporting:** A monthly performance report detailing CPL, CPA, and ROAS.`,
+      },
+
+      // --- Pricing & Legal Templates ---
+      {
+        name: 'Pricing Table',
+        category: 'Pricing',
+        content: `## Investment\n\n| Service                  | Monthly Cost |\n| ------------------------ | :----------: |\n| SEO Services             |    $1,500    |\n| PPC Management (excl. ad spend) |     $750     |\n| **Total** |  **$2,250** |`,
+      },
+      {
+        name: 'Timeline & Deliverables',
+        category: 'Pricing',
+        content: `## Timeline & Deliverables\n\n- **Month 1:** Technical SEO audit report, keyword strategy document.\n- **Month 2:** First two blog posts published, PPC campaigns launched.\n- **Month 3:** Monthly performance report, strategy review meeting.`,
+      },
+      {
+        name: 'Terms & Conditions',
+        category: 'Legal',
+        content: `## Terms & Conditions\n\n- This proposal is valid for 30 days.\n- Invoices will be sent on the 1st of each month and are due on a NET 15 basis.\n- Either party may terminate this agreement with 30 days written notice.\n- All work produced will be the intellectual property of {{client.name}} upon receipt of final payment.`,
+      },
+    ];
+
+    // Insert templates into the database
+    await db
+      .insert(schema.proposalTemplates)
+      .values(templates.map(t => ({ ...t, agencyId })))
+      .onConflictDoNothing(); // Prevents duplicates if seed is run again
+      
+    console.log(`Seeded ${templates.length} proposal templates for agency ${agencyId}.`);
+  }
+  // =================================================================
+  // END: Add Proposal Template Seeding Logic
+  // =================================================================
+
+
+  console.log('Seeding complete.');
+  process.exit(0);
+}
+
+seed().catch((error) => {
+  console.error('Error during seeding:', error);
+  process.exit(1);
+});
