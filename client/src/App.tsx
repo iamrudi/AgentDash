@@ -16,6 +16,7 @@ const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
 const ClientDetail = lazy(() => import("@/pages/client-detail"));
 const StaffDashboard = lazy(() => import("@/pages/staff-dashboard"));
+const EmbedForm = lazy(() => import("@/pages/forms/embed"));
 
 // Client Portal Pages (lazy-loaded)
 const Dashboard = lazy(() => import("@/pages/client/dashboard"));
@@ -49,6 +50,7 @@ const CrmDashboard = lazy(() => import("@/pages/agency/crm/dashboard"));
 const CrmCompanies = lazy(() => import("@/pages/agency/crm/companies"));
 const CrmContacts = lazy(() => import("@/pages/agency/crm/contacts"));
 const CrmDeals = lazy(() => import("@/pages/agency/crm/deals"));
+const CrmForms = lazy(() => import("@/pages/agency/crm/forms"));
 
 // Loading fallback component
 function PageLoader() {
@@ -68,6 +70,9 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      
+      {/* Public Form Embed (no auth required) */}
+      <Route path="/forms/embed/:publicId" component={EmbedForm} />
       
       {/* Client Portal - All routes wrapped in ClientLayout */}
       <Route path="/client">
@@ -284,6 +289,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
             <CrmDeals />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/crm/forms">
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AgencyLayout>
+            <CrmForms />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

@@ -114,6 +114,12 @@ const menuGroups = [
         icon: DollarSign,
         notificationKey: null,
       },
+      {
+        title: "Forms",
+        url: "/agency/crm/forms",
+        icon: FileText,
+        notificationKey: null,
+      },
     ],
   },
   {

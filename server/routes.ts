@@ -246,11 +246,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const submission = await storage.createFormSubmission({
         formId: form.id,
         agencyId: form.agencyId,
-        data: formData,
+        submission: formData,
       });
       
       // Auto-create Contact and Deal from submission
-      // Extract common fields (email, name, phone)
+      // Extract common fields (email, name, phone) based on field types and labels
       let email: string | null = null;
       let firstName: string | null = null;
       let lastName: string | null = null;
@@ -258,31 +258,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const field of fields) {
         const value = formData[field.id];
-        if (!value) continue;
+        if (!value || typeof value !== 'string' || value.trim() === '') continue;
         
-        if (field.fieldType === "email") {
-          email = value;
-        } else if (field.label.toLowerCase().includes("first name") || field.label.toLowerCase() === "name") {
-          firstName = value;
-        } else if (field.label.toLowerCase().includes("last name")) {
-          lastName = value;
-        } else if (field.fieldType === "phone") {
-          phone = value;
+        const trimmedValue = value.trim();
+        const labelLower = field.label.toLowerCase();
+        
+        // Email field type takes precedence
+        if (field.fieldType === "email" && !email) {
+          email = trimmedValue;
+        }
+        // Phone field type takes precedence
+        else if (field.fieldType === "phone" && !phone) {
+          phone = trimmedValue;
+        }
+        // Parse name fields by label patterns
+        else if ((labelLower.includes("first name") || labelLower === "name" || labelLower === "first") && !firstName) {
+          firstName = trimmedValue;
+        }
+        else if ((labelLower.includes("last name") || labelLower === "last" || labelLower === "surname") && !lastName) {
+          lastName = trimmedValue;
+        }
+        // If label is just "name" or "full name", try to split it
+        else if ((labelLower === "full name" || labelLower === "your name") && !firstName) {
+          const nameParts = trimmedValue.split(' ');
+          if (nameParts.length >= 2) {
+            firstName = nameParts[0];
+            lastName = nameParts.slice(1).join(' ');
+          } else {
+            firstName = trimmedValue;
+          }
         }
       }
       
-      // Create contact if we have at least email or name
-      if (email || firstName) {
+      // Only create contact if we have BOTH valid email AND explicit name
+      // Never fabricate or derive placeholder data
+      const hasValidEmail = email && email.includes('@') && email.includes('.') && !email.includes('placeholder.com');
+      const hasExplicitName = firstName && firstName.trim().length > 0 && firstName !== "Unknown";
+      
+      // Require BOTH email and name for contact creation
+      if (hasValidEmail && hasExplicitName) {
         try {
+          // TypeScript knows firstName and email are not null here because of hasExplicitName and hasValidEmail checks
           const contact = await storage.createContact({
             agencyId: form.agencyId,
-            firstName: firstName || "Unknown",
-            lastName: lastName || null,
-            email: email || null,
-            phone: phone || null,
+            firstName: firstName!.trim(),
+            lastName: (lastName && lastName.trim().length > 0) ? lastName.trim() : firstName!.trim(),
+            email: email!.trim(),
+            phone: phone ? phone.trim() : null,
             companyId: null,
-            jobTitle: null,
-            notes: `Created from form submission: ${form.name}`,
+            clientId: null,
           });
           
           // Create deal associated with the contact
@@ -294,11 +318,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             value: 0, // Default to 0, agency can update later
             stage: "lead",
             closeDate: null,
-            notes: `Auto-created from form submission`,
           });
-        } catch (error) {
-          console.error("Failed to auto-create contact/deal:", error);
+          
+          console.log(`[Form Submission] Created contact (${contact.email}) and deal from form: ${form.name}`);
+        } catch (error: any) {
+          console.error("[Form Submission] Failed to auto-create contact/deal:", error);
+          // Check if it's a duplicate email error
+          if (error.message && (error.message.includes('unique') || error.message.includes('duplicate'))) {
+            console.log('[Form Submission] Contact with this email already exists - skipping creation');
+          }
           // Don't fail the submission if contact/deal creation fails
+        }
+      } else {
+        // Log the specific reason for skipping
+        if (!hasValidEmail && !hasExplicitName) {
+          console.log('[Form Submission] Skipping contact/deal creation - no valid email or name provided');
+        } else if (!hasValidEmail) {
+          console.log('[Form Submission] Skipping contact/deal creation - no valid email provided');
+        } else if (!hasExplicitName) {
+          console.log('[Form Submission] Skipping contact/deal creation - no explicit name provided');
         }
       }
       
