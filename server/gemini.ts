@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { retry, isRetryableError } from "./lib/retry";
 
 // DON'T DELETE THIS COMMENT
 // Follow these instructions when using this blueprint:
@@ -7,6 +8,36 @@ import { GoogleGenAI } from "@google/genai";
 
 // This API key is from Gemini Developer API Key, not vertex AI API Key
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+/**
+ * Wrapper for Gemini API calls with retry logic
+ * Handles transient failures like network errors and rate limits
+ */
+async function callGeminiWithRetry<T>(
+  operation: () => Promise<T>,
+  context: string
+): Promise<T> {
+  return retry(operation, {
+    maxAttempts: 3,
+    initialDelay: 1000, // 1s
+    backoffMultiplier: 2, // 1s → 2s → 4s
+    onRetry: (attempt, error) => {
+      // Check if error is retryable (network, timeout, rate limit)
+      const isRateLimitError = error?.message?.includes('429') || 
+                              error?.message?.includes('quota') ||
+                              error?.message?.includes('rate limit');
+      
+      if (isRetryableError(error) || isRateLimitError) {
+        console.warn(
+          `⚠️  Gemini API ${context} attempt ${attempt} failed, retrying... (${error.message})`
+        );
+      } else {
+        // Don't retry non-retryable errors (auth, invalid request, etc.)
+        throw error;
+      }
+    },
+  });
+}
 
 interface MetricData {
   date: string;
@@ -126,46 +157,49 @@ Generate ${presetConfig.count} recommendations focusing on: ${presetConfig.areas
 ${competitorContext ? '\nInclude competitive insights and opportunities to outperform the specified competitors.' : ''}
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-pro",
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "ARRAY",
-          items: {
-            type: "OBJECT",
-            properties: {
-              title: { type: "STRING" },
-              observation: { type: "STRING" },
-              observationInsights: {
-                type: "ARRAY",
-                items: {
-                  type: "OBJECT",
-                  properties: {
-                    label: { type: "STRING" },
-                    value: { type: "STRING" },
-                    context: { type: "STRING" }
-                  },
-                  required: ["label", "value"]
-                }
+    const response = await callGeminiWithRetry(
+      () => ai.models.generateContent({
+        model: "gemini-2.5-pro",
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                title: { type: "STRING" },
+                observation: { type: "STRING" },
+                observationInsights: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      label: { type: "STRING" },
+                      value: { type: "STRING" },
+                      context: { type: "STRING" }
+                    },
+                    required: ["label", "value"]
+                  }
+                },
+                proposedAction: { type: "STRING" },
+                actionTasks: {
+                  type: "ARRAY",
+                  items: { type: "STRING" }
+                },
+                impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
+                estimatedCost: { type: "NUMBER" },
+                triggerMetric: { type: "STRING" },
+                baselineValue: { type: "NUMBER" }
               },
-              proposedAction: { type: "STRING" },
-              actionTasks: {
-                type: "ARRAY",
-                items: { type: "STRING" }
-              },
-              impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
-              estimatedCost: { type: "NUMBER" },
-              triggerMetric: { type: "STRING" },
-              baselineValue: { type: "NUMBER" }
-            },
-            required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact", "estimatedCost", "triggerMetric", "baselineValue"]
+              required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact", "estimatedCost", "triggerMetric", "baselineValue"]
+            }
           }
-        }
-      },
-      contents: metricsContext,
-    });
+        },
+        contents: metricsContext,
+      }),
+      `analyzeClientMetrics(${preset})`
+    );
 
     const rawJson = response.text;
 
@@ -225,43 +259,46 @@ Based on the data and the question, generate a single, actionable recommendation
 - If data is limited, identify this as an opportunity
 `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            title: { type: "STRING" },
-            observation: { type: "STRING" },
-            observationInsights: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  label: { type: "STRING" },
-                  value: { type: "STRING" },
-                  context: { type: "STRING" }
-                },
-                required: ["label", "value"]
-              }
+    const response = await callGeminiWithRetry(
+      () => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              title: { type: "STRING" },
+              observation: { type: "STRING" },
+              observationInsights: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    label: { type: "STRING" },
+                    value: { type: "STRING" },
+                    context: { type: "STRING" }
+                  },
+                  required: ["label", "value"]
+                }
+              },
+              proposedAction: { type: "STRING" },
+              actionTasks: {
+                type: "ARRAY",
+                items: { type: "STRING" }
+              },
+              impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
+              estimatedCost: { type: "NUMBER" },
+              triggerMetric: { type: "STRING" },
+              baselineValue: { type: "NUMBER" },
             },
-            proposedAction: { type: "STRING" },
-            actionTasks: {
-              type: "ARRAY",
-              items: { type: "STRING" }
-            },
-            impact: { type: "STRING", enum: ["High", "Medium", "Low"] },
-            estimatedCost: { type: "NUMBER" },
-            triggerMetric: { type: "STRING" },
-            baselineValue: { type: "NUMBER" },
+            required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact"],
           },
-          required: ["title", "observation", "observationInsights", "proposedAction", "actionTasks", "impact"],
         },
-      },
-      contents: prompt,
-    });
+        contents: prompt,
+      }),
+      `analyzeDataOnDemand("${question}")`
+    );
 
     const rawJson = response.text;
     if (!rawJson) {
@@ -312,25 +349,28 @@ export async function summarizeLighthouseReport(
     2.  A "recommendations" array of the top 5 most impactful, actionable items the agency should focus on to improve the site's scores.
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "object",
-          properties: {
-            summary: { type: "string" },
-            recommendations: {
-              type: "array",
-              items: { type: "string" },
+    const response = await callGeminiWithRetry(
+      () => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              summary: { type: "string" },
+              recommendations: {
+                type: "array",
+                items: { type: "string" },
+              },
             },
+            required: ["summary", "recommendations"],
           },
-          required: ["summary", "recommendations"],
         },
-      },
-      contents: prompt,
-    });
+        contents: prompt,
+      }),
+      `summarizeLighthouseReport("${url}")`
+    );
 
     const rawJson = response.text;
     if (!rawJson) {
@@ -370,23 +410,26 @@ Focus on messages from the "Client" role - these are the most important for unde
     If the conversation contains only greetings/small talk with no substantive content, return empty arrays. Otherwise, be perceptive and capture real insights even from brief messages.
     `;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            painPoints: { type: "ARRAY", items: { type: "STRING" } },
-            recentWins: { type: "ARRAY", items: { type: "STRING" } },
-            activeQuestions: { type: "ARRAY", items: { type: "STRING" } },
+    const response = await callGeminiWithRetry(
+      () => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        config: {
+          systemInstruction: systemPrompt,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              painPoints: { type: "ARRAY", items: { type: "STRING" } },
+              recentWins: { type: "ARRAY", items: { type: "STRING" } },
+              activeQuestions: { type: "ARRAY", items: { type: "STRING" } },
+            },
+            required: ["painPoints", "recentWins", "activeQuestions"],
           },
-          required: ["painPoints", "recentWins", "activeQuestions"],
         },
-      },
-      contents: prompt,
-    });
+        contents: prompt,
+      }),
+      `analyzeChatHistory`
+    );
 
     const rawJson = response.text;
     if (!rawJson) {
