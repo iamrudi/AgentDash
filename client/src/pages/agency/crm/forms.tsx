@@ -177,23 +177,45 @@ export default function FormsPage() {
   };
 
   const handleEdit = async (formToEdit: Form) => {
-    const response = await fetch(`/api/crm/forms/${formToEdit.id}`);
-    const formWithFields: FormWithFields = await response.json();
-    
-    setEditingForm(formWithFields);
-    form.reset({
-      name: formWithFields.name,
-      description: formWithFields.description || "",
-      fields: formWithFields.fields
-        .sort((a, b) => a.sortOrder - b.sortOrder)
-        .map((f) => ({
-          label: f.label,
-          fieldType: f.fieldType as any,
-          placeholder: f.placeholder || "",
-          required: f.required === 1,
-          sortOrder: f.sortOrder,
-        })),
-    });
+    try {
+      const response = await fetch(`/api/crm/forms/${formToEdit.id}`, {
+        credentials: 'include', // Ensure cookies are sent
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch form: ${response.statusText}`);
+      }
+      
+      const formWithFields: FormWithFields = await response.json();
+      
+      // Validate that fields exist and is an array
+      if (!formWithFields.fields || !Array.isArray(formWithFields.fields)) {
+        throw new Error("Form fields are missing or invalid");
+      }
+      
+      setEditingForm(formWithFields);
+      form.reset({
+        name: formWithFields.name,
+        description: formWithFields.description || "",
+        fields: formWithFields.fields
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((f) => ({
+            label: f.label,
+            fieldType: f.fieldType as any,
+            placeholder: f.placeholder || "",
+            required: f.required === 1,
+            sortOrder: f.sortOrder,
+          })),
+      });
+      setIsCreateOpen(true);
+    } catch (error: any) {
+      console.error("Failed to load form for editing:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load form for editing",
+        variant: "destructive",
+      });
+    }
   };
 
   const getEmbedCode = (publicId: string) => {
