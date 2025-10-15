@@ -471,10 +471,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch and store GA4 data
       if (ga4Integration && ga4Integration.ga4PropertyId && ga4Integration.accessToken) {
-        const { fetchGA4Data } = await import("./lib/googleOAuth");
+        const { fetchGA4Data, fetchGA4KeyEvents } = await import("./lib/googleOAuth");
         const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end, clientId);
         
-        // Store GA4 metrics
+        // Fetch conversions data if lead event is configured
+        let conversionsData: { rows?: Array<{ dimensionValues?: Array<{ value?: string }>, metricValues?: Array<{ value?: string }> }> } = { rows: [] };
+        if (ga4Integration.ga4LeadEventName) {
+          try {
+            conversionsData = await fetchGA4KeyEvents(
+              ga4Integration.accessToken,
+              ga4Integration.ga4PropertyId,
+              ga4Integration.ga4LeadEventName,
+              start,
+              end,
+              clientId
+            );
+          } catch (error) {
+            console.error("Error fetching GA4 Key Events during sync:", error);
+          }
+        }
+        
+        // Create a map of date -> conversions for quick lookup
+        const conversionsMap = new Map<string, number>();
+        for (const row of conversionsData.rows || []) {
+          const dateValue = row.dimensionValues?.[0]?.value;
+          const conversions = parseInt(row.metricValues?.[0]?.value || '0');
+          if (dateValue) {
+            conversionsMap.set(dateValue, conversions);
+          }
+        }
+        
+        // Store GA4 metrics with conversions
         for (const row of ga4Data.rows || []) {
           const dateValue = row.dimensionValues?.[0]?.value;
           const sessions = parseInt(row.metricValues?.[0]?.value || '0');
@@ -485,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               clientId: clientId,
               source: 'GA4',
               sessions: sessions,
-              conversions: 0,
+              conversions: conversionsMap.get(dateValue) || 0,
               clicks: 0,
               impressions: 0,
               spend: '0'

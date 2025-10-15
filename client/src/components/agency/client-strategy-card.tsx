@@ -1,9 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, BrainCircuit, Target, MessageSquare, TrendingUp, TrendingDown, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Loader2, BrainCircuit, Target, MessageSquare, TrendingUp, TrendingDown, AlertCircle, CheckCircle, HelpCircle, Edit2 } from "lucide-react";
 import { ClientObjective } from "@shared/schema";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface StrategyCardData {
   businessContext: string | null;
