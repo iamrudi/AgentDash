@@ -16,6 +16,10 @@ import {
   Target,
   Settings,
   Sparkles,
+  Briefcase,
+  DollarSign,
+  BarChart2,
+  Building,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -78,6 +82,36 @@ const menuGroups = [
         title: "SEO Audit",
         url: "/agency/seo-audit",
         icon: BarChartHorizontal,
+        notificationKey: null,
+      },
+    ],
+  },
+  {
+    title: "CRM",
+    icon: Briefcase,
+    items: [
+      {
+        title: "Dashboard",
+        url: "/agency/crm/dashboard",
+        icon: BarChart2,
+        notificationKey: null,
+      },
+      {
+        title: "Companies",
+        url: "/agency/crm/companies",
+        icon: Building,
+        notificationKey: null,
+      },
+      {
+        title: "Contacts",
+        url: "/agency/crm/contacts",
+        icon: Users,
+        notificationKey: null,
+      },
+      {
+        title: "Deals",
+        url: "/agency/crm/deals",
+        icon: DollarSign,
         notificationKey: null,
       },
     ],

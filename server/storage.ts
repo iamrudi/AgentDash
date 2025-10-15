@@ -32,6 +32,12 @@ import {
   type Notification,
   type InsertNotification,
   type Agency,
+  type Company,
+  type InsertCompany,
+  type Contact,
+  type InsertContact,
+  type Deal,
+  type InsertDeal,
   users,
   profiles,
   clients,
@@ -49,6 +55,9 @@ import {
   clientMessages,
   notifications,
   agencies,
+  companies,
+  contacts,
+  deals,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -190,6 +199,27 @@ export interface IStorage {
   archiveNotification(id: string, userId: string): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
   getUnreadNotificationCount(userId: string): Promise<number>;
+  
+  // CRM - Companies
+  getCompaniesByAgencyId(agencyId: string): Promise<Company[]>;
+  getCompanyById(id: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: string, data: Partial<Company>): Promise<Company>;
+  deleteCompany(id: string): Promise<void>;
+  
+  // CRM - Contacts
+  getContactsByAgencyId(agencyId: string): Promise<Contact[]>;
+  getContactById(id: string): Promise<Contact | undefined>;
+  createContact(contact: InsertContact): Promise<Contact>;
+  updateContact(id: string, data: Partial<Contact>): Promise<Contact>;
+  deleteContact(id: string): Promise<void>;
+  
+  // CRM - Deals
+  getDealsByAgencyId(agencyId: string): Promise<Deal[]>;
+  getDealById(id: string): Promise<Deal | undefined>;
+  createDeal(deal: InsertDeal): Promise<Deal>;
+  updateDeal(id: string, data: Partial<Deal>): Promise<Deal>;
+  deleteDeal(id: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -1487,6 +1517,93 @@ export class DbStorage implements IStorage {
         eq(notifications.isArchived, "false")
       ));
     return result.length;
+  }
+
+  // CRM - Companies
+  async getCompaniesByAgencyId(agencyId: string): Promise<Company[]> {
+    return await db.select().from(companies)
+      .where(eq(companies.agencyId, agencyId))
+      .orderBy(desc(companies.createdAt));
+  }
+
+  async getCompanyById(id: string): Promise<Company | undefined> {
+    const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createCompany(company: InsertCompany): Promise<Company> {
+    const result = await db.insert(companies).values(company).returning();
+    return result[0];
+  }
+
+  async updateCompany(id: string, data: Partial<Company>): Promise<Company> {
+    const result = await db.update(companies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(companies.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCompany(id: string): Promise<void> {
+    await db.delete(companies).where(eq(companies.id, id));
+  }
+
+  // CRM - Contacts
+  async getContactsByAgencyId(agencyId: string): Promise<Contact[]> {
+    return await db.select().from(contacts)
+      .where(eq(contacts.agencyId, agencyId))
+      .orderBy(desc(contacts.createdAt));
+  }
+
+  async getContactById(id: string): Promise<Contact | undefined> {
+    const result = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createContact(contact: InsertContact): Promise<Contact> {
+    const result = await db.insert(contacts).values(contact).returning();
+    return result[0];
+  }
+
+  async updateContact(id: string, data: Partial<Contact>): Promise<Contact> {
+    const result = await db.update(contacts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(contacts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteContact(id: string): Promise<void> {
+    await db.delete(contacts).where(eq(contacts.id, id));
+  }
+
+  // CRM - Deals
+  async getDealsByAgencyId(agencyId: string): Promise<Deal[]> {
+    return await db.select().from(deals)
+      .where(eq(deals.agencyId, agencyId))
+      .orderBy(desc(deals.createdAt));
+  }
+
+  async getDealById(id: string): Promise<Deal | undefined> {
+    const result = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createDeal(deal: InsertDeal): Promise<Deal> {
+    const result = await db.insert(deals).values(deal).returning();
+    return result[0];
+  }
+
+  async updateDeal(id: string, data: Partial<Deal>): Promise<Deal> {
+    const result = await db.update(deals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(deals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDeal(id: string): Promise<void> {
+    await db.delete(deals).where(eq(deals.id, id));
   }
 }
 

@@ -1,0 +1,384 @@
+Of course. Here is a clear, consolidated prompt you can provide to your Replit AI to implement the CRM functionality we have designed. This prompt contains all the necessary context, code, and architectural guidelines.
+
+Replit AI Prompt:
+Objective: Your mission is to integrate a new CRM (Customer Relationship Management) module into the AgentDash application. You will create the foundational database schema, add the navigation links, and build the full-stack functionality for creating a new "Company" entity.
+
+Adhere strictly to the project's existing technology stack, architectural patterns, and security principles, particularly regarding multi-tenancy.
+
+Step 1: Update the Database Schema
+Modify the shared/schema.ts file to include the new tables for the CRM. Add the following Drizzle schema definitions after the existing projects table.
+
+File: shared/schema.ts
+
+TypeScript
+
+// ... (existing schema definitions for projects)
+
+// =================================================================
+// CRM Schema
+// =================================================================
+
+export const companyTypeEnum = pgEnum('company_type', ['customer', 'supplier', 'partner', 'lead']);
+
+export const companies = pgTable('companies', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  website: text('website'),
+  phone: text('phone'),
+  address: text('address'),
+  type: companyTypeEnum('type').default('lead'),
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const contacts = pgTable('contacts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email').notNull().unique(),
+  phone: text('phone'),
+  companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
+  clientId: uuid('client_id').references(() => users.id, {
+    onDelete: 'set null',
+  }),
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const deals = pgTable('deals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  stage: text('stage').default('lead').notNull(), // e.g., lead, qualified, proposal, closed-won
+  value: integer('value'), // Store in cents
+  closeDate: date('close_date'),
+  contactId: uuid('contact_id')
+    .notNull()
+    .references(() => contacts.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => companies.id),
+  ownerId: uuid('owner_id').references(() => users.id),
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ... (rest of the schema)
+Step 2: Update the Agency Sidebar Navigation
+Modify client/src/components/agency-sidebar.tsx to add a new "CRM" navigation group. Import the necessary icons from lucide-react and insert the new menu object into the navGroups array as shown below.
+
+File: client/src/components/agency-sidebar.tsx
+
+TypeScript
+
+// ... (imports)
+import {
+  // ... (existing icons)
+  Users,
+  Building,
+  DollarSign,
+  Briefcase,
+  BarChart2,
+} from 'lucide-react';
+
+// ...
+
+const navGroups = [
+  {
+    title: 'Workspace',
+    items: [
+      {
+        href: '/agency',
+        label: 'Dashboard',
+        icon: LayoutDashboard,
+        exact: true,
+      },
+      // START: Add this new CRM block
+      {
+        label: 'CRM',
+        icon: Briefcase,
+        subItems: [
+          {
+            href: '/agency/crm/dashboard',
+            label: 'Dashboard',
+            icon: BarChart2,
+          },
+          { href: '/agency/crm/companies', label: 'Companies', icon: Building },
+          { href: '/agency/crm/contacts', label: 'Contacts', icon: Users },
+          { href: '/agency/crm/deals', label: 'Deals', icon: DollarSign },
+        ],
+      },
+      // END: New CRM block
+      {
+        href: '/agency/clients',
+        label: 'Clients',
+        icon: Users,
+      },
+      // ... (rest of the navigation items)
+    ],
+  },
+  // ... (rest of the navGroups)
+];
+
+// ... (rest of the component)
+Step 3: Create the Backend API for Companies
+First, create a new router file for all CRM-related endpoints. This route must enforce tenant isolation by using the agencyId from the authenticated user's session (req.user).
+
+New File: server/routes/crm.ts
+
+TypeScript
+
+import { Router } from 'express';
+import { db } from '../db';
+import * as schema from '../../shared/schema';
+import { requireAuth } from '../middleware/auth';
+import { z } from 'zod';
+import { validateRequest } from 'zod-express-middleware';
+
+const crmRouter = Router();
+
+const createCompanySchema = z.object({
+  name: z.string().min(1, 'Company name is required.'),
+  website: z.string().url().optional().or(z.literal('')),
+  phone: z.string().optional(),
+  type: z.enum(schema.companyTypeEnum.enumValues).default('lead'),
+});
+
+crmRouter.post(
+  '/companies',
+  requireAuth,
+  validateRequest({ body: createCompanySchema }),
+  async (req, res, next) => {
+    try {
+      const { name, website, phone, type } = req.body;
+      const agencyId = req.user!.agencyId;
+
+      const [newCompany] = await db
+        .insert(schema.companies)
+        .values({
+          name,
+          website,
+          phone,
+          type,
+          agencyId,
+        })
+        .returning();
+
+      res.status(201).json(newCompany);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+export default crmRouter;
+Next, register this new router in the main API router file.
+
+File: server/routes.ts
+
+TypeScript
+
+// ... (other imports)
+import crmRouter from './routes/crm'; // <-- IMPORT
+
+const router = Router();
+
+// ... (existing routes)
+
+// Register the CRM routes
+router.use('/api/crm', requireAuth, crmRouter); // <-- ADD THIS LINE
+
+// ... (rest of the routes)
+
+export default router;
+Step 4: Create the Frontend "Create Company" Form
+Create a new reusable dialog component for the form. Use react-hook-form, zod, Shadcn/UI components, and TanStack Query (useMutation) for a robust implementation.
+
+New File: client/src/components/crm/create-company-dialog.tsx
+
+TypeScript
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
+import { useState } from 'react';
+
+const formSchema = z.object({
+  name: z.string().min(1, 'Company name is required.'),
+  website: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  type: z.enum(['customer', 'supplier', 'partner', 'lead']).default('lead'),
+});
+
+type FormData = z.infer<typeof formSchema>;
+
+async function createCompany(data: FormData) {
+  const response = await fetch('/api/crm/companies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create company');
+  }
+  return response.json();
+}
+
+export function CreateCompanyDialog() {
+  const [isOpen, setIsOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: '',
+      website: '',
+      phone: '',
+      type: 'lead',
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: createCompany,
+    onSuccess: () => {
+      toast({ title: 'Success', description: 'Company created successfully.' });
+      queryClient.invalidateQueries({ queryKey: ['companies'] });
+      setIsOpen(false);
+      form.reset();
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Could not create company. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const onSubmit = (data: FormData) => {
+    mutation.mutate(data);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button>Create Company</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Create New Company</DialogTitle>
+          <DialogDescription>
+            Add a new company to your CRM. Click save when you're done.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Company Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Acme Inc." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="website"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Website</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://acme.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+1 (555) 123-4567" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="partner">Partner</SelectItem>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex justify-end pt-4">
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? 'Saving...' : 'Save Company'}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

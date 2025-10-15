@@ -34,7 +34,7 @@ export const profiles = pgTable("profiles", {
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   companyName: text("company_name").notNull(),
-  profileId: uuid("profile_id").notNull().unique().references(() => profiles.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }), // Every client belongs to an agency
   businessContext: text("business_context"), // Strategic business context for AI recommendations
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
@@ -117,6 +117,61 @@ export const invoiceLineItems = pgTable("invoice_line_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   invoiceIdIdx: index("invoice_line_items_invoice_id_idx").on(table.invoiceId),
+}));
+
+// =================================================================
+// CRM SCHEMA - Customer Relationship Management
+// =================================================================
+
+// COMPANIES
+export const companies = pgTable("companies", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  website: text("website"),
+  phone: text("phone"),
+  address: text("address"),
+  type: text("type").default("lead"), // 'customer', 'supplier', 'partner', 'lead'
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("companies_agency_id_idx").on(table.agencyId),
+}));
+
+// CONTACTS
+export const contacts = pgTable("contacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  companyId: uuid("company_id").references(() => companies.id, { onDelete: "set null" }),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("contacts_agency_id_idx").on(table.agencyId),
+  companyIdIdx: index("contacts_company_id_idx").on(table.companyId),
+}));
+
+// DEALS
+export const deals = pgTable("deals", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  stage: text("stage").default("lead").notNull(), // 'lead', 'qualified', 'proposal', 'closed-won', 'closed-lost'
+  value: integer("value"), // Store in cents
+  closeDate: date("close_date"),
+  contactId: uuid("contact_id").notNull().references(() => contacts.id, { onDelete: "cascade" }),
+  companyId: uuid("company_id").references(() => companies.id, { onDelete: "set null" }),
+  ownerId: uuid("owner_id").references(() => profiles.id, { onDelete: "set null" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("deals_agency_id_idx").on(table.agencyId),
+  contactIdIdx: index("deals_contact_id_idx").on(table.contactId),
+  companyIdIdx: index("deals_company_id_idx").on(table.companyId),
 }));
 
 // Type definitions for jsonb fields
@@ -365,6 +420,25 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
   createdAt: true,
 });
 
+// CRM Insert Schemas
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDealSchema = createInsertSchema(deals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Admin user creation schemas
 export const createClientUserSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -436,6 +510,16 @@ export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 
+// CRM Types
+export type Company = typeof companies.$inferSelect;
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+
+export type Deal = typeof deals.$inferSelect;
+export type InsertDeal = z.infer<typeof insertDealSchema>;
+
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };
 export type TaskWithProject = Task & { project?: Project };
@@ -444,3 +528,6 @@ export type InvoiceWithLineItems = Invoice & { lineItems?: InvoiceLineItem[] };
 export type InvoiceWithClientAndLineItems = Invoice & { client?: Client; lineItems?: InvoiceLineItem[] };
 export type InitiativeWithClient = Initiative & { client?: Client };
 export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };
+export type CompanyWithContacts = Company & { contacts?: Contact[] };
+export type DealWithContact = Deal & { contact?: Contact };
+export type DealWithCompany = Deal & { company?: Company };
