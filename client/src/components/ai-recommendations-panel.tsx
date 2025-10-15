@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Client } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getAuthUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
@@ -95,6 +97,8 @@ export function AIRecommendationsPanel({
   const [selectedClientId, setSelectedClientId] = useState<string>(preSelectedClientId || "");
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
   const [includeCompetitors, setIncludeCompetitors] = useState(false);
+  const [competitorDomains, setCompetitorDomains] = useState<string[]>([]);
+  const [newCompetitorDomain, setNewCompetitorDomain] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState("");
@@ -104,14 +108,7 @@ export function AIRecommendationsPanel({
   });
 
   const { data: connectionStatus, isError: connectionStatusError } = useQuery<ConnectionStatus>({
-    queryKey: ["/api/clients", selectedClientId, "connection-status"],
-    queryFn: async () => {
-      const response = await fetch(`/api/clients/${selectedClientId}/connection-status`, {
-        credentials: "include"
-      });
-      if (!response.ok) throw new Error("Failed to fetch connection status");
-      return response.json();
-    },
+    queryKey: [`/api/clients/${selectedClientId}/connection-status`],
     enabled: !!selectedClientId,
   });
 
@@ -127,6 +124,7 @@ export function AIRecommendationsPanel({
       clientId: string;
       preset: Preset;
       includeCompetitors: boolean;
+      competitorDomains?: string[];
     }) => {
       setIsGenerating(true);
       setGenerationProgress("Collecting GA4 data...");
@@ -136,10 +134,16 @@ export function AIRecommendationsPanel({
       setTimeout(() => setGenerationProgress("Analyzing DataForSEO keywords..."), 2000);
       setTimeout(() => setGenerationProgress("Generating AI recommendations..."), 3000);
       
-      return await apiRequest("POST", `/api/agency/clients/${data.clientId}/generate-recommendations`, {
+      const payload: any = {
         preset: data.preset,
-        includeCompetitors: data.includeCompetitors
-      });
+        includeCompetitors: data.includeCompetitors,
+      };
+      
+      if (data.competitorDomains && data.competitorDomains.length > 0) {
+        payload.competitorDomains = data.competitorDomains;
+      }
+      
+      return await apiRequest("POST", `/api/agency/clients/${data.clientId}/generate-recommendations`, payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/agency/initiatives"] });
@@ -162,6 +166,38 @@ export function AIRecommendationsPanel({
     },
   });
 
+  const handleAddCompetitor = () => {
+    if (!newCompetitorDomain.trim()) return;
+    
+    // Basic URL validation
+    const domain = newCompetitorDomain.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    if (competitorDomains.includes(domain)) {
+      toast({
+        title: "Duplicate domain",
+        description: "This competitor is already added",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (competitorDomains.length >= 5) {
+      toast({
+        title: "Limit reached",
+        description: "Maximum 5 competitors allowed",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setCompetitorDomains([...competitorDomains, domain]);
+    setNewCompetitorDomain("");
+  };
+
+  const handleRemoveCompetitor = (domain: string) => {
+    setCompetitorDomains(competitorDomains.filter(d => d !== domain));
+  };
+
   const handlePresetClick = (preset: Preset) => {
     if (!selectedClientId) {
       toast({
@@ -172,12 +208,19 @@ export function AIRecommendationsPanel({
       return;
     }
 
-    setSelectedPreset(preset);
-    generateMutation.mutate({
+    const payload: any = {
       clientId: selectedClientId,
       preset,
       includeCompetitors,
-    });
+    };
+    
+    // Only include competitorDomains if competitors are enabled and domains exist
+    if (includeCompetitors && competitorDomains.length > 0) {
+      payload.competitorDomains = competitorDomains;
+    }
+    
+    setSelectedPreset(preset);
+    generateMutation.mutate(payload);
   };
 
   const selectedClient = clients?.find(c => c.id === selectedClientId);
@@ -295,17 +338,64 @@ export function AIRecommendationsPanel({
               })}
             </div>
 
-            {/* Competitor Toggle */}
-            <div className="flex items-center gap-2 p-3 border rounded-md">
-              <Checkbox
-                id="include-competitors"
-                checked={includeCompetitors}
-                onCheckedChange={(checked) => setIncludeCompetitors(checked as boolean)}
-                data-testid="checkbox-include-competitors"
-              />
-              <Label htmlFor="include-competitors" className="cursor-pointer flex-1">
-                Include competitor comparison
-              </Label>
+            {/* Competitor Analysis */}
+            <div className="space-y-3 p-3 border rounded-md">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="include-competitors"
+                  checked={includeCompetitors}
+                  onCheckedChange={(checked) => setIncludeCompetitors(checked as boolean)}
+                  data-testid="checkbox-include-competitors"
+                />
+                <Label htmlFor="include-competitors" className="cursor-pointer flex-1">
+                  Include competitor comparison
+                </Label>
+              </div>
+              
+              {includeCompetitors && (
+                <div className="space-y-2 pl-6">
+                  <Label className="text-xs text-muted-foreground">Add competitor domains (max 5)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="example.com"
+                      value={newCompetitorDomain}
+                      onChange={(e) => setNewCompetitorDomain(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCompetitor()}
+                      data-testid="input-competitor-domain"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleAddCompetitor}
+                      disabled={!newCompetitorDomain.trim()}
+                      data-testid="button-add-competitor"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {competitorDomains.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {competitorDomains.map((domain) => (
+                        <Badge
+                          key={domain}
+                          variant="secondary"
+                          className="gap-1 pl-2 pr-1"
+                          data-testid={`badge-competitor-${domain}`}
+                        >
+                          {domain}
+                          <button
+                            onClick={() => handleRemoveCompetitor(domain)}
+                            className="ml-1 hover:bg-destructive/20 rounded-sm p-0.5"
+                            data-testid={`button-remove-competitor-${domain}`}
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Advanced Options */}

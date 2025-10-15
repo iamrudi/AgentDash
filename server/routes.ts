@@ -602,10 +602,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/agency/clients/:clientId/generate-recommendations", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const { preset, includeCompetitors } = req.body;
+      
+      // Validate request body
+      const generateRecommendationsSchema = z.object({
+        preset: z.enum(["quick-wins", "strategic-growth", "full-audit"]),
+        includeCompetitors: z.boolean().default(false),
+        competitorDomains: z.array(z.string()).max(5).optional()
+      });
+      
+      const validatedData = generateRecommendationsSchema.parse(req.body);
       const { generateAIRecommendations } = await import("./ai-analyzer");
       
-      // TODO: Update AI analyzer to use preset configuration
+      // TODO: Update AI analyzer to use preset configuration and competitor domains
       // For now, using existing implementation
       const result = await generateAIRecommendations(storage, clientId);
       
@@ -619,6 +627,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         count: result.recommendationsCreated 
       });
     } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       res.status(500).json({ message: error.message });
     }
   });
