@@ -48,11 +48,17 @@ The platform is a full-stack JavaScript application using React for the frontend
 
 ### Feature Specifications
 - **Client Portal**: Dashboard (KPIs, action items), Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Comprehensive management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, SEO Website Audit Tool, and Content Co-pilot.
+- **Agency Admin Portal**: Comprehensive management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, SEO Website Audit Tool, Content Co-pilot, and CRM (Companies, Contacts, Deals).
 - **Staff Portal**: View and update assigned tasks.
 - **Strategic Initiative Workflow**: `Needs Review` → `Awaiting Approval` → `Approved` → `In Progress` → `Completed` → `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console (OAuth, site selection, performance metrics).
 - **SEO Integrations**: Data for SEO API (credential-based auth, stored encrypted in clientIntegrations table).
+- **CRM System (October 2025)**: Full-featured Customer Relationship Management with three modules:
+  - **Companies**: Company profiles with name, website, industry, size, notes
+  - **Contacts**: Contact management with first/last name, email, phone, job title, optional company association
+  - **Deals**: Sales pipeline with deal name, value (cents storage), stage (lead/qualified/proposal/closed-won/closed-lost), close date, required contact association, optional company association
+  - **Security**: Multi-layer tenant isolation - POST endpoints validate FK ownership before creation, GET endpoints filter cross-agency data. AgencyId excluded from client schemas and injected server-side
+  - **Data Relationships**: Contacts can be associated with companies; deals require contacts and optionally companies. Null handling uses "__NONE__" sentinel pattern for optional FK fields
 
 ### System Design Choices
 - **Multi-tenancy**: Defense-in-depth tenant isolation with three layers:
