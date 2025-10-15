@@ -452,6 +452,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientId } = req.params;
       const { daysToFetch = 30 } = req.body;
 
+      // Get client data to access leadEvents
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
       // Get GA4 integration
       let ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
       // Get GSC integration
@@ -474,14 +480,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { fetchGA4Data, fetchGA4KeyEvents } = await import("./lib/googleOAuth");
         const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end, clientId);
         
-        // Fetch conversions data if lead event is configured
+        // Fetch conversions data if lead events are configured
         let conversionsData: { rows?: Array<{ dimensionValues?: Array<{ value?: string }>, metricValues?: Array<{ value?: string }> }> } = { rows: [] };
-        if (ga4Integration.ga4LeadEventName) {
+        if (client.leadEvents && client.leadEvents.length > 0) {
           try {
+            // Join lead events array into comma-separated string (trim to avoid GA4 mismatches)
+            const leadEventsString = client.leadEvents.map(e => e.trim()).join(', ');
             conversionsData = await fetchGA4KeyEvents(
               ga4Integration.accessToken,
               ga4Integration.ga4PropertyId,
-              ga4Integration.ga4LeadEventName,
+              leadEventsString,
               start,
               end,
               clientId
