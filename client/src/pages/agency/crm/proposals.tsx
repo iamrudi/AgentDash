@@ -21,6 +21,7 @@ import {
   GripVertical,
   ChevronLeft,
   Loader2,
+  Download,
 } from "lucide-react";
 import {
   Select,
@@ -310,6 +311,42 @@ export default function ProposalBuilderPage() {
     });
   };
 
+  const handleExportPDF = async () => {
+    if (!proposal) return;
+    
+    try {
+      const user = await getAuthUser();
+      if (!user?.token) throw new Error("Not authenticated");
+
+      const response = await fetch(`/api/crm/proposals/${proposal.id}/export-pdf`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to export PDF");
+      }
+
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${proposal.name.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({ title: "PDF exported successfully" });
+    } catch (error) {
+      console.error("Export PDF error:", error);
+      toast({ title: "Failed to export PDF", variant: "destructive" });
+    }
+  };
+
   const selectedSection = sections.find(s => s.id === selectedSectionId);
 
   if (isLoadingProposal) {
@@ -410,6 +447,14 @@ export default function ProposalBuilderPage() {
             >
               <Save className="w-4 h-4 mr-2" />
               Save
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportPDF}
+              data-testid="button-export-pdf"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export PDF
             </Button>
             {proposal.status === "draft" && (
               <Button

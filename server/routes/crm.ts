@@ -4,7 +4,8 @@ import { requireAuth, requireRole, type AuthRequest } from "../middleware/supaba
 import { z } from "zod";
 import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema, insertProposalTemplateSchema, insertProposalSchema, insertProposalSectionSchema } from "@shared/schema";
 import { GoogleGenAI } from "@google/genai";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 const crmRouter = Router();
 
@@ -1174,7 +1175,6 @@ crmRouter.post("/proposals/:id/export-pdf", requireAuth, requireRole("Admin"), a
             <div>${contact.firstName} ${contact.lastName}</div>
             ${contact.email ? `<div>${contact.email}</div>` : ''}
             ${contact.phone ? `<div>${contact.phone}</div>` : ''}
-            ${contact.jobTitle ? `<div>${contact.jobTitle}</div>` : ''}
           </div>
           ` : ''}
           
@@ -1194,8 +1194,9 @@ crmRouter.post("/proposals/:id/export-pdf", requireAuth, requireRole("Admin"), a
 
     // Launch Puppeteer and generate PDF
     browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: "shell",
     });
 
     const page = await browser.newPage();
