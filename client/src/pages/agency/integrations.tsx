@@ -950,7 +950,9 @@ function ClientIntegrationCard({
               )}
               {ga4Status?.connected && (
                 <p className="text-xs text-muted-foreground">
-                  Lead Events: {(ga4Status as any).ga4LeadEventName || <span className="text-orange-500">Not configured</span>}
+                  Lead Events: {client.leadEvents && client.leadEvents.length > 0 
+                    ? client.leadEvents.join(', ') 
+                    : <span className="text-orange-500">Not configured</span>}
                 </p>
               )}
             </div>
@@ -965,7 +967,7 @@ function ClientIntegrationCard({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => onEditLeadEvent(client.id, ga4Status.ga4LeadEventName || "")}
+                  onClick={() => onEditLeadEvent(client.id, "")}
                   data-testid={`button-edit-lead-event-${client.id}`}
                 >
                   Edit Lead Events
