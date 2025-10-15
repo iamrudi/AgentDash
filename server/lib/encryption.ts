@@ -1,5 +1,33 @@
 import crypto from 'crypto';
 
+/**
+ * AES-256-GCM Encryption Module
+ * 
+ * CRITICAL SECURITY NOTES:
+ * 
+ * 1. ENCRYPTION_KEY Format:
+ *    - Must be exactly 32 bytes (256 bits)
+ *    - Recommended: base64-encoded (44 chars ending with '=')
+ *    - Generate using: node -e "console.log(crypto.randomBytes(32).toString('base64'))"
+ * 
+ * 2. ENCRYPTION_KEY Migration Warning:
+ *    ⚠️  Changing ENCRYPTION_KEY makes ALL existing encrypted data unreadable!
+ *    
+ *    Before changing ENCRYPTION_KEY:
+ *    a) Export all encrypted credentials from the database
+ *    b) Update the ENCRYPTION_KEY environment variable
+ *    c) Re-encrypt and update all credentials OR clear encrypted fields
+ *    d) Have users re-enter credentials through the Settings UI
+ * 
+ *    Affected tables: client_integrations, agency_integrations
+ *    Affected fields: *_token, *_iv, *_auth_tag, dataforseo_login, dataforseo_password
+ * 
+ * 3. Error Handling:
+ *    - Use safeDecryptCredential() for user-facing operations (better error messages)
+ *    - Use hasEncryptedCredentials() to check before attempting decryption
+ *    - Use decrypt() only when you're certain credentials exist and are valid
+ */
+
 // Encryption key from environment variable
 // CRITICAL: In production, this MUST be a 32-byte (256-bit) random key
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
@@ -131,4 +159,56 @@ export function encryptToken(token: string): EncryptedData {
  */
 export function decryptToken(encrypted: string, iv: string, authTag: string): string {
   return decrypt(encrypted, iv, authTag);
+}
+
+/**
+ * Safely checks if credentials are encrypted and available for decryption
+ * @param encrypted - The encrypted credential (can be null/undefined)
+ * @param iv - The initialization vector (can be null/undefined)
+ * @param authTag - The authentication tag (can be null/undefined)
+ * @returns true if all required fields are present, false otherwise
+ */
+export function hasEncryptedCredentials(
+  encrypted: string | null | undefined,
+  iv: string | null | undefined,
+  authTag: string | null | undefined
+): boolean {
+  return !!(encrypted && iv && authTag);
+}
+
+/**
+ * Safely decrypts credentials with user-friendly error handling
+ * Checks if credentials exist before attempting decryption
+ * @param encrypted - The encrypted credential
+ * @param iv - The initialization vector
+ * @param authTag - The authentication tag
+ * @param credentialName - Name of the credential for error messages (e.g., "DataForSEO login")
+ * @returns The decrypted credential
+ * @throws Error with user-friendly message if credentials are missing or decryption fails
+ */
+export function safeDecryptCredential(
+  encrypted: string | null | undefined,
+  iv: string | null | undefined,
+  authTag: string | null | undefined,
+  credentialName: string = 'credential'
+): string {
+  // Check if credentials exist before attempting decryption
+  if (!hasEncryptedCredentials(encrypted, iv, authTag)) {
+    throw new Error(
+      `${credentialName} not configured. Please configure your credentials in Settings.`
+    );
+  }
+
+  try {
+    return decrypt(encrypted!, iv!, authTag!);
+  } catch (error) {
+    // Check if this is an ENCRYPTION_KEY mismatch error
+    if (error instanceof Error && error.message.includes('Unsupported state or unable to authenticate data')) {
+      throw new Error(
+        `${credentialName} configuration is invalid (possibly due to encryption key change). ` +
+        `Please re-enter your credentials in Settings.`
+      );
+    }
+    throw error;
+  }
 }
