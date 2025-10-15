@@ -730,7 +730,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 3. Process Chat History with AI
-      const recentMessages = messages.slice(-15);
+      // Take last 30 messages (or all if less than 30) to capture more conversation history
+      const recentMessages = messages.slice(-30);
       const chatHistoryText = recentMessages.length > 0
         ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\n')
         : "No recent conversations.";

@@ -314,17 +314,26 @@ export async function analyzeChatHistory(
   chatHistory: string
 ): Promise<{ painPoints: string[]; recentWins: string[]; activeQuestions: string[] }> {
   try {
-    const systemPrompt = `You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights. Identify the client's frustrations, their successes, and any open questions they are waiting on. Be concise and extract only the most important points.`;
+    const systemPrompt = `You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights. 
+
+IMPORTANT: Even in casual or brief conversations, look for any Client concerns, questions, or positive feedback. Be perceptive and extract insights even from informal language. If a Client asks a question or expresses a need (even informally), capture it. If they seem happy or frustrated, note it.
+
+Focus on messages from the "Client" role - these are the most important for understanding their needs and sentiment.`;
 
     const prompt = `
     Here is the recent chat history between the agency and the client:
     ---
     ${chatHistory}
     ---
-    Based on this conversation, please extract the following:
-    1.  "painPoints": A list of specific problems, frustrations, or negative trends the client mentioned.
-    2.  "recentWins": A list of positive outcomes, successes, or happy comments from the client.
-    3.  "activeQuestions": A list of any specific, unanswered questions the client has.
+    Based on this conversation, extract actionable insights:
+    
+    1. **painPoints**: Problems, frustrations, concerns, or improvement requests from the Client (even if expressed casually like "can we improve X?"). Look for Client messages expressing dissatisfaction, concern, or desire for change.
+    
+    2. **recentWins**: Positive feedback, satisfaction, or happy comments from the Client. Even brief positive acknowledgments count (e.g., "great", "thanks", "love it").
+    
+    3. **activeQuestions**: Any unanswered questions or requests from the Client that need follow-up. Include questions about improving performance, traffic, conversions, or any service-related inquiries.
+    
+    If the conversation contains only greetings/small talk with no substantive content, return empty arrays. Otherwise, be perceptive and capture real insights even from brief messages.
     `;
 
     const response = await ai.models.generateContent({
