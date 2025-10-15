@@ -9,9 +9,18 @@ interface AIRecommendationResult {
   error?: string;
 }
 
+type Preset = "quick-wins" | "strategic-growth" | "full-audit";
+
+interface GenerateRecommendationsOptions {
+  preset: Preset;
+  includeCompetitors?: boolean;
+  competitorDomains?: string[];
+}
+
 export async function generateAIRecommendations(
   storage: IStorage,
-  clientId: string
+  clientId: string,
+  options: GenerateRecommendationsOptions = { preset: "full-audit" }
 ): Promise<AIRecommendationResult> {
   try {
     // 1. Get client info
@@ -95,12 +104,21 @@ export async function generateAIRecommendations(
       .map(o => o.description)
       .join("; ") || undefined;
 
-    // 11. Call Gemini AI to analyze and generate recommendations
+    // 11. Prepare competitor context if provided
+    let competitorContext: string | undefined;
+    if (options.includeCompetitors && options.competitorDomains && options.competitorDomains.length > 0) {
+      competitorContext = `Competitor domains to analyze against: ${options.competitorDomains.join(", ")}. 
+Include competitive analysis and opportunities to outperform these competitors.`;
+    }
+
+    // 12. Call Gemini AI to analyze and generate recommendations
     const aiRecommendations = await analyzeClientMetrics(
       client.companyName,
       formattedGA4,
       formattedGSC,
-      objectives
+      objectives,
+      options.preset,
+      competitorContext
     );
 
     // 12. Create initiative records from AI recommendations

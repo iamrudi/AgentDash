@@ -577,8 +577,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get GSC integration
       const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
       // Check DataForSEO - either client-level or agency-level with access
-      const clientIntegrations = await storage.getClientIntegrations(clientId);
-      const dataForSeoIntegration = clientIntegrations.find(i => i.service === 'DataForSEO');
+      const clientIntegrations = await storage.getAllIntegrationsByClientId(clientId);
+      const dataForSeoIntegration = clientIntegrations.find((i: any) => i.service === 'DataForSEO');
       
       res.json({
         ga4: {
@@ -613,9 +613,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = generateRecommendationsSchema.parse(req.body);
       const { generateAIRecommendations } = await import("./ai-analyzer");
       
-      // TODO: Update AI analyzer to use preset configuration and competitor domains
-      // For now, using existing implementation
-      const result = await generateAIRecommendations(storage, clientId);
+      // Call AI analyzer with preset and competitor configuration
+      const result = await generateAIRecommendations(storage, clientId, {
+        preset: validatedData.preset,
+        includeCompetitors: validatedData.includeCompetitors,
+        competitorDomains: validatedData.competitorDomains
+      });
       
       if (!result.success) {
         return res.status(400).json({ message: result.error });

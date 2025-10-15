@@ -39,21 +39,54 @@ interface RecommendationOutput {
   baselineValue: number;
 }
 
+type Preset = "quick-wins" | "strategic-growth" | "full-audit";
+
+const PRESET_CONFIGS = {
+  "quick-wins": {
+    focus: "Quick, low-effort, high-impact optimizations that can be implemented immediately",
+    areas: ["Title tag optimization", "Meta description improvements", "CTR enhancement", "Low-hanging keyword opportunities", "Technical quick fixes"],
+    count: "2-3",
+    taskComplexity: "Simple, actionable tasks (1-3 steps each)",
+    timeframe: "Can be completed within 1-2 weeks"
+  },
+  "strategic-growth": {
+    focus: "Long-term growth strategies and content roadmap",
+    areas: ["Content cluster development", "Keyword expansion strategies", "Landing page optimization", "Link building opportunities", "Authority building"],
+    count: "3-5",
+    taskComplexity: "Strategic initiatives with clear execution plans (3-5 steps each)",
+    timeframe: "1-3 month implementation timeline"
+  },
+  "full-audit": {
+    focus: "Comprehensive analysis across all marketing categories",
+    areas: ["Technical SEO", "Content optimization", "User experience", "Conversion funnel", "Traffic acquisition", "Performance issues"],
+    count: "5-8",
+    taskComplexity: "Mix of quick wins and strategic initiatives with detailed action plans",
+    timeframe: "Immediate to 3+ months"
+  }
+};
+
 export async function analyzeClientMetrics(
   clientName: string,
   ga4Metrics: MetricData[],
   gscMetrics: MetricData[],
-  objectives?: string
+  objectives?: string,
+  preset: Preset = "full-audit",
+  competitorContext?: string
 ): Promise<RecommendationOutput[]> {
   try {
+    const presetConfig = PRESET_CONFIGS[preset];
+    
     const systemPrompt = `You are an expert digital marketing strategist analyzing client performance data.
-Your task is to identify actionable opportunities and issues based on GA4 and Google Search Console metrics.
+
+ANALYSIS TYPE: ${preset.toUpperCase().replace("-", " ")}
+FOCUS: ${presetConfig.focus}
 
 Generate strategic recommendations that are:
 - Data-driven and specific
 - Actionable with clear next steps
 - Prioritized by impact
 - Include estimated costs where applicable
+- Aligned with the ${preset} preset requirements
 
 For each recommendation, provide:
 1. A concise title (max 60 characters)
@@ -63,20 +96,25 @@ For each recommendation, provide:
    - value: the specific value or finding
    - context (optional): brief explanation if needed
 4. A summary of the proposed action (1-2 sentences)
-5. Action tasks - a numbered list of specific, actionable steps
+5. Action tasks - specific, actionable steps (${presetConfig.taskComplexity})
 6. Impact level (High/Medium/Low)
 7. Estimated cost in USD (or 0 if no cost)
 8. The metric that triggered this recommendation
 9. Baseline value of that metric
 
 The observationInsights should contain 2-4 key data points that support your recommendation.
-The actionTasks should contain 3-5 specific steps the agency will take.
+
+PRESET REQUIREMENTS:
+- Focus areas: ${presetConfig.areas.join(", ")}
+- Number of recommendations: ${presetConfig.count}
+- Implementation timeframe: ${presetConfig.timeframe}
 
 Respond with a JSON array of recommendations.`;
 
     const metricsContext = `
 CLIENT: ${clientName}
 ${objectives ? `OBJECTIVES: ${objectives}` : ''}
+${competitorContext ? `\nCOMPETITOR ANALYSIS:\n${competitorContext}` : ''}
 
 GA4 METRICS (last 30 days):
 ${JSON.stringify(ga4Metrics, null, 2)}
@@ -84,12 +122,8 @@ ${JSON.stringify(ga4Metrics, null, 2)}
 GOOGLE SEARCH CONSOLE METRICS (last 30 days):
 ${JSON.stringify(gscMetrics, null, 2)}
 
-Analyze this data and generate 2-5 strategic recommendations focusing on:
-- Conversion optimization opportunities
-- Traffic growth strategies
-- User experience improvements
-- Search visibility enhancements
-- Performance issues that need attention
+Generate ${presetConfig.count} recommendations focusing on: ${presetConfig.areas.join(", ")}
+${competitorContext ? '\nInclude competitive insights and opportunities to outperform the specified competitors.' : ''}
 `;
 
     const response = await ai.models.generateContent({
