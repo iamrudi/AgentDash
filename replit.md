@@ -72,6 +72,17 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **API Documentation**: Built-in API docs with code examples (cURL, JavaScript, PHP/WordPress) for external system integrations
   - **External Integrations**: Direct API access allows WordPress forms, Contact Form 7, or custom systems to submit data and auto-create CRM records
   - **Validation**: Client-side and server-side validation, required field support, Zod schema with boolean/number coercion for required fields
+- **AI-Powered Proposal Builder (October 2025)**: Professional proposal creation tool with reusable templates and AI assistance:
+  - **Template Library**: Pre-built reusable sections (10 default templates across Core, Services, Pricing, Legal categories)
+  - **Template Categories**: Introduction, Executive Summary, Scope of Work (SEO/PPC/Content Marketing), Pricing Tables, Terms & Conditions, Next Steps
+  - **Merge Tags**: Dynamic content insertion with {{client.name}}, {{contact.firstName}}, {{deal.value}} placeholders
+  - **Markdown Support**: Full Markdown formatting for professional-looking proposals
+  - **AI Content Generation**: Gemini AI-powered section writing and refinement based on deal context
+  - **Deal Integration**: Proposals linked to CRM deals, auto-populated with client/contact/deal information
+  - **Workflow States**: Draft → Sent → Accepted/Rejected status tracking
+  - **Database Schema**: 3-table design (proposalTemplates, proposals, proposalSections) with JSONB content and sortOrder
+  - **Template Seeding**: `server/seed-templates.ts` script populates 10 high-quality templates with Markdown and merge tags
+  - **PDF Export**: Infrastructure implemented but blocked by Replit environment limitations (requires serverless deployment for Chromium)
 
 ### System Design Choices
 - **Multi-tenancy**: Defense-in-depth tenant isolation with three layers:
