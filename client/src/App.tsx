@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ClientLayout } from "@/components/client-layout";
+import { AgencyLayout } from "@/components/agency-layout";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
@@ -112,100 +113,132 @@ function Router() {
         </ProtectedRoute>
       </Route>
       
-      {/* Agency Portal */}
+      {/* Agency Portal - All routes wrapped in AgencyLayout */}
       <Route path="/agency">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyDashboard />
+          <AgencyLayout>
+            <AgencyDashboard />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/messages">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyMessages />
+          <AgencyLayout>
+            <AgencyMessages />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/tasks">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyTasks />
+          <AgencyLayout>
+            <AgencyTasks />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/projects">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyProjects />
+          <AgencyLayout>
+            <AgencyProjects />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/projects/:id">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyProjectDetail />
+          <AgencyLayout>
+            <AgencyProjectDetail />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/recommendations">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyRecommendations />
+          <AgencyLayout>
+            <AgencyRecommendations />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/clients">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyClients />
+          <AgencyLayout>
+            <AgencyClients />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/staff">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyStaff />
+          <AgencyLayout>
+            <AgencyStaff />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/users">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyUsers />
+          <AgencyLayout>
+            <AgencyUsers />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/integrations">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyIntegrations />
+          <AgencyLayout>
+            <AgencyIntegrations />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/content-copilot">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyContentCopilot />
+          <AgencyLayout>
+            <AgencyContentCopilot />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/invoices">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyInvoices />
+          <AgencyLayout>
+            <AgencyInvoices />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/trash">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyTrash />
+          <AgencyLayout>
+            <AgencyTrash />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/seo-audit">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencySeoAudit />
+          <AgencyLayout>
+            <AgencySeoAudit />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/settings">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencySettings />
+          <AgencyLayout>
+            <AgencySettings />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
 
       <Route path="/agency/clients/:clientId">
         <ProtectedRoute allowedRoles={["Admin"]}>
-          <ClientDetail />
+          <AgencyLayout>
+            <ClientDetail />
+          </AgencyLayout>
         </ProtectedRoute>
       </Route>
       
