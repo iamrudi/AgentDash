@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getAuthUser } from "@/lib/auth";
+import { getPublicUrl } from "@/lib/public-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -230,7 +231,7 @@ export default function FormsPage() {
   };
 
   const getEmbedCode = (publicId: string) => {
-    const embedUrl = `${window.location.origin}/forms/embed/${publicId}`;
+    const embedUrl = `${getPublicUrl()}/forms/embed/${publicId}`;
     return `<iframe src="${embedUrl}" width="100%" height="600" frameborder="0"></iframe>`;
   };
 
@@ -602,7 +603,7 @@ export default function FormsPage() {
                 </p>
                 <div className="bg-muted p-3 rounded-md space-y-2">
                   <div className="font-mono text-sm">
-                    <span className="text-green-600">GET</span> {window.location.origin}/api/public/forms/{apiFormId}
+                    <span className="text-green-600">GET</span> {getPublicUrl()}/api/public/forms/{apiFormId}
                   </div>
                 </div>
                 
@@ -640,7 +641,7 @@ export default function FormsPage() {
                 </p>
                 <div className="bg-muted p-3 rounded-md space-y-2">
                   <div className="font-mono text-sm">
-                    <span className="text-blue-600">POST</span> {window.location.origin}/api/public/forms/{apiFormId}/submit
+                    <span className="text-blue-600">POST</span> {getPublicUrl()}/api/public/forms/{apiFormId}/submit
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Content-Type: application/json
@@ -681,7 +682,7 @@ export default function FormsPage() {
                 <details className="border rounded-md p-3">
                   <summary className="cursor-pointer font-semibold text-sm">cURL</summary>
                   <div className="mt-2 space-y-2">
-                    <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`curl -X POST '${window.location.origin}/api/public/forms/${apiFormId}/submit' \\
+                    <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`curl -X POST '${getPublicUrl()}/api/public/forms/${apiFormId}/submit' \\
   -H 'Content-Type: application/json' \\
   -d '{
     "formData": {
@@ -693,7 +694,7 @@ export default function FormsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(`curl -X POST '${window.location.origin}/api/public/forms/${apiFormId}/submit' -H 'Content-Type: application/json' -d '{"formData":{"1":"john@example.com","2":"John Doe"},"honeypot":""}'`)}
+                      onClick={() => copyToClipboard(`curl -X POST '${getPublicUrl()}/api/public/forms/${apiFormId}/submit' -H 'Content-Type: application/json' -d '{"formData":{"1":"john@example.com","2":"John Doe"},"honeypot":""}'`)}
                     >
                       <Copy className="w-3 h-3 mr-1" />
                       Copy
@@ -706,7 +707,7 @@ export default function FormsPage() {
                   <summary className="cursor-pointer font-semibold text-sm">JavaScript / Fetch</summary>
                   <div className="mt-2 space-y-2">
                     <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`// Submit form data
-const response = await fetch('${window.location.origin}/api/public/forms/${apiFormId}/submit', {
+const response = await fetch('${getPublicUrl()}/api/public/forms/${apiFormId}/submit', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -729,7 +730,7 @@ if (response.ok) {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => copyToClipboard(`const response = await fetch('${window.location.origin}/api/public/forms/${apiFormId}/submit', {
+                      onClick={() => copyToClipboard(`const response = await fetch('${getPublicUrl()}/api/public/forms/${apiFormId}/submit', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -766,7 +767,7 @@ function submit_to_agency_portal($contact_form) {
         'honeypot' => ''
     );
     
-    $response = wp_remote_post('${window.location.origin}/api/public/forms/${apiFormId}/submit', array(
+    $response = wp_remote_post('${getPublicUrl()}/api/public/forms/${apiFormId}/submit', array(
         'headers' => array('Content-Type' => 'application/json'),
         'body' => json_encode($data),
         'timeout' => 15,
@@ -791,7 +792,7 @@ function submit_to_agency_portal($contact_form) {
         'formData' => array('1' => $posted_data['your-email'], '2' => $posted_data['your-name']),
         'honeypot' => ''
     );
-    wp_remote_post('${window.location.origin}/api/public/forms/${apiFormId}/submit', array(
+    wp_remote_post('${getPublicUrl()}/api/public/forms/${apiFormId}/submit', array(
         'headers' => array('Content-Type' => 'application/json'),
         'body' => json_encode($data)
     ));
