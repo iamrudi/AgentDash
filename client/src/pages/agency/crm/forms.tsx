@@ -65,6 +65,7 @@ export default function FormsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingForm, setEditingForm] = useState<FormWithFields | null>(null);
   const [embedFormId, setEmbedFormId] = useState<string | null>(null);
+  const [apiFormId, setApiFormId] = useState<string | null>(null);
 
   const { data: forms, isLoading } = useQuery<Form[]>({
     queryKey: ["/api/crm/forms"],
@@ -456,7 +457,7 @@ export default function FormsPage() {
                   <div className="font-mono text-xs mt-1 break-all">ID: {formItem.publicId}</div>
                 </div>
               </CardContent>
-              <CardFooter className="flex gap-2">
+              <CardFooter className="flex gap-2 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -473,6 +474,15 @@ export default function FormsPage() {
                 >
                   <Code className="w-4 h-4 mr-1" />
                   Embed
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setApiFormId(formItem.publicId)}
+                  data-testid={`button-api-form-${formItem.id}`}
+                >
+                  <Code className="w-4 h-4 mr-1" />
+                  API
                 </Button>
                 <Button
                   variant="ghost"
@@ -525,6 +535,254 @@ export default function FormsPage() {
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Preview
                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* API Documentation Dialog */}
+      <Dialog open={!!apiFormId} onOpenChange={() => setApiFormId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>API Documentation</DialogTitle>
+            <DialogDescription>
+              Use these endpoints to connect external systems like WordPress, Contact Form 7, or custom integrations
+            </DialogDescription>
+          </DialogHeader>
+          
+          {apiFormId && (
+            <div className="space-y-6">
+              {/* API Base Info */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-sm">Form ID</h3>
+                <div className="bg-muted p-3 rounded-md font-mono text-sm break-all">
+                  {apiFormId}
+                </div>
+              </div>
+
+              {/* Endpoint 1: Get Form Metadata */}
+              <div className="space-y-2">
+                <h3 className="font-semibold">1. Get Form Metadata (Fields)</h3>
+                <p className="text-sm text-muted-foreground">
+                  Retrieve form fields and configuration. Useful to build dynamic forms.
+                </p>
+                <div className="bg-muted p-3 rounded-md space-y-2">
+                  <div className="font-mono text-sm">
+                    <span className="text-green-600">GET</span> {window.location.origin}/api/public/forms/{apiFormId}
+                  </div>
+                </div>
+                
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">Response Example</summary>
+                  <pre className="mt-2 text-xs overflow-x-auto">{`{
+  "name": "Contact Form",
+  "description": "Get in touch with us",
+  "fields": [
+    {
+      "id": "1",
+      "label": "Email",
+      "fieldType": "email",
+      "placeholder": "you@example.com",
+      "required": 1,
+      "sortOrder": 0
+    },
+    {
+      "id": "2",
+      "label": "Full Name",
+      "fieldType": "text",
+      "required": 1,
+      "sortOrder": 1
+    }
+  ]
+}`}</pre>
+                </details>
+              </div>
+
+              {/* Endpoint 2: Submit Form */}
+              <div className="space-y-2">
+                <h3 className="font-semibold">2. Submit Form Data</h3>
+                <p className="text-sm text-muted-foreground">
+                  Submit form data. The server will auto-create a Contact and Deal in your CRM if email and name are provided.
+                </p>
+                <div className="bg-muted p-3 rounded-md space-y-2">
+                  <div className="font-mono text-sm">
+                    <span className="text-blue-600">POST</span> {window.location.origin}/api/public/forms/{apiFormId}/submit
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Content-Type: application/json
+                  </div>
+                </div>
+                
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">Request Body Example</summary>
+                  <pre className="mt-2 text-xs overflow-x-auto">{`{
+  "formData": {
+    "1": "john@example.com",
+    "2": "John Doe",
+    "3": "+1234567890"
+  },
+  "honeypot": ""
+}`}</pre>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    • Use field IDs as keys in formData object<br />
+                    • Always include honeypot field (leave empty for real users)<br />
+                    • Required fields must be filled
+                  </p>
+                </details>
+
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">Response Example (Success)</summary>
+                  <pre className="mt-2 text-xs overflow-x-auto">{`{
+  "message": "Form submitted successfully",
+  "submissionId": "123"
+}`}</pre>
+                </details>
+              </div>
+
+              {/* Code Examples */}
+              <div className="space-y-3">
+                <h3 className="font-semibold">Code Examples</h3>
+                
+                {/* cURL Example */}
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">cURL</summary>
+                  <div className="mt-2 space-y-2">
+                    <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`curl -X POST '${window.location.origin}/api/public/forms/${apiFormId}/submit' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "formData": {
+      "1": "john@example.com",
+      "2": "John Doe"
+    },
+    "honeypot": ""
+  }'`}</pre>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(`curl -X POST '${window.location.origin}/api/public/forms/${apiFormId}/submit' -H 'Content-Type: application/json' -d '{"formData":{"1":"john@example.com","2":"John Doe"},"honeypot":""}'`)}
+                    >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                </details>
+
+                {/* JavaScript Example */}
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">JavaScript / Fetch</summary>
+                  <div className="mt-2 space-y-2">
+                    <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`// Submit form data
+const response = await fetch('${window.location.origin}/api/public/forms/${apiFormId}/submit', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    formData: {
+      '1': document.getElementById('email').value,
+      '2': document.getElementById('name').value,
+    },
+    honeypot: '', // Always empty for real users
+  }),
+});
+
+const result = await response.json();
+if (response.ok) {
+  console.log('Form submitted successfully:', result);
+} else {
+  console.error('Submission failed:', result);
+}`}</pre>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(`const response = await fetch('${window.location.origin}/api/public/forms/${apiFormId}/submit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    formData: { '1': email, '2': name },
+    honeypot: '',
+  }),
+});`)}
+                    >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                </details>
+
+                {/* PHP/WordPress Example */}
+                <details className="border rounded-md p-3">
+                  <summary className="cursor-pointer font-semibold text-sm">PHP (WordPress)</summary>
+                  <div className="mt-2 space-y-2">
+                    <pre className="text-xs overflow-x-auto bg-muted p-3 rounded">{`<?php
+// WordPress form submission handler
+add_action('wpcf7_mail_sent', 'submit_to_agency_portal');
+
+function submit_to_agency_portal($contact_form) {
+    $submission = WPCF7_Submission::get_instance();
+    $posted_data = $submission->get_posted_data();
+    
+    // Map your WordPress form fields to API field IDs
+    $data = array(
+        'formData' => array(
+            '1' => $posted_data['your-email'],    // Field ID 1: Email
+            '2' => $posted_data['your-name'],     // Field ID 2: Name
+            '3' => $posted_data['your-phone'],    // Field ID 3: Phone (if exists)
+        ),
+        'honeypot' => ''
+    );
+    
+    $response = wp_remote_post('${window.location.origin}/api/public/forms/${apiFormId}/submit', array(
+        'headers' => array('Content-Type' => 'application/json'),
+        'body' => json_encode($data),
+        'timeout' => 15,
+    ));
+    
+    if (is_wp_error($response)) {
+        error_log('Form submission failed: ' . $response->get_error_message());
+    } else {
+        error_log('Form submitted successfully');
+    }
+}
+?>`}</pre>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(`<?php
+add_action('wpcf7_mail_sent', 'submit_to_agency_portal');
+function submit_to_agency_portal($contact_form) {
+    $submission = WPCF7_Submission::get_instance();
+    $posted_data = $submission->get_posted_data();
+    $data = array(
+        'formData' => array('1' => $posted_data['your-email'], '2' => $posted_data['your-name']),
+        'honeypot' => ''
+    );
+    wp_remote_post('${window.location.origin}/api/public/forms/${apiFormId}/submit', array(
+        'headers' => array('Content-Type' => 'application/json'),
+        'body' => json_encode($data)
+    ));
+}
+?>`)}
+                    >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                </details>
+              </div>
+
+              {/* Important Notes */}
+              <div className="border-l-4 border-primary pl-4 space-y-2">
+                <h3 className="font-semibold text-sm">Important Notes</h3>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Always leave the <code className="bg-muted px-1 rounded">honeypot</code> field empty for legitimate submissions</li>
+                  <li>Use field IDs (not labels) as keys in the formData object</li>
+                  <li>The API automatically creates a Contact and Deal when both email and name are provided</li>
+                  <li>Duplicate email addresses are handled gracefully (no error thrown)</li>
+                  <li>Form fields can be retrieved from the metadata endpoint to build dynamic forms</li>
+                  <li>No authentication required for public endpoints</li>
+                </ul>
               </div>
             </div>
           )}

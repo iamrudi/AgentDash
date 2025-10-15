@@ -62,6 +62,16 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **CRUD Operations**: Complete Create, Read, Update, Delete functionality for all three modules with EditCompanyDialog, EditContactDialog, EditDealDialog components, proper form validation, query invalidation, and toast notifications
   - **Security**: Multi-layer tenant isolation - POST/PATCH/DELETE endpoints validate FK ownership and tenant isolation, GET endpoints filter cross-agency data. AgencyId excluded from client schemas and injected server-side
   - **Data Relationships**: Contacts can be associated with companies; deals require contacts and optionally companies. Null handling uses "__NONE__" sentinel pattern for optional FK fields
+- **Form Creator (October 2025)**: Lead capture form builder with external integration capabilities:
+  - **Form Builder**: Visual form designer with drag-and-drop field management (text, email, phone, textarea)
+  - **Database Schema**: 3 tables (forms, formFields, formSubmissions) with tenant isolation and soft delete
+  - **Public Endpoints**: No-auth required endpoints for form metadata (GET /api/public/forms/:publicId) and submission (POST /api/public/forms/:publicId/submit)
+  - **Auto Contact/Deal Creation**: Server automatically creates Contact and Deal when both valid email AND explicit name provided (no placeholder data fabrication)
+  - **Security Features**: Honeypot field for bot detection, server-side validation, handles duplicate emails gracefully
+  - **Embed Options**: Copy-to-clipboard iframe embed code for website integration
+  - **API Documentation**: Built-in API docs with code examples (cURL, JavaScript, PHP/WordPress) for external system integrations
+  - **External Integrations**: Direct API access allows WordPress forms, Contact Form 7, or custom systems to submit data and auto-create CRM records
+  - **Validation**: Client-side and server-side validation, required field support, Zod schema with boolean/number coercion for required fields
 
 ### System Design Choices
 - **Multi-tenancy**: Defense-in-depth tenant isolation with three layers:
