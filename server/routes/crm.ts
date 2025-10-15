@@ -263,10 +263,101 @@ crmRouter.get("/deals", requireAuth, requireRole("Admin"), async (req: AuthReque
     }
 
     const deals = await storage.getDealsByAgencyId(agencyId);
-    res.json(deals);
+    
+    // Join with contact and company data - verify tenant isolation
+    const dealsWithRelations = await Promise.all(
+      deals.map(async (deal) => {
+        const contact = await storage.getContactById(deal.contactId);
+        
+        // Verify contact belongs to this agency
+        if (contact && contact.agencyId !== agencyId) {
+          return { ...deal, contact: null, company: null };
+        }
+        
+        let company = null;
+        if (deal.companyId) {
+          const fetchedCompany = await storage.getCompanyById(deal.companyId);
+          
+          // Only return company if it belongs to the caller's agency
+          if (fetchedCompany && fetchedCompany.agencyId === agencyId) {
+            company = fetchedCompany;
+          }
+        }
+        
+        return { ...deal, contact, company };
+      })
+    );
+    
+    res.json(dealsWithRelations);
   } catch (error: any) {
     console.error("Get deals error:", error);
     res.status(500).json({ message: error.message || "Failed to fetch deals" });
+  }
+});
+
+// Create a new deal
+crmRouter.post("/deals", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Validate request body - exclude agencyId, ownerId as they come from server
+    const createDealSchema = insertDealSchema.omit({ 
+      agencyId: true, 
+      ownerId: true 
+    }).extend({
+      name: z.string().min(1, "Deal name is required"),
+      value: z.number().int().optional(),
+      stage: z.enum(["lead", "qualified", "proposal", "closed-won", "closed-lost"]).default("lead"),
+      closeDate: z.string().optional(),
+      contactId: z.string().uuid("Please select a contact"),
+      companyId: z.string().uuid().optional(),
+    });
+
+    const validatedData = createDealSchema.parse(req.body);
+
+    // Verify contactId belongs to caller's agency (required field - tenant isolation)
+    const contact = await storage.getContactById(validatedData.contactId);
+    
+    if (!contact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    
+    if (contact.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied: Contact belongs to different agency" });
+    }
+
+    // Verify companyId belongs to caller's agency (optional field - tenant isolation)
+    if (validatedData.companyId) {
+      const company = await storage.getCompanyById(validatedData.companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      if (company.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied: Company belongs to different agency" });
+      }
+    }
+
+    const dealData = {
+      ...validatedData,
+      agencyId,
+      ownerId: null, // Could be set to req.user.id if needed
+    };
+
+    const newDeal = await storage.createDeal(dealData);
+
+    res.status(201).json(newDeal);
+  } catch (error: any) {
+    console.error("Create deal error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create deal" });
   }
 });
 
