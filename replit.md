@@ -44,7 +44,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
 - **SEO Integrations**: Data for SEO API.
 - **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules, including CRUD operations and multi-layer tenant isolation.
-- **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints for submissions, auto-creation of CRM records, honeypot bot detection, embed options, and API documentation.
+- **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints for submissions, auto-creation of CRM records, honeypot bot detection, embed options, API documentation, and automatic production URL adaptation (uses VITE_PUBLIC_URL env variable or falls back to current domain).
 - **AI-Powered Proposal Builder**: Professional proposal creation tool with reusable templates, AI content generation (Gemini AI), merge tags, Markdown support, integration with CRM deals, workflow states, and secure PDF export.
 
 ### System Design Choices
