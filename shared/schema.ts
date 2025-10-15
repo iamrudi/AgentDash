@@ -174,6 +174,57 @@ export const deals = pgTable("deals", {
   companyIdIdx: index("deals_company_id_idx").on(table.companyId),
 }));
 
+// =================================================================
+// FORMS - Lead Capture Form Builder
+// =================================================================
+
+// FORMS (Custom lead capture forms for agencies)
+export const forms = pgTable("forms", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  publicId: uuid("public_id").defaultRandom().notNull().unique(), // For public access without exposing internal ID
+  name: text("name").notNull(),
+  description: text("description"),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  isDeleted: integer("is_deleted").default(0).notNull(), // Soft delete: 0 = active, 1 = deleted
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("forms_agency_id_idx").on(table.agencyId),
+  publicIdIdx: uniqueIndex("forms_public_id_idx").on(table.publicId),
+  agencyNameIdx: uniqueIndex("forms_agency_name_idx").on(table.agencyId, table.name), // Unique form name per agency
+}));
+
+// FORM FIELDS (Configurable fields for each form)
+export const formFields = pgTable("form_fields", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: uuid("form_id").notNull().references(() => forms.id, { onDelete: "cascade" }),
+  label: text("label").notNull(),
+  fieldType: text("field_type").notNull(), // 'text', 'email', 'textarea', 'phone'
+  placeholder: text("placeholder"),
+  required: integer("required").default(0).notNull(), // 0 = false, 1 = true
+  sortOrder: integer("sort_order").notNull(), // For ordering fields in the form
+  metadata: jsonb("metadata"), // Future: store additional field configurations
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  formIdIdx: index("form_fields_form_id_idx").on(table.formId),
+  sortOrderIdx: index("form_fields_sort_order_idx").on(table.formId, table.sortOrder),
+}));
+
+// FORM SUBMISSIONS (Captured lead data from public form submissions)
+export const formSubmissions = pgTable("form_submissions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  formId: uuid("form_id").notNull().references(() => forms.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  submission: jsonb("submission").notNull(), // Complete form data as JSON
+  ipAddress: text("ip_address"), // Track IP for rate limiting and analytics
+  userAgent: text("user_agent"), // Track user agent for analytics
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+}, (table) => ({
+  formIdIdx: index("form_submissions_form_id_idx").on(table.formId),
+  agencyIdIdx: index("form_submissions_agency_id_idx").on(table.agencyId),
+  submittedAtIdx: index("form_submissions_submitted_at_idx").on(table.submittedAt),
+}));
+
 // Type definitions for jsonb fields
 export type ObservationInsight = {
   label: string;
@@ -439,6 +490,24 @@ export const insertDealSchema = createInsertSchema(deals).omit({
   updatedAt: true,
 });
 
+// Form Insert Schemas
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  publicId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFormFieldSchema = createInsertSchema(formFields).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
 // Admin user creation schemas
 export const createClientUserSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -519,6 +588,19 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 
 export type Deal = typeof deals.$inferSelect;
 export type InsertDeal = z.infer<typeof insertDealSchema>;
+
+// Form Types
+export type Form = typeof forms.$inferSelect;
+export type InsertForm = z.infer<typeof insertFormSchema>;
+
+export type FormField = typeof formFields.$inferSelect;
+export type InsertFormField = z.infer<typeof insertFormFieldSchema>;
+
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+
+// Extended form types
+export type FormWithFields = Form & { fields?: FormField[] };
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };
