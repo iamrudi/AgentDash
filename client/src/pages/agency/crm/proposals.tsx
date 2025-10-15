@@ -315,12 +315,28 @@ export default function ProposalBuilderPage() {
     if (!proposal) return;
     
     try {
+      // Get auth user for token
       const user = await getAuthUser();
       if (!user?.token) throw new Error("Not authenticated");
 
-      // Open print view in new window
-      const printUrl = `/api/proposals/${proposal.id}/print`;
-      const printWindow = window.open(printUrl + `?token=${user.token}`, '_blank');
+      // Request short-lived print token from backend
+      const tokenResponse = await fetch(`/api/proposals/${proposal.id}/print-token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error("Failed to generate print token");
+      }
+
+      const { token } = await tokenResponse.json();
+
+      // Open print view in new window with short-lived token
+      const printUrl = `/api/proposals/${proposal.id}/print?token=${token}`;
+      const printWindow = window.open(printUrl, '_blank');
       
       if (!printWindow) {
         throw new Error("Please allow popups to export PDF");

@@ -58,7 +58,14 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   res.on('finish', () => {
     const duration = Date.now() - startTime;
     const contentLength = res.get('Content-Length') || 0;
-    const logMessage = `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms - ${contentLength} bytes`;
+    
+    // Mask sensitive token parameters to prevent logging
+    let sanitizedUrl = req.originalUrl;
+    if (sanitizedUrl.includes('token=')) {
+      sanitizedUrl = sanitizedUrl.replace(/([?&]token=)[^&]+/, '$1[REDACTED]');
+    }
+    
+    const logMessage = `${req.method} ${sanitizedUrl} ${res.statusCode} - ${duration}ms - ${contentLength} bytes`;
     
     const logContext = { requestId };
     

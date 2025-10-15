@@ -4260,49 +4260,71 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
-  // Proposal print endpoint (no auth middleware - handles token via query param)
+  // Generate short-lived print token (requires authentication)
+  app.post("/api/proposals/:id/print-token", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Verify user has access to this proposal
+      const proposal = await storage.getProposalById(id);
+      
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      if (proposal.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "You do not have permission to access this proposal" });
+      }
+      
+      if (req.user!.role !== 'Admin') {
+        return res.status(403).json({ message: "Only admins can export proposals" });
+      }
+      
+      // Generate short-lived print token
+      const { generatePrintToken } = await import('./lib/print-tokens');
+      const printToken = generatePrintToken(
+        id,
+        req.user!.id,
+        req.user!.agencyId,
+        req.user!.role
+      );
+      
+      res.json({ token: printToken });
+    } catch (error: any) {
+      console.error("Generate print token error:", error);
+      res.status(500).json({ message: error.message || "Failed to generate print token" });
+    }
+  });
+
+  // Proposal print endpoint (no auth middleware - validates short-lived token)
   // Note: Using /api/proposals instead of /api/crm to avoid the requireAuth middleware
   app.get("/api/proposals/:id/print", async (req, res) => {
     try {
-      // Support token-based auth via query params for new window
-      const token = req.query.token as string || req.headers.authorization?.replace('Bearer ', '');
-      
-      console.log('[PDF Print] Token received:', token ? `${token.substring(0, 20)}...` : 'none');
+      const { id } = req.params;
+      const token = req.query.token as string;
       
       if (!token) {
-        return res.status(401).send('<html><body><h1>Unauthorized</h1><p>Please log in to view this proposal.</p></body></html>');
+        return res.status(401).send('<html><body><h1>Unauthorized</h1><p>Print token required.</p></body></html>');
       }
 
-      // Verify token using Supabase Auth
-      const { supabaseAdmin } = await import('./lib/supabase');
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      // Validate short-lived print token
+      const { validatePrintToken } = await import('./lib/print-tokens');
+      const tokenData = validatePrintToken(token, id);
       
-      if (authError || !user) {
-        console.error('[PDF Print] Token verification failed:', authError?.message || 'User not found');
-        return res.status(401).send('<html><body><h1>Unauthorized</h1><p>Invalid or expired token.</p></body></html>');
+      if (!tokenData) {
+        return res.status(401).send('<html><body><h1>Unauthorized</h1><p>Invalid or expired print token.</p></body></html>');
       }
       
-      console.log('[PDF Print] Token verified successfully. User:', user.email);
-      
-      const agencyId = user.app_metadata?.agency_id;
-      const userRole = user.user_metadata?.role;
-
-      if (!agencyId || userRole !== 'Admin') {
-        console.log('[PDF Print] Access denied. AgencyId:', agencyId, 'Role:', userRole);
-        return res.status(403).send('<html><body><h1>Forbidden</h1><p>You do not have permission to access this resource.</p></body></html>');
-      }
-
-      const { id } = req.params;
-      console.log('[PDF Print] Fetching proposal:', id);
-
+      // Fetch proposal and verify tenant isolation
       const proposal = await storage.getProposalById(id);
       
       if (!proposal) {
         return res.status(404).send('<html><body><h1>Not Found</h1><p>Proposal not found.</p></body></html>');
       }
       
-      if (proposal.agencyId !== agencyId) {
-        return res.status(403).send('<html><body><h1>Forbidden</h1><p>You do not have permission to access this proposal.</p></body></html>');
+      // Critical: Verify token's agency matches proposal's agency (tenant isolation)
+      if (proposal.agencyId !== tokenData.agencyId) {
+        return res.status(403).send('<html><body><h1>Forbidden</h1><p>Invalid print token for this proposal.</p></body></html>');
       }
 
       // Fetch sections
