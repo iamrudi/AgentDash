@@ -4,6 +4,7 @@ import { requireAuth, requireRole, type AuthRequest } from "../middleware/supaba
 import { z } from "zod";
 import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema, insertProposalTemplateSchema, insertProposalSchema, insertProposalSectionSchema } from "@shared/schema";
 import { GoogleGenAI } from "@google/genai";
+import puppeteer from "puppeteer";
 
 const crmRouter = Router();
 
@@ -1038,6 +1039,194 @@ crmRouter.delete("/proposals/:id", requireAuth, requireRole("Admin"), async (req
   } catch (error: any) {
     console.error("Delete proposal error:", error);
     res.status(500).json({ message: error.message || "Failed to delete proposal" });
+  }
+});
+
+// Export proposal as PDF
+crmRouter.post("/proposals/:id/export-pdf", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  let browser;
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const proposal = await storage.getProposalById(id);
+    
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Fetch sections
+    const sections = await storage.getProposalSectionsByProposalId(id);
+    
+    // Fetch deal and contact info
+    const deal = await storage.getDealById(proposal.dealId);
+    let contact = null;
+    if (deal?.contactId) {
+      contact = await storage.getContactById(deal.contactId);
+    }
+
+    // Generate HTML for PDF
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+              line-height: 1.6;
+              color: #1a1a1a;
+              padding: 60px 80px;
+              background: white;
+            }
+            
+            .header {
+              margin-bottom: 60px;
+              padding-bottom: 30px;
+              border-bottom: 3px solid #0a84ff;
+            }
+            
+            .proposal-title {
+              font-size: 36px;
+              font-weight: 700;
+              margin-bottom: 12px;
+              color: #0a84ff;
+            }
+            
+            .meta-info {
+              font-size: 14px;
+              color: #666;
+            }
+            
+            .client-info {
+              margin-bottom: 40px;
+              padding: 20px;
+              background: #f5f5f7;
+              border-radius: 8px;
+            }
+            
+            .client-info h3 {
+              font-size: 16px;
+              margin-bottom: 8px;
+              color: #0a84ff;
+            }
+            
+            .section {
+              margin-bottom: 40px;
+              page-break-inside: avoid;
+            }
+            
+            .section-title {
+              font-size: 24px;
+              font-weight: 600;
+              margin-bottom: 16px;
+              color: #1a1a1a;
+            }
+            
+            .section-content {
+              font-size: 14px;
+              line-height: 1.8;
+              white-space: pre-wrap;
+            }
+            
+            .footer {
+              margin-top: 80px;
+              padding-top: 30px;
+              border-top: 1px solid #e0e0e0;
+              text-align: center;
+              color: #999;
+              font-size: 12px;
+            }
+            
+            @media print {
+              body {
+                padding: 40px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="proposal-title">${proposal.name}</h1>
+            <div class="meta-info">
+              Status: <strong>${proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}</strong> | 
+              Created: ${new Date(proposal.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </div>
+          </div>
+          
+          ${contact ? `
+          <div class="client-info">
+            <h3>Prepared For:</h3>
+            <div>${contact.firstName} ${contact.lastName}</div>
+            ${contact.email ? `<div>${contact.email}</div>` : ''}
+            ${contact.phone ? `<div>${contact.phone}</div>` : ''}
+            ${contact.jobTitle ? `<div>${contact.jobTitle}</div>` : ''}
+          </div>
+          ` : ''}
+          
+          ${sections.map(section => `
+            <div class="section">
+              <h2 class="section-title">${section.title}</h2>
+              <div class="section-content">${section.content}</div>
+            </div>
+          `).join('')}
+          
+          <div class="footer">
+            Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Launch Puppeteer and generate PDF
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    const pdf = await page.pdf({
+      format: 'A4',
+      margin: {
+        top: '20mm',
+        right: '20mm',
+        bottom: '20mm',
+        left: '20mm'
+      },
+      printBackground: true
+    });
+
+    await browser.close();
+    browser = null;
+
+    // Set headers for PDF download
+    const filename = `${proposal.name.replace(/[^a-z0-9]/gi, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdf);
+
+  } catch (error: any) {
+    console.error("Export PDF error:", error);
+    if (browser) {
+      await browser.close();
+    }
+    res.status(500).json({ message: error.message || "Failed to export PDF" });
   }
 });
 
