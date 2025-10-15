@@ -90,6 +90,14 @@ export default function AgencyClientsPage() {
     setAiPanelOpen(true);
   };
 
+  const handleAIPanelClose = (open: boolean) => {
+    setAiPanelOpen(open);
+    if (!open) {
+      // Reset selected client when panel closes
+      setAiPanelClientId("");
+    }
+  };
+
   // Get initials from company name
   const getInitials = (name: string) => {
     return name
@@ -470,7 +478,7 @@ export default function AgencyClientsPage() {
         {/* AI Recommendations Panel */}
         <AIRecommendationsPanel
           open={aiPanelOpen}
-          onOpenChange={setAiPanelOpen}
+          onOpenChange={handleAIPanelClose}
           preSelectedClientId={aiPanelClientId}
         />
     </div>
