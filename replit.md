@@ -28,6 +28,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI summaries and recommendations.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention.
 - **Invoice Automation**: Node-cron for retainers and Puppeteer for PDF generation.
+- **Proposal PDF Export**: Secure browser-native PDF printing with short-lived token system (64-char hex, 5-minute TTL, single-use), tenant isolation validation, and token masking in logs.
 - **Client-to-Account Manager Chat**: Real-time messaging with Server-Sent Events (SSE), multi-tenant filtering, and AI-powered conversation analysis.
 - **Chat with your Data**: AI-powered analytics data querying and recommendation generation.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization.
