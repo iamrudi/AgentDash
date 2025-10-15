@@ -175,6 +175,51 @@ export const deals = pgTable("deals", {
 }));
 
 // =================================================================
+// PROPOSALS - AI-Powered Proposal Builder
+// =================================================================
+
+// PROPOSAL TEMPLATES (Reusable content blocks for proposals)
+export const proposalTemplates = pgTable("proposal_templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").default("Core").notNull(), // 'Core', 'Services', 'Pricing', 'Case Studies', 'Custom'
+  content: text("content").notNull(), // Store as Markdown
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("proposal_templates_agency_id_idx").on(table.agencyId),
+  categoryIdx: index("proposal_templates_category_idx").on(table.category),
+}));
+
+// PROPOSALS (Custom proposals linked to deals)
+export const proposals = pgTable("proposals", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  status: text("status").default("draft").notNull(), // 'draft', 'sent', 'accepted', 'rejected'
+  dealId: uuid("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dealIdIdx: index("proposals_deal_id_idx").on(table.dealId),
+  agencyIdIdx: index("proposals_agency_id_idx").on(table.agencyId),
+}));
+
+// PROPOSAL SECTIONS (Individual sections within a proposal)
+export const proposalSections = pgTable("proposal_sections", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: uuid("proposal_id").notNull().references(() => proposals.id, { onDelete: "cascade" }),
+  content: text("content").notNull(), // Final Markdown content
+  order: integer("order").notNull(), // Display order
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  proposalIdIdx: index("proposal_sections_proposal_id_idx").on(table.proposalId),
+  orderIdx: index("proposal_sections_order_idx").on(table.proposalId, table.order),
+}));
+
+// =================================================================
 // FORMS - Lead Capture Form Builder
 // =================================================================
 
@@ -490,6 +535,25 @@ export const insertDealSchema = createInsertSchema(deals).omit({
   updatedAt: true,
 });
 
+// Proposal Insert Schemas
+export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProposalSchema = createInsertSchema(proposals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProposalSectionSchema = createInsertSchema(proposalSections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Form Insert Schemas
 export const insertFormSchema = createInsertSchema(forms).omit({
   id: true,
@@ -589,6 +653,16 @@ export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Deal = typeof deals.$inferSelect;
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 
+// Proposal Types
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
+
+export type Proposal = typeof proposals.$inferSelect;
+export type InsertProposal = z.infer<typeof insertProposalSchema>;
+
+export type ProposalSection = typeof proposalSections.$inferSelect;
+export type InsertProposalSection = z.infer<typeof insertProposalSectionSchema>;
+
 // Form Types
 export type Form = typeof forms.$inferSelect;
 export type InsertForm = z.infer<typeof insertFormSchema>;
@@ -613,3 +687,4 @@ export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };
 export type CompanyWithContacts = Company & { contacts?: Contact[] };
 export type DealWithContact = Deal & { contact?: Contact };
 export type DealWithCompany = Deal & { company?: Company };
+export type ProposalWithSections = Proposal & { sections?: ProposalSection[] };

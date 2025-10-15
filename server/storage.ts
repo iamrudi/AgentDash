@@ -44,6 +44,12 @@ import {
   type InsertFormField,
   type FormSubmission,
   type InsertFormSubmission,
+  type ProposalTemplate,
+  type InsertProposalTemplate,
+  type Proposal,
+  type InsertProposal,
+  type ProposalSection,
+  type InsertProposalSection,
   users,
   profiles,
   clients,
@@ -67,6 +73,9 @@ import {
   forms,
   formFields,
   formSubmissions,
+  proposalTemplates,
+  proposals,
+  proposalSections,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -240,6 +249,28 @@ export interface IStorage {
   softDeleteForm(id: string): Promise<void>;
   createFormSubmission(submission: InsertFormSubmission): Promise<FormSubmission>;
   getFormSubmissionsByAgencyId(agencyId: string): Promise<FormSubmission[]>;
+  
+  // Proposal Templates
+  getProposalTemplatesByAgencyId(agencyId: string): Promise<ProposalTemplate[]>;
+  getProposalTemplateById(id: string): Promise<ProposalTemplate | undefined>;
+  createProposalTemplate(template: InsertProposalTemplate): Promise<ProposalTemplate>;
+  updateProposalTemplate(id: string, data: Partial<ProposalTemplate>): Promise<ProposalTemplate>;
+  deleteProposalTemplate(id: string): Promise<void>;
+  
+  // Proposals
+  getProposalsByAgencyId(agencyId: string): Promise<Proposal[]>;
+  getProposalByDealId(dealId: string): Promise<Proposal | undefined>;
+  getProposalById(id: string): Promise<Proposal | undefined>;
+  createProposal(proposal: InsertProposal): Promise<Proposal>;
+  updateProposal(id: string, data: Partial<Proposal>): Promise<Proposal>;
+  deleteProposal(id: string): Promise<void>;
+  
+  // Proposal Sections
+  getProposalSectionsByProposalId(proposalId: string): Promise<ProposalSection[]>;
+  createProposalSection(section: InsertProposalSection): Promise<ProposalSection>;
+  updateProposalSection(id: string, data: Partial<ProposalSection>): Promise<ProposalSection>;
+  deleteProposalSection(id: string): Promise<void>;
+  bulkUpdateProposalSections(sections: Array<Partial<ProposalSection> & { id: string }>): Promise<ProposalSection[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1720,6 +1751,112 @@ export class DbStorage implements IStorage {
     return await db.select().from(formSubmissions)
       .where(eq(formSubmissions.agencyId, agencyId))
       .orderBy(desc(formSubmissions.submittedAt));
+  }
+
+  // Proposal Templates
+  async getProposalTemplatesByAgencyId(agencyId: string): Promise<ProposalTemplate[]> {
+    return await db.select().from(proposalTemplates)
+      .where(eq(proposalTemplates.agencyId, agencyId))
+      .orderBy(desc(proposalTemplates.createdAt));
+  }
+
+  async getProposalTemplateById(id: string): Promise<ProposalTemplate | undefined> {
+    const result = await db.select().from(proposalTemplates)
+      .where(eq(proposalTemplates.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createProposalTemplate(template: InsertProposalTemplate): Promise<ProposalTemplate> {
+    const result = await db.insert(proposalTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateProposalTemplate(id: string, data: Partial<ProposalTemplate>): Promise<ProposalTemplate> {
+    const result = await db.update(proposalTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(proposalTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProposalTemplate(id: string): Promise<void> {
+    await db.delete(proposalTemplates).where(eq(proposalTemplates.id, id));
+  }
+
+  // Proposals
+  async getProposalsByAgencyId(agencyId: string): Promise<Proposal[]> {
+    return await db.select().from(proposals)
+      .where(eq(proposals.agencyId, agencyId))
+      .orderBy(desc(proposals.createdAt));
+  }
+
+  async getProposalByDealId(dealId: string): Promise<Proposal | undefined> {
+    const result = await db.select().from(proposals)
+      .where(eq(proposals.dealId, dealId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getProposalById(id: string): Promise<Proposal | undefined> {
+    const result = await db.select().from(proposals)
+      .where(eq(proposals.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createProposal(proposal: InsertProposal): Promise<Proposal> {
+    const result = await db.insert(proposals).values(proposal).returning();
+    return result[0];
+  }
+
+  async updateProposal(id: string, data: Partial<Proposal>): Promise<Proposal> {
+    const result = await db.update(proposals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(proposals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProposal(id: string): Promise<void> {
+    await db.delete(proposals).where(eq(proposals.id, id));
+  }
+
+  // Proposal Sections
+  async getProposalSectionsByProposalId(proposalId: string): Promise<ProposalSection[]> {
+    return await db.select().from(proposalSections)
+      .where(eq(proposalSections.proposalId, proposalId))
+      .orderBy(proposalSections.order);
+  }
+
+  async createProposalSection(section: InsertProposalSection): Promise<ProposalSection> {
+    const result = await db.insert(proposalSections).values(section).returning();
+    return result[0];
+  }
+
+  async updateProposalSection(id: string, data: Partial<ProposalSection>): Promise<ProposalSection> {
+    const result = await db.update(proposalSections)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(proposalSections.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProposalSection(id: string): Promise<void> {
+    await db.delete(proposalSections).where(eq(proposalSections.id, id));
+  }
+
+  async bulkUpdateProposalSections(sections: Array<Partial<ProposalSection> & { id: string }>): Promise<ProposalSection[]> {
+    const results: ProposalSection[] = [];
+    for (const section of sections) {
+      const { id, ...data } = section;
+      const result = await db.update(proposalSections)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(proposalSections.id, id))
+        .returning();
+      results.push(result[0]);
+    }
+    return results;
   }
 }
 

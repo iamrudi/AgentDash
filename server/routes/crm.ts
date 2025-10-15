@@ -2,7 +2,8 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/supabase-auth";
 import { z } from "zod";
-import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema } from "@shared/schema";
+import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema, insertProposalTemplateSchema, insertProposalSchema, insertProposalSectionSchema } from "@shared/schema";
+import { GoogleGenAI } from "@google/genai";
 
 const crmRouter = Router();
 
@@ -718,6 +719,593 @@ crmRouter.delete("/forms/:id", requireAuth, requireRole("Admin"), async (req: Au
   } catch (error: any) {
     console.error("Delete form error:", error);
     res.status(500).json({ message: error.message || "Failed to delete form" });
+  }
+});
+
+// ============================================================================
+// PROPOSAL TEMPLATES
+// ============================================================================
+
+// Get all proposal templates for the agency
+crmRouter.get("/proposal-templates", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const templates = await storage.getProposalTemplatesByAgencyId(agencyId);
+    res.json(templates);
+  } catch (error: any) {
+    console.error("Get proposal templates error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch proposal templates" });
+  }
+});
+
+// Get a single proposal template by ID
+crmRouter.get("/proposal-templates/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const template = await storage.getProposalTemplateById(id);
+    
+    if (!template) {
+      return res.status(404).json({ message: "Proposal template not found" });
+    }
+    
+    // Verify tenant isolation
+    if (template.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    res.json(template);
+  } catch (error: any) {
+    console.error("Get proposal template error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch proposal template" });
+  }
+});
+
+// Create a new proposal template
+crmRouter.post("/proposal-templates", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const createTemplateSchema = insertProposalTemplateSchema.omit({ agencyId: true });
+    const validatedData = createTemplateSchema.parse(req.body);
+
+    const newTemplate = await storage.createProposalTemplate({
+      ...validatedData,
+      agencyId,
+    });
+
+    res.status(201).json(newTemplate);
+  } catch (error: any) {
+    console.error("Create proposal template error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create proposal template" });
+  }
+});
+
+// Update a proposal template
+crmRouter.patch("/proposal-templates/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const existingTemplate = await storage.getProposalTemplateById(id);
+    
+    if (!existingTemplate) {
+      return res.status(404).json({ message: "Proposal template not found" });
+    }
+    
+    if (existingTemplate.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateTemplateSchema = insertProposalTemplateSchema.omit({ agencyId: true }).partial();
+    const validatedData = updateTemplateSchema.parse(req.body);
+
+    const updatedTemplate = await storage.updateProposalTemplate(id, validatedData);
+    res.json(updatedTemplate);
+  } catch (error: any) {
+    console.error("Update proposal template error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update proposal template" });
+  }
+});
+
+// Delete a proposal template
+crmRouter.delete("/proposal-templates/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const existingTemplate = await storage.getProposalTemplateById(id);
+    
+    if (!existingTemplate) {
+      return res.status(404).json({ message: "Proposal template not found" });
+    }
+    
+    if (existingTemplate.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await storage.deleteProposalTemplate(id);
+    res.json({ message: "Proposal template deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete proposal template error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete proposal template" });
+  }
+});
+
+// ============================================================================
+// PROPOSALS
+// ============================================================================
+
+// Get all proposals for the agency
+crmRouter.get("/proposals", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const proposalsList = await storage.getProposalsByAgencyId(agencyId);
+    res.json(proposalsList);
+  } catch (error: any) {
+    console.error("Get proposals error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch proposals" });
+  }
+});
+
+// Get a proposal by deal ID
+crmRouter.get("/proposals/by-deal/:dealId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { dealId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify deal belongs to agency
+    const deal = await storage.getDealById(dealId);
+    if (!deal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    if (deal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const proposal = await storage.getProposalByDealId(dealId);
+    if (!proposal) {
+      return res.status(404).json({ message: "No proposal found for this deal" });
+    }
+
+    res.json(proposal);
+  } catch (error: any) {
+    console.error("Get proposal by deal error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch proposal" });
+  }
+});
+
+// Get a single proposal by ID (with sections)
+crmRouter.get("/proposals/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const proposal = await storage.getProposalById(id);
+    
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    
+    // Verify tenant isolation
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Fetch sections
+    const sections = await storage.getProposalSectionsByProposalId(id);
+
+    res.json({ ...proposal, sections });
+  } catch (error: any) {
+    console.error("Get proposal error:", error);
+    res.status(500).json({ message: error.message || "Failed to fetch proposal" });
+  }
+});
+
+// Create a new proposal
+crmRouter.post("/proposals", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const createProposalSchema = insertProposalSchema.omit({ agencyId: true });
+    const validatedData = createProposalSchema.parse(req.body);
+
+    // Verify deal belongs to agency
+    const deal = await storage.getDealById(validatedData.dealId);
+    if (!deal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    if (deal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const newProposal = await storage.createProposal({
+      ...validatedData,
+      agencyId,
+    });
+
+    res.status(201).json(newProposal);
+  } catch (error: any) {
+    console.error("Create proposal error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create proposal" });
+  }
+});
+
+// Update a proposal
+crmRouter.patch("/proposals/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const existingProposal = await storage.getProposalById(id);
+    
+    if (!existingProposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    
+    if (existingProposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateProposalSchemaValidation = insertProposalSchema.omit({ agencyId: true, dealId: true }).partial();
+    const validatedData = updateProposalSchemaValidation.parse(req.body);
+
+    const updatedProposal = await storage.updateProposal(id, validatedData);
+    res.json(updatedProposal);
+  } catch (error: any) {
+    console.error("Update proposal error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update proposal" });
+  }
+});
+
+// Delete a proposal
+crmRouter.delete("/proposals/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    const existingProposal = await storage.getProposalById(id);
+    
+    if (!existingProposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    
+    if (existingProposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await storage.deleteProposal(id);
+    res.json({ message: "Proposal deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete proposal error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete proposal" });
+  }
+});
+
+// ============================================================================
+// PROPOSAL SECTIONS
+// ============================================================================
+
+// Create a new proposal section
+crmRouter.post("/proposals/:proposalId/sections", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { proposalId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify proposal belongs to agency
+    const proposal = await storage.getProposalById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const createSectionSchema = insertProposalSectionSchema.omit({ proposalId: true });
+    const validatedData = createSectionSchema.parse(req.body);
+
+    const newSection = await storage.createProposalSection({
+      ...validatedData,
+      proposalId,
+    });
+
+    res.status(201).json(newSection);
+  } catch (error: any) {
+    console.error("Create proposal section error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to create proposal section" });
+  }
+});
+
+// Update a proposal section
+crmRouter.patch("/proposals/:proposalId/sections/:sectionId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { proposalId, sectionId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify proposal belongs to agency
+    const proposal = await storage.getProposalById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const updateSectionSchema = insertProposalSectionSchema.omit({ proposalId: true }).partial();
+    const validatedData = updateSectionSchema.parse(req.body);
+
+    const updatedSection = await storage.updateProposalSection(sectionId, validatedData);
+    res.json(updatedSection);
+  } catch (error: any) {
+    console.error("Update proposal section error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update proposal section" });
+  }
+});
+
+// Bulk update proposal sections (for reordering)
+crmRouter.patch("/proposals/:proposalId/sections", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { proposalId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify proposal belongs to agency
+    const proposal = await storage.getProposalById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const sectionsSchema = z.array(z.object({
+      id: z.string(),
+      content: z.string().optional(),
+      order: z.number().optional(),
+    }));
+
+    const validatedData = sectionsSchema.parse(req.body);
+
+    const updatedSections = await storage.bulkUpdateProposalSections(validatedData);
+    res.json(updatedSections);
+  } catch (error: any) {
+    console.error("Bulk update proposal sections error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update proposal sections" });
+  }
+});
+
+// Delete a proposal section
+crmRouter.delete("/proposals/:proposalId/sections/:sectionId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { proposalId, sectionId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify proposal belongs to agency
+    const proposal = await storage.getProposalById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await storage.deleteProposalSection(sectionId);
+    res.json({ message: "Proposal section deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete proposal section error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete proposal section" });
+  }
+});
+
+// ============================================================================
+// AI PROPOSAL GENERATION
+// ============================================================================
+
+// AI-powered proposal content generation and refinement
+crmRouter.post("/proposals/:proposalId/ai-generate", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { proposalId } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify proposal belongs to agency
+    const proposal = await storage.getProposalById(proposalId);
+    if (!proposal) {
+      return res.status(404).json({ message: "Proposal not found" });
+    }
+    if (proposal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const aiRequestSchema = z.object({
+      action: z.enum(["generate-summary", "personalize", "refine", "shorten", "expand"]),
+      dealContext: z.object({
+        clientName: z.string(),
+        industry: z.string().optional(),
+        dealValue: z.number().optional(),
+      }).optional(),
+      contentToRefine: z.string().optional(),
+      customPrompt: z.string().optional(),
+    });
+
+    const validatedData = aiRequestSchema.parse(req.body);
+    const { action, dealContext, contentToRefine, customPrompt } = validatedData;
+
+    // Initialize Gemini AI
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+    let finalPrompt = "";
+
+    // Construct prompts based on action
+    switch (action) {
+      case "generate-summary":
+        if (!contentToRefine) {
+          return res.status(400).json({ message: "Content to summarize is required" });
+        }
+        finalPrompt = `Based on the following proposal content, write a concise executive summary for ${dealContext?.clientName || "the client"}:
+
+${contentToRefine}
+
+Generate a professional executive summary (2-3 paragraphs) that highlights the key value propositions, scope, and expected outcomes.`;
+        break;
+
+      case "personalize":
+        if (!contentToRefine) {
+          return res.status(400).json({ message: "Content to personalize is required" });
+        }
+        finalPrompt = `Rewrite the following text to be more personalized for ${dealContext?.clientName || "the client"}${dealContext?.industry ? ` in the ${dealContext.industry} industry` : ""}:
+
+${contentToRefine}
+
+Keep the core message but make it feel tailored specifically to this client's needs and industry context.`;
+        break;
+
+      case "refine":
+        if (!contentToRefine) {
+          return res.status(400).json({ message: "Content to refine is required" });
+        }
+        finalPrompt = `Refine and improve the following proposal text to be more professional, clear, and compelling:
+
+${contentToRefine}
+
+Improve clarity, professionalism, and persuasiveness while maintaining the core message.`;
+        break;
+
+      case "shorten":
+        if (!contentToRefine) {
+          return res.status(400).json({ message: "Content to shorten is required" });
+        }
+        finalPrompt = `Shorten the following text to be more concise while keeping all key points:
+
+${contentToRefine}
+
+Make it 30-40% shorter while preserving all essential information.`;
+        break;
+
+      case "expand":
+        if (!contentToRefine) {
+          return res.status(400).json({ message: "Content to expand is required" });
+        }
+        finalPrompt = `Expand the following text with more details, examples, and elaboration:
+
+${contentToRefine}
+
+Add relevant details, benefits, and context to make it more comprehensive and persuasive.`;
+        break;
+
+      default:
+        finalPrompt = customPrompt || "";
+    }
+
+    if (!finalPrompt) {
+      return res.status(400).json({ message: "No valid prompt generated" });
+    }
+
+    // Generate content using Gemini
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: finalPrompt,
+    });
+
+    const generatedText = response.text;
+
+    if (!generatedText) {
+      return res.status(500).json({ message: "AI failed to generate content" });
+    }
+
+    res.json({ generatedContent: generatedText });
+  } catch (error: any) {
+    console.error("AI proposal generation error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to generate AI content" });
   }
 });
 

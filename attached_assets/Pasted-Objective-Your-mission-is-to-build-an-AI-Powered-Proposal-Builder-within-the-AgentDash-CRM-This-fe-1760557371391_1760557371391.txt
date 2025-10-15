@@ -1,0 +1,194 @@
+Objective: Your mission is to build an AI-Powered Proposal Builder within the AgentDash CRM. This feature will allow agency staff to create customized, professional proposals directly from a deal, using a library of reusable, AI-enhanced content templates.
+
+Phase 1: Database Schema and Core API
+First, create the database tables and API endpoints needed to manage proposals and their templates.
+
+1.1. Update the Database Schema
+
+Modify shared/schema.ts to include three new tables: proposalTemplates, proposals, and proposalSections. Add these after the existing CRM table definitions.
+
+File: shared/schema.ts
+
+TypeScript
+
+// ... (after the 'deals' table definition)
+
+export const proposalTemplates = pgTable('proposal_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  category: text('category').default('Core').notNull(),
+  content: text('content').notNull(), // Store as Markdown
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+});
+
+export const proposals = pgTable('proposals', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  status: text('status').default('draft').notNull(), // draft, sent, accepted
+  dealId: uuid('deal_id')
+    .notNull()
+    .references(() => deals.id, { onDelete: 'cascade' }),
+  agencyId: uuid('agency_id')
+    .notNull()
+    .references(() => agencies.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const proposalSections = pgTable('proposal_sections', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  proposalId: uuid('proposal_id')
+    .notNull()
+    .references(() => proposals.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(), // Store final Markdown content
+  order: integer('order').notNull(),
+});
+1.2. Create CRUD Endpoints for Templates and Proposals
+
+In the existing server/routes/crm.ts file, add the necessary endpoints for managing proposal templates. These are standard, authenticated CRUD operations.
+
+File: server/routes/crm.ts
+
+TypeScript
+
+// ... (inside the crmRouter)
+
+/**
+ * @route GET /api/crm/proposal-templates
+ * @description Get all proposal templates for the agency
+ */
+crmRouter.get('/proposal-templates', requireAuth, async (req, res, next) => {
+  // ... Logic to fetch all templates for req.user.agencyId
+});
+
+/**
+ * @route POST /api/crm/proposal-templates
+ * @description Create a new proposal template
+ */
+crmRouter.post('/proposal-templates', requireAuth, async (req, res, next) => {
+  // ... Logic to create a new template for req.user.agencyId
+});
+
+// Implement GET by ID, PUT, and DELETE for /api/crm/proposal-templates/:id as well.
+// Also, implement the core CRUD endpoints for /api/crm/proposals linked to a deal.
+Phase 2: AI Integration
+Now, create the backend service that will connect the proposal builder to the Gemini AI.
+
+2.1. Create the AI Proposal Endpoint
+
+Create a new API route specifically for AI actions related to proposals. This endpoint will take context (like the deal info and existing proposal content) and generate or refine text.
+
+New File: server/routes/ai.ts (or add to an existing AI router if you have one)
+
+TypeScript
+
+// server/routes/ai.ts
+
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
+import { streamGoogleGemini } from '../gemini'; // Assuming this is your Gemini service
+
+const aiRouter = Router();
+
+aiRouter.post('/proposals/generate', requireAuth, async (req, res) => {
+  try {
+    const { dealContext, prompt, contentToRefine, action } = req.body;
+    
+    // Construct a detailed, context-rich prompt for the Gemini model
+    let finalPrompt;
+    if (action === 'generate-summary') {
+      finalPrompt = `Based on the following proposal content, write a concise executive summary for ${dealContext.clientName}:\n\n${contentToRefine}`;
+    } else if (action === 'personalize') {
+        finalPrompt = `Rewrite the following text to be more personalized for a client named ${dealContext.clientName} in the ${dealContext.industry} industry:\n\n${contentToRefine}`;
+    } else {
+        finalPrompt = prompt; // For generic generation
+    }
+
+    // Use a streaming response for a better UX
+    return streamGoogleGemini(finalPrompt, res);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('An error occurred with the AI service.');
+  }
+});
+
+export default aiRouter;
+Remember to register this new router in server/routes.ts: router.use('/api/ai', aiRouter);
+
+Phase 3: Frontend Proposal Builder
+Build the user interface where staff will create proposals.
+
+3.1. Create the Proposal Builder Page
+
+Create a new page at client/src/pages/agency/crm/proposals/[proposalId].tsx. This page will feature the two-panel layout: a template library on the left and the main proposal canvas on the right.
+
+Template Library (Left Panel):
+
+Fetch all templates from /api/crm/proposal-templates.
+
+Group them by category.
+
+Include a button on each template to add its content to the canvas.
+
+Proposal Canvas (Right Panel):
+
+Manage the proposal sections' state using useState or a more robust state manager.
+
+Render each section as an editable block (e.g., using a Markdown editor component).
+
+For each section, include a "✨ AI Actions" menu with options like "Refine," "Shorten," and "Personalize."
+
+At the top of the canvas, add a button [✨ Generate Executive Summary].
+
+When an AI action is triggered, call the /api/ai/proposals/generate endpoint using useMutation from TanStack Query and stream the response into the relevant text area.
+
+Phase 4: PDF Export
+Finally, add the ability to export the finished proposal as a PDF.
+
+4.1. Create the PDF Generation Endpoint
+
+Create a new API endpoint that takes a proposal ID, renders its content to HTML, and uses the existing Puppeteer service to generate a PDF.
+
+File: server/routes/crm.ts
+
+TypeScript
+
+// ... (inside the crmRouter)
+
+import { generatePdf } from '../services/pdfGenerator'; // Your existing PDF service
+
+/**
+ * @route GET /api/crm/proposals/:proposalId/pdf
+ * @description Generate a PDF for a proposal
+ */
+crmRouter.get('/proposals/:proposalId/pdf', requireAuth, async (req, res, next) => {
+    try {
+        const { proposalId } = req.params;
+        
+        // 1. Fetch the proposal and its sections from the database
+        // (Ensure RLS is respected via req.user.agencyId)
+        const proposalContent = // ... fetch and combine sections ...
+        
+        // 2. Convert Markdown content to HTML
+        // You may need a library like 'marked' for this
+        const htmlContent = convertMarkdownToHtml(proposalContent);
+
+        // 3. Generate the PDF using Puppeteer
+        const pdfBuffer = await generatePdf(`
+            <html>
+                <head><style>/* Add your CSS for branding */</style></head>
+                <body>${htmlContent}</body>
+            </html>
+        `);
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=proposal.pdf');
+        res.send(pdfBuffer);
+        
+    } catch (error) {
+        next(error);
+    }
+});
+On the frontend proposal builder page, add an "Export to PDF" button that links to this new endpoint.
