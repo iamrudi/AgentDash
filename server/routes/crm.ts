@@ -249,6 +249,90 @@ crmRouter.post("/contacts", requireAuth, requireRole("Admin"), async (req: AuthR
   }
 });
 
+// Update a contact
+crmRouter.patch("/contacts/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify contact exists and belongs to agency
+    const existingContact = await storage.getContactById(id);
+    
+    if (!existingContact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    
+    if (existingContact.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Exclude agencyId and clientId from updates to prevent tenant isolation breach
+    const updateContactSchema = insertContactSchema.omit({ 
+      agencyId: true, 
+      clientId: true 
+    }).partial().extend({
+      companyId: z.string().uuid().optional().nullable(),
+    });
+    
+    const validatedData = updateContactSchema.parse(req.body);
+
+    // Verify companyId belongs to caller's agency if provided (tenant isolation)
+    if (validatedData.companyId) {
+      const company = await storage.getCompanyById(validatedData.companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      if (company.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied: Company belongs to different agency" });
+      }
+    }
+
+    const updatedContact = await storage.updateContact(id, validatedData);
+    res.json(updatedContact);
+  } catch (error: any) {
+    console.error("Update contact error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update contact" });
+  }
+});
+
+// Delete a contact
+crmRouter.delete("/contacts/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify contact exists and belongs to agency
+    const existingContact = await storage.getContactById(id);
+    
+    if (!existingContact) {
+      return res.status(404).json({ message: "Contact not found" });
+    }
+    
+    if (existingContact.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await storage.deleteContact(id);
+    res.json({ message: "Contact deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete contact error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete contact" });
+  }
+});
+
 // ============================================================================
 // DEALS
 // ============================================================================
@@ -358,6 +442,104 @@ crmRouter.post("/deals", requireAuth, requireRole("Admin"), async (req: AuthRequ
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
     res.status(500).json({ message: error.message || "Failed to create deal" });
+  }
+});
+
+// Update a deal
+crmRouter.patch("/deals/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify deal exists and belongs to agency
+    const existingDeal = await storage.getDealById(id);
+    
+    if (!existingDeal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    
+    if (existingDeal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Exclude agencyId and ownerId from updates to prevent tenant isolation breach
+    const updateDealSchema = insertDealSchema.omit({ 
+      agencyId: true, 
+      ownerId: true 
+    }).partial().extend({
+      contactId: z.string().uuid().optional(),
+      companyId: z.string().uuid().optional().nullable(),
+    });
+    
+    const validatedData = updateDealSchema.parse(req.body);
+
+    // Verify contactId belongs to caller's agency if provided (tenant isolation)
+    if (validatedData.contactId) {
+      const contact = await storage.getContactById(validatedData.contactId);
+      
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      
+      if (contact.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied: Contact belongs to different agency" });
+      }
+    }
+
+    // Verify companyId belongs to caller's agency if provided (tenant isolation)
+    if (validatedData.companyId) {
+      const company = await storage.getCompanyById(validatedData.companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      if (company.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied: Company belongs to different agency" });
+      }
+    }
+
+    const updatedDeal = await storage.updateDeal(id, validatedData);
+    res.json(updatedDeal);
+  } catch (error: any) {
+    console.error("Update deal error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ message: error.message || "Failed to update deal" });
+  }
+});
+
+// Delete a deal
+crmRouter.delete("/deals/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const agencyId = req.user!.agencyId;
+    
+    if (!agencyId) {
+      return res.status(403).json({ message: "No agency access" });
+    }
+
+    // Verify deal exists and belongs to agency
+    const existingDeal = await storage.getDealById(id);
+    
+    if (!existingDeal) {
+      return res.status(404).json({ message: "Deal not found" });
+    }
+    
+    if (existingDeal.agencyId !== agencyId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    await storage.deleteDeal(id);
+    res.json({ message: "Deal deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete deal error:", error);
+    res.status(500).json({ message: error.message || "Failed to delete deal" });
   }
 });
 

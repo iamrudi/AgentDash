@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Company } from "@shared/schema";
 import { CreateCompanyDialog } from "@/components/crm/create-company-dialog";
+import { EditCompanyDialog } from "@/components/crm/edit-company-dialog";
 import {
   Table,
   TableBody,
@@ -13,12 +15,49 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Building, Pencil, Trash2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function CompaniesPage() {
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const { data: companies, isLoading, error } = useQuery<Company[]>({
     queryKey: ["/api/crm/companies"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/crm/companies/${id}`, {});
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Success", 
+        description: "Company deleted successfully." 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/companies"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not delete company. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (company: Company) => {
+    setEditingCompany(company);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (company: Company) => {
+    if (window.confirm(`Are you sure you want to delete ${company.name}?`)) {
+      deleteMutation.mutate(company.id);
+    }
+  };
 
   const getTypeVariant = (type: string) => {
     switch (type) {
@@ -105,6 +144,7 @@ export default function CompaniesPage() {
                       <TableHead>Website</TableHead>
                       <TableHead>Phone</TableHead>
                       <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -142,6 +182,27 @@ export default function CompaniesPage() {
                         <TableCell data-testid={`text-company-created-${company.id}`}>
                           {formatDate(company.createdAt)}
                         </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(company)}
+                              data-testid={`button-edit-company-${company.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(company)}
+                              disabled={deleteMutation.isPending}
+                              data-testid={`button-delete-company-${company.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -151,6 +212,12 @@ export default function CompaniesPage() {
           )}
         </CardContent>
       </Card>
+
+      <EditCompanyDialog
+        company={editingCompany as any}
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      />
     </div>
   );
 }

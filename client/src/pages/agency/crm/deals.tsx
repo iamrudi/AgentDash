@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Building2, DollarSign, Plus, TrendingUp, User } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Building2, DollarSign, Plus, TrendingUp, User, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CreateDealDialog } from "@/components/crm/create-deal-dialog";
+import { EditDealDialog } from "@/components/crm/edit-deal-dialog";
+import { toast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Deal, Contact, Company } from "@shared/schema";
 
 const stageColors = {
@@ -26,10 +29,43 @@ const stageLabels = {
 
 export default function DealsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: deals = [], isLoading } = useQuery<(Deal & { contact?: Contact; company?: Company | null })[]>({
     queryKey: ["/api/crm/deals"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/crm/deals/${id}`, {});
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Success", 
+        description: "Deal deleted successfully." 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/deals"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not delete deal. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (deal: Deal) => {
+    setEditingDeal(deal);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (deal: Deal) => {
+    if (window.confirm(`Are you sure you want to delete deal "${deal.name}"?`)) {
+      deleteMutation.mutate(deal.id);
+    }
+  };
 
   const formatCurrency = (cents?: number | null) => {
     if (!cents) return "—";
@@ -87,6 +123,7 @@ export default function DealsPage() {
                     <TableHead>Company</TableHead>
                     <TableHead>Close Date</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -132,6 +169,27 @@ export default function DealsPage() {
                       <TableCell className="text-muted-foreground" data-testid={`text-deal-created-${deal.id}`}>
                         {new Date(deal.createdAt).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(deal)}
+                            data-testid={`button-edit-deal-${deal.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(deal)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-deal-${deal.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -144,6 +202,12 @@ export default function DealsPage() {
       <CreateDealDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
+      />
+      
+      <EditDealDialog
+        deal={editingDeal as any}
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
       />
     </div>
   );

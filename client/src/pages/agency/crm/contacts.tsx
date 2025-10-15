@@ -1,18 +1,54 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Building2, Mail, Phone, Plus } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Building2, Mail, Phone, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CreateContactDialog } from "@/components/crm/create-contact-dialog";
+import { EditContactDialog } from "@/components/crm/edit-contact-dialog";
+import { toast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Contact, Company } from "@shared/schema";
 
 export default function ContactsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const { data: contacts = [], isLoading } = useQuery<(Contact & { company?: Company | null })[]>({
     queryKey: ["/api/crm/contacts"],
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/crm/contacts/${id}`, {});
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Success", 
+        description: "Contact deleted successfully." 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Could not delete contact. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (contact: Contact) => {
+    setEditingContact(contact);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDelete = (contact: Contact) => {
+    if (window.confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName}?`)) {
+      deleteMutation.mutate(contact.id);
+    }
+  };
 
   return (
     <div className="h-full p-6 space-y-6">
@@ -60,6 +96,7 @@ export default function ContactsPage() {
                     <TableHead>Phone</TableHead>
                     <TableHead>Company</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -100,6 +137,27 @@ export default function ContactsPage() {
                       <TableCell className="text-muted-foreground" data-testid={`text-contact-created-${contact.id}`}>
                         {new Date(contact.createdAt).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(contact)}
+                            data-testid={`button-edit-contact-${contact.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(contact)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-contact-${contact.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -112,6 +170,12 @@ export default function ContactsPage() {
       <CreateContactDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
+      />
+      
+      <EditContactDialog
+        contact={editingContact as any}
+        isOpen={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
       />
     </div>
   );
