@@ -1846,18 +1846,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/integrations/dataforseo/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
+      const agencyId = req.user!.agencyId!;
 
-      const integration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
+      // Check client-level integration first
+      const clientIntegration = await storage.getIntegrationByClientId(clientId, 'DataForSEO');
 
-      if (!integration || !integration.dataForSeoLogin) {
-        return res.json({ connected: false });
+      if (clientIntegration && clientIntegration.dataForSeoLogin) {
+        return res.json({
+          connected: true,
+          source: 'client',
+          createdAt: clientIntegration.createdAt,
+          updatedAt: clientIntegration.updatedAt,
+        });
       }
 
-      res.json({
-        connected: true,
-        createdAt: integration.createdAt,
-        updatedAt: integration.updatedAt,
-      });
+      // Check agency-level integration with client access
+      const agencyIntegration = await storage.getAgencyIntegration(agencyId, 'DataForSEO');
+      
+      if (agencyIntegration) {
+        const clientAccess = await storage.getClientAccessList(agencyIntegration.id);
+        const hasAccess = clientAccess.includes(clientId);
+        
+        if (hasAccess) {
+          return res.json({
+            connected: true,
+            source: 'agency',
+            createdAt: agencyIntegration.createdAt,
+            updatedAt: agencyIntegration.updatedAt,
+          });
+        }
+      }
+
+      // No integration found
+      res.json({ connected: false });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

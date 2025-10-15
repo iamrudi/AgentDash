@@ -27,9 +27,31 @@ interface StrategyCardData {
 }
 
 export function ClientStrategyCard({ clientId }: { clientId: string }) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [businessContext, setBusinessContext] = useState("");
+  const { toast } = useToast();
+
   const { data, isLoading, error } = useQuery<StrategyCardData>({
     queryKey: ['/api/agency/clients', clientId, 'strategy-card'],
     enabled: !!clientId,
+  });
+
+  const updateBusinessContext = useMutation({
+    mutationFn: async (context: string) => {
+      return await apiRequest(`/api/agency/clients/${clientId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ businessContext: context }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'strategy-card'] });
+      toast({ title: "Business context updated successfully" });
+      setEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update business context", description: error.message, variant: "destructive" });
+    },
   });
 
   if (isLoading) {
@@ -67,7 +89,20 @@ export function ClientStrategyCard({ clientId }: { clientId: string }) {
         {/* Column 1: Qualitative Context */}
         <div className="space-y-4">
           <div>
-            <h4 className="font-semibold mb-2">Business Context</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold">Business Context</h4>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  setBusinessContext(data?.businessContext || "");
+                  setEditDialogOpen(true);
+                }}
+                data-testid="button-edit-business-context"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+            </div>
             <p className="text-sm text-muted-foreground whitespace-pre-line" data-testid="business-context">
               {data?.businessContext || "No business context provided."}
             </p>
@@ -137,6 +172,47 @@ export function ClientStrategyCard({ clientId }: { clientId: string }) {
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Business Context</DialogTitle>
+            <DialogDescription>
+              Update the business context to provide strategic background for this client.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={businessContext}
+            onChange={(e) => setBusinessContext(e.target.value)}
+            placeholder="Enter business context..."
+            className="min-h-[200px]"
+            data-testid="input-business-context"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              data-testid="button-cancel-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateBusinessContext.mutate(businessContext)}
+              disabled={updateBusinessContext.isPending}
+              data-testid="button-save-business-context"
+            >
+              {updateBusinessContext.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -31,6 +31,7 @@ type EnrichedClient = Client & {
   overdueInvoicesCount: number;
   hasGA4: boolean;
   hasGSC: boolean;
+  hasDFS: boolean;
 };
 
 export default function AgencyClientsPage() {
@@ -355,7 +356,22 @@ export default function AgencyClientsPage() {
                             {client.hasGSC ? "Search Console Connected" : "Search Console Not Connected"}
                           </TooltipContent>
                         </Tooltip>
-                        {(!client.hasGA4 || !client.hasGSC) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center" data-testid={`integration-dfs-${client.id}`}>
+                              {client.hasDFS ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                              )}
+                              <span className="ml-1 text-xs text-muted-foreground">DFS</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {client.hasDFS ? "Data for SEO Connected" : "Data for SEO Not Connected"}
+                          </TooltipContent>
+                        </Tooltip>
+                        {(!client.hasGA4 || !client.hasGSC || !client.hasDFS) && (
                           <Link href={`/agency/clients/${client.id}?tab=integrations`}>
                             <Button variant="ghost" size="sm" className="h-6 px-2" data-testid={`button-setup-integrations-${client.id}`}>
                               <ExternalLink className="h-3 w-3" />

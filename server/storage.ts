@@ -74,12 +74,13 @@ export interface IStorage {
   getClientById(id: string): Promise<Client | undefined>;
   getClientByProfileId(profileId: string): Promise<Client | undefined>;
   getAllClients(): Promise<Client[]>;
-  getAllClientsWithDetails(): Promise<Array<Client & { 
+  getAllClientsWithDetails(agencyId?: string): Promise<Array<Client & { 
     primaryContact: string | null; 
     activeProjectsCount: number;
     overdueInvoicesCount: number;
     hasGA4: boolean;
     hasGSC: boolean;
+    hasDFS: boolean;
   }>>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, data: Partial<Client>): Promise<Client>;
@@ -342,17 +343,20 @@ export class DbStorage implements IStorage {
     overdueInvoicesCount: number;
     hasGA4: boolean;
     hasGSC: boolean;
+    hasDFS: boolean;
   }>> {
     const allClients = agencyId 
       ? await db.select().from(clients).where(eq(clients.agencyId, agencyId)).orderBy(desc(clients.createdAt))
       : await db.select().from(clients).orderBy(desc(clients.createdAt));
     
     // Fetch all related data in bulk to avoid N+1 queries
-    const [allProfiles, allProjects, allInvoices, allIntegrations] = await Promise.all([
+    const [allProfiles, allProjects, allInvoices, allIntegrations, allAgencyIntegrations, allClientAccess] = await Promise.all([
       db.select().from(profiles),
       db.select().from(projects),
       db.select().from(invoices),
       db.select().from(clientIntegrations),
+      agencyId ? db.select().from(agencyIntegrations).where(eq(agencyIntegrations.agencyId, agencyId)) : Promise.resolve([]),
+      agencyId ? db.select().from(agencyIntegrationClientAccess) : Promise.resolve([]),
     ]);
     
     // Create lookup maps for efficient access
@@ -376,6 +380,15 @@ export class DbStorage implements IStorage {
       integrationsByClient.set(integration.clientId, [...existing, integration]);
     });
     
+    // Create DFS agency integration access map
+    const agencyDFSIntegration = allAgencyIntegrations.find(i => i.serviceName === 'DataForSEO');
+    const dfsAccessSet = new Set<string>();
+    if (agencyDFSIntegration) {
+      allClientAccess
+        .filter(access => access.agencyIntegrationId === agencyDFSIntegration.id)
+        .forEach(access => dfsAccessSet.add(access.clientId));
+    }
+    
     const now = new Date();
     
     // Enrich clients with data from lookup maps
@@ -397,9 +410,11 @@ export class DbStorage implements IStorage {
       const clientIntegrationsList = integrationsByClient.get(client.id) || [];
       const ga4Integration = clientIntegrationsList.find(i => i.serviceName === 'GA4');
       const gscIntegration = clientIntegrationsList.find(i => i.serviceName === 'GSC');
+      const dfsIntegration = clientIntegrationsList.find(i => i.serviceName === 'DataForSEO');
       
       const hasGA4 = !!ga4Integration && ga4Integration.accessToken !== null;
       const hasGSC = !!gscIntegration && gscIntegration.accessToken !== null;
+      const hasDFS = (!!dfsIntegration && dfsIntegration.dataForSeoLogin !== null) || dfsAccessSet.has(client.id);
       
       return {
         ...client,
@@ -408,6 +423,7 @@ export class DbStorage implements IStorage {
         overdueInvoicesCount,
         hasGA4,
         hasGSC,
+        hasDFS,
       };
     });
     
