@@ -11,8 +11,9 @@ try {
 
 const { combine, timestamp, printf, colorize, errors } = winston.format;
 
-const logFormat = printf(({ level, message, timestamp, stack }) => {
-  return `${timestamp} [${level}]: ${stack || message}`;
+const logFormat = printf(({ level, message, timestamp, stack, requestId }) => {
+  const reqId = requestId ? `[${requestId}] ` : '';
+  return `${timestamp} ${reqId}[${level}]: ${stack || message}`;
 });
 
 const logger = winston.createLogger({
@@ -52,17 +53,21 @@ if (process.env.NODE_ENV !== 'production') {
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const startTime = Date.now();
+  const requestId = (req as any).requestId || 'unknown';
 
   res.on('finish', () => {
     const duration = Date.now() - startTime;
-    const logMessage = `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`;
+    const contentLength = res.get('Content-Length') || 0;
+    const logMessage = `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms - ${contentLength} bytes`;
+    
+    const logContext = { requestId };
     
     if (res.statusCode >= 500) {
-      logger.error(logMessage);
+      logger.error(logMessage, logContext);
     } else if (res.statusCode >= 400) {
-      logger.warn(logMessage);
+      logger.warn(logMessage, logContext);
     } else {
-      logger.info(logMessage);
+      logger.info(logMessage, logContext);
     }
   });
 

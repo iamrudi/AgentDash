@@ -1,14 +1,48 @@
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
+import swaggerUi from "swagger-ui-express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { InvoiceScheduler } from "./services/invoiceScheduler";
 import { TrashCleanupScheduler } from "./services/trashCleanupScheduler";
 import { storage } from "./storage";
+import { requestIdMiddleware } from "./middleware/requestId";
+import { requestLogger } from "./middleware/logger";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { generalLimiter } from "./middleware/rateLimiter";
+import { metricsMiddleware, metricsHandler } from "./middleware/metrics";
+import { swaggerSpec } from "./config/swagger";
+import { features } from "./config/features";
+import { env } from "./env";
 
 const app = express();
+
+// Trust proxy for correct client IP detection (Replit, load balancers, etc.)
+app.set('trust proxy', 1);
+
+// Security: Helmet for secure HTTP headers
+app.use(helmet({
+  contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Request ID for tracing
+app.use(requestIdMiddleware);
+
+// Metrics collection
+app.use(metricsMiddleware);
+
+// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Request logging (after body parsing)
+app.use(requestLogger);
+
+// Rate limiting for general requests
+app.use(generalLimiter);
+
+// Legacy logging (can be removed once Winston is fully adopted)
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -39,24 +73,52 @@ app.use((req, res, next) => {
   next();
 });
 
+// Health check endpoint (before auth)
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: env.NODE_ENV,
+    features: {
+      maintenance: features.maintenanceMode,
+      ai: features.aiRecommendations,
+      analytics: features.googleAnalytics,
+    },
+  });
+});
+
+// Metrics endpoint (Prometheus format)
+app.get('/metrics', metricsHandler);
+
+// API Documentation (Swagger UI)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Agency Portal API Documentation',
+}));
+
 (async () => {
   const server = await registerRoutes(app);
 
   // Start invoice scheduler for automated monthly invoicing
-  const invoiceScheduler = new InvoiceScheduler(storage);
-  invoiceScheduler.start();
+  if (features.autoInvoicing) {
+    const invoiceScheduler = new InvoiceScheduler(storage);
+    invoiceScheduler.start();
+    log('✅ Invoice scheduler started');
+  }
 
   // Start trash cleanup scheduler for automatic deletion after 30 days
-  const trashCleanupScheduler = new TrashCleanupScheduler(storage);
-  trashCleanupScheduler.start();
+  if (features.trashCleanup) {
+    const trashCleanupScheduler = new TrashCleanupScheduler(storage);
+    trashCleanupScheduler.start();
+    log('✅ Trash cleanup scheduler started');
+  }
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  // 404 handler
+  app.use(notFoundHandler);
 
-    res.status(status).json({ message });
-    throw err;
-  });
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -71,12 +133,19 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(env.PORT, 10);
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`🚀 Server running on port ${port}`);
+    log(`📚 API docs available at http://localhost:${port}/api-docs`);
+    log(`📊 Metrics available at http://localhost:${port}/metrics`);
+    log(`🏥 Health check at http://localhost:${port}/health`);
+    
+    if (features.maintenanceMode) {
+      log('⚠️  Maintenance mode is ENABLED');
+    }
   });
 })();

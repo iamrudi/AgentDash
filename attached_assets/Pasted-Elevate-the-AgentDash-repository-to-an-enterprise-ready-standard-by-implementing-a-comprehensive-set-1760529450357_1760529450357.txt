@@ -1,0 +1,121 @@
+Elevate the AgentDash repository to an enterprise-ready standard by implementing a comprehensive set of improvements across the entire stack. This involves enhancing the CI/CD pipeline, finalizing the API documentation, strengthening security, and improving the overall developer experience.
+
+1. CI/CD Completion
+
+Expand the existing .github/workflows/ci.yml file to create a full CI pipeline. The pipeline should run the following steps in order:
+
+npm install
+
+npm run lint (you will need to add a lint script to package.json)
+
+npm run check (type checking)
+
+npm run test (you will need to add a test script and a testing framework)
+
+npm run db:push -- --strict (Drizzle migration check)
+
+npm run build
+
+Configure the .github/workflows/deploy.yml file to automatically deploy the application to Replit upon a successful merge to the main branch.
+
+2. OpenAPI Finalization
+
+Complete the Swagger configuration in server/config/swagger.ts to generate a full swagger.json specification from all existing route definitions in server/routes.ts.
+
+Implement schema validation for all request and response bodies using Zod schemas.
+
+Ensure that the /docs route is automatically generated from the OpenAPI spec.
+
+3. Input Validation Layer
+
+Create Zod schemas for all API inputs.
+
+Create a validated environment variable setup (e.g., server/env.ts) using Zod to ensure that all required environment variables are present and correctly typed.
+
+Apply Zod parsing in every route handler before any database or external API calls are made.
+
+4. Centralized Error & Logging
+
+Enhance the existing server/middleware/errorHandler.ts to be a unified error handler for the entire application.
+
+Replace all console.log statements with structured logging using the winston library.
+
+Implement request-ID correlation to trace a single request through the entire system.
+
+Ensure that all logs include the route, status code, latency, payload size, and any errors from external APIs.
+
+5. Rate Limiting & Security
+
+Apply the rate limiting middleware from server/middleware/rateLimiter.ts to all AI- and data-intensive endpoints.
+
+Ensure that the helmet middleware is applied to all requests to set secure HTTP headers.
+
+Verify that all secrets (Google, DataForSEO, etc.) are loaded exclusively from environment variables.
+
+Enable HTTPS-only mode in the production environment.
+
+6. Database Hardening
+
+Create an automatic seeding and migration runner script.
+
+Review the database schema in shared/schema.ts and confirm that all relations and constraints are correctly enforced.
+
+If using Supabase, define and test Row Level Security (RLS) policies for all tables.
+
+Add connection pool limits and a retry policy to the database connection logic in server/db.ts.
+
+7. Monitoring & Metrics
+
+Integrate prom-client to expose basic application metrics (requests per second, error rates, latency) via a /metrics endpoint.
+
+8. Frontend Refinement
+
+Implement a type-safe API client on the frontend that consumes the generated OpenAPI spec.
+
+Add loading and error boundaries to your React components to improve the user experience.
+
+Standardize all UI tokens, typography, and spacing in your tailwind.config.ts file.
+
+9. Testing Infrastructure
+
+Add vitest for unit testing and supertest for HTTP route testing.
+
+Create mock implementations for the DataForSEO and Google APIs to use in your tests.
+
+Ensure that the test suite is run as part of the CI pipeline.
+
+10. Documentation Upgrade
+
+Expand the README.md to include:
+
+Prerequisites
+
+A detailed setup guide
+
+An example .env file
+
+Instructions for all dev and prod commands
+
+A contribution guide
+
+Create CONTRIBUTING.md and SECURITY.md files.
+
+11. Dependency Audit & Management
+
+Add an audit script to package.json that runs npm audit.
+
+Add a depcheck script to package.json to identify unused dependencies.
+
+12. Performance & Cost Optimization
+
+Add vite-bundle-visualizer to your Vite config to allow for bundle size analysis.
+
+13. Feature Flagging
+
+Implement a basic feature flagging mechanism. This can be as simple as a configuration file that can be updated without a full redeployment.
+
+14. Code Style and Formatting
+
+Add prettier to your devDependencies.
+
+Create a format script in package.json that runs prettier --write . to format the entire codebase.

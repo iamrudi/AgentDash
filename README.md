@@ -179,11 +179,23 @@ npm run start            # Start production server
 npm run db:generate      # Generate migrations from schema
 npm run db:push          # Push schema to database
 npm run db:studio        # Open Drizzle Studio GUI
-npm run db:seed          # Seed initial data
 
 # Code Quality
-npm run typecheck        # TypeScript type checking
-npm run lint             # Lint code
+npm run check            # TypeScript type checking
+npm run lint             # ESLint code analysis
+npm run lint:fix         # Auto-fix linting issues
+npm run format           # Format code with Prettier
+npm run format:check     # Check code formatting
+
+# Testing
+npm run test             # Run tests
+npm run test:watch       # Run tests in watch mode
+npm run test:coverage    # Generate coverage report
+
+# Security & Maintenance
+npm run audit            # Check for security vulnerabilities
+npm run depcheck         # Find unused dependencies
+npm run bundle:analyze   # Analyze bundle size
 \`\`\`
 
 ### Project Structure
@@ -223,6 +235,7 @@ agency-portal/
 - Drizzle ORM + PostgreSQL
 - Supabase Auth
 - Winston (logging)
+- Prometheus (metrics)
 
 **Integrations:**
 - Google Gemini AI
@@ -231,18 +244,49 @@ agency-portal/
 - Data for SEO API
 - Puppeteer (PDF generation)
 
+**Development:**
+- Vitest (testing)
+- ESLint + Prettier (code quality)
+- Supertest (API testing)
+- GitHub Actions (CI/CD)
+
 ## 🧪 Testing
 
+### Unit & Integration Tests
+
 \`\`\`bash
-# Run tests (when configured)
+# Run all tests
 npm test
 
-# Run with coverage
-npm run test:coverage
+# Run tests in watch mode (development)
+npm run test:watch
 
-# E2E tests (when configured)
-npm run test:e2e
+# Generate coverage report
+npm run test:coverage
 \`\`\`
+
+### Test Structure
+
+\`\`\`
+tests/
+├── setup.ts           # Test environment setup
+├── example.test.ts    # Example test suite
+└── mocks/             # Mock implementations
+\`\`\`
+
+### Writing Tests
+
+\`\`\`typescript
+import { describe, it, expect } from 'vitest';
+
+describe('Feature Name', () => {
+  it('should do something', () => {
+    expect(result).toBe(expected);
+  });
+});
+\`\`\`
+
+See [Testing Guide](./CONTRIBUTING.md#testing-guidelines) for more details.
 
 ## 🚢 Deployment
 
@@ -336,6 +380,31 @@ http://localhost:5000/api-docs
 https://your-domain.com/api-docs
 \`\`\`
 
+### Health & Monitoring
+
+\`\`\`bash
+# Health check
+GET /health
+
+# Prometheus metrics
+GET /metrics
+\`\`\`
+
+**Response:**
+\`\`\`json
+{
+  "status": "healthy",
+  "timestamp": "2025-10-15T12:00:00.000Z",
+  "uptime": 12345,
+  "environment": "production",
+  "features": {
+    "maintenance": false,
+    "ai": true,
+    "analytics": true
+  }
+}
+\`\`\`
+
 ### Key Endpoints
 
 #### Authentication
@@ -391,6 +460,58 @@ npm run db:push
 \`\`\`
 
 **⚠️ Important**: Never change existing primary key ID types. See [Database Migrations Guide](./docs/DATABASE_MIGRATIONS.md).
+
+## 🎛️ Feature Flags
+
+The application includes a feature flagging system for controlled feature rollout:
+
+\`\`\`typescript
+// server/config/features.ts
+export const features = {
+  aiRecommendations: true,
+  chatWithData: true,
+  contentCopilot: true,
+  // ... more features
+};
+\`\`\`
+
+**Environment-based controls:**
+- Set `MAINTENANCE_MODE=true` to enable maintenance mode
+- Features auto-adjust for development vs production
+
+**Usage in routes:**
+\`\`\`typescript
+import { requireFeature } from './config/features';
+
+app.post('/api/ai/analyze', requireFeature('chatWithData'), handler);
+\`\`\`
+
+## 📊 Monitoring & Observability
+
+### Prometheus Metrics
+
+Access metrics at `/metrics`:
+- HTTP request duration & count
+- Error rates by endpoint
+- Active connections
+- AI request metrics
+- Custom business metrics
+
+### Request Tracing
+
+Every request includes a unique `X-Request-ID` for correlation across logs:
+
+\`\`\`
+2025-10-15 12:00:00 [489VFNBAwHG0] [info]: GET /api/clients 200 - 45ms - 1234 bytes
+\`\`\`
+
+### Structured Logging
+
+Winston-based logging with:
+- Console output (development)
+- File transports (`logs/error.log`, `logs/combined.log`)
+- Request/response logging
+- Error stack traces
 
 ## 🏗️ Architecture
 
