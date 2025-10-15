@@ -425,6 +425,71 @@ export async function fetchGA4KeyEvents(
 }
 
 /**
+ * Fetch all available GA4 Key Events (for selection UI)
+ * @param accessToken - Valid access token
+ * @param propertyId - GA4 property ID
+ * @param clientId - Client ID for rate limiting
+ * @returns List of all key events with their counts (last 30 days)
+ */
+export async function fetchGA4AvailableKeyEvents(
+  accessToken: string,
+  propertyId: string,
+  clientId: string
+) {
+  const oauth2Client = createOAuth2Client();
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+  });
+
+  const analyticsData = google.analyticsdata({
+    version: 'v1beta',
+    auth: oauth2Client,
+  });
+
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  return withRateLimitAndRetry('GA4', clientId, async () => {
+    const response = await analyticsData.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        metrics: [
+          { name: 'eventCount' },
+        ],
+        dimensions: [{ name: 'eventName' }],
+        // Only include events marked as key events
+        dimensionFilter: {
+          filter: {
+            fieldName: 'isKeyEvent',
+            stringFilter: {
+              matchType: 'EXACT',
+              value: 'true',
+            },
+          },
+        },
+        orderBys: [
+          {
+            metric: {
+              metricName: 'eventCount',
+            },
+            desc: true,
+          },
+        ],
+        limit: 50, // Get top 50 key events
+      },
+    });
+
+    const events = (response.data.rows || []).map(row => ({
+      eventName: row.dimensionValues?.[0]?.value || '',
+      eventCount: parseInt(row.metricValues?.[0]?.value || '0', 10),
+    }));
+
+    return { events };
+  });
+}
+
+/**
  * Fetch Google Search Console analytics data
  * @param accessToken - Valid access token
  * @param siteUrl - GSC site URL
