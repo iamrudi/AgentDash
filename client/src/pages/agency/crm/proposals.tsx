@@ -318,32 +318,21 @@ export default function ProposalBuilderPage() {
       const user = await getAuthUser();
       if (!user?.token) throw new Error("Not authenticated");
 
-      const response = await fetch(`/api/crm/proposals/${proposal.id}/export-pdf`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${user.token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to export PDF");
+      // Open print view in new window
+      const printUrl = `/api/proposals/${proposal.id}/print`;
+      const printWindow = window.open(printUrl + `?token=${user.token}`, '_blank');
+      
+      if (!printWindow) {
+        throw new Error("Please allow popups to export PDF");
       }
 
-      // Download the PDF
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${proposal.name.replace(/[^a-z0-9]/gi, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({ title: "PDF exported successfully" });
+      toast({
+        title: "Print view opened",
+        description: "Click 'Print to PDF' in the new window to save your proposal",
+      });
     } catch (error) {
       console.error("Export PDF error:", error);
-      toast({ title: "Failed to export PDF", variant: "destructive" });
+      toast({ title: "Failed to open print view", variant: "destructive" });
     }
   };
 

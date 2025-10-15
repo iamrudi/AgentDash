@@ -82,7 +82,7 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **Workflow States**: Draft → Sent → Accepted/Rejected status tracking
   - **Database Schema**: 3-table design (proposalTemplates, proposals, proposalSections) with JSONB content and sortOrder
   - **Template Seeding**: `server/seed-templates.ts` script populates 10 high-quality templates with Markdown and merge tags
-  - **PDF Export**: Infrastructure implemented but blocked by Replit environment limitations (requires serverless deployment for Chromium)
+  - **PDF Export**: Browser-native print solution using print-optimized HTML (GET `/api/proposals/:id/print`). Opens in new window with "Print to PDF" button. Supabase Auth token-based authentication via query params for popup windows (bypasses requireAuth middleware). Markdown content rendered using `marked` library. Custom endpoint path outside /api/crm to avoid global requireAuth middleware.
 
 ### System Design Choices
 - **Multi-tenancy**: Defense-in-depth tenant isolation with three layers:
