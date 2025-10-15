@@ -29,9 +29,31 @@ export async function generateAIRecommendations(
       return { success: false, recommendationsCreated: 0, error: "Client not found" };
     }
 
-    // 2. Check if at least one integration is connected
-    const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
-    const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+    // 2. Check if at least one integration is connected (with error handling for decryption issues)
+    let ga4Integration;
+    let gscIntegration;
+    
+    try {
+      ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Decryption failed')) {
+        console.error('GA4 integration decryption failed - likely encryption key mismatch:', error.message);
+        // Continue without GA4 data
+      } else {
+        throw error;
+      }
+    }
+    
+    try {
+      gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Decryption failed')) {
+        console.error('GSC integration decryption failed - likely encryption key mismatch:', error.message);
+        // Continue without GSC data
+      } else {
+        throw error;
+      }
+    }
     
     if (!ga4Integration && !gscIntegration) {
       return { 

@@ -573,12 +573,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { clientId } = req.params;
       
-      // Get GA4 integration
-      const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
-      // Get GSC integration
-      const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      // Get GA4 integration (with error handling for decryption issues)
+      let ga4Integration;
+      try {
+        ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Decryption failed')) {
+          console.error('GA4 integration decryption failed - likely encryption key mismatch:', error.message);
+          ga4Integration = undefined;
+        } else {
+          throw error;
+        }
+      }
+      
+      // Get GSC integration (with error handling for decryption issues)
+      let gscIntegration;
+      try {
+        gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Decryption failed')) {
+          console.error('GSC integration decryption failed - likely encryption key mismatch:', error.message);
+          gscIntegration = undefined;
+        } else {
+          throw error;
+        }
+      }
+      
       // Check DataForSEO - either client-level or agency-level with access
-      const clientIntegrations = await storage.getAllIntegrationsByClientId(clientId);
+      let clientIntegrations: any[] = [];
+      try {
+        clientIntegrations = await storage.getAllIntegrationsByClientId(clientId);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Decryption failed')) {
+          console.error('Client integrations decryption failed - likely encryption key mismatch:', error.message);
+          clientIntegrations = [];
+        } else {
+          throw error;
+        }
+      }
       const dataForSeoClientIntegration = clientIntegrations.find((i: any) => i.serviceName === 'DataForSEO');
       
       // Check agency-level DataForSEO integration
