@@ -578,7 +578,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const gscIntegration = await storage.getIntegrationByClientId(clientId, 'GSC');
       // Check DataForSEO - either client-level or agency-level with access
       const clientIntegrations = await storage.getAllIntegrationsByClientId(clientId);
-      const dataForSeoIntegration = clientIntegrations.find((i: any) => i.service === 'DataForSEO');
+      const dataForSeoClientIntegration = clientIntegrations.find((i: any) => i.serviceName === 'DataForSEO');
+      
+      // Check agency-level DataForSEO integration
+      let dataForSeoConnected = false;
+      let dataForSeoSource: 'client' | 'agency' | undefined;
+      
+      if (dataForSeoClientIntegration) {
+        // Integration row exists for this client
+        dataForSeoConnected = true;
+        dataForSeoSource = 'client';
+      } else if (req.user?.agencyId) {
+        // Check for agency-level integration
+        const agencyIntegration = await storage.getAgencyIntegration(req.user?.agencyId, 'DataForSEO');
+        if (agencyIntegration) {
+          // Check if client has access to agency integration
+          const hasAccess = await storage.hasClientAccess(agencyIntegration.id, clientId);
+          if (hasAccess) {
+            dataForSeoConnected = true;
+            dataForSeoSource = 'agency';
+          }
+        }
+      }
       
       res.json({
         ga4: {
@@ -590,8 +611,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastSync: gscIntegration?.updatedAt ? new Date(gscIntegration.updatedAt).toLocaleString() : undefined
         },
         dataForSEO: {
-          connected: !!dataForSeoIntegration,
-          keywordCount: 850 // Placeholder - would come from actual data
+          connected: dataForSeoConnected,
+          source: dataForSeoSource
         }
       });
     } catch (error: any) {

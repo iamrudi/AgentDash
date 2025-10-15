@@ -104,14 +104,19 @@ export async function generateAIRecommendations(
       .map(o => o.description)
       .join("; ") || undefined;
 
-    // 11. Prepare competitor context if provided
+    // 11. Note: DataForSEO integration available but requires client website field
+    // TODO: Add website field to clients schema to enable DataForSEO keyword gap analysis
+    // Once added, we can fetch keyword opportunities by comparing client domain to competitors
+    // For now, DataForSEO connection status is displayed but not used in AI analysis
+
+    // 12. Prepare competitor context if provided
     let competitorContext: string | undefined;
     if (options.includeCompetitors && options.competitorDomains && options.competitorDomains.length > 0) {
       competitorContext = `Competitor domains to analyze against: ${options.competitorDomains.join(", ")}. 
 Include competitive analysis and opportunities to outperform these competitors.`;
     }
 
-    // 12. Call Gemini AI to analyze and generate recommendations
+    // 13. Call Gemini AI to analyze and generate recommendations
     const aiRecommendations = await analyzeClientMetrics(
       client.companyName,
       formattedGA4,
