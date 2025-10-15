@@ -15,7 +15,7 @@ import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
-import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
+import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { encrypt, decrypt } from "./lib/encryption";
 import { generateContentIdeas, generateContentBrief, optimizeContent } from "./lib/contentGeneration";
@@ -1625,6 +1625,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ga4LeadEventName: updated.ga4LeadEventName,
       });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fetch available GA4 key events for selection (Admin only)
+  app.get("/api/integrations/ga4/:clientId/key-events", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      let integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      
+      if (!integration || !integration.ga4PropertyId) {
+        return res.status(404).json({ message: "GA4 integration or property not configured" });
+      }
+
+      // Check if token is expired and refresh if needed
+      if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
+        if (!integration.refreshToken) {
+          return res.status(401).json({ message: "Token expired and no refresh token available" });
+        }
+
+        const newTokens = await refreshAccessToken(integration.refreshToken);
+        integration = await storage.updateIntegration(integration.id, {
+          accessToken: newTokens.accessToken,
+          expiresAt: newTokens.expiresAt,
+        });
+      }
+
+      const keyEventsData = await fetchGA4AvailableKeyEvents(
+        integration.accessToken!,
+        integration.ga4PropertyId!,
+        clientId
+      );
+      
+      res.json(keyEventsData);
+    } catch (error: any) {
+      console.error("Fetch key events error:", error);
+      const message = error.userMessage || error.message || "Failed to fetch key events";
+      res.status(500).json({ message });
+    }
+  });
+
+  // Save selected lead events for a client (Admin only)
+  app.post("/api/clients/:clientId/lead-events", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      const { leadEvents } = req.body;
+
+      // Validate leadEvents is an array of strings
+      if (!Array.isArray(leadEvents)) {
+        return res.status(400).json({ message: "leadEvents must be an array" });
+      }
+
+      if (!leadEvents.every(event => typeof event === 'string')) {
+        return res.status(400).json({ message: "All lead events must be strings" });
+      }
+
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const updated = await storage.updateClient(clientId, {
+        leadEvents,
+      });
+
+      res.json({
+        message: "Lead events saved successfully",
+        leadEvents: updated.leadEvents,
+      });
+    } catch (error: any) {
+      console.error("Save lead events error:", error);
       res.status(500).json({ message: error.message });
     }
   });
