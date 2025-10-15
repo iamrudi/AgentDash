@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Client } from "@shared/schema";
 import { Building2, CheckCircle2, XCircle, Link as LinkIcon, Loader2 } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
@@ -746,57 +747,14 @@ export default function AgencyIntegrationsPage() {
       </Dialog>
 
       {/* Edit Lead Event Dialog */}
-      <Dialog open={editLeadEventDialogOpen} onOpenChange={(open) => {
-        setEditLeadEventDialogOpen(open);
-        if (!open) setLeadEventName("");
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Configure Lead Events</DialogTitle>
-            <DialogDescription>
-              Enter one or more GA4 Key Event names (comma-separated) that represent leads for this client
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-lead-event-name">Lead Event Names</Label>
-              <Input
-                id="edit-lead-event-name"
-                placeholder="e.g., form_submit, generate_lead, Main_Form"
-                value={leadEventName}
-                onChange={(e) => setLeadEventName(e.target.value)}
-                data-testid="input-edit-lead-event-name"
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Enter one or more event names separated by commas. Example: "form_submit, generate_lead, email_click"
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setEditLeadEventDialogOpen(false)}
-                data-testid="button-cancel-edit-lead-event"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  updateLeadEventMutation.mutate({
-                    clientId: currentClientId,
-                    leadEventName: leadEventName.trim() || null,
-                  });
-                }}
-                disabled={updateLeadEventMutation.isPending}
-                data-testid="button-save-edit-lead-event"
-              >
-                {updateLeadEventMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <LeadEventsDialog
+        clientId={currentClientId}
+        open={editLeadEventDialogOpen}
+        onOpenChange={(open) => {
+          setEditLeadEventDialogOpen(open);
+          if (!open) setLeadEventName("");
+        }}
+      />
 
       {/* Data for SEO Connection Dialog */}
       <Dialog open={dataForSeoDialogOpen} onOpenChange={(open) => {
@@ -1163,5 +1121,135 @@ function ClientIntegrationCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function LeadEventsDialog({
+  clientId,
+  open,
+  onOpenChange,
+}: {
+  clientId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
+
+  // Fetch client data to get current lead events
+  const { data: client } = useQuery<Client>({
+    queryKey: ["/api/agency/clients", clientId],
+    enabled: open && !!clientId,
+  });
+
+  // Fetch available GA4 key events
+  const { data: keyEventsData, isLoading } = useQuery<{ events: Array<{ eventName: string; eventCount: number }> }>({
+    queryKey: ["/api/integrations/ga4", clientId, "key-events"],
+    enabled: open && !!clientId,
+  });
+
+  // Initialize selected events when client data loads
+  useEffect(() => {
+    if (client?.leadEvents) {
+      setSelectedEvents(client.leadEvents);
+    } else {
+      setSelectedEvents([]);
+    }
+  }, [client]);
+
+  const saveLeadEventsMutation = useMutation({
+    mutationFn: async (leadEvents: string[]) => {
+      return await apiRequest("POST", `/api/clients/${clientId}/lead-events`, { leadEvents });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/clients", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/ga4", clientId] });
+      toast({
+        title: "Success",
+        description: "Lead events updated successfully",
+      });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update lead events",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleEvent = (eventName: string) => {
+    setSelectedEvents(prev => 
+      prev.includes(eventName)
+        ? prev.filter(e => e !== eventName)
+        : [...prev, eventName]
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Configure Lead Events</DialogTitle>
+          <DialogDescription>
+            Select which GA4 Key Events should be tracked as leads for this client
+          </DialogDescription>
+        </DialogHeader>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : keyEventsData && keyEventsData.events.length > 0 ? (
+          <div className="space-y-4">
+            <div className="max-h-96 overflow-y-auto space-y-2 border rounded-md p-4">
+              {keyEventsData.events.map((event) => (
+                <div key={event.eventName} className="flex items-center justify-between py-2 px-3 hover-elevate rounded-md">
+                  <div className="flex items-center gap-3 flex-1">
+                    <Checkbox
+                      id={`event-${event.eventName}`}
+                      checked={selectedEvents.includes(event.eventName)}
+                      onCheckedChange={() => handleToggleEvent(event.eventName)}
+                      data-testid={`checkbox-lead-event-${event.eventName}`}
+                    />
+                    <Label htmlFor={`event-${event.eventName}`} className="text-sm font-medium cursor-pointer flex-1">
+                      {event.eventName}
+                    </Label>
+                  </div>
+                  <Badge variant="secondary" className="ml-2">
+                    {event.eventCount.toLocaleString()} events (30d)
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <p>{selectedEvents.length} event{selectedEvents.length !== 1 ? 's' : ''} selected</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-cancel-lead-events"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => saveLeadEventsMutation.mutate(selectedEvents)}
+                disabled={saveLeadEventsMutation.isPending}
+                data-testid="button-save-lead-events"
+              >
+                {saveLeadEventsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 text-muted-foreground">
+            <p>No key events found for this GA4 property.</p>
+            <p className="text-sm mt-2">Make sure your GA4 property has key events configured.</p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
