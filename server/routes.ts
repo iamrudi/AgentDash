@@ -2,6 +2,7 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import crmRouter from "./routes/crm";
+import settingsRouter from "./routes/settings";
 import { 
   requireAuth, 
   requireRole, 
@@ -4089,6 +4090,9 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
 
   // Register CRM routes
   app.use("/api/crm", requireAuth, crmRouter);
+
+  // Register Settings routes
+  app.use("/api/settings", settingsRouter);
 
   const httpServer = createServer(app);
   return httpServer;

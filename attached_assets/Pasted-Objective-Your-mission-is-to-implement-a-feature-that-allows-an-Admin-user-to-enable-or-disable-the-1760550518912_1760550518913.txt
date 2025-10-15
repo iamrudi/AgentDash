@@ -1,0 +1,228 @@
+Objective: Your mission is to implement a feature that allows an Admin user to enable or disable the global API rate limiter from the Agency Settings page. This is primarily a development/debugging tool. The state should be managed in-memory on the server.
+
+Step 1: Create the Backend Control Mechanism
+We need an in-memory flag and API endpoints to control the rate limiter's state.
+
+First, create a new file to manage this runtime setting.
+
+New File: server/config/runtimeSettings.ts
+
+TypeScript
+
+// server/config/runtimeSettings.ts
+// This object holds the in-memory state for runtime configurations.
+
+export const runtimeSettings = {
+  isRateLimiterEnabled: true, // Default to enabled
+};
+Next, create a new router for settings-related actions. This will include endpoints to get the current status and to toggle it. Access to toggle the setting must be restricted to Admin users.
+
+New File: server/routes/settings.ts
+
+TypeScript
+
+// server/routes/settings.ts
+
+import { Router } from 'express';
+import { requireAuth, requireRole } from '../middleware/auth';
+import { runtimeSettings } from '../config/runtimeSettings';
+
+const settingsRouter = Router();
+
+/**
+ * @route GET /api/settings/rate-limit-status
+ * @description Get the current status of the API rate limiter
+ * @access Private
+ */
+settingsRouter.get('/rate-limit-status', requireAuth, (req, res) => {
+  res.json({ isEnabled: runtimeSettings.isRateLimiterEnabled });
+});
+
+/**
+ * @route POST /api/settings/toggle-rate-limit
+ * @description Toggles the API rate limiter on or off
+ * @access Private (Admin Only)
+ */
+settingsRouter.post(
+  '/toggle-rate-limit',
+  requireAuth,
+  requireRole('admin'), // IMPORTANT: Restrict this action to admins
+  (req, res) => {
+    runtimeSettings.isRateLimiterEnabled = !runtimeSettings.isRateLimiterEnabled;
+    res.json({
+      message: `Rate limiter is now ${runtimeSettings.isRateLimiterEnabled ? 'enabled' : 'disabled'}.`,
+      isEnabled: runtimeSettings.isRateLimiterEnabled,
+    });
+  },
+);
+
+export default settingsRouter;
+Now, register this new router in the main API router file.
+
+File: server/routes.ts
+
+TypeScript
+
+// ... (other imports)
+import settingsRouter from './routes/settings'; // <-- IMPORT
+
+const router = Router();
+
+// ... (existing routes)
+
+router.use('/api/settings', settingsRouter); // <-- ADD THIS LINE
+
+// ... (rest of the routes)
+
+export default router;
+Step 2: Apply the Rate Limiter Conditionally
+Modify server/index.ts to check our in-memory flag before applying the rate limiter middleware on each request.
+
+File: server/index.ts
+
+TypeScript
+
+// server/index.ts
+
+// ... (imports)
+import rateLimiter from './middleware/rateLimiter';
+import { runtimeSettings } from './config/runtimeSettings'; // <-- IMPORT
+// ... (other imports)
+
+// ...
+
+// Apply rate limiting conditionally
+app.use((req, res, next) => {
+  if (runtimeSettings.isRateLimiterEnabled) {
+    return rateLimiter(req, res, next);
+  }
+  next();
+});
+
+// ... (rest of the server setup)
+Step 3: Build the Frontend Toggle Component
+Create a new component that fetches the rate limit status and provides a switch to toggle it.
+
+New File: client/src/components/agency/rate-limit-toggle.tsx
+
+TypeScript
+
+// client/src/components/agency/rate-limit-toggle.tsx
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+
+async function fetchRateLimitStatus() {
+  const res = await fetch('/api/settings/rate-limit-status');
+  if (!res.ok) {
+    throw new Error('Network response was not ok');
+  }
+  return res.json();
+}
+
+async function toggleRateLimit() {
+  const res = await fetch('/api/settings/toggle-rate-limit', {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    throw new Error('You may not have permission to perform this action.');
+  }
+  return res.json();
+}
+
+export function RateLimitToggle() {
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['rateLimitStatus'],
+    queryFn: fetchRateLimitStatus,
+  });
+
+  const mutation = useMutation({
+    mutationFn: toggleRateLimit,
+    onSuccess: (newData) => {
+      queryClient.setQueryData(['rateLimitStatus'], { isEnabled: newData.isEnabled });
+      toast({
+        title: 'Success',
+        description: `API rate limiter is now ${newData.isEnabled ? 'ON' : 'OFF'}.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to toggle rate limiter.',
+        variant: 'destructive',
+      });
+    },
+  });
+  
+  if (isError) {
+    // This component is admin-only, so non-admins might see an error.
+    // We can choose to render nothing if it fails.
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Developer Settings</CardTitle>
+        <CardDescription>
+          These settings are for development and debugging purposes.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center space-x-2">
+             <Skeleton className="h-6 w-24" />
+             <Skeleton className="h-6 w-12" />
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="rate-limit-switch"
+              checked={data?.isEnabled}
+              onCheckedChange={() => mutation.mutate()}
+              disabled={mutation.isPending}
+            />
+            <Label htmlFor="rate-limit-switch">
+              API Rate Limiter ({data?.isEnabled ? 'ON' : 'OFF'})
+            </Label>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+Step 4: Add the Component to the Settings Page
+Finally, place the new component on the agency settings page.
+
+File: client/src/pages/agency/settings.tsx
+
+TypeScript
+
+// client/src/pages/agency/settings.tsx
+
+import { RateLimitToggle } from '@/components/agency/rate-limit-toggle'; // <-- IMPORT
+
+export default function AgencySettingsPage() {
+  return (
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground">
+          Manage your agency account settings.
+        </p>
+      </div>
+      <div className="mt-6 space-y-8">
+        {/* Other settings cards can go here */}
+        
+        {/* Add the new developer settings card */}
+        <RateLimitToggle />
+      </div>
+    </div>
+  );
+}

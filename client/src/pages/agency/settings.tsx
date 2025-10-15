@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
+import { RateLimitToggle } from "@/components/agency/rate-limit-toggle";
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
@@ -143,6 +144,15 @@ export default function Settings() {
             </Card>
           </div>
         ))}
+
+        <Separator className="my-6" />
+
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold text-muted-foreground tracking-wider">
+            DEVELOPER
+          </h2>
+          <RateLimitToggle />
+        </div>
 
         <Separator className="my-6" />
 

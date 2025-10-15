@@ -10,6 +10,7 @@ import { requestIdMiddleware } from "./middleware/requestId";
 import { requestLogger } from "./middleware/logger";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { generalLimiter } from "./middleware/rateLimiter";
+import { runtimeSettings } from "./config/runtimeSettings";
 import { metricsMiddleware, metricsHandler } from "./middleware/metrics";
 import { swaggerSpec } from "./config/swagger";
 import { features } from "./config/features";
@@ -39,8 +40,13 @@ app.use(express.urlencoded({ extended: false }));
 // Request logging (after body parsing)
 app.use(requestLogger);
 
-// Rate limiting for general requests
-app.use(generalLimiter);
+// Apply rate limiting conditionally
+app.use((req, res, next) => {
+  if (runtimeSettings.isRateLimiterEnabled) {
+    return generalLimiter(req, res, next);
+  }
+  next();
+});
 
 // Legacy logging (can be removed once Winston is fully adopted)
 app.use((req, res, next) => {
