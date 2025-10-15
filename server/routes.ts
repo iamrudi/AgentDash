@@ -484,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const ga4Data = await fetchGA4Data(ga4Integration.accessToken, ga4Integration.ga4PropertyId, start, end, clientId);
         
         // Fetch conversions data if lead events are configured
-        let conversionsData: { rows?: Array<{ dimensionValues?: Array<{ value?: string }>, metricValues?: Array<{ value?: string }> }> } = { rows: [] };
+        let conversionsData: { rows?: Array<{ dimensionValues?: Array<{ value?: string | null }>, metricValues?: Array<{ value?: string | null }> }> } = { rows: [] };
         if (client.leadEvents && client.leadEvents.length > 0) {
           try {
             // Join lead events array into comma-separated string (trim to avoid GA4 mismatches)
@@ -3484,8 +3484,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Verify token using Supabase
-      const { supabase } = await import("./lib/supabase");
-      const { data: { user }, error } = await supabase.auth.getUser(token);
+      const { supabaseAdmin } = await import("./lib/supabase");
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
       
       if (error || !user) {
         res.status(401).json({ message: "Invalid or expired token" });

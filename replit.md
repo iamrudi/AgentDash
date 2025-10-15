@@ -45,6 +45,8 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **Code Splitting**: React.lazy() and Suspense for route-based code splitting across all routes
   - **Component Memoization**: React.memo for MetricsChart to prevent unnecessary re-renders
   - **Hover-based Prefetching**: Dashboard data prefetched on "Manage" button hover in clients list for instant navigation
+- **Developer Tools**:
+  - **Rate Limiter Toggle**: In-memory runtime control for API rate limiter (Settings → Developer section). Admin-only toggle switch enables/disables rate limiting for testing and debugging without server restart. Implementation: `server/config/runtimeSettings.ts` for state management, conditional middleware application in `server/index.ts`, frontend component at `client/src/components/agency/rate-limit-toggle.tsx`
 
 ### Feature Specifications
 - **Client Portal**: Dashboard (KPIs, action items), Projects, Strategic Initiatives (approve/reject/discuss), Billing, Profile, Support Chat, Chat with your Data.
@@ -57,7 +59,8 @@ The platform is a full-stack JavaScript application using React for the frontend
   - **Companies**: Company profiles with name, website, industry, size, notes
   - **Contacts**: Contact management with first/last name, email, phone, job title, optional company association
   - **Deals**: Sales pipeline with deal name, value (cents storage), stage (lead/qualified/proposal/closed-won/closed-lost), close date, required contact association, optional company association
-  - **Security**: Multi-layer tenant isolation - POST endpoints validate FK ownership before creation, GET endpoints filter cross-agency data. AgencyId excluded from client schemas and injected server-side
+  - **CRUD Operations**: Complete Create, Read, Update, Delete functionality for all three modules with EditCompanyDialog, EditContactDialog, EditDealDialog components, proper form validation, query invalidation, and toast notifications
+  - **Security**: Multi-layer tenant isolation - POST/PATCH/DELETE endpoints validate FK ownership and tenant isolation, GET endpoints filter cross-agency data. AgencyId excluded from client schemas and injected server-side
   - **Data Relationships**: Contacts can be associated with companies; deals require contacts and optionally companies. Null handling uses "__NONE__" sentinel pattern for optional FK fields
 
 ### System Design Choices
