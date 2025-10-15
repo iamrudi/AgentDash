@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -173,7 +172,6 @@ export default function AgencyInvoicesPage() {
   const overdueCount = filteredInvoices.filter(inv => inv.status === "Overdue").length;
 
   return (
-    <AgencyLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -514,6 +512,5 @@ export default function AgencyInvoicesPage() {
           </CardContent>
         </Card>
       </div>
-    </AgencyLayout>
   );
 }

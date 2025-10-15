@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -228,7 +227,6 @@ export default function ContentCopilot() {
   };
 
   return (
-    <AgencyLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -629,6 +627,5 @@ export default function ContentCopilot() {
           </TabsContent>
         </Tabs>
       </div>
-    </AgencyLayout>
   );
 }

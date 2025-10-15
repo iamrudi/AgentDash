@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -221,7 +220,6 @@ export default function AgencyMessagesPage() {
   };
 
   return (
-    <AgencyLayout>
       <div className="h-[calc(100vh-4rem)] flex">
         {/* Conversation List */}
         <div className="w-80 border-r flex flex-col">
@@ -485,6 +483,5 @@ export default function AgencyMessagesPage() {
           </div>
         )}
       </div>
-    </AgencyLayout>
   );
 }

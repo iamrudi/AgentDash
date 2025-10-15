@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Building2, FolderKanban, MessageSquare, TrendingUp, Sparkles, MousePointer, Eye, DollarSign, AlertCircle } from "lucide-react";
@@ -168,7 +167,7 @@ export default function AgencyDashboard() {
   );
 
   return (
-    <AgencyLayout>
+    <>
       <div className="p-6 space-y-6">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
@@ -492,6 +491,6 @@ export default function AgencyDashboard() {
           initialQuestion={`What opportunities do you see for ${selectedClient.companyName}?`}
         />
       )}
-    </AgencyLayout>
+    </>
   );
 }

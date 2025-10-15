@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,8 +34,7 @@ export default function AgencyTasksPage() {
   const completedProjects = filteredProjects?.filter(p => p.status === "Completed") || [];
 
   return (
-    <AgencyLayout>
-      <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold mb-2">Tasks & Projects</h1>
@@ -164,16 +162,15 @@ export default function AgencyTasksPage() {
             )}
           </TabsContent>
         </Tabs>
-      </div>
 
-      <CreateProjectDialog 
-        open={showCreateProject} 
-        onOpenChange={setShowCreateProject} 
-      />
-      <CreateTaskDialog 
-        open={showCreateTask} 
-        onOpenChange={setShowCreateTask} 
-      />
-    </AgencyLayout>
+        <CreateProjectDialog 
+          open={showCreateProject} 
+          onOpenChange={setShowCreateProject} 
+        />
+        <CreateTaskDialog 
+          open={showCreateTask} 
+          onOpenChange={setShowCreateTask} 
+        />
+      </div>
   );
 }

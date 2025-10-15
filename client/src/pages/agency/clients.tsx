@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Client, createClientUserSchema, type CreateClientUser } from "@shared/schema";
@@ -128,8 +127,7 @@ export default function AgencyClientsPage() {
   });
 
   return (
-    <AgencyLayout>
-      <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6">
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-semibold mb-2">Clients</h1>
@@ -471,7 +469,6 @@ export default function AgencyClientsPage() {
             </Table>
           </Card>
         )}
-      </div>
-    </AgencyLayout>
+    </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -120,7 +119,6 @@ export default function SeoAuditPage() {
   };
 
   return (
-    <AgencyLayout>
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-3xl font-semibold mb-2">On-Page SEO Audit</h1>
@@ -352,6 +350,5 @@ export default function SeoAuditPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AgencyLayout>
   );
 }

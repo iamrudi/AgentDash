@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { AgencyLayout } from "@/components/agency-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,7 +68,6 @@ export default function TrashPage() {
 
   if (isLoading) {
     return (
-      <AgencyLayout>
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -83,12 +81,10 @@ export default function TrashPage() {
             </CardContent>
           </Card>
         </div>
-      </AgencyLayout>
     );
   }
 
   return (
-    <AgencyLayout>
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -221,6 +217,5 @@ export default function TrashPage() {
           </div>
         )}
       </div>
-    </AgencyLayout>
   );
 }
