@@ -1696,8 +1696,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get returnTo parameter for context-aware redirect after OAuth
-      const returnTo = (req.query.returnTo as string) || 
-        (profile.role === "Admin" ? "/agency/integrations" : "/client");
+      // Security: Validate returnTo to prevent open redirect vulnerabilities
+      let returnTo = req.query.returnTo as string;
+      
+      // Default fallback based on role
+      const defaultReturnTo = profile.role === "Admin" ? "/agency/integrations" : "/client";
+      
+      // Validate returnTo is a safe internal path (must start with "/" and not be a protocol URL)
+      if (returnTo) {
+        // Strip any leading/trailing whitespace
+        returnTo = returnTo.trim();
+        
+        // Check if it's a relative path (starts with /) and doesn't contain protocol or //
+        if (!returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('://')) {
+          console.warn(`[OAuth Security] Rejected unsafe returnTo: ${returnTo}`);
+          returnTo = defaultReturnTo;
+        }
+      } else {
+        returnTo = defaultReturnTo;
+      }
 
       // Get client ID - for Admin, use query param; for Client, use their own
       let clientId: string;
@@ -1753,7 +1770,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(`/client?oauth_error=invalid_state`);
       }
       
-      const { clientId, service, returnTo } = stateData;
+      const { clientId, service, returnTo: stateReturnTo } = stateData;
+
+      // Security: Defensive validation of returnTo even though it was validated before signing
+      let returnTo = stateReturnTo;
+      const defaultReturnTo = stateData.initiatedBy === "Admin" ? "/agency/integrations" : "/client";
+      
+      if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('://')) {
+        console.warn(`[OAuth Security] Invalid returnTo in callback, using fallback: ${returnTo}`);
+        returnTo = defaultReturnTo;
+      }
 
       // Exchange code for tokens
       const tokens = await exchangeCodeForTokens(code as string);
