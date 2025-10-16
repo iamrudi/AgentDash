@@ -21,7 +21,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Responsive touch-friendly navigation with proper dismissal UX
 
 ### Technical Implementations
-- **Authentication & Authorization**: Supabase Auth, RBAC, tenant isolation, and automatic token refresh. Agency ID is stored in secure JWT `app_metadata`. OAuth race condition resolved via AuthProvider `authReady` flag that blocks queries until session restoration completes after OAuth redirects.
+- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation. Agency ID and role stored in secure `app_metadata` (immutable by users). OAuth race condition resolved at root cause via stateless authentication - agencyId always available in token. AuthProvider `authReady` flag provides additional safety layer. Backward compatible fallback to profile table for legacy users.
 - **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies and a `auth.get_agency_id()` helper.
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates and toast notifications.

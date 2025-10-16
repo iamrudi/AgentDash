@@ -33,44 +33,68 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       return res.status(401).json({ message: "Invalid or expired token" });
     }
 
-    // Get user profile from our database (profile.id = Supabase Auth user ID)
-    const [profile] = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, user.id))
-      .limit(1);
+    // Extract role and agencyId from app_metadata (stateless, no DB query needed)
+    // Fallback to user_metadata for backward compatibility with existing users
+    const role = (user.app_metadata?.['role'] || user.user_metadata?.['role']) as string;
+    let agencyId: string | undefined = user.app_metadata?.['agency_id'] || undefined;
+    let clientId: string | undefined;
 
-    if (!profile) {
-      return res.status(401).json({ message: "User profile not found" });
+    // Validate role exists
+    if (!role) {
+      return res.status(401).json({ message: "User role not found in token" });
     }
 
-    let clientId: string | undefined;
-    let agencyId: string | undefined = profile.agencyId || undefined;
-
-    // If user is a client, get their clientId for tenant isolation
-    if (profile.role === "Client") {
+    // Handle different user roles
+    if (role === "Client") {
+      // Client users: query database to get their clientId and agencyId
       const [client] = await db
         .select()
         .from(clients)
-        .where(eq(clients.profileId, profile.id))
+        .where(eq(clients.profileId, user.id))
         .limit(1);
       
-      clientId = client?.id;
-      agencyId = client?.agencyId; // Clients also belong to an agency
-    } else if (profile.role === "Admin" || profile.role === "Staff") {
-      // For Admin/Staff, get agencyId from profile
-      agencyId = profile.agencyId || undefined;
+      if (!client) {
+        return res.status(401).json({ message: "Client profile not found" });
+      }
+      
+      if (!client.agencyId) {
+        console.warn(`Client user ${user.id} has no agencyId in client record`);
+        return res.status(401).json({ message: "Agency association not found for client" });
+      }
+      
+      clientId = client.id;
+      agencyId = client.agencyId;
+    } else if ((role === "Admin" || role === "Staff") && !agencyId) {
+      // Admin/Staff without agencyId in app_metadata: fallback to profile table
+      // This ensures backward compatibility with existing users
+      const [profile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, user.id))
+        .limit(1);
+      
+      if (!profile) {
+        return res.status(401).json({ message: "User profile not found" });
+      }
+      
+      agencyId = profile.agencyId;
+      
+      if (!agencyId) {
+        console.warn(`Admin/Staff user ${user.id} has no agencyId in profile or app_metadata`);
+        return res.status(401).json({ message: "Agency association not found" });
+      }
     }
+    // For Admin/Staff with agencyId in app_metadata - no DB query needed (optimal path)
     
     req.user = {
       id: user.id, // Supabase Auth user ID
       email: user.email || '',
-      role: profile.role,
+      role,
       clientId,
       agencyId,
     };
 
-    console.log(`[AUTH] User ${user.email} authenticated - Role: ${profile.role}, AgencyId: ${agencyId}, ClientId: ${clientId}`);
+    console.log(`[AUTH] User ${user.email} authenticated - Role: ${role}, AgencyId: ${agencyId}, ClientId: ${clientId}`);
     
     next();
   } catch (error) {

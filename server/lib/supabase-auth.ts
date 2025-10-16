@@ -21,11 +21,11 @@ export async function createUserWithProfile(
     email_confirm: true, // Auto-confirm email
     user_metadata: {
       fullName,
-      role,
     },
-    // CRITICAL: Use app_metadata for agencyId (secure, user cannot modify)
+    // CRITICAL: Use app_metadata for security-critical fields (secure, user cannot modify)
     app_metadata: {
-      agency_id: agencyId || null
+      agency_id: agencyId || null,
+      role: role // Store role in app_metadata for security
     }
   });
 
@@ -116,9 +116,9 @@ export async function updateUserMetadata(
   const userMetadata: Record<string, any> = {};
   const appMetadata: Record<string, any> = {};
 
-  // Separate updates into user_metadata (display info) and app_metadata (secure tenant info)
+  // Separate updates into user_metadata (display info) and app_metadata (secure fields)
   if (updates.fullName !== undefined) userMetadata.fullName = updates.fullName;
-  if (updates.role !== undefined) userMetadata.role = updates.role;
+  if (updates.role !== undefined) appMetadata.role = updates.role; // Store role in app_metadata for security
   if (updates.agencyId !== undefined) appMetadata.agency_id = updates.agencyId;
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
