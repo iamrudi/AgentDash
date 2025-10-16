@@ -61,11 +61,11 @@ export function UserProfileDropdown() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
-          onClick={() => setLocation(authUser.profile.role === 'Admin' ? '/agency/profile' : '/client/profile')}
+          onClick={() => setLocation(authUser.profile.role === 'Admin' || authUser.profile.role === 'Staff' ? '/agency/settings' : '/client/profile')}
           data-testid="menu-item-profile"
         >
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
+          <Settings className="mr-2 h-4 w-4" />
+          <span>{authUser.profile.role === 'Admin' || authUser.profile.role === 'Staff' ? 'Settings' : 'Profile'}</span>
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger data-testid="menu-item-theme">
