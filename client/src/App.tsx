@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ClientLayout } from "@/components/client-layout";
 import { AgencyLayout } from "@/components/agency-layout";
+import { AuthProvider } from "@/context/auth-provider";
 
 // Lazy-loaded pages for code splitting
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -334,14 +335,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="light">
-        <TooltipProvider>
-          <Toaster />
-          <Suspense fallback={<PageLoader />}>
-            <Router />
-          </Suspense>
-        </TooltipProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider defaultTheme="light">
+          <TooltipProvider>
+            <Toaster />
+            <Suspense fallback={<PageLoader />}>
+              <Router />
+            </Suspense>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
