@@ -32,7 +32,7 @@ function CorsDomainsManager() {
   const [newDomain, setNewDomain] = useState("");
   const { toast } = useToast();
 
-  const { data: corsData, isLoading } = useQuery({
+  const { data: corsData, isLoading } = useQuery<{ domains: string[] }>({
     queryKey: ['/api/settings/cors-domains'],
   });
 
