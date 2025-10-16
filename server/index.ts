@@ -31,10 +31,57 @@ app.use(helmet({
 // =================================================================
 // CORS Configuration - Dynamic Whitelist for Public API Endpoints
 // =================================================================
+
+// Build list of allowed same-origin hostnames
+function getAllowedSameOriginHosts(): Set<string> {
+  const hosts = new Set<string>();
+  
+  // Add localhost
+  hosts.add(`localhost:${env.PORT}`);
+  
+  // Add VITE_PUBLIC_URL if set
+  if (process.env.VITE_PUBLIC_URL) {
+    try {
+      const url = new URL(process.env.VITE_PUBLIC_URL);
+      hosts.add(url.host); // includes hostname:port
+    } catch (e) {
+      console.warn('[CORS] Invalid VITE_PUBLIC_URL:', process.env.VITE_PUBLIC_URL);
+    }
+  }
+  
+  // Add REPLIT_DOMAINS (comma-separated list)
+  if (process.env.REPLIT_DOMAINS) {
+    const replitDomains = process.env.REPLIT_DOMAINS.split(',').map(d => d.trim());
+    replitDomains.forEach(domain => {
+      if (domain) {
+        hosts.add(domain);
+      }
+    });
+  }
+  
+  return hosts;
+}
+
+const allowedSameOriginHosts = getAllowedSameOriginHosts();
+
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g., mobile apps, curl, Postman)
     if (!origin) {
+      return callback(null, true);
+    }
+
+    // Parse origin URL for secure comparison
+    let originUrl: URL;
+    try {
+      originUrl = new URL(origin);
+    } catch (e) {
+      console.warn(`[CORS] Invalid origin format: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
+    }
+
+    // Check if origin is same-origin (strict hostname:port comparison)
+    if (allowedSameOriginHosts.has(originUrl.host)) {
       return callback(null, true);
     }
 
