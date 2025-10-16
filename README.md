@@ -1,7 +1,6 @@
 # Agency Client Portal
 
 [![CI Status](https://github.com/your-org/agency-portal/workflows/CI/badge.svg)](https://github.com/your-org/agency-portal/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A production-ready, multi-tenant SaaS platform for agency-client relationship management with AI-powered insights, project tracking, and automated workflows.
 
@@ -556,10 +555,6 @@ See [Architecture Documentation](./replit.md) for detailed design decisions.
 - **Error Handling**: Use `ApiError` class, centralized middleware
 - **Security**: Never expose secrets, always encrypt sensitive data
 - **Documentation**: Update README/docs with significant changes
-
-## 📄 License
-
-MIT License - see [LICENSE](./LICENSE) file
 
 ## 🆘 Support
 
