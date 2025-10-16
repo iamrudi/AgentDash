@@ -14,6 +14,11 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Design System**: macOS-inspired aesthetic (Apple Blue primary color, San Francisco font, macOS standard border-radius) with Tailwind CSS and Shadcn/UI for styling, supporting dark mode and mobile-first responsiveness.
 - **Icons**: Lucide React for consistent line-art styling.
 - **Navigation**: Collapsible sidebar with icon-only mode and portal-specific branding.
+- **Mobile Responsiveness**: 
+  - Sidebar renders as Sheet overlay on mobile (<768px) with auto-close on navigation
+  - Touch targets meet WCAG AA standards (44x44px minimum)
+  - useIsMobile hook with lazy initialization for accurate viewport detection
+  - Responsive touch-friendly navigation with proper dismissal UX
 
 ### Technical Implementations
 - **Authentication & Authorization**: Supabase Auth, RBAC, tenant isolation, and automatic token refresh. Agency ID is stored in secure JWT `app_metadata`.
