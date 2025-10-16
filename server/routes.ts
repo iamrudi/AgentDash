@@ -1753,7 +1753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect(`/client?oauth_error=invalid_state`);
       }
       
-      const { clientId, service } = stateData;
+      const { clientId, service, returnTo } = stateData;
 
       // Exchange code for tokens
       const tokens = await exchangeCodeForTokens(code as string);
@@ -1780,12 +1780,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Redirect based on who initiated
-      if (stateData.initiatedBy === "Admin") {
-        res.redirect(`/agency/integrations?success=google_connected&clientId=${clientId}&service=${service}`);
-      } else {
-        res.redirect('/client?oauth_success=true');
-      }
+      // Redirect to the original page with success message
+      const separator = returnTo.includes('?') ? '&' : '?';
+      res.redirect(`${returnTo}${separator}success=google_connected&clientId=${clientId}&service=${service}`);
     } catch (error: any) {
       console.error("OAuth callback error:", error);
       res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
