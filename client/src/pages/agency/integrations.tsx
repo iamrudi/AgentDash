@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuthStatus } from "@/context/auth-provider";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ export default function AgencyIntegrationsPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { authReady } = useAuthStatus();
   
   // Dialog states
   const [ga4DialogOpen, setGa4DialogOpen] = useState(false);
@@ -105,6 +107,7 @@ export default function AgencyIntegrationsPage() {
 
   const { data: clients } = useQuery<Client[]>({
     queryKey: ["/api/agency/clients"],
+    enabled: authReady,
   });
 
   // Fetch agency-level Data for SEO integration
@@ -116,6 +119,7 @@ export default function AgencyIntegrationsPage() {
     updatedAt?: string;
   }>({
     queryKey: ["/api/agency/integrations/dataforseo"],
+    enabled: authReady,
   });
 
   // Filter clients based on selection
@@ -126,13 +130,13 @@ export default function AgencyIntegrationsPage() {
   // Fetch GA4 properties
   const { data: ga4Properties, isLoading: loadingGA4Properties } = useQuery<GA4Property[]>({
     queryKey: ["/api/integrations/ga4", currentClientId, "properties"],
-    enabled: ga4DialogOpen && !!currentClientId,
+    enabled: authReady && ga4DialogOpen && !!currentClientId,
   });
 
   // Fetch GSC sites
   const { data: gscSites, isLoading: loadingGSCSites } = useQuery<GSCSite[]>({
     queryKey: ["/api/integrations/gsc", currentClientId, "sites"],
-    enabled: gscDialogOpen && !!currentClientId,
+    enabled: authReady && gscDialogOpen && !!currentClientId,
   });
 
   // Save GA4 property mutation
