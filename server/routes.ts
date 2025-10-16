@@ -1899,6 +1899,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ga4LeadEventName: ga4LeadEventName || null,
       });
 
+      // SYNC: Update client leadEvents array to match GA4 integration (reverse sync)
+      if (ga4LeadEventName) {
+        const leadEventsArray = ga4LeadEventName.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0);
+        await storage.updateClient(clientId, {
+          leadEvents: leadEventsArray,
+        });
+        console.log(`[Lead Events Sync] Updated client ${clientId} leadEvents from GA4 property save: ${leadEventsArray.join(',')}`);
+      } else {
+        // If no lead event name provided, clear the client's leadEvents
+        await storage.updateClient(clientId, {
+          leadEvents: [],
+        });
+        console.log(`[Lead Events Sync] Cleared client ${clientId} leadEvents (GA4 lead event name was null)`);
+      }
+
       res.json({
         message: "GA4 property and lead event saved successfully",
         ga4PropertyId: updated.ga4PropertyId,
@@ -1931,6 +1946,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateIntegration(integration.id, {
         ga4LeadEventName: ga4LeadEventName || null,
       });
+
+      // SYNC: Update client leadEvents array to match GA4 integration (reverse sync)
+      if (ga4LeadEventName) {
+        const leadEventsArray = ga4LeadEventName.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0);
+        await storage.updateClient(clientId, {
+          leadEvents: leadEventsArray,
+        });
+        console.log(`[Lead Events Sync] Updated client ${clientId} leadEvents from lead event PATCH: ${leadEventsArray.join(',')}`);
+      } else {
+        // If no lead event name provided, clear the client's leadEvents
+        await storage.updateClient(clientId, {
+          leadEvents: [],
+        });
+        console.log(`[Lead Events Sync] Cleared client ${clientId} leadEvents (lead event name was cleared via PATCH)`);
+      }
 
       res.json({
         message: "Lead event configuration updated successfully",
@@ -2002,6 +2032,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateClient(clientId, {
         leadEvents,
       });
+
+      // SYNC: Update GA4 integration with lead events to ensure consistency
+      const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');
+      if (ga4Integration) {
+        // Convert array to comma-separated string for GA4 API
+        const leadEventsString = leadEvents.map((e: string) => e.trim()).join(',');
+        await storage.updateIntegration(ga4Integration.id, {
+          ga4LeadEventName: leadEventsString || null,
+        });
+        console.log(`[Lead Events Sync] Updated GA4 integration for client ${clientId} with events: ${leadEventsString}`);
+      }
 
       res.json({
         message: "Lead events saved successfully",
@@ -2095,42 +2136,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         message: "Search Console site saved successfully",
         gscSiteUrl: updated.gscSiteUrl,
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Save selected GA4 property (Admin only)
-  app.post("/api/integrations/ga4/:clientId/property", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
-    try {
-      const { clientId } = req.params;
-      const { ga4PropertyId, ga4LeadEventName } = req.body;
-
-      if (!ga4PropertyId) {
-        return res.status(400).json({ message: "ga4PropertyId is required" });
-      }
-
-      // Validate lead event name if provided (optional)
-      if (ga4LeadEventName && (typeof ga4LeadEventName !== 'string' || ga4LeadEventName.length > 500)) {
-        return res.status(400).json({ message: "ga4LeadEventName must be a string with max 500 characters" });
-      }
-
-      const integration = await storage.getIntegrationByClientId(clientId, 'GA4');
-      
-      if (!integration) {
-        return res.status(404).json({ message: "GA4 integration not found" });
-      }
-
-      const updated = await storage.updateIntegration(integration.id, {
-        ga4PropertyId,
-        ga4LeadEventName: ga4LeadEventName || null,
-      });
-
-      res.json({
-        message: "GA4 property and lead event saved successfully",
-        ga4PropertyId: updated.ga4PropertyId,
-        ga4LeadEventName: updated.ga4LeadEventName,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -29,7 +29,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
 - **AI Recommendation Engine**: Preset-driven system utilizing Google Gemini AI for strategic initiatives and task lists based on real-time connection status and competitor analysis.
 - **Client Strategy Card**: AI-powered consolidated client view.
-- **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data.
+- **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events sync between client.leadEvents and integration.ga4LeadEventName to ensure conversion tracking works correctly across all update paths.
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI summaries and recommendations.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention.
 - **Invoice Automation**: Node-cron for retainers and Puppeteer for PDF generation.
