@@ -1695,6 +1695,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "service query parameter must be 'GA4' or 'GSC'" });
       }
 
+      // Get returnTo parameter for context-aware redirect after OAuth
+      const returnTo = (req.query.returnTo as string) || 
+        (profile.role === "Admin" ? "/agency/integrations" : "/client");
+
       // Get client ID - for Admin, use query param; for Client, use their own
       let clientId: string;
       
@@ -1717,7 +1721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create cryptographically signed state parameter for CSRF protection
-      const state = generateOAuthState(clientId, profile.role, service);
+      const state = generateOAuthState(clientId, profile.role, service, returnTo);
 
       const authUrl = getAuthUrl(state, service);
       res.json({ authUrl });
