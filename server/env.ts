@@ -40,6 +40,11 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
+
+  // CORS (Cross-Origin Resource Sharing)
+  CORS_ALLOWED_ORIGINS: z.string()
+    .default('http://localhost:5000,http://localhost:5173')
+    .transform((val) => val.split(',').map(origin => origin.trim())),
 });
 
 export type Env = z.infer<typeof envSchema>;
