@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
+import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -26,6 +27,32 @@ app.use(helmet({
   contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
   crossOriginEmbedderPolicy: false,
 }));
+
+// =================================================================
+// CORS Configuration - Dynamic Whitelist for Public API Endpoints
+// =================================================================
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., mobile apps, curl, Postman)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    // Check if the origin is in our whitelist from environment variable
+    if (env.CORS_ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      // Log rejected origins for debugging
+      console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, // Allow cookies and authentication headers
+  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+};
+
+app.use(cors(corsOptions));
+// =================================================================
 
 // Request ID for tracing
 app.use(requestIdMiddleware);
