@@ -191,7 +191,7 @@ export function AgencySidebar() {
 
   return (
     <Sidebar 
-      collapsible={sidebarMode === 'hover' || sidebarMode === 'collapsed' ? 'icon' : 'none'}
+      collapsible={sidebarMode === 'hover' || sidebarMode === 'collapsed' ? 'icon' : 'offcanvas'}
       onMouseEnter={() => sidebarMode === 'hover' && setOpen(true)}
       onMouseLeave={() => sidebarMode === 'hover' && setOpen(false)}
     >
