@@ -7,6 +7,7 @@ interface OAuthState {
   clientId: string;
   initiatedBy: string;
   service: 'GA4' | 'GSC' | 'BOTH';
+  returnTo: string;
   timestamp: number;
 }
 
@@ -15,13 +16,15 @@ interface OAuthState {
  * @param clientId - The client ID for this OAuth flow
  * @param initiatedBy - The role of the user who initiated (Admin/Client)
  * @param service - Which Google service(s) to authenticate (GA4, GSC, or BOTH)
+ * @param returnTo - The path to redirect to after successful authentication
  * @returns Signed state string
  */
-export function generateOAuthState(clientId: string, initiatedBy: string, service: 'GA4' | 'GSC' | 'BOTH' = 'BOTH'): string {
+export function generateOAuthState(clientId: string, initiatedBy: string, service: 'GA4' | 'GSC' | 'BOTH' = 'BOTH', returnTo: string = '/agency/integrations'): string {
   const state: OAuthState = {
     clientId,
     initiatedBy,
     service,
+    returnTo,
     timestamp: Date.now(),
   };
 

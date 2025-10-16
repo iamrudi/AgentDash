@@ -1,0 +1,110 @@
+Of course. Here is a clear, consolidated prompt you can provide to your Replit AI to implement the necessary code changes.
+
+Replit Prompt: Fix Broken OAuth Redirect Flow
+Objective: Your mission is to fix a critical bug in our application's Google OAuth flow. Currently, when a user authenticates with Google to connect an integration like GA4, they are incorrectly redirected to the main dashboard instead of being returned to the integrations page to complete the setup. This is caused by a loss of context, or "state," during the redirect.
+
+Your task is to re-architect the OAuth state management to be context-aware, ensuring the user is always returned to their original location after a successful authentication.
+
+1. The Problem: State Amnesia
+The current implementation in server/lib/oauthState.ts and the corresponding route handlers in server/routes.ts do not pass contextual information (like the user's intended return URL) through the OAuth process. The callback handler has no memory of what the user was doing and defaults to sending them to the dashboard.
+
+2. The Solution: Context-Aware State Management
+You will modify the system to encode the user's intended return path into the JWT-based state parameter. The OAuth callback handler will then decode this state and use the path for the final redirect.
+
+Step 1: Enhance the State Generation Logic
+
+File: server/lib/oauthState.ts
+
+Action: Update the generateState function to accept a returnTo string as an argument and include it in the JWT payload. Also, ensure the verifyState function can decode this new payload structure.
+
+TypeScript
+
+// server/lib/oauthState.ts
+
+import { sign, verify } from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-default-secret';
+
+// The payload will now include the return path
+export interface StatePayload {
+  userId: string;
+  returnTo: string;
+  nonce: number;
+}
+
+export function generateState(userId: string, returnTo: string): string {
+  const payload: StatePayload = { userId, returnTo, nonce: Date.now() };
+  return sign(payload, JWT_SECRET, { expiresIn: '15m' });
+}
+
+export function verifyState(token: string): StatePayload {
+  return verify(token, JWT_SECRET) as StatePayload;
+}
+Step 2: Update the Auth URL Endpoint
+
+File: server/routes.ts
+
+Action: In the route handler that generates the Google OAuth URL (e.g., /api/oauth/google/url), you must determine the correct return path based on the user's context. For the GA4 integration, this should be /agency/integrations.
+
+TypeScript
+
+// In server/routes.ts
+import { generateState } from './lib/oauthState';
+import { getAuthUrl } from './lib/googleOAuth';
+
+// ... inside your Express router setup ...
+
+router.get('/api/oauth/google/url', requireAuth, (req, res) => {
+  const service = req.query.service as GoogleService || 'BOTH';
+  
+  // Define the intended return path. This could also come from the query params.
+  const returnTo = '/agency/integrations';
+  
+  // Generate the state with the return path included
+  const state = generateState(req.user.id, returnTo);
+  const authUrl = getAuthUrl(state, service);
+  
+  res.json({ url: authUrl });
+});
+Step 3: Update the OAuth Callback Handler
+
+File: server/routes.ts
+
+Action: This is the most critical change. The callback handler (/api/oauth/google/callback) must now decode the state parameter it receives from Google, extract the returnTo path, and use it for the final browser redirect.
+
+TypeScript
+
+// In server/routes.ts
+import { verifyState } from './lib/oauthState';
+import { exchangeCodeForTokens } from './lib/googleOAuth';
+
+// ... inside your Express router setup ...
+
+router.get('/api/oauth/google/callback', async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code || !state) {
+    return res.status(400).send('Missing code or state parameter');
+  }
+
+  try {
+    // 1. Verify the state and extract the payload
+    const decodedState = verifyState(state as string);
+    const { userId, returnTo } = decodedState;
+
+    // 2. Exchange the authorization code for tokens
+    const tokens = await exchangeCodeForTokens(code as string);
+    
+    // 3. Securely store the tokens for the user (e.g., in your database)
+    // await saveUserTokens(userId, tokens);
+
+    // 4. Redirect the user to their original intended location
+    // Provide a fallback to the dashboard in case returnTo is missing.
+    res.redirect(returnTo || '/agency/dashboard');
+
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    // On error, send the user back to the integrations page with an error message
+    res.redirect('/agency/integrations?error=auth_failed');
+  }
+});
