@@ -32,7 +32,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     const [profile] = await db
       .select()
       .from(profiles)
-      .where(eq(profiles.userId, payload.userId))
+      .where(eq(profiles.id, payload.userId))
       .limit(1);
 
     let clientId: string | undefined;

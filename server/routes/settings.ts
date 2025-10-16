@@ -63,7 +63,7 @@ settingsRouter.get(
 
 /**
  * @route POST /api/settings/cors-domains
- * @description Add a new CORS allowed origin
+ * @description Add a new CORS allowed origin (with normalization)
  * @access Private (Admin Only)
  */
 settingsRouter.post(
@@ -78,9 +78,18 @@ settingsRouter.post(
         return res.status(400).json({ message: 'Domain is required' });
       }
 
-      // Validate domain format (basic URL validation)
+      // Normalize domain to origin format (removes trailing slash, path, etc.)
+      let normalizedDomain: string;
       try {
-        new URL(domain);
+        const url = new URL(domain);
+        normalizedDomain = url.origin; // e.g., "https://example.com"
+        
+        // Reject if there's a path (anything after hostname:port)
+        if (url.pathname !== '/' || url.search || url.hash) {
+          return res.status(400).json({ 
+            message: 'Domain must be a valid origin (protocol://hostname:port) without paths or query parameters' 
+          });
+        }
       } catch (e) {
         return res.status(400).json({ message: 'Invalid domain format. Use full URL (e.g., https://example.com)' });
       }
@@ -92,13 +101,13 @@ settingsRouter.post(
 
       const domains = setting?.value as { domains: string[] } || { domains: [] };
 
-      // Check if domain already exists
-      if (domains.domains.includes(domain)) {
+      // Check if normalized domain already exists
+      if (domains.domains.includes(normalizedDomain)) {
         return res.status(400).json({ message: 'Domain already exists' });
       }
 
-      // Add the new domain
-      domains.domains.push(domain);
+      // Add the new normalized domain
+      domains.domains.push(normalizedDomain);
 
       if (setting) {
         // Update existing setting
@@ -118,6 +127,9 @@ settingsRouter.post(
           updatedBy: req.user!.id,
         });
       }
+
+      // Reload CORS domains in runtime (critical for immediate effect)
+      await reloadCorsDomainsFromDB();
 
       res.json({ message: 'Domain added successfully', domains });
     } catch (error: any) {
@@ -170,6 +182,9 @@ settingsRouter.delete(
           updatedAt: new Date(),
         })
         .where(eq(systemSettings.id, setting.id));
+
+      // Reload CORS domains in runtime (critical for immediate effect)
+      await reloadCorsDomainsFromDB();
 
       res.json({ message: 'Domain removed successfully', domains });
     } catch (error: any) {
