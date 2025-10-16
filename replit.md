@@ -26,7 +26,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
-- **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls.
+- **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
 - **AI Recommendation Engine**: Preset-driven system utilizing Google Gemini AI for strategic initiatives and task lists based on real-time connection status and competitor analysis.
 - **Client Strategy Card**: AI-powered consolidated client view.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data.
