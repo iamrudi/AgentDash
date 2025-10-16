@@ -1001,22 +1001,28 @@ export class DbStorage implements IStorage {
       hasAccessToken: !!result[0]?.accessToken
     });
     
-    // Decrypt tokens before returning
+    // Decrypt tokens before returning (non-fatal if decryption fails)
     if (result[0] && result[0].accessToken) {
       const integration = result[0];
-      if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
-        integration.accessToken = decryptToken(
-          integration.accessToken,
-          integration.accessTokenIv,
-          integration.accessTokenAuthTag
-        );
-      }
-      if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
-        integration.refreshToken = decryptToken(
-          integration.refreshToken,
-          integration.refreshTokenIv,
-          integration.refreshTokenAuthTag
-        );
+      try {
+        if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
+          integration.accessToken = decryptToken(
+            integration.accessToken,
+            integration.accessTokenIv,
+            integration.accessTokenAuthTag
+          );
+        }
+        if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
+          integration.refreshToken = decryptToken(
+            integration.refreshToken,
+            integration.refreshTokenIv,
+            integration.refreshTokenAuthTag
+          );
+        }
+      } catch (error: any) {
+        console.warn('[Storage] Token decryption failed, returning integration without decrypted tokens:', error.message);
+        // Return the integration anyway - the caller can decide how to handle
+        // This prevents OAuth callback from crashing when checking if integration exists
       }
     }
     
@@ -1028,21 +1034,25 @@ export class DbStorage implements IStorage {
       .where(eq(clientIntegrations.clientId, clientId))
       .orderBy(desc(clientIntegrations.createdAt));
     
-    // Decrypt tokens before returning
+    // Decrypt tokens before returning (non-fatal if decryption fails)
     return results.map(integration => {
-      if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
-        integration.accessToken = decryptToken(
-          integration.accessToken,
-          integration.accessTokenIv,
-          integration.accessTokenAuthTag
-        );
-      }
-      if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
-        integration.refreshToken = decryptToken(
-          integration.refreshToken,
-          integration.refreshTokenIv,
-          integration.refreshTokenAuthTag
-        );
+      try {
+        if (integration.accessToken && integration.accessTokenIv && integration.accessTokenAuthTag) {
+          integration.accessToken = decryptToken(
+            integration.accessToken,
+            integration.accessTokenIv,
+            integration.accessTokenAuthTag
+          );
+        }
+        if (integration.refreshToken && integration.refreshTokenIv && integration.refreshTokenAuthTag) {
+          integration.refreshToken = decryptToken(
+            integration.refreshToken,
+            integration.refreshTokenIv,
+            integration.refreshTokenAuthTag
+          );
+        }
+      } catch (error: any) {
+        console.warn('[Storage] Token decryption failed for integration, returning without decrypted tokens:', error.message);
       }
       return integration;
     });
