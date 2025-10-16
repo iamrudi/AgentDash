@@ -58,7 +58,9 @@ export default function ClientDetail() {
 
   const initiateOAuthMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}`, {
+      // Include service and returnTo parameters for context-aware OAuth redirect
+      const returnTo = encodeURIComponent(window.location.pathname);
+      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}&service=GA4&returnTo=${returnTo}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },

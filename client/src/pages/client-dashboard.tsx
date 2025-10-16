@@ -90,7 +90,9 @@ export default function ClientDashboard() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientRecord.id}`, {
+      // Include service and returnTo parameters for context-aware OAuth redirect
+      const returnTo = encodeURIComponent(window.location.pathname);
+      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientRecord.id}&service=GA4&returnTo=${returnTo}`, {
         headers: {
           Authorization: `Bearer ${authUser.token}`,
         },

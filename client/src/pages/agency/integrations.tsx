@@ -267,7 +267,9 @@ export default function AgencyIntegrationsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}&service=${service}`, {
+      // Include returnTo parameter to return to integrations page after OAuth
+      const returnTo = encodeURIComponent(window.location.pathname);
+      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}&service=${service}&returnTo=${returnTo}`, {
         headers,
         credentials: "include",
       });
