@@ -9,7 +9,10 @@ import {
   ChevronRight,
   PenTool,
   Search,
-  DollarSign
+  DollarSign,
+  Globe,
+  Plus,
+  X
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,8 +20,146 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { RateLimitToggle } from "@/components/agency/rate-limit-toggle";
+import { Input } from "@/components/ui/input";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
+
+// CORS Domains Manager Component
+function CorsDomainsManager() {
+  const [newDomain, setNewDomain] = useState("");
+  const { toast } = useToast();
+
+  const { data: corsData, isLoading } = useQuery({
+    queryKey: ['/api/settings/cors-domains'],
+  });
+
+  const addDomainMutation = useMutation({
+    mutationFn: async (domain: string) => {
+      return await apiRequest('/api/settings/cors-domains', {
+        method: 'POST',
+        body: JSON.stringify({ domain }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/cors-domains'] });
+      setNewDomain("");
+      toast({
+        title: "Domain added",
+        description: "CORS domain has been added successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add domain",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeDomainMutation = useMutation({
+    mutationFn: async (domain: string) => {
+      return await apiRequest('/api/settings/cors-domains', {
+        method: 'DELETE',
+        body: JSON.stringify({ domain }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/cors-domains'] });
+      toast({
+        title: "Domain removed",
+        description: "CORS domain has been removed successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove domain",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddDomain = () => {
+    if (!newDomain.trim()) return;
+    addDomainMutation.mutate(newDomain.trim());
+  };
+
+  const domains = corsData?.domains || [];
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+            <Globe className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium mb-1">CORS Allowed Domains</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Add trusted domains that can embed your forms and access public APIs
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Input
+            placeholder="https://example.com"
+            value={newDomain}
+            onChange={(e) => setNewDomain(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleAddDomain();
+              }
+            }}
+            data-testid="input-cors-domain"
+          />
+          <Button
+            onClick={handleAddDomain}
+            disabled={!newDomain.trim() || addDomainMutation.isPending}
+            data-testid="button-add-cors-domain"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : domains.length > 0 ? (
+          <div className="space-y-2">
+            {domains.map((domain: string) => (
+              <div
+                key={domain}
+                className="flex items-center justify-between gap-2 p-3 rounded-md bg-muted/50"
+                data-testid={`cors-domain-${domain}`}
+              >
+                <span className="text-sm font-mono">{domain}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeDomainMutation.mutate(domain)}
+                  disabled={removeDomainMutation.isPending}
+                  data-testid={`button-remove-cors-domain-${domain}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground text-center py-4">
+            No custom CORS domains configured
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [, setLocation] = useLocation();
@@ -144,6 +285,15 @@ export default function Settings() {
             </Card>
           </div>
         ))}
+
+        <Separator className="my-6" />
+
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold text-muted-foreground tracking-wider">
+            SECURITY
+          </h2>
+          <CorsDomainsManager />
+        </div>
 
         <Separator className="my-6" />
 

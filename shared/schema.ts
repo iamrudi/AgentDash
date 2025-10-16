@@ -429,6 +429,17 @@ export const notifications = pgTable("notifications", {
   isArchivedIdx: index("notifications_is_archived_idx").on(table.isArchived),
 }));
 
+// SYSTEM SETTINGS (Global configuration)
+export const systemSettings = pgTable("system_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(), // 'cors_allowed_origins', 'api_rate_limit', etc.
+  value: jsonb("value").notNull(), // JSON value for flexible storage
+  description: text("description"), // Human-readable description
+  updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }), // Who last updated this setting
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -515,6 +526,12 @@ export const insertClientMessageSchema = createInsertSchema(clientMessages).omit
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // CRM Insert Schemas
@@ -643,6 +660,9 @@ export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 
 // CRM Types
 export type Company = typeof companies.$inferSelect;

@@ -72,7 +72,7 @@ export function UserProfileDropdown() {
             <Settings className="mr-2 h-4 w-4" />
             <span>Theme</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent side="right" sideOffset={8} alignOffset={-5}>
+          <DropdownMenuSubContent>
             <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}>
               <DropdownMenuRadioItem value="light" data-testid="theme-light">
                 Light

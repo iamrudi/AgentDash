@@ -62,7 +62,35 @@ function getAllowedSameOriginHosts(): Set<string> {
   return hosts;
 }
 
+// Load CORS domains from database (async)
+async function loadCorsDomainsFromDB(): Promise<string[]> {
+  try {
+    const { eq } = await import('drizzle-orm');
+    const { systemSettings } = await import('../shared/schema');
+    const { db } = await import('./db');
+    
+    const setting = await db.query.systemSettings.findFirst({
+      where: eq(systemSettings.key, 'cors_allowed_origins'),
+    });
+    
+    if (setting && setting.value) {
+      const domains = setting.value as { domains: string[] };
+      return domains.domains || [];
+    }
+  } catch (error) {
+    console.warn('[CORS] Failed to load domains from database:', error);
+  }
+  return [];
+}
+
 const allowedSameOriginHosts = getAllowedSameOriginHosts();
+let dbCorsDomains: string[] = [];
+
+// Load DB CORS domains asynchronously
+loadCorsDomainsFromDB().then(domains => {
+  dbCorsDomains = domains;
+  console.log(`[CORS] Loaded ${domains.length} domain(s) from database:`, domains);
+});
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
@@ -85,8 +113,8 @@ const corsOptions: cors.CorsOptions = {
       return callback(null, true);
     }
 
-    // Check if the origin is in our whitelist from environment variable
-    if (env.CORS_ALLOWED_ORIGINS.includes(origin)) {
+    // Check if the origin is in our whitelist from environment variable or database
+    if (env.CORS_ALLOWED_ORIGINS.includes(origin) || dbCorsDomains.includes(origin)) {
       callback(null, true);
     } else {
       // Log rejected origins for debugging
