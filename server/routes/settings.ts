@@ -6,6 +6,7 @@ import { runtimeSettings } from '../config/runtimeSettings';
 import { db } from '../db';
 import { systemSettings } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
+import { reloadCorsDomainsFromDB } from '../index';
 
 const settingsRouter = Router();
 
@@ -26,7 +27,7 @@ settingsRouter.get('/rate-limit-status', requireAuth, (req, res) => {
 settingsRouter.post(
   '/toggle-rate-limit',
   requireAuth,
-  requireRole('admin'),
+  requireRole('Admin'),
   (req, res) => {
     runtimeSettings.isRateLimiterEnabled = !runtimeSettings.isRateLimiterEnabled;
     res.json({
@@ -44,7 +45,7 @@ settingsRouter.post(
 settingsRouter.get(
   '/cors-domains',
   requireAuth,
-  requireRole('admin'),
+  requireRole('Admin'),
   async (req, res) => {
     try {
       const setting = await db.query.systemSettings.findFirst({
@@ -68,7 +69,7 @@ settingsRouter.get(
 settingsRouter.post(
   '/cors-domains',
   requireAuth,
-  requireRole('admin'),
+  requireRole('Admin'),
   async (req, res) => {
     try {
       const { domain } = req.body;
@@ -134,7 +135,7 @@ settingsRouter.post(
 settingsRouter.delete(
   '/cors-domains',
   requireAuth,
-  requireRole('admin'),
+  requireRole('Admin'),
   async (req, res) => {
     try {
       const { domain } = req.body;

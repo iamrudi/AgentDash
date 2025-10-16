@@ -62,8 +62,11 @@ function getAllowedSameOriginHosts(): Set<string> {
   return hosts;
 }
 
-// Load CORS domains from database (async)
-async function loadCorsDomainsFromDB(): Promise<string[]> {
+// Load CORS domains from database and update runtime list
+const allowedSameOriginHosts = getAllowedSameOriginHosts();
+let dbCorsDomains: string[] = [];
+
+export async function reloadCorsDomainsFromDB(): Promise<void> {
   try {
     const { eq } = await import('drizzle-orm');
     const { systemSettings } = await import('../shared/schema');
@@ -75,22 +78,20 @@ async function loadCorsDomainsFromDB(): Promise<string[]> {
     
     if (setting && setting.value) {
       const domains = setting.value as { domains: string[] };
-      return domains.domains || [];
+      dbCorsDomains = domains.domains || [];
+      console.log(`[CORS] Reloaded ${dbCorsDomains.length} domain(s) from database:`, dbCorsDomains);
+    } else {
+      dbCorsDomains = [];
+      console.log('[CORS] No domains in database, cleared runtime list');
     }
   } catch (error) {
     console.warn('[CORS] Failed to load domains from database:', error);
+    dbCorsDomains = [];
   }
-  return [];
 }
 
-const allowedSameOriginHosts = getAllowedSameOriginHosts();
-let dbCorsDomains: string[] = [];
-
-// Load DB CORS domains asynchronously
-loadCorsDomainsFromDB().then(domains => {
-  dbCorsDomains = domains;
-  console.log(`[CORS] Loaded ${domains.length} domain(s) from database:`, domains);
-});
+// Load DB CORS domains asynchronously at startup
+reloadCorsDomainsFromDB();
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {

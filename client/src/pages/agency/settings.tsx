@@ -38,11 +38,7 @@ function CorsDomainsManager() {
 
   const addDomainMutation = useMutation({
     mutationFn: async (domain: string) => {
-      return await apiRequest('/api/settings/cors-domains', {
-        method: 'POST',
-        body: JSON.stringify({ domain }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return await apiRequest('POST', '/api/settings/cors-domains', { domain });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings/cors-domains'] });
@@ -63,11 +59,7 @@ function CorsDomainsManager() {
 
   const removeDomainMutation = useMutation({
     mutationFn: async (domain: string) => {
-      return await apiRequest('/api/settings/cors-domains', {
-        method: 'DELETE',
-        body: JSON.stringify({ domain }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return await apiRequest('DELETE', '/api/settings/cors-domains', { domain });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/settings/cors-domains'] });
