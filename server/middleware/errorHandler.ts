@@ -77,9 +77,15 @@ export function asyncHandler(fn: Function) {
   };
 }
 
-export function notFoundHandler(req: Request, res: Response) {
-  res.status(404).json({
-    success: false,
-    message: `Route ${req.originalUrl} not found`
-  });
+export function notFoundHandler(req: Request, res: Response, next: NextFunction) {
+  // Only apply to API routes - let SPA handle all other routes
+  if (req.originalUrl.startsWith('/api/')) {
+    return res.status(404).json({
+      success: false,
+      message: `Route ${req.originalUrl} not found`
+    });
+  }
+  
+  // For non-API routes, pass through to SPA fallback
+  next();
 }
