@@ -35,6 +35,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Content Co-pilot**: AI-powered content creation using Data for SEO API and Gemini AI for ideas, briefs, and optimization.
 - **Performance Optimizations**: Server-side caching (in-memory, 1-hour TTL), aggregated API endpoints, frontend query optimization, table virtualization (`@tanstack/react-virtual`), code splitting, component memoization, and hover-based prefetching.
 - **Developer Tools**: In-memory runtime rate limiter toggle for testing and debugging.
+- **CORS Configuration**: Secure whitelist-based CORS for public API endpoints with automatic same-origin allowance, strict URL parsing to prevent bypass attacks, and dynamic whitelist from CORS_ALLOWED_ORIGINS environment variable. Supports external form embeds while maintaining security.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
