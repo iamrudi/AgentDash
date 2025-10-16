@@ -11,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
@@ -63,6 +64,7 @@ const menuItems = [
 export function ClientSidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const { data: notificationCounts } = useQuery<{ unreadMessages: number; newRecommendations: number }>({
     queryKey: ["/api/client/notifications/counts"],
@@ -72,6 +74,12 @@ export function ClientSidebar() {
   const handleLogout = () => {
     clearAuthUser();
     setLocation("/login");
+  };
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
   };
 
   return (
@@ -107,7 +115,7 @@ export function ClientSidebar() {
                       tooltip={item.title}
                       data-testid={`nav-${item.title.toLowerCase()}`}
                     >
-                      <Link href={item.url}>
+                      <Link href={item.url} onClick={handleNavClick}>
                         <item.icon className="h-4 w-4" />
                         <span className="flex-1">{item.title}</span>
                         {count > 0 && (

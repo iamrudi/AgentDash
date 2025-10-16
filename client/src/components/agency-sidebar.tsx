@@ -147,7 +147,7 @@ type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 export function AgencySidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
-  const { setOpen, open } = useSidebar();
+  const { setOpen, open, setOpenMobile, isMobile } = useSidebar();
   
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>(
     () => (localStorage.getItem('sidebarMode') as SidebarMode) || 'expanded'
@@ -189,6 +189,12 @@ export function AgencySidebar() {
     setLocation("/login");
   };
 
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <Sidebar 
       collapsible={sidebarMode === 'hover' || sidebarMode === 'collapsed' ? 'icon' : 'offcanvas'}
@@ -224,7 +230,7 @@ export function AgencySidebar() {
                       tooltip={item.title}
                       data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
                     >
-                      <Link href={item.url}>
+                      <Link href={item.url} onClick={handleNavClick}>
                         <item.icon className="h-4 w-4" />
                         <span className="flex-1">{item.title}</span>
                         {count > 0 && (
