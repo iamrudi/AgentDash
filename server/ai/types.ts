@@ -49,7 +49,8 @@ export interface AIProvider {
     gscMetrics: MetricData[],
     objectives?: string,
     preset?: Preset,
-    competitorContext?: string
+    competitorContext?: string,
+    hubspotData?: any
   ): Promise<RecommendationOutput[]>;
 
   analyzeDataOnDemand(

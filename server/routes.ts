@@ -2272,6 +2272,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // HubSpot Integration Routes
+
+  // Get HubSpot connection status (Admin only)
+  app.get("/api/integrations/hubspot/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { getHubSpotStatus } = await import("./lib/hubspot");
+      const status = await getHubSpotStatus();
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ 
+        connected: false, 
+        error: error.message || "Failed to check HubSpot status" 
+      });
+    }
+  });
+
+  // Fetch HubSpot CRM data (Admin only)
+  app.get("/api/integrations/hubspot/data", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { fetchHubSpotCRMData } = await import("./lib/hubspot");
+      const data = await fetchHubSpotCRMData();
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to fetch HubSpot data" 
+      });
+    }
+  });
+
   // Analytics Data API
 
   // Aggregated dashboard summary endpoint (optimized for performance)

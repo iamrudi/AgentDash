@@ -66,7 +66,8 @@ export class GeminiProvider implements AIProvider {
     gscMetrics: MetricData[],
     objectives?: string,
     preset: Preset = "full-audit",
-    competitorContext?: string
+    competitorContext?: string,
+    hubspotData?: any
   ): Promise<RecommendationOutput[]> {
     try {
       const presetConfig = PRESET_CONFIGS[preset];
@@ -117,8 +118,24 @@ ${JSON.stringify(ga4Metrics, null, 2)}
 GOOGLE SEARCH CONSOLE METRICS (last 30 days):
 ${JSON.stringify(gscMetrics, null, 2)}
 
+${hubspotData ? `HUBSPOT CRM DATA:
+Total Contacts: ${hubspotData.totalContacts}
+Total Companies: ${hubspotData.totalCompanies}
+Total Deals: ${hubspotData.totalDeals}
+Total Deal Value: $${hubspotData.dealValue.toLocaleString()}
+
+Recent Contacts (sample):
+${JSON.stringify(hubspotData.contacts.slice(0, 5), null, 2)}
+
+Recent Deals (sample):
+${JSON.stringify(hubspotData.deals.slice(0, 5), null, 2)}
+
+Use this CRM data to identify sales pipeline opportunities, lead nurturing needs, and conversion optimization recommendations.
+` : ''}
+
 Generate ${presetConfig.count} recommendations focusing on: ${presetConfig.areas.join(", ")}
 ${competitorContext ? '\nInclude competitive insights and opportunities to outperform the specified competitors.' : ''}
+${hubspotData ? '\nConsider HubSpot CRM data to suggest sales enablement, lead nurturing, and pipeline acceleration strategies.' : ''}
 `;
 
       const response = await callGeminiWithRetry(
