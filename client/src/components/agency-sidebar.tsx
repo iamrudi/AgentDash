@@ -94,6 +94,37 @@ const menuGroups = [
   },
 ];
 
+// This function adds Super Admin menu item conditionally
+function getMenuItems(isSuperAdmin: boolean) {
+  if (!isSuperAdmin) {
+    return menuGroups;
+  }
+  
+  // Add Super Admin menu item to Administration group
+  const adminGroup = menuGroups.find(g => g.title === "Administration");
+  if (adminGroup) {
+    return menuGroups.map(group => {
+      if (group.title === "Administration") {
+        return {
+          ...group,
+          items: [
+            ...group.items,
+            {
+              title: "Super Admin",
+              url: "/superadmin",
+              icon: Shield,
+              notificationKey: null,
+            },
+          ],
+        };
+      }
+      return group;
+    });
+  }
+  
+  return menuGroups;
+}
+
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
 export function AgencySidebar() {
@@ -146,6 +177,9 @@ export function AgencySidebar() {
       setOpenMobile(false);
     }
   };
+  
+  // Check if user is Super Admin
+  const isSuperAdmin = authUser?.profile?.isSuperAdmin || false;
 
   return (
     <Sidebar 
@@ -165,7 +199,7 @@ export function AgencySidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent className="p-2">
-        {menuGroups.map((group, index) => (
+        {getMenuItems(isSuperAdmin).map((group, index) => (
           <div key={group.title}>
             {index > 0 && <SidebarSeparator className="my-3 bg-border" />}
             <SidebarMenu>
