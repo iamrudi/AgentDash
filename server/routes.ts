@@ -2396,6 +2396,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // LinkedIn Integration Routes (Agency-wide)
+
+  // Get LinkedIn connection status for the agency (Admin only)
+  app.get("/api/integrations/linkedin/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ connected: false, error: "Agency ID not found" });
+      }
+
+      const { getLinkedInStatus } = await import("./lib/linkedin");
+      const status = await getLinkedInStatus(agencyId);
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ 
+        connected: false, 
+        error: error.message || "Failed to check LinkedIn status" 
+      });
+    }
+  });
+
+  // Connect LinkedIn for the agency (Admin only)
+  app.post("/api/integrations/linkedin/connect", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
+      const { accessToken, organizationId } = req.body;
+      if (!accessToken || !organizationId) {
+        return res.status(400).json({ error: "Access token and organization ID are required" });
+      }
+
+      // Encrypt the access token
+      const { encrypt } = await import("./lib/encryption");
+      const { encryptedData, iv, authTag } = encrypt(accessToken);
+
+      // Save to agency settings
+      const existing = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing settings
+        await db
+          .update(agencySettings)
+          .set({
+            linkedinAccessToken: encryptedData,
+            linkedinAccessTokenIv: iv,
+            linkedinAccessTokenAuthTag: authTag,
+            linkedinOrganizationId: organizationId,
+            linkedinConnectedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(agencySettings.agencyId, agencyId));
+      } else {
+        // Create new settings
+        await db
+          .insert(agencySettings)
+          .values({
+            agencyId,
+            linkedinAccessToken: encryptedData,
+            linkedinAccessTokenIv: iv,
+            linkedinAccessTokenAuthTag: authTag,
+            linkedinOrganizationId: organizationId,
+            linkedinConnectedAt: new Date(),
+          });
+      }
+
+      res.json({ success: true, message: "LinkedIn connected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: error.message || "Failed to connect LinkedIn" 
+      });
+    }
+  });
+
+  // Disconnect LinkedIn for the agency (Admin only)
+  app.post("/api/integrations/linkedin/disconnect", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
+      // Remove LinkedIn credentials from agency settings
+      await db
+        .update(agencySettings)
+        .set({
+          linkedinAccessToken: null,
+          linkedinAccessTokenIv: null,
+          linkedinAccessTokenAuthTag: null,
+          linkedinOrganizationId: null,
+          linkedinConnectedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(agencySettings.agencyId, agencyId));
+
+      res.json({ success: true, message: "LinkedIn disconnected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: error.message || "Failed to disconnect LinkedIn" 
+      });
+    }
+  });
+
+  // Fetch LinkedIn data for the agency (Admin only)
+  app.get("/api/integrations/linkedin/data", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
+      const { fetchLinkedInData } = await import("./lib/linkedin");
+      const data = await fetchLinkedInData(agencyId);
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ 
+        message: error.message || "Failed to fetch LinkedIn data" 
+      });
+    }
+  });
+
   // Analytics Data API
 
   // Aggregated dashboard summary endpoint (optimized for performance)
