@@ -359,12 +359,6 @@ export const clientIntegrations = pgTable("client_integrations", {
   ga4PropertyId: text("ga4_property_id"), // The specific GA4 property ID
   ga4LeadEventName: text("ga4_lead_event_name"), // The GA4 Key Event name that represents a lead (e.g., 'generate_lead', 'form_submission')
   gscSiteUrl: text("gsc_site_url"), // The specific Search Console site URL
-  dataForSeoLogin: text("dataforseo_login"), // Data for SEO API login (encrypted)
-  dataForSeoPassword: text("dataforseo_password"), // Data for SEO API password (encrypted)
-  dataForSeoLoginIv: text("dataforseo_login_iv"), // IV for login encryption
-  dataForSeoPasswordIv: text("dataforseo_password_iv"), // IV for password encryption
-  dataForSeoLoginAuthTag: text("dataforseo_login_auth_tag"), // Auth tag for login
-  dataForSeoPasswordAuthTag: text("dataforseo_password_auth_tag"), // Auth tag for password
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -375,13 +369,7 @@ export const clientIntegrations = pgTable("client_integrations", {
 export const agencyIntegrations = pgTable("agency_integrations", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
-  serviceName: text("service_name").notNull(), // 'DataForSEO', etc.
-  dataForSeoLogin: text("dataforseo_login"), // Data for SEO API login (encrypted)
-  dataForSeoPassword: text("dataforseo_password"), // Data for SEO API password (encrypted)
-  dataForSeoLoginIv: text("dataforseo_login_iv"), // IV for login encryption
-  dataForSeoPasswordIv: text("dataforseo_password_iv"), // IV for password encryption
-  dataForSeoLoginAuthTag: text("dataforseo_login_auth_tag"), // Auth tag for login
-  dataForSeoPasswordAuthTag: text("dataforseo_password_auth_tag"), // Auth tag for password
+  serviceName: text("service_name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

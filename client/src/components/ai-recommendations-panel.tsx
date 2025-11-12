@@ -63,7 +63,7 @@ const PRESETS: PresetConfig[] = [
     name: "Strategic Growth",
     description: "Long-term roadmap (content clusters, landing pages)",
     icon: TrendingUp,
-    dataSources: ["GA4", "GSC", "DataForSEO"],
+    dataSources: ["GA4", "GSC"],
     focusAreas: ["Content Strategy", "Link Building", "Keyword Expansion"],
     outputType: "strategic"
   },
@@ -72,7 +72,7 @@ const PRESETS: PresetConfig[] = [
     name: "Full Audit",
     description: "All categories auto-enabled",
     icon: Sparkles,
-    dataSources: ["GA4", "GSC", "DataForSEO"],
+    dataSources: ["GA4", "GSC"],
     focusAreas: ["All"],
     outputType: "comprehensive"
   }
@@ -81,7 +81,6 @@ const PRESETS: PresetConfig[] = [
 interface ConnectionStatus {
   ga4: { connected: boolean; lastSync?: string };
   gsc: { connected: boolean; lastSync?: string };
-  dataForSEO: { connected: boolean; keywordCount?: number };
 }
 
 export function AIRecommendationsPanel({

@@ -9,12 +9,10 @@ export interface FeatureFlags {
   // AI Features
   aiRecommendations: boolean;
   chatWithData: boolean;
-  contentCopilot: boolean;
   
   // Analytics
   googleAnalytics: boolean;
   googleSearchConsole: boolean;
-  dataForSEO: boolean;
   
   // Automation
   autoInvoicing: boolean;
@@ -25,7 +23,6 @@ export interface FeatureFlags {
   emailNotifications: boolean;
   
   // Advanced Features
-  seoAudit: boolean;
   competitorAnalysis: boolean;
   leadEventTracking: boolean;
   
@@ -38,12 +35,10 @@ const defaultFlags: FeatureFlags = {
   // AI Features - Enabled
   aiRecommendations: true,
   chatWithData: true,
-  contentCopilot: true,
   
   // Analytics - Enabled
   googleAnalytics: true,
   googleSearchConsole: true,
-  dataForSEO: true,
   
   // Automation - Enabled
   autoInvoicing: true,
@@ -54,7 +49,6 @@ const defaultFlags: FeatureFlags = {
   emailNotifications: false, // Requires SMTP config
   
   // Advanced Features - Enabled
-  seoAudit: true,
   competitorAnalysis: true,
   leadEventTracking: true,
   

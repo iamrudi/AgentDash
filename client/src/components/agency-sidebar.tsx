@@ -72,18 +72,6 @@ const menuGroups = [
         icon: Lightbulb,
         notificationKey: "unviewedResponses" as const,
       },
-      {
-        title: "Content Co-pilot",
-        url: "/agency/content-copilot",
-        icon: Sparkles,
-        notificationKey: null,
-      },
-      {
-        title: "SEO Audit",
-        url: "/agency/seo-audit",
-        icon: BarChartHorizontal,
-        notificationKey: null,
-      },
     ],
   },
   {

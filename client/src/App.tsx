@@ -39,11 +39,9 @@ const AgencyRecommendations = lazy(() => import("@/pages/agency/recommendations"
 const AgencyClients = lazy(() => import("@/pages/agency/clients"));
 const AgencyStaff = lazy(() => import("@/pages/agency/staff"));
 const AgencyIntegrations = lazy(() => import("@/pages/agency/integrations"));
-const AgencyContentCopilot = lazy(() => import("@/pages/agency/content-copilot"));
 const AgencyUsers = lazy(() => import("@/pages/agency/users"));
 const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
 const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
-const AgencySeoAudit = lazy(() => import("@/pages/agency/seo-audit"));
 const AgencySettings = lazy(() => import("@/pages/agency/settings"));
 
 // CRM Pages (lazy-loaded)
@@ -222,14 +220,6 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/agency/content-copilot">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <AgencyContentCopilot />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
       <Route path="/agency/invoices">
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
@@ -242,14 +232,6 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
             <AgencyTrash />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/seo-audit">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <AgencySeoAudit />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

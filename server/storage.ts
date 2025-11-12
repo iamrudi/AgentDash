@@ -107,7 +107,6 @@ export interface IStorage {
     overdueInvoicesCount: number;
     hasGA4: boolean;
     hasGSC: boolean;
-    hasDFS: boolean;
   }>>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: string, data: Partial<Client>): Promise<Client>;
@@ -424,7 +423,6 @@ export class DbStorage implements IStorage {
     overdueInvoicesCount: number;
     hasGA4: boolean;
     hasGSC: boolean;
-    hasDFS: boolean;
   }>> {
     const allClients = agencyId 
       ? await db.select().from(clients).where(eq(clients.agencyId, agencyId)).orderBy(desc(clients.createdAt))
@@ -461,15 +459,6 @@ export class DbStorage implements IStorage {
       integrationsByClient.set(integration.clientId, [...existing, integration]);
     });
     
-    // Create DFS agency integration access map
-    const agencyDFSIntegration = allAgencyIntegrations.find(i => i.serviceName === 'DataForSEO');
-    const dfsAccessSet = new Set<string>();
-    if (agencyDFSIntegration) {
-      allClientAccess
-        .filter(access => access.agencyIntegrationId === agencyDFSIntegration.id)
-        .forEach(access => dfsAccessSet.add(access.clientId));
-    }
-    
     const now = new Date();
     
     // Enrich clients with data from lookup maps
@@ -491,11 +480,9 @@ export class DbStorage implements IStorage {
       const clientIntegrationsList = integrationsByClient.get(client.id) || [];
       const ga4Integration = clientIntegrationsList.find(i => i.serviceName === 'GA4');
       const gscIntegration = clientIntegrationsList.find(i => i.serviceName === 'GSC');
-      const dfsIntegration = clientIntegrationsList.find(i => i.serviceName === 'DataForSEO');
       
       const hasGA4 = !!ga4Integration && ga4Integration.accessToken !== null;
       const hasGSC = !!gscIntegration && gscIntegration.accessToken !== null;
-      const hasDFS = (!!dfsIntegration && dfsIntegration.dataForSeoLogin !== null) || dfsAccessSet.has(client.id);
       
       return {
         ...client,
@@ -504,7 +491,6 @@ export class DbStorage implements IStorage {
         overdueInvoicesCount,
         hasGA4,
         hasGSC,
-        hasDFS,
       };
     });
     
@@ -1195,112 +1181,21 @@ export class DbStorage implements IStorage {
     
     if (result.length === 0) return undefined;
     
-    const integration = result[0];
-    
-    // Decrypt credentials if they exist
-    if (integration.dataForSeoLogin && integration.dataForSeoLoginIv && integration.dataForSeoLoginAuthTag) {
-      integration.dataForSeoLogin = decryptToken(
-        integration.dataForSeoLogin,
-        integration.dataForSeoLoginIv,
-        integration.dataForSeoLoginAuthTag
-      );
-    }
-    
-    if (integration.dataForSeoPassword && integration.dataForSeoPasswordIv && integration.dataForSeoPasswordAuthTag) {
-      integration.dataForSeoPassword = decryptToken(
-        integration.dataForSeoPassword,
-        integration.dataForSeoPasswordIv,
-        integration.dataForSeoPasswordAuthTag
-      );
-    }
-    
-    return integration;
+    return result[0];
   }
 
   async createAgencyIntegration(integration: InsertAgencyIntegration): Promise<AgencyIntegration> {
-    let encryptedData: any = { ...integration };
-    
-    // Encrypt Data for SEO credentials if provided
-    if (integration.dataForSeoLogin) {
-      const encrypted = encryptToken(integration.dataForSeoLogin);
-      encryptedData.dataForSeoLogin = encrypted.encrypted;
-      encryptedData.dataForSeoLoginIv = encrypted.iv;
-      encryptedData.dataForSeoLoginAuthTag = encrypted.authTag;
-    }
-    
-    if (integration.dataForSeoPassword) {
-      const encrypted = encryptToken(integration.dataForSeoPassword);
-      encryptedData.dataForSeoPassword = encrypted.encrypted;
-      encryptedData.dataForSeoPasswordIv = encrypted.iv;
-      encryptedData.dataForSeoPasswordAuthTag = encrypted.authTag;
-    }
-    
-    const result = await db.insert(agencyIntegrations).values(encryptedData).returning();
-    const created = result[0];
-    
-    // Return with decrypted credentials
-    if (created.dataForSeoLogin && created.dataForSeoLoginIv && created.dataForSeoLoginAuthTag) {
-      created.dataForSeoLogin = decryptToken(
-        created.dataForSeoLogin,
-        created.dataForSeoLoginIv,
-        created.dataForSeoLoginAuthTag
-      );
-    }
-    
-    if (created.dataForSeoPassword && created.dataForSeoPasswordIv && created.dataForSeoPasswordAuthTag) {
-      created.dataForSeoPassword = decryptToken(
-        created.dataForSeoPassword,
-        created.dataForSeoPasswordIv,
-        created.dataForSeoPasswordAuthTag
-      );
-    }
-    
-    return created;
+    const result = await db.insert(agencyIntegrations).values(integration).returning();
+    return result[0];
   }
 
   async updateAgencyIntegration(id: string, data: Partial<AgencyIntegration>): Promise<AgencyIntegration> {
-    let encryptedData: any = { ...data };
-    
-    // Encrypt Data for SEO credentials if provided
-    if (data.dataForSeoLogin) {
-      const encrypted = encryptToken(data.dataForSeoLogin);
-      encryptedData.dataForSeoLogin = encrypted.encrypted;
-      encryptedData.dataForSeoLoginIv = encrypted.iv;
-      encryptedData.dataForSeoLoginAuthTag = encrypted.authTag;
-    }
-    
-    if (data.dataForSeoPassword) {
-      const encrypted = encryptToken(data.dataForSeoPassword);
-      encryptedData.dataForSeoPassword = encrypted.encrypted;
-      encryptedData.dataForSeoPasswordIv = encrypted.iv;
-      encryptedData.dataForSeoPasswordAuthTag = encrypted.authTag;
-    }
-    
     const result = await db.update(agencyIntegrations)
-      .set({ ...encryptedData, updatedAt: new Date() })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(agencyIntegrations.id, id))
       .returning();
     
-    const updated = result[0];
-    
-    // Return with decrypted credentials
-    if (updated.dataForSeoLogin && updated.dataForSeoLoginIv && updated.dataForSeoLoginAuthTag) {
-      updated.dataForSeoLogin = decryptToken(
-        updated.dataForSeoLogin,
-        updated.dataForSeoLoginIv,
-        updated.dataForSeoLoginAuthTag
-      );
-    }
-    
-    if (updated.dataForSeoPassword && updated.dataForSeoPasswordIv && updated.dataForSeoPasswordAuthTag) {
-      updated.dataForSeoPassword = decryptToken(
-        updated.dataForSeoPassword,
-        updated.dataForSeoPasswordIv,
-        updated.dataForSeoPasswordAuthTag
-      );
-    }
-    
-    return updated;
+    return result[0];
   }
 
   async getClientAccessList(agencyIntegrationId: string): Promise<string[]> {
