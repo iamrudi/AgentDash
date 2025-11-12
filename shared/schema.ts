@@ -61,6 +61,7 @@ export const clients = pgTable("clients", {
   opportunityToCloseRate: numeric("opportunity_to_close_rate"), // DEPRECATED: e.g., 0.25 = 25% of opportunities close
   averageDealSize: numeric("average_deal_size"), // DEPRECATED: e.g., 5000 = $5,000 per deal
   leadEvents: text("lead_events").array(), // Selected GA4 key events to track as leads (e.g., ['generate_lead', 'form_submit'])
+  crmEnabled: text("crm_enabled").default("false"), // Whether CRM features are enabled for this client
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   agencyIdIdx: index("clients_agency_id_idx").on(table.agencyId),
