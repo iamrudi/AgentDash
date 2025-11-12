@@ -27,7 +27,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
 - **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
-- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status and competitor analysis. Provider configurable via AI_PROVIDER environment variable.
+- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status and competitor analysis. Agency-level provider preference stored in database with in-app settings UI toggle. Falls back to AI_PROVIDER environment variable if not set. Provider selection cached per agency for performance.
 - **Client Strategy Card**: AI-powered consolidated client view.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events sync between client.leadEvents and integration.ga4LeadEventName to ensure conversion tracking works correctly across all update paths.
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI summaries and recommendations.
@@ -44,7 +44,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, SEO Website Audit Tool, Content Co-pilot, and CRM.
+- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, SEO Website Audit Tool, Content Co-pilot, CRM, and AI Provider Settings.
 - **Staff Portal**: View and update assigned tasks.
 - **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
@@ -67,7 +67,8 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **AI Services**: Pluggable AI provider system supporting:
   - Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash) - Default
   - OpenAI (gpt-4o, gpt-4o-mini)
-  - Configured via `AI_PROVIDER` environment variable (values: "gemini" or "openai")
+  - Configured per-agency via Settings UI or globally via `AI_PROVIDER` environment variable (values: "gemini" or "openai")
+  - Agency preferences stored in `agency_settings` table with cache invalidation
 - **SEO APIs**: Data for SEO API
 - **SEO Auditing**: Google Lighthouse
 - **PDF Generation**: Puppeteer

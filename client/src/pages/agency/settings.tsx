@@ -12,7 +12,8 @@ import {
   DollarSign,
   Globe,
   Plus,
-  X
+  X,
+  Bot
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,87 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
+
+// AI Provider Manager Component
+function AIProviderManager() {
+  const { toast } = useToast();
+
+  const { data: settings, isLoading } = useQuery<{ aiProvider: string; isDefault: boolean }>({
+    queryKey: ['/api/agency/settings'],
+  });
+
+  const updateProviderMutation = useMutation({
+    mutationFn: async (aiProvider: string) => {
+      return await apiRequest('PUT', '/api/agency/settings', { aiProvider });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/agency/settings'] });
+      toast({
+        title: "AI Provider Updated",
+        description: "Your AI provider preference has been saved successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update AI provider",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const currentProvider = settings?.aiProvider || "gemini";
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+            <Bot className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium mb-1">AI Provider</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Choose which AI provider to use for recommendations and analysis
+            </p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          <RadioGroup 
+            value={currentProvider}
+            onValueChange={(value) => updateProviderMutation.mutate(value)}
+            disabled={updateProviderMutation.isPending}
+            data-testid="radio-ai-provider"
+          >
+            <div className="flex items-center space-x-2 p-3 rounded-md hover-elevate">
+              <RadioGroupItem value="gemini" id="gemini" data-testid="radio-gemini" />
+              <Label htmlFor="gemini" className="flex-1 cursor-pointer">
+                <div className="font-medium text-sm">Google Gemini</div>
+                <div className="text-xs text-muted-foreground">Gemini 2.5 Pro & Flash models</div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2 p-3 rounded-md hover-elevate">
+              <RadioGroupItem value="openai" id="openai" data-testid="radio-openai" />
+              <Label htmlFor="openai" className="flex-1 cursor-pointer">
+                <div className="font-medium text-sm">OpenAI</div>
+                <div className="text-xs text-muted-foreground">GPT-4o & GPT-4o-mini models</div>
+              </Label>
+            </div>
+          </RadioGroup>
+        )}
+
+        {settings?.isDefault && (
+          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+            Currently using default provider from environment configuration
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
 
 // CORS Domains Manager Component
 function CorsDomainsManager() {
@@ -250,6 +332,15 @@ export default function Settings() {
             <p className="text-sm text-muted-foreground">Manage integrations, team, and system preferences</p>
           </div>
         </div>
+
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold text-muted-foreground tracking-wider">
+            AI CONFIGURATION
+          </h2>
+          <AIProviderManager />
+        </div>
+
+        <Separator className="my-6" />
 
         {settingsSections.map((section, sectionIndex) => (
           <div key={section.title} className="space-y-3">

@@ -3,12 +3,26 @@ import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, unique
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Constants
+export const aiProviderEnum = ["gemini", "openai"] as const;
+
 // AGENCIES (Tenant isolation - each agency is a separate tenant)
 export const agencies = pgTable("agencies", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// AGENCY SETTINGS (Agency-level configuration and preferences)
+export const agencySettings = pgTable("agency_settings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
+  aiProvider: text("ai_provider").notNull().default("gemini"), // 'gemini' or 'openai'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("agency_settings_agency_id_idx").on(table.agencyId),
+}));
 
 // NOTE: Users are now managed by Supabase Auth (auth.users table)
 // We keep this table definition for backward compatibility but it's not actively used
@@ -451,6 +465,20 @@ export const insertAgencySchema = createInsertSchema(agencies).omit({
   createdAt: true,
 });
 
+export const insertAgencySettingSchema = createInsertSchema(agencySettings)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    aiProvider: z.enum(aiProviderEnum),
+  });
+
+export const updateAgencySettingSchema = z.object({
+  aiProvider: z.enum(aiProviderEnum),
+});
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({
   createdAt: true, // id is required (Supabase Auth user ID)
 });
@@ -615,6 +643,10 @@ export type CreateStaffAdminUser = z.infer<typeof createStaffAdminUserSchema>;
 
 export type Agency = typeof agencies.$inferSelect;
 export type InsertAgency = z.infer<typeof insertAgencySchema>;
+
+export type AgencySetting = typeof agencySettings.$inferSelect;
+export type InsertAgencySetting = z.infer<typeof insertAgencySettingSchema>;
+export type UpdateAgencySetting = z.infer<typeof updateAgencySettingSchema>;
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;

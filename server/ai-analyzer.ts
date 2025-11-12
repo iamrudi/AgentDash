@@ -139,7 +139,7 @@ Include competitive analysis and opportunities to outperform these competitors.`
     }
 
     // 13. Call AI provider to analyze and generate recommendations
-    const aiProvider = getAIProvider();
+    const aiProvider = await getAIProvider(client.agencyId);
     const aiRecommendations = await aiProvider.analyzeClientMetrics(
       client.companyName,
       formattedGA4,

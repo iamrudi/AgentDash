@@ -16,7 +16,7 @@ import {
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, agencySettings, updateAgencySettingSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { encrypt, decrypt, safeDecryptCredential } from "./lib/encryption";
@@ -24,13 +24,15 @@ import { generateContentIdeas, generateContentBrief, optimizeContent } from "./l
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
-import { getAIProvider } from "./ai/provider";
+import { getAIProvider, invalidateAIProviderCache } from "./ai/provider";
 import { SeoAuditService } from "./services/seoAuditService";
 import { OnPageSeoAuditService } from "./services/onPageSeoAuditService";
 import { cache, CACHE_TTL } from "./lib/cache";
 import express from "express";
 import path from "path";
 import { EventEmitter } from "events";
+import { db } from "./db";
+import { eq, sql } from "drizzle-orm";
 
 // SSE event emitter for real-time message updates
 const messageEmitter = new EventEmitter();
@@ -1048,7 +1050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\n')
         : "No recent conversations.";
       
-      const aiProvider = getAIProvider();
+      const aiProvider = await getAIProvider(client.agencyId);
       const chatAnalysis = await aiProvider.analyzeChatHistory(chatHistoryText);
 
       // 4. Assemble the final data card object
@@ -1088,6 +1090,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeIntegrations = integrations.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...safe }) => safe);
       res.json(safeIntegrations);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get agency settings (AI provider configuration)
+  app.get("/api/agency/settings", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // Query agency settings
+      const settings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, req.user!.agencyId))
+        .limit(1);
+
+      if (settings.length === 0) {
+        // Return default settings if not found (normalize to lowercase)
+        return res.json({
+          aiProvider: (process.env.AI_PROVIDER?.toLowerCase() || "gemini"),
+          isDefault: true,
+        });
+      }
+
+      res.json({
+        aiProvider: settings[0].aiProvider.toLowerCase(),
+        isDefault: false,
+      });
+    } catch (error: any) {
+      console.error("Error fetching agency settings:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update agency settings (AI provider configuration)
+  app.put("/api/agency/settings", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // Validate request body
+      const validationResult = updateAgencySettingSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Invalid settings data",
+          errors: validationResult.error.errors,
+        });
+      }
+
+      const { aiProvider } = validationResult.data;
+
+      // Check if settings already exist for this agency
+      const existingSettings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, req.user!.agencyId))
+        .limit(1);
+
+      if (existingSettings.length === 0) {
+        // Create new settings
+        const [newSettings] = await db
+          .insert(agencySettings)
+          .values({
+            agencyId: req.user!.agencyId,
+            aiProvider,
+          })
+          .returning();
+
+        // Invalidate AI provider cache for this agency
+        invalidateAIProviderCache(req.user!.agencyId);
+
+        res.json(newSettings);
+      } else {
+        // Update existing settings
+        const [updatedSettings] = await db
+          .update(agencySettings)
+          .set({
+            aiProvider,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(agencySettings.agencyId, req.user!.agencyId))
+          .returning();
+
+        // Invalidate AI provider cache for this agency
+        invalidateAIProviderCache(req.user!.agencyId);
+
+        res.json(updatedSettings);
+      }
+    } catch (error: any) {
+      console.error("Error updating agency settings:", error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -3514,7 +3609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[AI Analysis Request] Question:", question);
       console.log("[AI Analysis Request] Context Data:", JSON.stringify(contextData, null, 2));
 
-      const aiProvider = getAIProvider();
+      const aiProvider = await getAIProvider(client.agencyId);
       const analysis = await aiProvider.analyzeDataOnDemand(
         client.companyName,
         contextData,
