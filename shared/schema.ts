@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, timestamp, numeric, integer, date, uniqueIndex, index, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -48,11 +48,29 @@ export const users = pgTable("users", {
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(), // This IS the Supabase Auth user ID (no default, set explicitly)
   fullName: text("full_name").notNull(),
-  role: text("role").notNull(), // 'Admin', 'Client', 'Staff'
-  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client users
+  role: text("role").notNull(), // 'Admin', 'Client', 'Staff', 'SuperAdmin'
+  isSuperAdmin: boolean("is_super_admin").default(false).notNull(), // Platform-wide super admin flag
+  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client/SuperAdmin users
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   agencyIdIdx: index("profiles_agency_id_idx").on(table.agencyId),
+}));
+
+// AUDIT LOGS (Track Super Admin actions)
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // 'user.create', 'user.delete', 'user.update_role', 'agency.delete', 'client.delete', etc.
+  resourceType: text("resource_type").notNull(), // 'user', 'agency', 'client'
+  resourceId: uuid("resource_id"), // ID of the affected resource
+  details: jsonb("details"), // Additional context (e.g., old/new values)
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("audit_logs_user_id_idx").on(table.userId),
+  createdAtIdx: index("audit_logs_created_at_idx").on(table.createdAt),
+  actionIdx: index("audit_logs_action_idx").on(table.action),
 }));
 
 // CLIENTS (Company-level information)
@@ -482,6 +500,11 @@ export const insertProfileSchema = createInsertSchema(profiles).omit({
   createdAt: true, // id is required (Supabase Auth user ID)
 });
 
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClientSchema = createInsertSchema(clients).omit({
   id: true,
   createdAt: true,
@@ -649,6 +672,9 @@ export type UpdateAgencySetting = z.infer<typeof updateAgencySettingSchema>;
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = z.infer<typeof insertClientSchema>;
