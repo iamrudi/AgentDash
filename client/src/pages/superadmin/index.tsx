@@ -214,11 +214,15 @@ export default function SuperAdminPage() {
                             {user.clientName || "-"}
                           </TableCell>
                           <TableCell data-testid={`text-user-superadmin-${user.id}`}>
-                            {user.isSuperAdmin && (
-                              <Badge variant="default" data-testid={`badge-superadmin-${user.id}`}>
+                            {user.isSuperAdmin ? (
+                              <Badge variant="default" data-testid={`badge-superadmin-yes-${user.id}`}>
                                 <Shield className="w-3 h-3 mr-1" />
                                 Yes
                               </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm" data-testid={`text-superadmin-no-${user.id}`}>
+                                No
+                              </span>
                             )}
                           </TableCell>
                           <TableCell className="text-muted-foreground" data-testid={`text-user-created-${user.id}`}>
