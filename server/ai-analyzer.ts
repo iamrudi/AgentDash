@@ -1,4 +1,4 @@
-import { analyzeClientMetrics } from "./gemini";
+import { getAIProvider } from "./ai/provider";
 import { IStorage } from "./storage";
 import { InsertInitiative } from "@shared/schema";
 import { subDays, format } from "date-fns";
@@ -138,8 +138,9 @@ export async function generateAIRecommendations(
 Include competitive analysis and opportunities to outperform these competitors.`;
     }
 
-    // 13. Call Gemini AI to analyze and generate recommendations
-    const aiRecommendations = await analyzeClientMetrics(
+    // 13. Call AI provider to analyze and generate recommendations
+    const aiProvider = getAIProvider();
+    const aiRecommendations = await aiProvider.analyzeClientMetrics(
       client.companyName,
       formattedGA4,
       formattedGSC,

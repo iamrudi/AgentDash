@@ -24,7 +24,7 @@ import { generateContentIdeas, generateContentBrief, optimizeContent } from "./l
 import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
-import { analyzeDataOnDemand, summarizeLighthouseReport, analyzeChatHistory } from "./gemini";
+import { getAIProvider } from "./ai/provider";
 import { SeoAuditService } from "./services/seoAuditService";
 import { OnPageSeoAuditService } from "./services/onPageSeoAuditService";
 import { cache, CACHE_TTL } from "./lib/cache";
@@ -1048,7 +1048,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\n')
         : "No recent conversations.";
       
-      const chatAnalysis = await analyzeChatHistory(chatHistoryText);
+      const aiProvider = getAIProvider();
+      const chatAnalysis = await aiProvider.analyzeChatHistory(chatHistoryText);
 
       // 4. Assemble the final data card object
       const strategyCardData = {
@@ -3513,7 +3514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[AI Analysis Request] Question:", question);
       console.log("[AI Analysis Request] Context Data:", JSON.stringify(contextData, null, 2));
 
-      const analysis = await analyzeDataOnDemand(
+      const aiProvider = getAIProvider();
+      const analysis = await aiProvider.analyzeDataOnDemand(
         client.companyName,
         contextData,
         question
