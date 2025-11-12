@@ -44,14 +44,6 @@ const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
 const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
 const AgencySettings = lazy(() => import("@/pages/agency/settings"));
 
-// CRM Pages (lazy-loaded) - Now in Client Portal
-const CrmDashboard = lazy(() => import("@/pages/client/crm/dashboard"));
-const CrmCompanies = lazy(() => import("@/pages/client/crm/companies"));
-const CrmContacts = lazy(() => import("@/pages/client/crm/contacts"));
-const CrmDeals = lazy(() => import("@/pages/client/crm/deals"));
-const CrmForms = lazy(() => import("@/pages/client/crm/forms"));
-const CrmProposals = lazy(() => import("@/pages/client/crm/proposals"));
-
 // Loading fallback component
 function PageLoader() {
   return (
@@ -135,63 +127,6 @@ function Router() {
         <ProtectedRoute allowedRoles={["Client"]}>
           <ClientLayout>
             <Support />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      {/* Client CRM Routes - Conditionally accessible based on crmEnabled */}
-      <Route path="/client/crm">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmDashboard />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/dashboard">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmDashboard />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/companies">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmCompanies />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/contacts">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmContacts />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/deals">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmDeals />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/forms">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmForms />
-          </ClientLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/client/crm/deals/:dealId/proposal">
-        <ProtectedRoute allowedRoles={["Client"]}>
-          <ClientLayout>
-            <CrmProposals />
           </ClientLayout>
         </ProtectedRoute>
       </Route>

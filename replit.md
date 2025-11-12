@@ -42,11 +42,11 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, CRM, and AI Provider Settings.
+- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, and AI Provider Settings. Full CRM system available at agency level for managing Companies, Contacts, Deals, Forms, and Proposals.
 - **Staff Portal**: View and update assigned tasks.
 - **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
-- **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules, including CRUD operations and multi-layer tenant isolation.
+- **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules at agency level, including CRUD operations and multi-layer tenant isolation.
 - **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints for submissions, auto-creation of CRM records, honeypot bot detection, embed options, API documentation, and automatic production URL adaptation (uses VITE_PUBLIC_URL env variable or falls back to current domain).
 - **AI-Powered Proposal Builder**: Professional proposal creation tool with reusable templates, AI content generation (Gemini AI), merge tags, Markdown support, integration with CRM deals, workflow states, and secure PDF export.
 

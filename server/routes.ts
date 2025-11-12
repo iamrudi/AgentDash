@@ -1,7 +1,6 @@
 import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import crmRouter from "./routes/crm";
 import settingsRouter from "./routes/settings";
 import { 
   requireAuth, 
@@ -563,7 +562,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
+  app.get("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
       const client = await storage.getClientById(clientId);
@@ -581,7 +580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/agency/clients/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { clientId } = req.params;
-      const { leadValue, retainerAmount, billingDay, monthlyRetainerHours, crmEnabled } = req.body;
+      const { leadValue, retainerAmount, billingDay, monthlyRetainerHours } = req.body;
       
       const client = await storage.getClientById(clientId);
       if (!client) {
@@ -593,7 +592,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (retainerAmount !== undefined) updates.retainerAmount = retainerAmount;
       if (billingDay !== undefined) updates.billingDay = billingDay;
       if (monthlyRetainerHours !== undefined) updates.monthlyRetainerHours = monthlyRetainerHours;
-      if (crmEnabled !== undefined) updates.crmEnabled = crmEnabled === true || crmEnabled === "true" ? "true" : "false";
       
       const updatedClient = await storage.updateClient(clientId, updates);
       res.json(updatedClient);
@@ -4216,9 +4214,6 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       res.status(500).send('<html><body><h1>Error</h1><p>Failed to generate print view.</p></body></html>');
     }
   });
-
-  // Register CRM routes
-  app.use("/api/crm", requireAuth, crmRouter);
 
   // Register Settings routes
   app.use("/api/settings", settingsRouter);
