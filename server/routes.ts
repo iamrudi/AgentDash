@@ -123,6 +123,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Temporary endpoint to check current user profile
+  app.get("/api/auth/debug-profile", authenticateToken, async (req, res) => {
+    res.json({
+      user: req.user,
+      profile: req.user?.profile,
+      isSuperAdmin: req.user?.profile?.isSuperAdmin,
+    });
+  });
+
   // Refresh access token using refresh token
   app.post("/api/auth/refresh", async (req, res) => {
     try {
