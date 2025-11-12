@@ -44,13 +44,13 @@ const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
 const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
 const AgencySettings = lazy(() => import("@/pages/agency/settings"));
 
-// CRM Pages (lazy-loaded)
-const CrmDashboard = lazy(() => import("@/pages/agency/crm/dashboard"));
-const CrmCompanies = lazy(() => import("@/pages/agency/crm/companies"));
-const CrmContacts = lazy(() => import("@/pages/agency/crm/contacts"));
-const CrmDeals = lazy(() => import("@/pages/agency/crm/deals"));
-const CrmForms = lazy(() => import("@/pages/agency/crm/forms"));
-const CrmProposals = lazy(() => import("@/pages/agency/crm/proposals"));
+// CRM Pages (lazy-loaded) - Now in Client Portal
+const CrmDashboard = lazy(() => import("@/pages/client/crm/dashboard"));
+const CrmCompanies = lazy(() => import("@/pages/client/crm/companies"));
+const CrmContacts = lazy(() => import("@/pages/client/crm/contacts"));
+const CrmDeals = lazy(() => import("@/pages/client/crm/deals"));
+const CrmForms = lazy(() => import("@/pages/client/crm/forms"));
+const CrmProposals = lazy(() => import("@/pages/client/crm/proposals"));
 
 // Loading fallback component
 function PageLoader() {
@@ -135,6 +135,63 @@ function Router() {
         <ProtectedRoute allowedRoles={["Client"]}>
           <ClientLayout>
             <Support />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Client CRM Routes - Conditionally accessible based on crmEnabled */}
+      <Route path="/client/crm">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmDashboard />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/dashboard">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmDashboard />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/companies">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmCompanies />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/contacts">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmContacts />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/deals">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmDeals />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/forms">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmForms />
+          </ClientLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/client/crm/deals/:dealId/proposal">
+        <ProtectedRoute allowedRoles={["Client"]}>
+          <ClientLayout>
+            <CrmProposals />
           </ClientLayout>
         </ProtectedRoute>
       </Route>
@@ -240,55 +297,6 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
             <AgencySettings />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      {/* CRM Routes */}
-      <Route path="/agency/crm/dashboard">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmDashboard />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/crm/companies">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmCompanies />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/crm/contacts">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmContacts />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/crm/deals">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmDeals />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/crm/forms">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmForms />
-          </AgencyLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/agency/crm/deals/:dealId/proposal">
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AgencyLayout>
-            <CrmProposals />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>
