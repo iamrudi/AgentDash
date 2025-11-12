@@ -50,6 +50,8 @@ import {
   type InsertProposal,
   type ProposalSection,
   type InsertProposalSection,
+  type AuditLog,
+  type InsertAuditLog,
   users,
   profiles,
   clients,
@@ -76,6 +78,7 @@ import {
   proposalTemplates,
   proposals,
   proposalSections,
+  auditLogs,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -270,6 +273,18 @@ export interface IStorage {
   updateProposalSection(id: string, data: Partial<ProposalSection>): Promise<ProposalSection>;
   deleteProposalSection(id: string): Promise<void>;
   bulkUpdateProposalSections(sections: Array<Partial<ProposalSection> & { id: string }>): Promise<ProposalSection[]>;
+  
+  // Super Admin - User Management
+  getAllUsersForSuperAdmin(): Promise<Array<Profile & { agencyName?: string; clientName?: string }>>;
+  
+  // Super Admin - Agency Management
+  getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>>;
+  getAgencyById(id: string): Promise<Agency | undefined>;
+  deleteAgency(id: string): Promise<void>;
+  
+  // Super Admin - Audit Logs
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(limit: number, offset: number): Promise<AuditLog[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1762,6 +1777,68 @@ export class DbStorage implements IStorage {
       results.push(result[0]);
     }
     return results;
+  }
+
+  // Super Admin - User Management
+  async getAllUsersForSuperAdmin(): Promise<Array<Profile & { agencyName?: string; clientName?: string }>> {
+    const result = await db
+      .select({
+        id: profiles.id,
+        fullName: profiles.fullName,
+        role: profiles.role,
+        isSuperAdmin: profiles.isSuperAdmin,
+        agencyId: profiles.agencyId,
+        createdAt: profiles.createdAt,
+        agencyName: agencies.name,
+        clientId: clients.id,
+        clientName: clients.companyName,
+      })
+      .from(profiles)
+      .leftJoin(agencies, eq(profiles.agencyId, agencies.id))
+      .leftJoin(clients, eq(clients.profileId, profiles.id))
+      .orderBy(desc(profiles.createdAt));
+
+    return result;
+  }
+
+  // Super Admin - Agency Management
+  async getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>> {
+    const result = await db
+      .select({
+        id: agencies.id,
+        name: agencies.name,
+        createdAt: agencies.createdAt,
+        userCount: sql<number>`(SELECT COUNT(*) FROM ${profiles} WHERE ${profiles.agencyId} = ${agencies.id})`,
+        clientCount: sql<number>`(SELECT COUNT(*) FROM ${clients} WHERE ${clients.agencyId} = ${agencies.id})`,
+      })
+      .from(agencies)
+      .orderBy(desc(agencies.createdAt));
+
+    return result;
+  }
+
+  async getAgencyById(id: string): Promise<Agency | undefined> {
+    const result = await db.select().from(agencies).where(eq(agencies.id, id)).limit(1);
+    return result[0];
+  }
+
+  async deleteAgency(id: string): Promise<void> {
+    await db.delete(agencies).where(eq(agencies.id, id));
+  }
+
+  // Super Admin - Audit Logs
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const result = await db.insert(auditLogs).values(log).returning();
+    return result[0];
+  }
+
+  async getAuditLogs(limit: number, offset: number): Promise<AuditLog[]> {
+    return await db
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
   }
 }
 

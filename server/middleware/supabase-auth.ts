@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     role: string;
     clientId?: string; // Client ID for tenant isolation (Client role)
     agencyId?: string; // Agency ID for tenant isolation (Admin/Staff roles)
+    isSuperAdmin?: boolean; // Platform-wide super admin flag
   };
 }
 
@@ -44,6 +45,19 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       return res.status(401).json({ message: "User role not found in token" });
     }
 
+    // Query profiles table to get isSuperAdmin flag
+    // This is done for all users to ensure Super Admins are always identified
+    let isSuperAdmin = false;
+    const [profile] = await db
+      .select({ isSuperAdmin: profiles.isSuperAdmin, agencyId: profiles.agencyId })
+      .from(profiles)
+      .where(eq(profiles.id, user.id))
+      .limit(1);
+
+    if (profile) {
+      isSuperAdmin = profile.isSuperAdmin || false;
+    }
+
     // Handle different user roles
     if (role === "Client") {
       // Client users: query database to get their clientId and agencyId
@@ -64,14 +78,10 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       
       clientId = client.id;
       agencyId = client.agencyId;
-    } else if ((role === "Admin" || role === "Staff") && !agencyId) {
+    } else if ((role === "Admin" || role === "Staff") && !agencyId && !isSuperAdmin) {
       // Admin/Staff without agencyId in app_metadata: fallback to profile table
       // This ensures backward compatibility with existing users
-      const [profile] = await db
-        .select()
-        .from(profiles)
-        .where(eq(profiles.id, user.id))
-        .limit(1);
+      // Skip this check for Super Admins as they don't need agency association
       
       if (!profile) {
         return res.status(401).json({ message: "User profile not found" });
@@ -85,6 +95,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       }
     }
     // For Admin/Staff with agencyId in app_metadata - no DB query needed (optimal path)
+    // Super Admins don't require agency association
     
     req.user = {
       id: user.id, // Supabase Auth user ID
@@ -92,9 +103,10 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       role,
       clientId,
       agencyId,
+      isSuperAdmin,
     };
 
-    console.log(`[AUTH] User ${user.email} authenticated - Role: ${role}, AgencyId: ${agencyId}, ClientId: ${clientId}`);
+    console.log(`[AUTH] User ${user.email} authenticated - Role: ${role}, AgencyId: ${agencyId}, ClientId: ${clientId}, SuperAdmin: ${isSuperAdmin}`);
     
     next();
   } catch (error) {
@@ -126,6 +138,12 @@ export async function verifyClientAccess(
 ): Promise<boolean> {
   if (!req.user) {
     return false;
+  }
+
+  // Super Admins can access any client across all agencies
+  if (req.user.isSuperAdmin) {
+    console.log(`[SUPER ADMIN ACCESS] User ${req.user.id} granted access to client ${resourceClientId}`);
+    return true;
   }
 
   // Admins can ONLY access clients in their own agency
@@ -360,4 +378,19 @@ export function requireInvoiceAccess(storage: IStorage) {
 
     next();
   };
+}
+
+// Middleware to require Super Admin access
+export function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  if (!req.user.isSuperAdmin) {
+    console.warn(`[SUPER ADMIN REQUIRED] User ${req.user.id} (${req.user.email}) attempted to access Super Admin route`);
+    return res.status(403).json({ message: "Super Admin access required" });
+  }
+
+  console.log(`[SUPER ADMIN] User ${req.user.id} (${req.user.email}) accessing Super Admin route`);
+  next();
 }

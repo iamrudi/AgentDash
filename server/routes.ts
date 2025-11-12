@@ -10,6 +10,7 @@ import {
   requireTaskAccess,
   requireInitiativeAccess,
   requireInvoiceAccess,
+  requireSuperAdmin,
   type AuthRequest 
 } from "./middleware/supabase-auth";
 import { generateToken } from "./lib/jwt";
@@ -4463,6 +4464,167 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     } catch (error: any) {
       console.error('[PDF Print] Error:', error);
       res.status(500).send('<html><body><h1>Error</h1><p>Failed to generate print view.</p></body></html>');
+    }
+  });
+
+  // ============================================================================
+  // SUPER ADMIN ROUTES - Platform-level administration
+  // ============================================================================
+
+  // Helper function to log audit events
+  const logAuditEvent = async (
+    userId: string,
+    action: string,
+    resourceType: string,
+    resourceId: string | null,
+    details: any,
+    ipAddress: string | undefined,
+    userAgent: string | undefined
+  ) => {
+    try {
+      await storage.createAuditLog({
+        userId,
+        action,
+        resourceType,
+        resourceId,
+        details,
+        ipAddress,
+        userAgent,
+      });
+    } catch (error) {
+      console.error('[AUDIT LOG ERROR]', error);
+    }
+  };
+
+  // Get all users across all agencies (Super Admin only)
+  app.get("/api/superadmin/users", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const users = await storage.getAllUsersForSuperAdmin();
+      res.json(users);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching users:', error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // Update user role (Super Admin only)
+  app.patch("/api/superadmin/users/:userId/role", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { userId } = req.params;
+      const { role } = req.body;
+
+      if (!['Admin', 'Staff', 'Client'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      // Get old user data for audit log
+      const oldUser = await storage.getUserById(userId);
+      if (!oldUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUserRole(userId, role);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'user.update_role',
+        'user',
+        userId,
+        { oldRole: oldUser.role, newRole: role },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "User role updated successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user role:', error);
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Delete user (Super Admin only)
+  app.delete("/api/superadmin/users/:userId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Get user data for audit log
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.deleteUser(userId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'user.delete',
+        'user',
+        userId,
+        { deletedUser: user },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "User deleted successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting user:', error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Get all agencies (Super Admin only)
+  app.get("/api/superadmin/agencies", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const agencies = await storage.getAllAgenciesForSuperAdmin();
+      res.json(agencies);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching agencies:', error);
+      res.status(500).json({ message: "Failed to fetch agencies" });
+    }
+  });
+
+  // Delete agency (Super Admin only)
+  app.delete("/api/superadmin/agencies/:agencyId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = req.params;
+
+      // Get agency data for audit log
+      const agency = await storage.getAgencyById(agencyId);
+      if (!agency) {
+        return res.status(404).json({ message: "Agency not found" });
+      }
+
+      await storage.deleteAgency(agencyId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'agency.delete',
+        'agency',
+        agencyId,
+        { deletedAgency: agency },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "Agency deleted successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting agency:', error);
+      res.status(500).json({ message: "Failed to delete agency" });
+    }
+  });
+
+  // Get audit logs (Super Admin only)
+  app.get("/api/superadmin/audit-logs", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { limit = '100', offset = '0' } = req.query;
+      const auditLogs = await storage.getAuditLogs(parseInt(limit as string), parseInt(offset as string));
+      res.json(auditLogs);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching audit logs:', error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
     }
   });
 
