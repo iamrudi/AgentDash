@@ -31,8 +31,10 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   REDIRECT_URI: z.string().url().optional(),
 
-  // Google Gemini AI
-  GEMINI_API_KEY: z.string().min(1),
+  // AI Provider Configuration
+  AI_PROVIDER: z.enum(['gemini', 'openai']).default('gemini'),
+  GEMINI_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
 
   // Email (Optional)
   SMTP_HOST: z.string().optional(),
@@ -57,6 +59,17 @@ function validateEnv(): Env {
     if (!isDev && validated.JWT_SECRET && validated.JWT_SECRET === validated.SESSION_SECRET) {
       console.error('❌ JWT_SECRET must be different from SESSION_SECRET for security');
       process.exit(1);
+    }
+
+    // Additional validation: Require API key for the selected provider
+    const provider = validated.AI_PROVIDER || 'gemini';
+    if (provider === 'gemini' && !validated.GEMINI_API_KEY) {
+      console.error('❌ GEMINI_API_KEY is required when AI_PROVIDER is set to "gemini"');
+      if (!isDev) process.exit(1);
+    }
+    if (provider === 'openai' && !validated.OPENAI_API_KEY) {
+      console.error('❌ OPENAI_API_KEY is required when AI_PROVIDER is set to "openai"');
+      if (!isDev) process.exit(1);
     }
 
     return validated;

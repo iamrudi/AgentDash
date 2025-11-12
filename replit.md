@@ -27,7 +27,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
 - **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
-- **AI Recommendation Engine**: Preset-driven system utilizing Google Gemini AI for strategic initiatives and task lists based on real-time connection status and competitor analysis.
+- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status and competitor analysis. Provider configurable via AI_PROVIDER environment variable.
 - **Client Strategy Card**: AI-powered consolidated client view.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events sync between client.leadEvents and integration.ga4LeadEventName to ensure conversion tracking works correctly across all update paths.
 - **SEO Website Audit Tool**: Lighthouse-powered audits with AI summaries and recommendations.
@@ -64,7 +64,10 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Authentication**: Supabase Auth
 - **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
 - **OAuth Integrations**: Google OAuth (for GA4, Google Search Console)
-- **AI Services**: Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash)
+- **AI Services**: Pluggable AI provider system supporting:
+  - Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash) - Default
+  - OpenAI (gpt-4o, gpt-4o-mini)
+  - Configured via `AI_PROVIDER` environment variable (values: "gemini" or "openai")
 - **SEO APIs**: Data for SEO API
 - **SEO Auditing**: Google Lighthouse
 - **PDF Generation**: Puppeteer
