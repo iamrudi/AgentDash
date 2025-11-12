@@ -103,6 +103,12 @@ export default function AgencyIntegrationsPage() {
     enabled: authReady,
   });
 
+  // Fetch HubSpot connection status
+  const { data: hubspotStatus } = useQuery<{ connected: boolean; contactCount?: number; dealCount?: number; companyCount?: number }>({
+    queryKey: ["/api/integrations/hubspot/status"],
+    enabled: authReady,
+  });
+
   // Filter clients based on selection
   const filteredClients = selectedClientId === "ALL"
     ? clients
@@ -380,7 +386,7 @@ export default function AgencyIntegrationsPage() {
           <div>
             <h1 className="text-3xl font-semibold mb-2">API Integrations</h1>
             <p className="text-muted-foreground">
-              Manage Google Analytics 4 and Search Console connections for clients
+              Manage Google Analytics 4, Search Console, and HubSpot CRM connections
             </p>
           </div>
           <ClientFilter
@@ -388,6 +394,67 @@ export default function AgencyIntegrationsPage() {
             selectedClientId={selectedClientId}
             onClientChange={setSelectedClientId}
           />
+        </div>
+
+        {/* HubSpot CRM Integration (Agency-wide) */}
+        <Card data-testid="hubspot-integration-card">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                <LinkIcon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-lg">HubSpot CRM</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Agency-wide CRM integration for contacts, deals, and companies
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-md bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
+                  <LinkIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="font-medium">HubSpot CRM Data</p>
+                  {hubspotStatus?.connected && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>Contacts: {hubspotStatus.contactCount?.toLocaleString() || 0}</p>
+                      <p>Companies: {hubspotStatus.companyCount?.toLocaleString() || 0}</p>
+                      <p>Deals: {hubspotStatus.dealCount?.toLocaleString() || 0}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {hubspotStatus?.connected ? (
+                  <Badge variant="default" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <>
+                    <Badge variant="secondary" className="gap-1">
+                      <XCircle className="h-3 w-3" />
+                      Not Connected
+                    </Badge>
+                    <p className="text-xs text-muted-foreground">
+                      Add HUBSPOT_ACCESS_TOKEN to Secrets
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold">Client Integrations</h2>
+          <p className="text-sm text-muted-foreground">
+            Connect Google Analytics 4 and Search Console for individual clients
+          </p>
         </div>
 
         {!filteredClients || filteredClients.length === 0 ? (
