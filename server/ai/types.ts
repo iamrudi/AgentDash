@@ -50,7 +50,8 @@ export interface AIProvider {
     objectives?: string,
     preset?: Preset,
     competitorContext?: string,
-    hubspotData?: any
+    hubspotData?: any,
+    linkedinData?: any
   ): Promise<RecommendationOutput[]>;
 
   analyzeDataOnDemand(

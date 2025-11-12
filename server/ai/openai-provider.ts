@@ -44,7 +44,8 @@ export class OpenAIProvider implements AIProvider {
     objectives?: string,
     preset: Preset = "full-audit",
     competitorContext?: string,
-    hubspotData?: any
+    hubspotData?: any,
+    linkedinData?: any
   ): Promise<RecommendationOutput[]> {
     try {
       const presetConfig = PRESET_CONFIGS[preset];
@@ -110,9 +111,22 @@ ${JSON.stringify(hubspotData.deals.slice(0, 5), null, 2)}
 Use this CRM data to identify sales pipeline opportunities, lead nurturing needs, and conversion optimization recommendations.
 ` : ''}
 
+${linkedinData ? `LINKEDIN SOCIAL DATA:
+Organization Followers: ${linkedinData.organization?.followerCount?.toLocaleString() || 'N/A'}
+Recent Posts: ${linkedinData.recentPosts.length}
+Total Engagement: ${linkedinData.totalEngagement}
+Average Engagement Rate: ${(linkedinData.averageEngagementRate * 100).toFixed(2)}%
+
+Recent Post Performance:
+${JSON.stringify(linkedinData.recentPosts.slice(0, 5), null, 2)}
+
+Use this LinkedIn data to identify social media engagement opportunities, thought leadership strategies, and brand awareness campaigns.
+` : ''}
+
 Generate ${presetConfig.count} recommendations focusing on: ${presetConfig.areas.join(", ")}
 ${competitorContext ? '\nInclude competitive insights and opportunities to outperform the specified competitors.' : ''}
 ${hubspotData ? '\nConsider HubSpot CRM data to suggest sales enablement, lead nurturing, and pipeline acceleration strategies.' : ''}
+${linkedinData ? '\nIncorporate LinkedIn data to recommend social selling strategies, LinkedIn ad campaigns, and professional network growth tactics.' : ''}
 `;
 
       const response = await openai.chat.completions.create({

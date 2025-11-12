@@ -140,7 +140,21 @@ export async function generateAIRecommendations(
       // Continue without HubSpot data - it's optional
     }
 
-    // 12. Note: DataForSEO integration available but requires client website field
+    // 12. Fetch LinkedIn data if available (agency-scoped)
+    let linkedinData: any = null;
+    try {
+      const { isLinkedInConfigured, fetchLinkedInData } = await import("./lib/linkedin");
+      const configured = await isLinkedInConfigured(client.agencyId);
+      if (configured) {
+        linkedinData = await fetchLinkedInData(client.agencyId);
+        console.log(`[LinkedIn] Fetched ${linkedinData.organization?.followerCount} followers, ${linkedinData.recentPosts.length} posts for agency ${client.agencyId}`);
+      }
+    } catch (error) {
+      console.error("[LinkedIn] Failed to fetch data:", error instanceof Error ? error.message : error);
+      // Continue without LinkedIn data - it's optional
+    }
+
+    // 13. Note: DataForSEO integration available but requires client website field
     // TODO: Add website field to clients schema to enable DataForSEO keyword gap analysis
     // Once added, we can fetch keyword opportunities by comparing client domain to competitors
     // For now, DataForSEO connection status is displayed but not used in AI analysis
@@ -161,7 +175,8 @@ Include competitive analysis and opportunities to outperform these competitors.`
       objectives,
       options.preset,
       competitorContext,
-      hubspotData
+      hubspotData,
+      linkedinData
     );
 
     // 12. Create initiative records from AI recommendations
