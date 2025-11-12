@@ -24,6 +24,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { AIRecommendationsPanel } from "@/components/ai-recommendations-panel";
 import { format, subDays } from "date-fns";
 
@@ -82,8 +84,33 @@ export default function AgencyClientsPage() {
     },
   });
 
+  const toggleCrmMutation = useMutation({
+    mutationFn: async ({ clientId, enabled }: { clientId: string; enabled: boolean }) => {
+      return await apiRequest("PATCH", `/api/agency/clients/${clientId}`, { crmEnabled: enabled });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/clients"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/agency/clients/${variables.clientId}`] });
+      toast({
+        title: "Success",
+        description: `CRM ${variables.enabled ? "enabled" : "disabled"} for client`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update CRM status",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: CreateClientUser) => {
     createClientMutation.mutate(data);
+  };
+
+  const handleToggleCrm = (clientId: string, enabled: boolean) => {
+    toggleCrmMutation.mutate({ clientId, enabled });
   };
 
   const handleGenerateAI = (clientId: string, clientName: string) => {
@@ -325,6 +352,20 @@ export default function AgencyClientsPage() {
                     )}
                   </div>
 
+                  {/* CRM Toggle */}
+                  <div className="flex items-center justify-between py-3 border-y mb-3">
+                    <Label htmlFor={`crm-toggle-${client.id}`} className="text-sm font-medium cursor-pointer">
+                      CRM Access
+                    </Label>
+                    <Switch
+                      id={`crm-toggle-${client.id}`}
+                      checked={client.crmEnabled === "true"}
+                      onCheckedChange={(checked) => handleToggleCrm(client.id, checked)}
+                      disabled={toggleCrmMutation.isPending}
+                      data-testid={`switch-crm-${client.id}`}
+                    />
+                  </div>
+
                   {/* Integration Status & Actions */}
                   <div className="flex items-center justify-between pt-3 border-t">
                     <TooltipProvider>
@@ -423,6 +464,7 @@ export default function AgencyClientsPage() {
                   <TableHead className="text-center">Projects</TableHead>
                   <TableHead className="text-center">Integrations</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-center">CRM</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -465,6 +507,14 @@ export default function AgencyClientsPage() {
                       ) : (
                         <Badge variant="secondary">Active</Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        checked={client.crmEnabled === "true"}
+                        onCheckedChange={(checked) => handleToggleCrm(client.id, checked)}
+                        disabled={toggleCrmMutation.isPending}
+                        data-testid={`switch-crm-table-${client.id}`}
+                      />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

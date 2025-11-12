@@ -142,3 +142,39 @@ export function requireClientAccess(storage: IStorage) {
     next();
   };
 }
+
+// Middleware to verify CRM is enabled for the client
+export function verifyCrmEnabled(storage: IStorage) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    // Get clientId from user (for Client role) or route params (for Admin/Staff)
+    const clientId = req.user.clientId || req.params.clientId;
+    
+    if (!clientId) {
+      return res.status(400).json({ message: "Client ID required" });
+    }
+
+    try {
+      const client = await storage.getClientById(clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      // Check if CRM is enabled for this client
+      if (client.crmEnabled !== "true") {
+        return res.status(403).json({ 
+          message: "CRM access is not enabled for this client" 
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Error verifying CRM access:", error);
+      return res.status(500).json({ message: "Failed to verify CRM access" });
+    }
+  };
+}
