@@ -58,11 +58,14 @@ export default function AgencyIntegrationsPage() {
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [editLeadEventDialogOpen, setEditLeadEventDialogOpen] = useState(false);
   const [hubspotDialogOpen, setHubspotDialogOpen] = useState(false);
+  const [linkedinDialogOpen, setLinkedinDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
   const [leadEventName, setLeadEventName] = useState("");
   const [selectedGSCSite, setSelectedGSCSite] = useState("");
   const [hubspotToken, setHubspotToken] = useState("");
+  const [linkedinAccessToken, setLinkedinAccessToken] = useState("");
+  const [linkedinOrganizationId, setLinkedinOrganizationId] = useState("");
   
   // Check for OAuth success/error in URL
   useEffect(() => {
@@ -108,6 +111,12 @@ export default function AgencyIntegrationsPage() {
   // Fetch HubSpot connection status
   const { data: hubspotStatus } = useQuery<{ connected: boolean; contactCount?: number; dealCount?: number; companyCount?: number }>({
     queryKey: ["/api/integrations/hubspot/status"],
+    enabled: authReady,
+  });
+
+  // Fetch LinkedIn connection status
+  const { data: linkedinStatus } = useQuery<{ connected: boolean; followerCount?: number; recentPostCount?: number; totalEngagement?: number }>({
+    queryKey: ["/api/integrations/linkedin/status"],
     enabled: authReady,
   });
 
@@ -398,6 +407,51 @@ export default function AgencyIntegrationsPage() {
     },
   });
 
+  // Connect LinkedIn mutation (agency-wide)
+  const connectLinkedInMutation = useMutation({
+    mutationFn: async ({ accessToken, organizationId }: { accessToken: string; organizationId: string }) => {
+      await apiRequest("POST", "/api/integrations/linkedin/connect", { accessToken, organizationId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/linkedin/status"] });
+      setLinkedinDialogOpen(false);
+      setLinkedinAccessToken("");
+      setLinkedinOrganizationId("");
+      toast({
+        title: "Connected",
+        description: "LinkedIn integration connected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect LinkedIn mutation (agency-wide)
+  const disconnectLinkedInMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/integrations/linkedin/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/linkedin/status"] });
+      toast({
+        title: "Disconnected",
+        description: "LinkedIn integration disconnected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC') => {
     if (service === 'GA4') {
       disconnectGA4Mutation.mutate(clientId);
@@ -502,6 +556,76 @@ export default function AgencyIntegrationsPage() {
                       size="sm"
                       onClick={() => setHubspotDialogOpen(true)}
                       data-testid="button-connect-hubspot"
+                    >
+                      Connect
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* LinkedIn Integration (Agency-wide) */}
+        <Card data-testid="linkedin-integration-card">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                <LinkIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <CardTitle className="text-lg">LinkedIn</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Agency-wide social media integration for engagement metrics
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-md bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
+                  <LinkIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="font-medium">LinkedIn Data</p>
+                  {linkedinStatus?.connected && (
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      <p>Followers: {linkedinStatus.followerCount?.toLocaleString() || 0}</p>
+                      <p>Recent Posts: {linkedinStatus.recentPostCount || 0}</p>
+                      <p>Total Engagement: {linkedinStatus.totalEngagement?.toLocaleString() || 0}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {linkedinStatus?.connected ? (
+                  <>
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Connected
+                    </Badge>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => disconnectLinkedInMutation.mutate()}
+                      disabled={disconnectLinkedInMutation.isPending}
+                      data-testid="button-disconnect-linkedin"
+                    >
+                      {disconnectLinkedInMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="secondary" className="gap-1">
+                      <XCircle className="h-3 w-3" />
+                      Not Connected
+                    </Badge>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setLinkedinDialogOpen(true)}
+                      data-testid="button-connect-linkedin"
                     >
                       Connect
                     </Button>
@@ -695,6 +819,18 @@ export default function AgencyIntegrationsPage() {
         setToken={setHubspotToken}
         onConnect={() => connectHubSpotMutation.mutate(hubspotToken)}
         isPending={connectHubSpotMutation.isPending}
+      />
+
+      {/* LinkedIn Connect Dialog */}
+      <LinkedInConnectDialog
+        open={linkedinDialogOpen}
+        onOpenChange={setLinkedinDialogOpen}
+        accessToken={linkedinAccessToken}
+        setAccessToken={setLinkedinAccessToken}
+        organizationId={linkedinOrganizationId}
+        setOrganizationId={setLinkedinOrganizationId}
+        onConnect={() => connectLinkedInMutation.mutate({ accessToken: linkedinAccessToken, organizationId: linkedinOrganizationId })}
+        isPending={connectLinkedInMutation.isPending}
       />
     </>
   );
@@ -1051,6 +1187,86 @@ function HubSpotConnectDialog({
               onClick={onConnect}
               disabled={!token || isPending}
               data-testid="button-submit-hubspot"
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Connect
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinkedInConnectDialog({
+  open,
+  onOpenChange,
+  accessToken,
+  setAccessToken,
+  organizationId,
+  setOrganizationId,
+  onConnect,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  accessToken: string;
+  setAccessToken: (token: string) => void;
+  organizationId: string;
+  setOrganizationId: (id: string) => void;
+  onConnect: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect LinkedIn</DialogTitle>
+          <DialogDescription>
+            Enter your LinkedIn access token and organization ID to connect social media data
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="linkedin-token">Access Token</Label>
+            <Input
+              id="linkedin-token"
+              type="password"
+              placeholder="AQV..."
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              data-testid="input-linkedin-token"
+            />
+            <p className="text-xs text-muted-foreground">
+              Create a LinkedIn app with organization access to get your access token.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="linkedin-org-id">Organization ID</Label>
+            <Input
+              id="linkedin-org-id"
+              type="text"
+              placeholder="12345678"
+              value={organizationId}
+              onChange={(e) => setOrganizationId(e.target.value)}
+              data-testid="input-linkedin-org-id"
+            />
+            <p className="text-xs text-muted-foreground">
+              Your LinkedIn organization's numeric ID.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              data-testid="button-cancel-linkedin"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onConnect}
+              disabled={!accessToken || !organizationId || isPending}
+              data-testid="button-submit-linkedin"
             >
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Connect
