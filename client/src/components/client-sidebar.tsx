@@ -1,4 +1,4 @@
-import { Home, FolderKanban, Lightbulb, CreditCard, BarChart3, User, HelpCircle, LogOut, Building2 } from "lucide-react";
+import { Home, FolderKanban, Lightbulb, CreditCard, BarChart3, User, HelpCircle, LogOut, Building2, Briefcase, BarChart2, Building, Users, DollarSign, FileText } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
+import type { Client } from "@shared/schema";
 
 const menuItems = [
   {
@@ -61,10 +62,45 @@ const menuItems = [
   },
 ];
 
+const crmMenuItems = [
+  {
+    title: "Dashboard",
+    url: "/client/crm/dashboard",
+    icon: BarChart2,
+  },
+  {
+    title: "Companies",
+    url: "/client/crm/companies",
+    icon: Building,
+  },
+  {
+    title: "Contacts",
+    url: "/client/crm/contacts",
+    icon: Users,
+  },
+  {
+    title: "Deals",
+    url: "/client/crm/deals",
+    icon: DollarSign,
+  },
+  {
+    title: "Forms",
+    url: "/client/crm/forms",
+    icon: FileText,
+  },
+];
+
 export function ClientSidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
   const { setOpenMobile, isMobile } = useSidebar();
+
+  // Fetch client data to check if CRM is enabled
+  const { data: clientData } = useQuery<Client>({
+    queryKey: [`/api/agency/clients/${authUser?.clientId}`],
+    enabled: !!authUser?.clientId,
+    refetchOnWindowFocus: true, // Refetch when window gains focus to catch admin changes
+  });
 
   const { data: notificationCounts } = useQuery<{ unreadMessages: number; newRecommendations: number }>({
     queryKey: ["/api/client/notifications/counts"],
@@ -135,6 +171,32 @@ export function ClientSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        
+        {/* CRM Group - Only shown when CRM is enabled for this client */}
+        {clientData?.crmEnabled === "true" && (
+          <SidebarGroup>
+            <SidebarGroupLabel>CRM</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {crmMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location === item.url}
+                      tooltip={item.title}
+                      data-testid={`nav-crm-${item.title.toLowerCase()}`}
+                    >
+                      <Link href={item.url} onClick={handleNavClick}>
+                        <item.icon className="h-4 w-4" />
+                        <span className="flex-1">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
         
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>

@@ -75,42 +75,6 @@ const menuGroups = [
     ],
   },
   {
-    title: "CRM",
-    icon: Briefcase,
-    items: [
-      {
-        title: "Dashboard",
-        url: "/agency/crm/dashboard",
-        icon: BarChart2,
-        notificationKey: null,
-      },
-      {
-        title: "Companies",
-        url: "/agency/crm/companies",
-        icon: Building,
-        notificationKey: null,
-      },
-      {
-        title: "Contacts",
-        url: "/agency/crm/contacts",
-        icon: Users,
-        notificationKey: null,
-      },
-      {
-        title: "Deals",
-        url: "/agency/crm/deals",
-        icon: DollarSign,
-        notificationKey: null,
-      },
-      {
-        title: "Forms",
-        url: "/agency/crm/forms",
-        icon: FileText,
-        notificationKey: null,
-      },
-    ],
-  },
-  {
     title: "Administration",
     icon: Shield,
     items: [
