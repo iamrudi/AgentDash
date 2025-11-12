@@ -126,13 +126,14 @@ export async function generateAIRecommendations(
       .map(o => o.description)
       .join("; ") || undefined;
 
-    // 11. Fetch HubSpot CRM data if available
+    // 11. Fetch HubSpot CRM data if available (agency-scoped)
     let hubspotData: any = null;
     try {
       const { isHubSpotConfigured, fetchHubSpotCRMData } = await import("./lib/hubspot");
-      if (isHubSpotConfigured()) {
-        hubspotData = await fetchHubSpotCRMData();
-        console.log(`[HubSpot] Fetched ${hubspotData.totalContacts} contacts, ${hubspotData.totalDeals} deals, ${hubspotData.totalCompanies} companies`);
+      const configured = await isHubSpotConfigured(client.agencyId);
+      if (configured) {
+        hubspotData = await fetchHubSpotCRMData(client.agencyId);
+        console.log(`[HubSpot] Fetched ${hubspotData.totalContacts} contacts, ${hubspotData.totalDeals} deals, ${hubspotData.totalCompanies} companies for agency ${client.agencyId}`);
       }
     } catch (error) {
       console.error("[HubSpot] Failed to fetch CRM data:", error instanceof Error ? error.message : error);

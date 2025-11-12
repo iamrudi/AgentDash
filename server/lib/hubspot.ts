@@ -1,4 +1,8 @@
 import axios from 'axios';
+import { db } from '../db';
+import { agencySettings } from '@shared/schema';
+import { eq } from 'drizzle-orm';
+import { decrypt } from './encryption';
 
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
 
@@ -52,27 +56,63 @@ export interface HubSpotCRMData {
   dealValue: number;
 }
 
-/**
- * Check if HubSpot integration is configured
- */
-export function isHubSpotConfigured(): boolean {
-  return !!process.env.HUBSPOT_ACCESS_TOKEN;
+interface HubSpotCredentials {
+  accessToken: string;
 }
 
 /**
- * Fetch contacts from HubSpot
+ * Get decrypted HubSpot credentials for an agency
  */
-export async function fetchHubSpotContacts(limit: number = 100): Promise<HubSpotContact[]> {
-  const accessToken = process.env.HUBSPOT_ACCESS_TOKEN;
+async function getHubSpotCredentials(agencyId: string): Promise<HubSpotCredentials | null> {
+  const settings = await db
+    .select()
+    .from(agencySettings)
+    .where(eq(agencySettings.agencyId, agencyId))
+    .limit(1);
+
+  if (settings.length === 0 || !settings[0].hubspotAccessToken) {
+    return null;
+  }
+
+  const setting = settings[0];
+
+  try {
+    // Decrypt the access token
+    const accessToken = decrypt(
+      setting.hubspotAccessToken,
+      setting.hubspotAccessTokenIv!,
+      setting.hubspotAccessTokenAuthTag!
+    );
+
+    return { accessToken };
+  } catch (error) {
+    console.error('[HubSpot] Failed to decrypt credentials:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if HubSpot integration is configured for an agency
+ */
+export async function isHubSpotConfigured(agencyId: string): Promise<boolean> {
+  const credentials = await getHubSpotCredentials(agencyId);
+  return !!credentials;
+}
+
+/**
+ * Fetch contacts from HubSpot for a specific agency
+ */
+export async function fetchHubSpotContacts(agencyId: string, limit: number = 100): Promise<HubSpotContact[]> {
+  const credentials = await getHubSpotCredentials(agencyId);
   
-  if (!accessToken) {
-    throw new Error('HubSpot access token not configured');
+  if (!credentials) {
+    throw new Error('HubSpot not connected for this agency');
   }
 
   try {
     const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${credentials.accessToken}`,
         'Content-Type': 'application/json',
       },
       params: {
@@ -91,19 +131,19 @@ export async function fetchHubSpotContacts(limit: number = 100): Promise<HubSpot
 }
 
 /**
- * Fetch deals from HubSpot
+ * Fetch deals from HubSpot for a specific agency
  */
-export async function fetchHubSpotDeals(limit: number = 100): Promise<HubSpotDeal[]> {
-  const accessToken = process.env.HUBSPOT_ACCESS_TOKEN;
+export async function fetchHubSpotDeals(agencyId: string, limit: number = 100): Promise<HubSpotDeal[]> {
+  const credentials = await getHubSpotCredentials(agencyId);
   
-  if (!accessToken) {
-    throw new Error('HubSpot access token not configured');
+  if (!credentials) {
+    throw new Error('HubSpot not connected for this agency');
   }
 
   try {
     const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${credentials.accessToken}`,
         'Content-Type': 'application/json',
       },
       params: {
@@ -122,19 +162,19 @@ export async function fetchHubSpotDeals(limit: number = 100): Promise<HubSpotDea
 }
 
 /**
- * Fetch companies from HubSpot
+ * Fetch companies from HubSpot for a specific agency
  */
-export async function fetchHubSpotCompanies(limit: number = 100): Promise<HubSpotCompany[]> {
-  const accessToken = process.env.HUBSPOT_ACCESS_TOKEN;
+export async function fetchHubSpotCompanies(agencyId: string, limit: number = 100): Promise<HubSpotCompany[]> {
+  const credentials = await getHubSpotCredentials(agencyId);
   
-  if (!accessToken) {
-    throw new Error('HubSpot access token not configured');
+  if (!credentials) {
+    throw new Error('HubSpot not connected for this agency');
   }
 
   try {
     const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/companies`, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${credentials.accessToken}`,
         'Content-Type': 'application/json',
       },
       params: {
@@ -153,13 +193,13 @@ export async function fetchHubSpotCompanies(limit: number = 100): Promise<HubSpo
 }
 
 /**
- * Fetch all CRM data from HubSpot (contacts, deals, companies)
+ * Fetch all CRM data from HubSpot for a specific agency
  */
-export async function fetchHubSpotCRMData(): Promise<HubSpotCRMData> {
+export async function fetchHubSpotCRMData(agencyId: string): Promise<HubSpotCRMData> {
   const [contacts, deals, companies] = await Promise.all([
-    fetchHubSpotContacts(),
-    fetchHubSpotDeals(),
-    fetchHubSpotCompanies(),
+    fetchHubSpotContacts(agencyId),
+    fetchHubSpotDeals(agencyId),
+    fetchHubSpotCompanies(agencyId),
   ]);
 
   // Calculate total deal value
@@ -180,17 +220,23 @@ export async function fetchHubSpotCRMData(): Promise<HubSpotCRMData> {
 }
 
 /**
- * Get HubSpot connection status
+ * Get HubSpot connection status for a specific agency
  */
-export async function getHubSpotStatus(): Promise<{ connected: boolean; error?: string }> {
-  if (!isHubSpotConfigured()) {
+export async function getHubSpotStatus(agencyId: string): Promise<{ connected: boolean; contactCount?: number; dealCount?: number; companyCount?: number; error?: string }> {
+  const configured = await isHubSpotConfigured(agencyId);
+  if (!configured) {
     return { connected: false };
   }
 
   try {
-    // Test connection by fetching a single contact
-    await fetchHubSpotContacts(1);
-    return { connected: true };
+    // Test connection and fetch basic stats
+    const data = await fetchHubSpotCRMData(agencyId);
+    return { 
+      connected: true,
+      contactCount: data.totalContacts,
+      dealCount: data.totalDeals,
+      companyCount: data.totalCompanies,
+    };
   } catch (error) {
     return { 
       connected: false, 

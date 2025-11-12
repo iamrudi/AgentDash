@@ -2272,13 +2272,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // HubSpot Integration Routes
+  // HubSpot Integration Routes (Agency-wide)
 
-  // Get HubSpot connection status (Admin only)
+  // Get HubSpot connection status for the agency (Admin only)
   app.get("/api/integrations/hubspot/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ connected: false, error: "Agency ID not found" });
+      }
+
       const { getHubSpotStatus } = await import("./lib/hubspot");
-      const status = await getHubSpotStatus();
+      const status = await getHubSpotStatus(agencyId);
       res.json(status);
     } catch (error: any) {
       res.status(500).json({ 
@@ -2288,11 +2293,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fetch HubSpot CRM data (Admin only)
+  // Connect HubSpot for the agency (Admin only)
+  app.post("/api/integrations/hubspot/connect", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
+      const { accessToken } = req.body;
+      if (!accessToken) {
+        return res.status(400).json({ error: "Access token is required" });
+      }
+
+      // Encrypt the access token
+      const { encrypt } = await import("./lib/encryption");
+      const { encryptedData, iv, authTag } = encrypt(accessToken);
+
+      // Save to agency settings
+      const existing = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1);
+
+      if (existing.length > 0) {
+        // Update existing settings
+        await db
+          .update(agencySettings)
+          .set({
+            hubspotAccessToken: encryptedData,
+            hubspotAccessTokenIv: iv,
+            hubspotAccessTokenAuthTag: authTag,
+            hubspotConnectedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(agencySettings.agencyId, agencyId));
+      } else {
+        // Create new settings
+        await db
+          .insert(agencySettings)
+          .values({
+            agencyId,
+            hubspotAccessToken: encryptedData,
+            hubspotAccessTokenIv: iv,
+            hubspotAccessTokenAuthTag: authTag,
+            hubspotConnectedAt: new Date(),
+          });
+      }
+
+      res.json({ success: true, message: "HubSpot connected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: error.message || "Failed to connect HubSpot" 
+      });
+    }
+  });
+
+  // Disconnect HubSpot for the agency (Admin only)
+  app.post("/api/integrations/hubspot/disconnect", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
+      // Remove HubSpot credentials from agency settings
+      await db
+        .update(agencySettings)
+        .set({
+          hubspotAccessToken: null,
+          hubspotAccessTokenIv: null,
+          hubspotAccessTokenAuthTag: null,
+          hubspotConnectedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(agencySettings.agencyId, agencyId));
+
+      res.json({ success: true, message: "HubSpot disconnected successfully" });
+    } catch (error: any) {
+      res.status(500).json({ 
+        error: error.message || "Failed to disconnect HubSpot" 
+      });
+    }
+  });
+
+  // Fetch HubSpot CRM data for the agency (Admin only)
   app.get("/api/integrations/hubspot/data", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
+      const agencyId = req.user!.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ error: "Agency ID not found" });
+      }
+
       const { fetchHubSpotCRMData } = await import("./lib/hubspot");
-      const data = await fetchHubSpotCRMData();
+      const data = await fetchHubSpotCRMData(agencyId);
       res.json(data);
     } catch (error: any) {
       res.status(500).json({ 

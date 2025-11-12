@@ -57,10 +57,12 @@ export default function AgencyIntegrationsPage() {
   const [ga4DialogOpen, setGa4DialogOpen] = useState(false);
   const [gscDialogOpen, setGscDialogOpen] = useState(false);
   const [editLeadEventDialogOpen, setEditLeadEventDialogOpen] = useState(false);
+  const [hubspotDialogOpen, setHubspotDialogOpen] = useState(false);
   const [currentClientId, setCurrentClientId] = useState("");
   const [selectedGA4Property, setSelectedGA4Property] = useState("");
   const [leadEventName, setLeadEventName] = useState("");
   const [selectedGSCSite, setSelectedGSCSite] = useState("");
+  const [hubspotToken, setHubspotToken] = useState("");
   
   // Check for OAuth success/error in URL
   useEffect(() => {
@@ -352,6 +354,50 @@ export default function AgencyIntegrationsPage() {
     },
   });
 
+  // Connect HubSpot mutation (agency-wide)
+  const connectHubSpotMutation = useMutation({
+    mutationFn: async (accessToken: string) => {
+      await apiRequest("POST", "/api/integrations/hubspot/connect", { accessToken });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/hubspot/status"] });
+      setHubspotDialogOpen(false);
+      setHubspotToken("");
+      toast({
+        title: "Connected",
+        description: "HubSpot CRM connected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disconnect HubSpot mutation (agency-wide)
+  const disconnectHubSpotMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/integrations/hubspot/disconnect");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations/hubspot/status"] });
+      toast({
+        title: "Disconnected",
+        description: "HubSpot CRM disconnected successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDisconnect = (clientId: string, service: 'GA4' | 'GSC') => {
     if (service === 'GA4') {
       disconnectGA4Mutation.mutate(clientId);
@@ -430,19 +476,35 @@ export default function AgencyIntegrationsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {hubspotStatus?.connected ? (
-                  <Badge variant="default" className="gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Connected
-                  </Badge>
+                  <>
+                    <Badge variant="default" className="gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Connected
+                    </Badge>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => disconnectHubSpotMutation.mutate()}
+                      disabled={disconnectHubSpotMutation.isPending}
+                      data-testid="button-disconnect-hubspot"
+                    >
+                      {disconnectHubSpotMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Badge variant="secondary" className="gap-1">
                       <XCircle className="h-3 w-3" />
                       Not Connected
                     </Badge>
-                    <p className="text-xs text-muted-foreground">
-                      Add HUBSPOT_ACCESS_TOKEN to Secrets
-                    </p>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setHubspotDialogOpen(true)}
+                      data-testid="button-connect-hubspot"
+                    >
+                      Connect
+                    </Button>
                   </>
                 )}
               </div>
@@ -623,6 +685,16 @@ export default function AgencyIntegrationsPage() {
           setEditLeadEventDialogOpen(open);
           if (!open) setLeadEventName("");
         }}
+      />
+
+      {/* HubSpot Connect Dialog */}
+      <HubSpotConnectDialog
+        open={hubspotDialogOpen}
+        onOpenChange={setHubspotDialogOpen}
+        token={hubspotToken}
+        setToken={setHubspotToken}
+        onConnect={() => connectHubSpotMutation.mutate(hubspotToken)}
+        isPending={connectHubSpotMutation.isPending}
       />
     </>
   );
@@ -923,6 +995,68 @@ function LeadEventsDialog({
             <p className="text-sm mt-2">Make sure your GA4 property has key events configured.</p>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HubSpotConnectDialog({
+  open,
+  onOpenChange,
+  token,
+  setToken,
+  onConnect,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  token: string;
+  setToken: (token: string) => void;
+  onConnect: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Connect HubSpot CRM</DialogTitle>
+          <DialogDescription>
+            Enter your HubSpot Private App Access Token to connect your CRM data
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="hubspot-token">Access Token</Label>
+            <Input
+              id="hubspot-token"
+              type="password"
+              placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              data-testid="input-hubspot-token"
+            />
+            <p className="text-xs text-muted-foreground">
+              Create a Private App in HubSpot with CRM read permissions to get your access token.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              data-testid="button-cancel-hubspot"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={onConnect}
+              disabled={!token || isPending}
+              data-testid="button-submit-hubspot"
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Connect
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

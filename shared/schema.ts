@@ -18,6 +18,11 @@ export const agencySettings = pgTable("agency_settings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
   aiProvider: text("ai_provider").notNull().default("gemini"), // 'gemini' or 'openai'
+  // HubSpot CRM Integration (agency-wide)
+  hubspotAccessToken: text("hubspot_access_token"), // Encrypted before storage
+  hubspotAccessTokenIv: text("hubspot_access_token_iv"), // IV for encryption
+  hubspotAccessTokenAuthTag: text("hubspot_access_token_auth_tag"), // Auth tag for encryption
+  hubspotConnectedAt: timestamp("hubspot_connected_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
