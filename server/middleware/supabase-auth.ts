@@ -87,7 +87,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
         return res.status(401).json({ message: "User profile not found" });
       }
       
-      agencyId = profile.agencyId;
+      agencyId = profile.agencyId ?? undefined;
       
       if (!agencyId) {
         console.warn(`Admin/Staff user ${user.id} has no agencyId in profile or app_metadata`);

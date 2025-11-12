@@ -1798,7 +1798,11 @@ export class DbStorage implements IStorage {
       .leftJoin(clients, eq(clients.profileId, profiles.id))
       .orderBy(desc(profiles.createdAt));
 
-    return result;
+    return result.map(row => ({
+      ...row,
+      agencyName: row.agencyName ?? undefined,
+      clientName: row.clientName ?? undefined,
+    }));
   }
 
   // Super Admin - Agency Management
