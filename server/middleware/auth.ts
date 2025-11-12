@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     role: string;
     clientId?: string; // Client ID for tenant isolation (Client role)
     agencyId?: string; // Agency ID for tenant isolation (Admin/Staff roles)
+    isSuperAdmin?: boolean; // Platform-wide super admin flag
   };
 }
 
@@ -59,7 +60,10 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       role: profile?.role || payload.role,
       clientId,
       agencyId,
+      isSuperAdmin: profile?.isSuperAdmin || false,
     };
+
+    console.log(`[AUTH] User ${payload.email} authenticated - Role: ${req.user.role}, AgencyId: ${req.user.agencyId}, ClientId: ${req.user.clientId}, SuperAdmin: ${req.user.isSuperAdmin}`);
 
     next();
   } catch (error) {
@@ -90,6 +94,12 @@ export async function verifyClientAccess(
 ): Promise<boolean> {
   if (!req.user) {
     return false;
+  }
+
+  // Super Admins can access any client across all agencies
+  if (req.user.isSuperAdmin) {
+    console.log(`[SUPER ADMIN ACCESS] User ${req.user.id} granted access to client ${resourceClientId}`);
+    return true;
   }
 
   // Admins can ONLY access clients in their own agency
@@ -141,4 +151,19 @@ export function requireClientAccess(storage: IStorage) {
 
     next();
   };
+}
+
+// Middleware to require Super Admin access
+export function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  if (!req.user.isSuperAdmin) {
+    console.warn(`[SUPER ADMIN REQUIRED] User ${req.user.id} (${req.user.email}) attempted to access Super Admin route`);
+    return res.status(403).json({ message: "Super Admin access required" });
+  }
+
+  console.log(`[SUPER ADMIN] User ${req.user.id} (${req.user.email}) accessing Super Admin route`);
+  next();
 }
