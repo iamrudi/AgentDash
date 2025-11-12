@@ -183,7 +183,7 @@ export default function SuperAdminPage() {
             </CardHeader>
             <CardContent>
               {usersLoading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="loading-users">Loading users...</div>
               ) : users && users.length > 0 ? (
                 <div className="rounded-md border">
                   <Table>
@@ -201,27 +201,27 @@ export default function SuperAdminPage() {
                     <TableBody>
                       {users.map((user) => (
                         <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                          <TableCell className="font-medium">{user.fullName}</TableCell>
+                          <TableCell className="font-medium" data-testid={`text-user-name-${user.id}`}>{user.fullName}</TableCell>
                           <TableCell>
                             <Badge variant={getRoleBadgeVariant(user.role)} data-testid={`badge-role-${user.id}`}>
                               {user.role}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground" data-testid={`text-user-agency-${user.id}`}>
                             {user.agencyName || "-"}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground" data-testid={`text-user-client-${user.id}`}>
                             {user.clientName || "-"}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-testid={`text-user-superadmin-${user.id}`}>
                             {user.isSuperAdmin && (
-                              <Badge variant="default">
+                              <Badge variant="default" data-testid={`badge-superadmin-${user.id}`}>
                                 <Shield className="w-3 h-3 mr-1" />
                                 Yes
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground" data-testid={`text-user-created-${user.id}`}>
                             {format(new Date(user.createdAt), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell className="text-right">
@@ -253,7 +253,7 @@ export default function SuperAdminPage() {
                   </Table>
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">No users found</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-users">No users found</div>
               )}
             </CardContent>
           </Card>
@@ -269,7 +269,7 @@ export default function SuperAdminPage() {
             </CardHeader>
             <CardContent>
               {agenciesLoading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading agencies...</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="loading-agencies">Loading agencies...</div>
               ) : agencies && agencies.length > 0 ? (
                 <div className="rounded-md border">
                   <Table>
@@ -285,7 +285,7 @@ export default function SuperAdminPage() {
                     <TableBody>
                       {agencies.map((agency) => (
                         <TableRow key={agency.id} data-testid={`row-agency-${agency.id}`}>
-                          <TableCell className="font-medium">{agency.name}</TableCell>
+                          <TableCell className="font-medium" data-testid={`text-agency-name-${agency.id}`}>{agency.name}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" data-testid={`badge-users-${agency.id}`}>
                               <Users className="w-3 h-3 mr-1" />
@@ -297,7 +297,7 @@ export default function SuperAdminPage() {
                               {agency.clientCount}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground" data-testid={`text-agency-created-${agency.id}`}>
                             {format(new Date(agency.createdAt), "MMM d, yyyy")}
                           </TableCell>
                           <TableCell className="text-right">
@@ -316,7 +316,7 @@ export default function SuperAdminPage() {
                   </Table>
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">No agencies found</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-agencies">No agencies found</div>
               )}
             </CardContent>
           </Card>
@@ -332,7 +332,7 @@ export default function SuperAdminPage() {
             </CardHeader>
             <CardContent>
               {logsLoading ? (
-                <div className="text-center py-8 text-muted-foreground">Loading audit logs...</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="loading-logs">Loading audit logs...</div>
               ) : auditLogs && auditLogs.length > 0 ? (
                 <div className="space-y-4">
                   {auditLogs.map((log) => (
@@ -346,22 +346,22 @@ export default function SuperAdminPage() {
                       </div>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{log.action}</p>
-                          <Badge variant="outline" className="text-xs">
+                          <p className="font-medium" data-testid={`text-log-action-${log.id}`}>{log.action}</p>
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-log-type-${log.id}`}>
                             {log.resourceType}
                           </Badge>
                         </div>
                         {log.resourceId && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground" data-testid={`text-log-resource-${log.id}`}>
                             Resource ID: {log.resourceId}
                           </p>
                         )}
                         {log.details && (
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-sm text-muted-foreground" data-testid={`text-log-details-${log.id}`}>
                             {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground" data-testid={`text-log-created-${log.id}`}>
                           {format(new Date(log.createdAt), "MMM d, yyyy 'at' h:mm a")}
                         </p>
                       </div>
@@ -369,7 +369,7 @@ export default function SuperAdminPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">No audit logs found</div>
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-logs">No audit logs found</div>
               )}
             </CardContent>
           </Card>
