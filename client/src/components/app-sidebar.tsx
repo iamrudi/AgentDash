@@ -89,6 +89,14 @@ export function AppSidebar() {
 
   // Check if user is Super Admin
   const isSuperAdmin = authUser?.profile?.isSuperAdmin || false;
+  
+  // Debug logging
+  console.log('AppSidebar Debug:', {
+    authUser: authUser?.email,
+    role,
+    isSuperAdmin,
+    profileData: authUser?.profile,
+  });
 
   // Admin/Agency menu items
   const agencyMenuItems = [
