@@ -358,7 +358,7 @@ export default function SuperAdminPage() {
                         )}
                         {log.details && (
                           <p className="text-sm text-muted-foreground">
-                            {JSON.stringify(log.details)}
+                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
