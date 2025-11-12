@@ -23,6 +23,12 @@ export const agencySettings = pgTable("agency_settings", {
   hubspotAccessTokenIv: text("hubspot_access_token_iv"), // IV for encryption
   hubspotAccessTokenAuthTag: text("hubspot_access_token_auth_tag"), // Auth tag for encryption
   hubspotConnectedAt: timestamp("hubspot_connected_at"),
+  // LinkedIn Integration (agency-wide)
+  linkedinAccessToken: text("linkedin_access_token"), // Encrypted before storage
+  linkedinAccessTokenIv: text("linkedin_access_token_iv"), // IV for encryption
+  linkedinAccessTokenAuthTag: text("linkedin_access_token_auth_tag"), // Auth tag for encryption
+  linkedinOrganizationId: text("linkedin_organization_id"), // LinkedIn organization/company page ID
+  linkedinConnectedAt: timestamp("linkedin_connected_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
