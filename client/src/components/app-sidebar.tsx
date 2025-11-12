@@ -31,6 +31,7 @@ import {
   PenTool,
   Search,
   Trash2,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +87,9 @@ export function AppSidebar() {
     setLocation("/login");
   };
 
+  // Check if user is Super Admin
+  const isSuperAdmin = authUser?.profile?.isSuperAdmin || false;
+
   // Admin/Agency menu items
   const agencyMenuItems = [
     {
@@ -136,6 +140,12 @@ export function AppSidebar() {
       icon: Settings,
       notificationKey: null,
     },
+    ...(isSuperAdmin ? [{
+      title: "Super Admin",
+      url: "/superadmin",
+      icon: Shield,
+      notificationKey: null,
+    }] : []),
   ];
 
   // Staff menu items

@@ -44,6 +44,9 @@ const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
 const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
 const AgencySettings = lazy(() => import("@/pages/agency/settings"));
 
+// Super Admin Portal Pages (lazy-loaded)
+const SuperAdminPortal = lazy(() => import("@/pages/superadmin/index"));
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -240,6 +243,15 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AgencyLayout>
             <ClientDetail />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Super Admin Portal */}
+      <Route path="/superadmin">
+        <ProtectedRoute allowedRoles={["Admin"]} requireSuperAdmin={true}>
+          <AgencyLayout>
+            <SuperAdminPortal />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>
