@@ -27,7 +27,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
 - **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
-- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status and competitor analysis. Agency-level provider preference stored in database with in-app settings UI toggle. Falls back to AI_PROVIDER environment variable if not set. Provider selection cached per agency for performance.
+- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status, competitor analysis, and HubSpot CRM data. Agency-level provider preference stored in database with in-app settings UI toggle. Falls back to AI_PROVIDER environment variable if not set. Provider selection cached per agency for performance. Automatically incorporates HubSpot contacts, deals, and companies data when HUBSPOT_ACCESS_TOKEN is configured.
 - **Client Strategy Card**: AI-powered consolidated client view.
 - **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events sync between client.leadEvents and integration.ga4LeadEventName to ensure conversion tracking works correctly across all update paths.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention.
@@ -46,6 +46,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Staff Portal**: View and update assigned tasks.
 - **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
+- **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data. Enriches AI recommendations with real-time CRM insights for sales pipeline analysis, lead nurturing, and conversion optimization.
 - **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules at agency level, including CRUD operations and multi-layer tenant isolation.
 - **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints for submissions, auto-creation of CRM records, honeypot bot detection, embed options, API documentation, and automatic production URL adaptation (uses VITE_PUBLIC_URL env variable or falls back to current domain).
 - **AI-Powered Proposal Builder**: Professional proposal creation tool with reusable templates, AI content generation (Gemini AI), merge tags, Markdown support, integration with CRM deals, workflow states, and secure PDF export.
@@ -60,7 +61,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Database**: PostgreSQL (via Supabase)
 - **Authentication**: Supabase Auth
 - **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
-- **OAuth Integrations**: Google OAuth (for GA4, Google Search Console)
+- **OAuth Integrations**: Google OAuth (for GA4, Google Search Console), HubSpot (CRM data integration via API token)
 - **AI Services**: Pluggable AI provider system supporting:
   - Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash) - Default
   - OpenAI (gpt-4o, gpt-4o-mini)
