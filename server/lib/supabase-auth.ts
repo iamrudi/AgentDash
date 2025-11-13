@@ -1,7 +1,7 @@
 import { supabaseAdmin } from './supabase';
 import { db } from '../db';
-import { profiles, clients } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { profiles, clients, agencies } from '@shared/schema';
+import { eq, sql } from 'drizzle-orm';
 import type { AuthResponse, User as SupabaseUser } from '@supabase/supabase-js';
 
 /**
@@ -315,4 +315,192 @@ export async function promoteUserToSuperAdmin(userId: string): Promise<Profile> 
     
     throw new Error(`Failed to update profile: ${dbError.message}`);
   }
+}
+
+/**
+ * Update user role (including demotion from SuperAdmin)
+ * @param userId - User ID to update
+ * @param newRole - New role to assign
+ * @param agencyId - Required when demoting from SuperAdmin or assigning agency-scoped roles
+ * @returns Updated profile
+ */
+export async function updateUserRole(
+  userId: string,
+  newRole: 'Client' | 'Staff' | 'Admin' | 'SuperAdmin',
+  agencyId?: string
+): Promise<typeof profiles.$inferSelect> {
+  // 1. Get current user state
+  const [profile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, userId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('User not found');
+  }
+
+  const oldState = {
+    role: profile.role,
+    isSuperAdmin: profile.isSuperAdmin,
+    agencyId: profile.agencyId
+  };
+
+  console.log('[UPDATE_USER_ROLE] Starting role update', {
+    userId,
+    email: profile.email,
+    oldRole: oldState.role,
+    newRole,
+    oldAgencyId: oldState.agencyId,
+    newAgencyId: agencyId || null
+  });
+
+  // 2. Validation
+  const isNewSuperAdmin = newRole === 'SuperAdmin';
+  const isDemotingFromSuperAdmin = profile.isSuperAdmin && !isNewSuperAdmin;
+
+  // CRITICAL: Clients cannot be promoted to SuperAdmin (they have agency-scoped client records)
+  if (isNewSuperAdmin && profile.role === 'Client') {
+    throw new Error('Clients cannot be promoted to SuperAdmin. Convert to Staff/Admin first.');
+  }
+
+  // CRITICAL: Only Admin and Staff can be promoted to SuperAdmin
+  if (isNewSuperAdmin && !['Admin', 'Staff'].includes(profile.role)) {
+    throw new Error('Only Admin and Staff users can be promoted to SuperAdmin');
+  }
+
+  // CRITICAL: Non-SuperAdmin roles MUST have an agency assignment (tenant isolation)
+  if (!isNewSuperAdmin && !agencyId) {
+    throw new Error('Agency must be specified for all non-SuperAdmin roles');
+  }
+
+  // If promoting to SuperAdmin, agency should not be provided
+  if (isNewSuperAdmin && agencyId) {
+    throw new Error('SuperAdmin users cannot have an agency assignment');
+  }
+
+  // CRITICAL: Validate agency exists when assigning non-SuperAdmin roles
+  if (!isNewSuperAdmin && agencyId) {
+    const [agency] = await db
+      .select()
+      .from(agencies)
+      .where(eq(agencies.id, agencyId))
+      .limit(1);
+
+    if (!agency) {
+      throw new Error('Invalid agency ID specified');
+    }
+  }
+
+  // If already has the role and same agency, no change needed
+  if (profile.role === newRole && profile.agencyId === agencyId) {
+    console.log('[UPDATE_USER_ROLE] No changes needed', { userId, role: newRole, agencyId });
+    return profile;
+  }
+
+  // 3. Update profiles table in transaction (CRITICAL: Must happen before Supabase Auth)
+  try {
+    await db.transaction(async (tx) => {
+      // CRITICAL: If demoting from SuperAdmin, lock and count SuperAdmins first
+      if (isDemotingFromSuperAdmin) {
+        const superadmins = await tx
+          .select({ id: profiles.id })
+          .from(profiles)
+          .where(eq(profiles.isSuperAdmin, true))
+          .for('update'); // Row-level lock prevents concurrent demotions
+
+        if (superadmins.length <= 1) {
+          throw new Error('Cannot demote the last remaining SuperAdmin. Promote another user first.');
+        }
+      }
+
+      // Update profile
+      await tx.update(profiles)
+        .set({
+          role: newRole,
+          isSuperAdmin: isNewSuperAdmin,
+          agencyId: isNewSuperAdmin ? null : (agencyId || null)
+        })
+        .where(eq(profiles.id, userId));
+    });
+    
+    console.log('[UPDATE_USER_ROLE] Database transaction completed successfully', { userId });
+  } catch (dbError: any) {
+    console.error('[UPDATE_USER_ROLE] Database transaction failed', {
+      userId,
+      error: dbError.message
+    });
+    throw new Error(`Failed to update profile: ${dbError.message}`);
+  }
+
+  // 4. Update Supabase Auth app_metadata (CRITICAL: After DB transaction succeeds)
+  try {
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        role: newRole,
+        is_super_admin: isNewSuperAdmin,
+        agency_id: isNewSuperAdmin ? null : (agencyId || null)
+      }
+    });
+
+    if (authError) {
+      throw new Error(`Failed to update Supabase Auth metadata: ${authError.message}`);
+    }
+
+    console.log('[UPDATE_USER_ROLE] Supabase Auth updated successfully', { userId });
+  } catch (authError: any) {
+    // CRITICAL: Rollback database changes if Supabase Auth update fails
+    console.error('[UPDATE_USER_ROLE] Supabase Auth update failed, rolling back database...', {
+      userId,
+      error: authError.message
+    });
+    
+    try {
+      await db.update(profiles)
+        .set({
+          role: oldState.role,
+          isSuperAdmin: oldState.isSuperAdmin,
+          agencyId: oldState.agencyId
+        })
+        .where(eq(profiles.id, userId));
+      
+      console.log('[UPDATE_USER_ROLE] Database rollback successful', {
+        userId,
+        restoredState: oldState
+      });
+    } catch (rollbackError: any) {
+      console.error('[UPDATE_USER_ROLE] CRITICAL: Database rollback failed!', {
+        userId,
+        email: profile.email,
+        rollbackError: rollbackError.message,
+        originalError: authError.message,
+        oldState,
+        message: 'Manual intervention required - Supabase Auth and DB are out of sync'
+      });
+    }
+    
+    throw new Error(`Failed to update Supabase Auth: ${authError.message}`);
+  }
+
+  console.log('[UPDATE_USER_ROLE] Role update successful', {
+    userId,
+    email: profile.email,
+    oldRole: oldState.role,
+    newRole,
+    oldAgencyId: oldState.agencyId,
+    newAgencyId: isNewSuperAdmin ? null : (agencyId || null)
+  });
+
+  // 5. Fetch and return updated profile
+  const [updatedProfile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, userId))
+    .limit(1);
+
+  if (!updatedProfile) {
+    throw new Error('Failed to fetch updated profile');
+  }
+
+  return updatedProfile;
 }

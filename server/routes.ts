@@ -4786,6 +4786,61 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Update user role (Super Admin only)
+  app.patch("/api/superadmin/users/:userId/role", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { updateUserRole } = await import("./lib/supabase-auth");
+      const { userId } = req.params;
+      const { role, agencyId } = req.body;
+
+      // Validate role
+      if (!role || !['Client', 'Staff', 'Admin', 'SuperAdmin'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role specified" });
+      }
+
+      // Get user data before update for audit log
+      const profile = await storage.getProfileById(userId);
+      if (!profile) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const oldState = {
+        role: profile.role,
+        isSuperAdmin: profile.isSuperAdmin,
+        agencyId: profile.agencyId
+      };
+
+      // Perform role update
+      const updatedProfile = await updateUserRole(userId, role, agencyId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'user.role_update',
+        'user',
+        userId,
+        { 
+          oldRole: oldState.role,
+          newRole: role,
+          oldAgencyId: oldState.agencyId,
+          newAgencyId: updatedProfile.agencyId,
+          oldIsSuperAdmin: oldState.isSuperAdmin,
+          newIsSuperAdmin: updatedProfile.isSuperAdmin
+        },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ 
+        message: "User role updated successfully",
+        profile: updatedProfile
+      });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user role:', error);
+      res.status(500).json({ message: error.message || "Failed to update user role" });
+    }
+  });
+
   // Delete user (Super Admin only)
   app.delete("/api/superadmin/users/:userId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {
