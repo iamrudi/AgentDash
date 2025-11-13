@@ -282,6 +282,10 @@ export interface IStorage {
   getAgencyById(id: string): Promise<Agency | undefined>;
   deleteAgency(id: string): Promise<void>;
   
+  // Super Admin - Client Management
+  getAllClientsForSuperAdmin(): Promise<Array<Client & { agencyName: string; userEmail?: string }>>;
+  deleteClient(id: string): Promise<void>;
+  
   // Super Admin - Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(limit: number, offset: number): Promise<AuditLog[]>;
@@ -1828,6 +1832,62 @@ export class DbStorage implements IStorage {
 
   async deleteAgency(id: string): Promise<void> {
     await db.delete(agencies).where(eq(agencies.id, id));
+  }
+
+  // Super Admin - Client Management
+  async getAllClientsForSuperAdmin(): Promise<Array<Client & { agencyName: string; userEmail?: string }>> {
+    const result = await db
+      .select({
+        id: clients.id,
+        companyName: clients.companyName,
+        profileId: clients.profileId,
+        agencyId: clients.agencyId,
+        businessContext: clients.businessContext,
+        retainerAmount: clients.retainerAmount,
+        billingDay: clients.billingDay,
+        monthlyRetainerHours: clients.monthlyRetainerHours,
+        usedRetainerHours: clients.usedRetainerHours,
+        retainerHoursResetDate: clients.retainerHoursResetDate,
+        leadValue: clients.leadValue,
+        leadToOpportunityRate: clients.leadToOpportunityRate,
+        opportunityToCloseRate: clients.opportunityToCloseRate,
+        averageDealSize: clients.averageDealSize,
+        leadEvents: clients.leadEvents,
+        createdAt: clients.createdAt,
+        agencyName: agencies.name,
+        userEmail: users.email,
+      })
+      .from(clients)
+      .leftJoin(agencies, eq(clients.agencyId, agencies.id))
+      .leftJoin(profiles, eq(clients.profileId, profiles.id))
+      .leftJoin(users, eq(profiles.userId, users.id))
+      .orderBy(desc(clients.createdAt));
+
+    return result.map(row => ({
+      ...row,
+      agencyName: row.agencyName || '',
+      userEmail: row.userEmail ?? undefined,
+    }));
+  }
+
+  async deleteClient(id: string): Promise<void> {
+    // Get client data to find associated profile
+    const client = await db.select().from(clients).where(eq(clients.id, id)).limit(1);
+    
+    if (client.length === 0) {
+      throw new Error('Client not found');
+    }
+    
+    const profileId = client[0].profileId;
+    
+    // Delete client first (cascade will handle related entities)
+    await db.delete(clients).where(eq(clients.id, id));
+    
+    // Delete associated profile and user account
+    // This will cascade to delete the user via profile.userId -> users.id relationship
+    if (profileId) {
+      await db.delete(profiles).where(eq(profiles.id, profileId));
+    }
   }
 
   // Super Admin - Audit Logs

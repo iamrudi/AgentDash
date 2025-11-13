@@ -4616,6 +4616,50 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Get all clients (Super Admin only)
+  app.get("/api/superadmin/clients", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const clients = await storage.getAllClientsForSuperAdmin();
+      res.json(clients);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching clients:', error);
+      res.status(500).json({ message: "Failed to fetch clients" });
+    }
+  });
+
+  // Delete client (Super Admin only)
+  app.delete("/api/superadmin/clients/:clientId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+
+      // Get client data for audit log
+      const allClients = await storage.getAllClientsForSuperAdmin();
+      const client = allClients.find(c => c.id === clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      await storage.deleteClient(clientId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'client.delete',
+        'client',
+        clientId,
+        { deletedClient: client },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "Client deleted successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting client:', error);
+      res.status(500).json({ message: "Failed to delete client" });
+    }
+  });
+
   // Get audit logs (Super Admin only)
   app.get("/api/superadmin/audit-logs", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Profile, Agency, AuditLog } from "@shared/schema";
+import { Profile, Agency, AuditLog, Client } from "@shared/schema";
 import { Shield, Users, Building2, ScrollText, Trash2, UserCog } from "lucide-react";
 import { useState } from "react";
 import {
@@ -45,11 +45,17 @@ type AgencyWithCounts = Agency & {
   clientCount: number;
 };
 
+type ClientWithDetails = Client & {
+  agencyName: string;
+  userEmail?: string;
+};
+
 export default function SuperAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithAgency | null>(null);
   const [newRole, setNewRole] = useState<string>("");
   const [deletingUser, setDeletingUser] = useState<UserWithAgency | null>(null);
   const [deletingAgency, setDeletingAgency] = useState<AgencyWithCounts | null>(null);
+  const [deletingClient, setDeletingClient] = useState<ClientWithDetails | null>(null);
   const { toast } = useToast();
 
   const { data: users, isLoading: usersLoading } = useQuery<UserWithAgency[]>({
@@ -62,6 +68,10 @@ export default function SuperAdminPage() {
 
   const { data: auditLogs, isLoading: logsLoading } = useQuery<AuditLog[]>({
     queryKey: ["/api/superadmin/audit-logs"],
+  });
+
+  const { data: clients, isLoading: clientsLoading } = useQuery<ClientWithDetails[]>({
+    queryKey: ["/api/superadmin/clients"],
   });
 
   const updateRoleMutation = useMutation({
@@ -128,6 +138,28 @@ export default function SuperAdminPage() {
     },
   });
 
+  const deleteClientMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      return await apiRequest("DELETE", `/api/superadmin/clients/${clientId}`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/clients"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/agencies"] });
+      setDeletingClient(null);
+      toast({
+        title: "Success",
+        description: "Client deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete client",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case "Admin":
@@ -158,7 +190,7 @@ export default function SuperAdminPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -166,6 +198,10 @@ export default function SuperAdminPage() {
           <TabsTrigger value="agencies" data-testid="tab-agencies">
             <Building2 className="w-4 h-4 mr-2" />
             Agencies
+          </TabsTrigger>
+          <TabsTrigger value="clients" data-testid="tab-clients">
+            <UserCog className="w-4 h-4 mr-2" />
+            Clients
           </TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">
             <ScrollText className="w-4 h-4 mr-2" />
@@ -326,6 +362,69 @@ export default function SuperAdminPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="clients" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Clients</CardTitle>
+              <CardDescription>
+                View and manage all clients across all agencies
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {clientsLoading ? (
+                <div className="text-center py-8 text-muted-foreground" data-testid="loading-clients">Loading clients...</div>
+              ) : clients && clients.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Agency</TableHead>
+                        <TableHead>User Email</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clients.map((client) => (
+                        <TableRow key={client.id} data-testid={`row-client-${client.id}`}>
+                          <TableCell className="font-medium" data-testid={`text-client-name-${client.id}`}>
+                            {client.companyName}
+                          </TableCell>
+                          <TableCell data-testid={`text-client-agency-${client.id}`}>
+                            <Badge variant="secondary">
+                              <Building2 className="w-3 h-3 mr-1" />
+                              {client.agencyName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-client-email-${client.id}`}>
+                            {client.userEmail || 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground" data-testid={`text-client-created-${client.id}`}>
+                            {format(new Date(client.createdAt), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeletingClient(client)}
+                              data-testid={`button-delete-client-${client.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-clients">No clients found</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="audit" className="mt-6">
           <Card>
             <CardHeader>
@@ -472,6 +571,32 @@ export default function SuperAdminPage() {
                 data-testid="button-confirm-delete-agency"
               >
                 Delete Agency
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Delete Client Dialog */}
+      {deletingClient && (
+        <AlertDialog open={!!deletingClient} onOpenChange={() => setDeletingClient(null)}>
+          <AlertDialogContent data-testid="dialog-delete-client">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete{" "}
+                <span className="font-semibold">{deletingClient.companyName}</span>?
+                This will permanently delete the client and all associated data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-client">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deletingClient && deleteClientMutation.mutate(deletingClient.id)}
+                data-testid="button-confirm-delete-client"
+              >
+                Delete Client
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
