@@ -53,22 +53,37 @@ export default function Login() {
       return await res.json();
     },
     onSuccess: (data) => {
+      console.log("[LOGIN] Response received:", { 
+        hasData: !!data, 
+        hasUser: !!data?.user, 
+        hasProfile: !!data?.user?.profile, 
+        hasToken: !!data?.token,
+        role: data?.user?.profile?.role
+      });
+      
       try {
         // Validate response structure
         if (!data || !data.user || !data.user.profile || !data.token) {
+          console.error("[LOGIN] Invalid response structure:", data);
           throw new Error("Invalid server response");
         }
         
+        console.log("[LOGIN] Setting auth user and redirecting...");
         setAuthUser(data);
         const role = data.user.profile.role;
         
         // Redirect based on role
         if (role === "Admin" || role === "SuperAdmin") {
+          console.log("[LOGIN] Redirecting to /agency");
           setLocation("/agency");
         } else if (role === "Client") {
+          console.log("[LOGIN] Redirecting to /client");
           setLocation("/client");
         } else if (role === "Staff") {
+          console.log("[LOGIN] Redirecting to /staff");
           setLocation("/staff");
+        } else {
+          console.warn("[LOGIN] Unknown role, not redirecting:", role);
         }
         
         toast({
@@ -76,6 +91,7 @@ export default function Login() {
           description: "You have successfully logged in.",
         });
       } catch (error) {
+        console.error("[LOGIN] Error in onSuccess:", error);
         const errorMessage = error instanceof Error ? error.message : "Invalid response from server";
         toast({
           title: "Login failed",
