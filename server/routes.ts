@@ -4816,7 +4816,9 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
         return res.status(404).json({ message: "User not found" });
       }
 
-      await storage.deleteUser(userId);
+      // Use Supabase Auth delete function
+      const { deleteUser } = await import("./lib/supabase-auth");
+      await deleteUser(userId);
 
       // Log audit event
       await logAuditEvent(
