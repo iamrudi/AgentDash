@@ -63,7 +63,7 @@ export default function Login() {
         const role = data.user.profile.role;
         
         // Redirect based on role
-        if (role === "Admin") {
+        if (role === "Admin" || role === "SuperAdmin") {
           setLocation("/agency");
         } else if (role === "Client") {
           setLocation("/client");
