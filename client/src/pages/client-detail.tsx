@@ -1,8 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,58 +110,24 @@ export default function ClientDetail() {
     }
   };
 
-  const style = {
-    "--sidebar-width": "16rem",
-  };
-
   if (clientLoading) {
     return (
-      <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-screen w-full">
-          <AppSidebar />
-          <div className="flex flex-col flex-1">
-            <header className="flex items-center justify-between p-4 border-b">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <ThemeToggle />
-            </header>
-            <main className="flex-1 overflow-auto p-6 flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   if (!client) {
     return (
-      <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-screen w-full">
-          <AppSidebar />
-          <div className="flex flex-col flex-1">
-            <header className="flex items-center justify-between p-4 border-b">
-              <SidebarTrigger data-testid="button-sidebar-toggle" />
-              <ThemeToggle />
-            </header>
-            <main className="flex-1 overflow-auto p-6">
-              <p className="text-muted-foreground">Client not found</p>
-            </main>
-          </div>
-        </div>
-      </SidebarProvider>
+      <div className="p-6">
+        <p className="text-muted-foreground">Client not found</p>
+      </div>
     );
   }
 
   return (
-    <SidebarProvider style={style as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <header className="flex items-center justify-between p-4 border-b">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <ThemeToggle />
-          </header>
-          <main className="flex-1 overflow-auto p-6">
+    <div className="p-6">
             <div className="max-w-7xl mx-auto space-y-6">
               <div>
                 <h1 className="text-3xl font-semibold mb-2" data-testid="text-client-name">
@@ -350,10 +313,7 @@ export default function ClientDetail() {
                 </TabsContent>
               </Tabs>
             </div>
-          </main>
-        </div>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }
 
