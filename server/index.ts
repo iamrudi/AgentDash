@@ -28,108 +28,12 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// =================================================================
-// CORS Configuration - Dynamic Whitelist for Public API Endpoints
-// =================================================================
-
-// Build list of allowed same-origin hostnames
-function getAllowedSameOriginHosts(): Set<string> {
-  const hosts = new Set<string>();
-  
-  // Add localhost and 127.0.0.1 (browsers treat these as different origins)
-  hosts.add(`localhost:${env.PORT}`);
-  hosts.add(`127.0.0.1:${env.PORT}`);
-  
-  // Add VITE_PUBLIC_URL if set
-  if (process.env.VITE_PUBLIC_URL) {
-    try {
-      const url = new URL(process.env.VITE_PUBLIC_URL);
-      hosts.add(url.host); // includes hostname:port
-    } catch (e) {
-      console.warn('[CORS] Invalid VITE_PUBLIC_URL:', process.env.VITE_PUBLIC_URL);
-    }
-  }
-  
-  // Add REPLIT_DOMAINS (comma-separated list)
-  if (process.env.REPLIT_DOMAINS) {
-    const replitDomains = process.env.REPLIT_DOMAINS.split(',').map(d => d.trim());
-    replitDomains.forEach(domain => {
-      if (domain) {
-        hosts.add(domain);
-      }
-    });
-  }
-  
-  return hosts;
-}
-
-// Load CORS domains from database and update runtime list
-const allowedSameOriginHosts = getAllowedSameOriginHosts();
-let dbCorsDomains: string[] = [];
-
-export async function reloadCorsDomainsFromDB(): Promise<void> {
-  try {
-    const { eq } = await import('drizzle-orm');
-    const { systemSettings } = await import('../shared/schema');
-    const { db } = await import('./db');
-    
-    const setting = await db.query.systemSettings.findFirst({
-      where: eq(systemSettings.key, 'cors_allowed_origins'),
-    });
-    
-    if (setting && setting.value) {
-      const domains = setting.value as { domains: string[] };
-      dbCorsDomains = domains.domains || [];
-      console.log(`[CORS] Reloaded ${dbCorsDomains.length} domain(s) from database:`, dbCorsDomains);
-    } else {
-      dbCorsDomains = [];
-      console.log('[CORS] No domains in database, cleared runtime list');
-    }
-  } catch (error) {
-    console.warn('[CORS] Failed to load domains from database:', error);
-    dbCorsDomains = [];
-  }
-}
-
-// Load DB CORS domains asynchronously at startup
-reloadCorsDomainsFromDB();
-
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g., mobile apps, curl, Postman)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Parse origin URL for secure comparison
-    let originUrl: URL;
-    try {
-      originUrl = new URL(origin);
-    } catch (e) {
-      console.warn(`[CORS] Invalid origin format: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
-    }
-
-    // Check if origin is same-origin (strict hostname:port comparison)
-    if (allowedSameOriginHosts.has(originUrl.host)) {
-      return callback(null, true);
-    }
-
-    // Check if the origin is in our whitelist from environment variable or database
-    if (env.CORS_ALLOWED_ORIGINS.includes(origin) || dbCorsDomains.includes(origin)) {
-      callback(null, true);
-    } else {
-      // Log rejected origins for debugging
-      console.warn(`[CORS] Blocked request from unauthorized origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+// Simple CORS configuration - Allow all origins
+app.use(cors({
+  origin: true, // Allow all origins
   credentials: true, // Allow cookies and authentication headers
-  optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
-};
-
-app.use(cors(corsOptions));
-// =================================================================
+  optionsSuccessStatus: 200
+}));
 
 // Request ID for tracing
 app.use(requestIdMiddleware);
