@@ -4609,42 +4609,6 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
-  // Update user role (Super Admin only)
-  app.patch("/api/superadmin/users/:userId/role", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-    try {
-      const { userId } = req.params;
-      const { role } = req.body;
-
-      if (!['Admin', 'Staff', 'Client'].includes(role)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-
-      // Get old user data for audit log
-      const oldUser = await storage.getUserById(userId);
-      if (!oldUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      await storage.updateUserRole(userId, role);
-
-      // Log audit event
-      await logAuditEvent(
-        req.user!.id,
-        'user.update_role',
-        'user',
-        userId,
-        { oldRole: oldUser.role, newRole: role },
-        req.ip,
-        req.get('user-agent')
-      );
-
-      res.json({ message: "User role updated successfully" });
-    } catch (error: any) {
-      console.error('[SUPER ADMIN] Error updating user role:', error);
-      res.status(500).json({ message: "Failed to update user role" });
-    }
-  });
-
   // Update user email (Super Admin only)
   app.patch("/api/superadmin/users/:userId/email", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {
