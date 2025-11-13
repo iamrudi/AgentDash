@@ -128,6 +128,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     log('✅ Trash cleanup scheduler started');
   }
 
+  // Start orphan user cleanup scheduler for detecting and removing orphaned auth users
+  const { scheduleOrphanCleanup } = await import("./jobs/orphan-cleanup");
+  scheduleOrphanCleanup();
+  log('✅ Orphan user cleanup scheduler started (runs nightly at 2:00 AM)');
+
   // Serve frontend (must be after API routes but before 404 handler)
   // This catch-all serves index.html for all non-API GET requests
   if (app.get("env") === "development") {

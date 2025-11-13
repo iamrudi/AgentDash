@@ -52,21 +52,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "System configuration error: No default agency found" });
       }
 
-      // Create user in Supabase Auth with agencyId in app_metadata
-      const { createUserWithProfile } = await import("./lib/supabase-auth");
+      // Use robust provisioning service with compensation logic
+      const { provisionUser } = await import("./lib/user-provisioning");
       
       // SECURITY: Always assign Client role for self-registration
       // Admin and Staff roles must be assigned by existing administrators
-      const authResult = await createUserWithProfile(email, password, fullName, "Client", defaultAgency.id);
-
-      // Create client record
-      if (companyName) {
-        await storage.createClient({
-          companyName,
-          profileId: authResult.profileId, // This is the Supabase Auth user ID
-          agencyId: defaultAgency.id,
-        });
-      }
+      await provisionUser({
+        email,
+        password,
+        fullName,
+        role: "Client",
+        agencyId: defaultAgency.id,
+        clientData: companyName ? {
+          companyName
+        } : undefined
+      });
 
       res.status(201).json({ message: "Account created successfully" });
     } catch (error: any) {
@@ -4075,26 +4075,28 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       const validatedData = createClientUserSchema.parse(req.body);
       const { email, password, fullName, companyName } = validatedData;
 
-      // Create user in Supabase Auth
-      const { createUserWithProfile } = await import("./lib/supabase-auth");
+      // Use robust provisioning service with compensation logic
+      const { provisionUser } = await import("./lib/user-provisioning");
       
       // Resolve agency context (SuperAdmin must provide agencyId in body)
       const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
       
-      const authResult = await createUserWithProfile(email, password, fullName, "Client", agencyId!);
-      
-      // Create client record in the resolved agency
-      const client = await storage.createClient({
-        companyName,
-        profileId: authResult.profileId, // Supabase Auth user ID
+      const result = await provisionUser({
+        email,
+        password,
+        fullName,
+        role: "Client",
         agencyId: agencyId!,
+        clientData: {
+          companyName
+        }
       });
 
       res.status(201).json({ 
         message: "Client created successfully",
         client: { 
-          id: client.id, 
-          companyName: client.companyName,
+          id: result.clientId!, 
+          companyName: companyName,
           user: { 
             email: email,
             fullName: fullName
@@ -4174,18 +4176,24 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       const validatedData = createStaffAdminUserSchema.parse(req.body);
       const { email, password, fullName, role } = validatedData;
 
-      // Create user in Supabase Auth
-      const { createUserWithProfile } = await import("./lib/supabase-auth");
+      // Use robust provisioning service with compensation logic
+      const { provisionUser } = await import("./lib/user-provisioning");
       
       // Resolve agency context (SuperAdmin must provide agencyId in body)
       const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
       
-      const authResult = await createUserWithProfile(email, password, fullName, role, agencyId!);
+      const result = await provisionUser({
+        email,
+        password,
+        fullName,
+        role,
+        agencyId: agencyId!
+      });
 
       res.status(201).json({ 
         message: `${role} user created successfully`,
         user: { 
-          id: authResult.profileId,
+          id: result.profileId,
           email: email,
           fullName: fullName,
           role: role
@@ -4215,8 +4223,8 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
         
         console.log(`[TEST CREATE USER] Request: email=${email}, role=${role}, requestedAgencyId=${requestedAgencyId}`);
         
-        // Create user in Supabase Auth
-        const { createUserWithProfile } = await import("./lib/supabase-auth");
+        // Use robust provisioning service with compensation logic
+        const { provisionUser } = await import("./lib/user-provisioning");
         
         // Determine agencyId: use requested if provided, otherwise default for Client users
         let agencyId: string | undefined = requestedAgencyId;
@@ -4231,29 +4239,21 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
           console.log(`[TEST CREATE USER] Using requested agency: ${agencyId}`);
         }
         
-        const authResult = await createUserWithProfile(
-          email, 
-          password, 
-          fullName, 
-          role || "Client",
-          agencyId
-        );
+        const result = await provisionUser({
+          email,
+          password,
+          fullName,
+          role: role || "Client",
+          agencyId: agencyId || null,
+          clientData: companyName ? { companyName } : undefined
+        });
         
-        console.log(`[TEST CREATE USER] Profile created with ID: ${authResult.profileId}`);
-
-        // Create client record if role is Client and companyName provided
-        if ((role === "Client" || !role) && companyName && agencyId) {
-          await storage.createClient({
-            companyName,
-            profileId: authResult.profileId,
-            agencyId: agencyId,
-          });
-        }
+        console.log(`[TEST CREATE USER] Profile created with ID: ${result.profileId}`);
 
         res.status(201).json({ 
           message: "Test user created successfully",
-          user: { id: authResult.profileId, email: email },
-          profile: { id: authResult.profileId, fullName: fullName, role: role || "Client", agencyId }
+          user: { id: result.profileId, email: email },
+          profile: { id: result.profileId, fullName: fullName, role: role || "Client", agencyId }
         });
       } catch (error: any) {
         console.error("Test user creation error:", error);
