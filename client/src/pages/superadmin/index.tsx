@@ -55,6 +55,7 @@ type ClientWithDetails = Client & {
 export default function SuperAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithAgency | null>(null);
   const [newRole, setNewRole] = useState<string>("");
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   const [editingUserEmail, setEditingUserEmail] = useState<UserWithAgency | null>(null);
   const [newEmail, setNewEmail] = useState<string>("");
   const [editingUserPassword, setEditingUserPassword] = useState<UserWithAgency | null>(null);
@@ -82,12 +83,16 @@ export default function SuperAdminPage() {
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      return await apiRequest("PATCH", `/api/superadmin/users/${userId}/role`, { role });
+    mutationFn: async ({ userId, role, agencyId }: { userId: string; role: string; agencyId?: string }) => {
+      return await apiRequest("PATCH", `/api/superadmin/users/${userId}/role`, { 
+        role,
+        ...(agencyId && { agencyId })
+      });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/users"] });
       setSelectedUser(null);
+      setSelectedAgencyId("");
       toast({
         title: "Success",
         description: "User role updated successfully",
@@ -343,7 +348,10 @@ export default function SuperAdminPage() {
                                 variant="outline"
                                 onClick={() => {
                                   setSelectedUser(user);
-                                  setNewRole(user.role);
+                                  // Initialize to current role if not SuperAdmin, otherwise empty for manual selection
+                                  setNewRole(user.isSuperAdmin ? "" : user.role);
+                                  // Initialize agency if user already has one
+                                  setSelectedAgencyId(user.agencyId || "");
                                 }}
                                 data-testid={`button-edit-user-${user.id}`}
                               >
@@ -585,36 +593,98 @@ export default function SuperAdminPage() {
 
       {/* Update Role Dialog */}
       {selectedUser && (
-        <AlertDialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+        <AlertDialog open={!!selectedUser} onOpenChange={() => {
+          setSelectedUser(null);
+          setSelectedAgencyId("");
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Update User Role</AlertDialogTitle>
               <AlertDialogDescription>
                 Change the role for {selectedUser.fullName}
+                {selectedUser.isSuperAdmin && (
+                  <span className="block mt-2 text-yellow-600 dark:text-yellow-500">
+                    <strong>Warning:</strong> Demoting from SuperAdmin requires selecting an agency.
+                  </span>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="py-4">
-              <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger data-testid="select-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Admin">Admin</SelectItem>
-                  <SelectItem value="Staff">Staff</SelectItem>
-                  <SelectItem value="Client">Client</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="role-select">Role</Label>
+                <Select value={newRole} onValueChange={setNewRole}>
+                  <SelectTrigger id="role-select" data-testid="select-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Staff">Staff</SelectItem>
+                    <SelectItem value="Client">Client</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Show agency selector when demoting from SuperAdmin or when role requires agency */}
+              {(selectedUser.isSuperAdmin || !selectedUser.agencyId) && newRole !== "SuperAdmin" && (
+                <div className="space-y-2">
+                  <Label htmlFor="agency-select">
+                    Agency <span className="text-destructive">*</span>
+                  </Label>
+                  <Select value={selectedAgencyId} onValueChange={setSelectedAgencyId}>
+                    <SelectTrigger id="agency-select" data-testid="select-agency">
+                      <SelectValue placeholder="Select an agency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agencies?.map((agency) => (
+                        <SelectItem key={agency.id} value={agency.id}>
+                          {agency.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {!selectedAgencyId && (
+                    <p className="text-sm text-muted-foreground">
+                      Required when demoting from SuperAdmin or assigning agency
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel data-testid="button-cancel-role">Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => {
-                  if (selectedUser) {
-                    updateRoleMutation.mutate({
-                      userId: selectedUser.id,
-                      role: newRole,
+                onClick={(e) => {
+                  if (!selectedUser) return;
+                  
+                  // Validate role selection
+                  if (!newRole) {
+                    e.preventDefault();
+                    toast({
+                      title: "Role Required",
+                      description: "Please select a role",
+                      variant: "destructive",
                     });
+                    return;
                   }
+                  
+                  // Validate agency requirement
+                  const requiresAgency = (selectedUser.isSuperAdmin || !selectedUser.agencyId) && newRole !== "SuperAdmin";
+                  
+                  if (requiresAgency && !selectedAgencyId) {
+                    e.preventDefault();
+                    toast({
+                      title: "Agency Required",
+                      description: "Please select an agency for this role",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  
+                  updateRoleMutation.mutate({
+                    userId: selectedUser.id,
+                    role: newRole,
+                    agencyId: selectedAgencyId || undefined,
+                  });
                 }}
                 data-testid="button-confirm-role"
               >
