@@ -249,7 +249,7 @@ function Router() {
       
       {/* Super Admin Portal */}
       <Route path="/superadmin">
-        <ProtectedRoute allowedRoles={["Admin"]} requireSuperAdmin={true}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]} requireSuperAdmin={true}>
           <AgencyLayout>
             <SuperAdminPortal />
           </AgencyLayout>
