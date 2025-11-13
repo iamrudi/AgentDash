@@ -186,3 +186,77 @@ export async function updateUserPassword(
     throw new Error(`Failed to update user password: ${error.message}`);
   }
 }
+
+/**
+ * Promote user to SuperAdmin (SuperAdmin only)
+ * Only Admin and Staff users can be promoted. Clients cannot be promoted due to agency-scoped constraints.
+ */
+export async function promoteUserToSuperAdmin(userId: string): Promise<void> {
+  // 1. Fetch current profile to validate eligibility
+  const [profile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, userId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('User not found');
+  }
+
+  // 2. Check if already SuperAdmin
+  if (profile.isSuperAdmin) {
+    throw new Error('User is already a SuperAdmin');
+  }
+
+  // 3. Only Admin and Staff can be promoted (Clients have agency-scoped client records)
+  if (profile.role === 'Client') {
+    throw new Error('Clients cannot be promoted to SuperAdmin. Convert to Staff/Admin first.');
+  }
+
+  if (!['Admin', 'Staff'].includes(profile.role)) {
+    throw new Error('Only Admin and Staff users can be promoted to SuperAdmin');
+  }
+
+  // 4. Update Supabase Auth app_metadata first
+  const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    app_metadata: {
+      role: 'SuperAdmin',
+      is_super_admin: true,
+      agency_id: null // SuperAdmins are not bound to any agency
+    }
+  });
+
+  if (authError) {
+    throw new Error(`Failed to update Supabase Auth metadata: ${authError.message}`);
+  }
+
+  // 5. Update profiles table in transaction
+  try {
+    await db.update(profiles)
+      .set({
+        role: 'SuperAdmin',
+        isSuperAdmin: true,
+        agencyId: null // Clear agency association
+      })
+      .where(eq(profiles.id, userId));
+  } catch (dbError: any) {
+    // Rollback Supabase Auth changes if DB update fails
+    console.error('[PROMOTE_SUPERADMIN] Database update failed, attempting rollback...', dbError);
+    
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        app_metadata: {
+          role: profile.role,
+          is_super_admin: false,
+          agency_id: profile.agencyId
+        }
+      });
+      console.error('[PROMOTE_SUPERADMIN] Rollback successful');
+    } catch (rollbackError: any) {
+      console.error('[PROMOTE_SUPERADMIN] CRITICAL: Rollback failed!', rollbackError);
+      throw new Error(`Promotion failed and rollback unsuccessful: ${dbError.message}`);
+    }
+    
+    throw new Error(`Failed to update profile: ${dbError.message}`);
+  }
+}
