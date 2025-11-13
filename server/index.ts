@@ -36,8 +36,9 @@ app.use(helmet({
 function getAllowedSameOriginHosts(): Set<string> {
   const hosts = new Set<string>();
   
-  // Add localhost
+  // Add localhost and 127.0.0.1 (browsers treat these as different origins)
   hosts.add(`localhost:${env.PORT}`);
+  hosts.add(`127.0.0.1:${env.PORT}`);
   
   // Add VITE_PUBLIC_URL if set
   if (process.env.VITE_PUBLIC_URL) {
