@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { User, Profile, Client, createStaffAdminUserSchema, type CreateStaffAdminUser } from "@shared/schema";
 import { Users as UsersIcon, Mail, Building2, Shield, UserCog, Plus, Trash2, Filter } from "lucide-react";
 import { useState } from "react";
+import { getAuthUser } from "@/lib/auth";
+import { useAuthStatus } from "@/context/auth-provider";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +53,13 @@ type UserWithProfile = User & {
   client?: Client | null;
 };
 
+type Agency = {
+  id: string;
+  name: string;
+  userCount: number;
+  clientCount: number;
+};
+
 export default function AgencyUsersPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -59,6 +68,11 @@ export default function AgencyUsersPage() {
   const [newRole, setNewRole] = useState<string>("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const { toast } = useToast();
+  const { authReady } = useAuthStatus();
+  
+  // Wait for auth to be ready before determining user role
+  const authUser = authReady ? getAuthUser() : null;
+  const isSuperAdmin = authUser?.profile?.role === "SuperAdmin";
 
   const form = useForm<CreateStaffAdminUser>({
     resolver: zodResolver(createStaffAdminUserSchema),
@@ -67,11 +81,17 @@ export default function AgencyUsersPage() {
       password: "",
       fullName: "",
       role: "Staff",
+      agencyId: undefined,
     },
   });
 
   const { data: users, isLoading } = useQuery<UserWithProfile[]>({
     queryKey: ["/api/agency/users"],
+  });
+  
+  const { data: agencies, isLoading: agenciesLoading } = useQuery<Agency[]>({
+    queryKey: ["/api/superadmin/agencies"],
+    enabled: isSuperAdmin,
   });
 
   const createUserMutation = useMutation({
@@ -165,8 +185,32 @@ export default function AgencyUsersPage() {
   };
 
   const onSubmit = (data: CreateStaffAdminUser) => {
-    createUserMutation.mutate(data);
+    // Validate that SuperAdmin has selected an agency
+    if (isSuperAdmin && !data.agencyId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an agency before creating the user",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Clean up payload: only include agencyId if it has a value (SuperAdmin selected an agency)
+    const { agencyId, ...baseData } = data;
+    const payload = agencyId ? { ...baseData, agencyId } : baseData;
+    createUserMutation.mutate(payload);
   };
+
+  // Wait for auth to be ready before rendering the form
+  if (!authReady) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-lg text-muted-foreground">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   // Filter users by role
   const filteredUsers = users?.filter(user => {
@@ -212,6 +256,32 @@ export default function AgencyUsersPage() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {isSuperAdmin && (
+                    <FormField
+                      control={form.control}
+                      name="agencyId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Agency</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-agency">
+                                <SelectValue placeholder="Select agency" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {agencies?.map((agency) => (
+                                <SelectItem key={agency.id} value={agency.id}>
+                                  {agency.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="role"
@@ -281,8 +351,8 @@ export default function AgencyUsersPage() {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={createUserMutation.isPending} data-testid="button-submit-user">
-                      {createUserMutation.isPending ? "Creating..." : "Create User"}
+                    <Button type="submit" disabled={createUserMutation.isPending || (isSuperAdmin && agenciesLoading)} data-testid="button-submit-user">
+                      {createUserMutation.isPending ? "Creating..." : (isSuperAdmin && agenciesLoading) ? "Loading agencies..." : "Create User"}
                     </Button>
                   </div>
                 </form>

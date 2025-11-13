@@ -6,6 +6,8 @@ import { Client, createClientUserSchema, type CreateClientUser } from "@shared/s
 import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink, Sparkles } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
 import { useState } from "react";
+import { getAuthUser } from "@/lib/auth";
+import { useAuthStatus } from "@/context/auth-provider";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AIRecommendationsPanel } from "@/components/ai-recommendations-panel";
 import { format, subDays } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type EnrichedClient = Client & {
   primaryContact: string | null;
@@ -36,6 +45,13 @@ type EnrichedClient = Client & {
   hasDFS: boolean;
 };
 
+type Agency = {
+  id: string;
+  name: string;
+  userCount: number;
+  clientCount: number;
+};
+
 export default function AgencyClientsPage() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [isCreating, setIsCreating] = useState(false);
@@ -44,6 +60,11 @@ export default function AgencyClientsPage() {
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiPanelClientId, setAiPanelClientId] = useState<string>("");
   const { toast } = useToast();
+  const { authReady } = useAuthStatus();
+  
+  // Wait for auth to be ready before determining user role
+  const authUser = authReady ? getAuthUser() : null;
+  const isSuperAdmin = authUser?.profile?.role === "SuperAdmin";
 
   const form = useForm<CreateClientUser>({
     resolver: zodResolver(createClientUserSchema),
@@ -52,11 +73,17 @@ export default function AgencyClientsPage() {
       password: "",
       fullName: "",
       companyName: "",
+      agencyId: undefined,
     },
   });
 
   const { data: clients } = useQuery<EnrichedClient[]>({
     queryKey: ["/api/agency/clients"],
+  });
+  
+  const { data: agencies, isLoading: agenciesLoading } = useQuery<Agency[]>({
+    queryKey: ["/api/superadmin/agencies"],
+    enabled: isSuperAdmin,
   });
 
   const createClientMutation = useMutation({
@@ -83,8 +110,32 @@ export default function AgencyClientsPage() {
   });
 
   const onSubmit = (data: CreateClientUser) => {
-    createClientMutation.mutate(data);
+    // Validate that SuperAdmin has selected an agency
+    if (isSuperAdmin && !data.agencyId) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an agency before creating the client",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Clean up payload: only include agencyId if it has a value (SuperAdmin selected an agency)
+    const { agencyId, ...baseData } = data;
+    const payload = agencyId ? { ...baseData, agencyId } : baseData;
+    createClientMutation.mutate(payload);
   };
+
+  // Wait for auth to be ready before rendering the page
+  if (!authReady) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <div className="text-lg text-muted-foreground">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleGenerateAI = (clientId: string, clientName: string) => {
     setAiPanelClientId(clientId);
@@ -155,6 +206,32 @@ export default function AgencyClientsPage() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+                  {isSuperAdmin && (
+                    <FormField
+                      control={form.control}
+                      name="agencyId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Agency</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-agency">
+                                <SelectValue placeholder="Select agency" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {agencies?.map((agency) => (
+                                <SelectItem key={agency.id} value={agency.id}>
+                                  {agency.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="companyName"
@@ -236,10 +313,10 @@ export default function AgencyClientsPage() {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={createClientMutation.isPending}
+                      disabled={createClientMutation.isPending || (isSuperAdmin && agenciesLoading)}
                       data-testid="button-submit-client"
                     >
-                      {createClientMutation.isPending ? "Creating..." : "Create Client"}
+                      {createClientMutation.isPending ? "Creating..." : (isSuperAdmin && agenciesLoading) ? "Loading agencies..." : "Create Client"}
                     </Button>
                   </div>
                 </form>

@@ -646,6 +646,7 @@ export const createClientUserSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   fullName: z.string().min(1, "Full name is required"),
   companyName: z.string().min(1, "Company name is required"),
+  agencyId: z.string().optional(), // Optional for regular Admin, required for SuperAdmin (validated in backend)
 });
 
 export const createStaffAdminUserSchema = z.object({
@@ -655,6 +656,7 @@ export const createStaffAdminUserSchema = z.object({
   role: z.enum(["Staff", "Admin"], {
     errorMap: () => ({ message: "Role must be Staff or Admin" })
   }),
+  agencyId: z.string().optional(), // Optional for regular Admin, required for SuperAdmin (validated in backend)
 });
 
 // Types
