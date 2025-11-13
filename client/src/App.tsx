@@ -136,7 +136,7 @@ function Router() {
       
       {/* Agency Portal - All routes wrapped in AgencyLayout */}
       <Route path="/agency">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyDashboard />
           </AgencyLayout>
@@ -144,7 +144,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/messages">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyMessages />
           </AgencyLayout>
@@ -152,7 +152,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/tasks">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyTasks />
           </AgencyLayout>
@@ -160,7 +160,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/projects">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyProjects />
           </AgencyLayout>
@@ -168,7 +168,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/projects/:id">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyProjectDetail />
           </AgencyLayout>
@@ -176,7 +176,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/recommendations">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyRecommendations />
           </AgencyLayout>
@@ -184,7 +184,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/clients">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyClients />
           </AgencyLayout>
@@ -192,7 +192,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/staff">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyStaff />
           </AgencyLayout>
@@ -200,7 +200,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/users">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyUsers />
           </AgencyLayout>
@@ -208,7 +208,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/integrations">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyIntegrations />
           </AgencyLayout>
@@ -216,7 +216,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/invoices">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyInvoices />
           </AgencyLayout>
@@ -224,7 +224,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/trash">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyTrash />
           </AgencyLayout>
@@ -232,7 +232,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/settings">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencySettings />
           </AgencyLayout>
@@ -240,7 +240,7 @@ function Router() {
       </Route>
 
       <Route path="/agency/clients/:clientId">
-        <ProtectedRoute allowedRoles={["Admin"]}>
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <ClientDetail />
           </AgencyLayout>

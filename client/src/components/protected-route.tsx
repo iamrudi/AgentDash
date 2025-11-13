@@ -21,7 +21,7 @@ export function ProtectedRoute({ children, allowedRoles, requireSuperAdmin }: Pr
       const role = getUserRole();
       if (!role || !allowedRoles.includes(role)) {
         // Redirect to appropriate dashboard based on role
-        if (role === "Admin") {
+        if (role === "Admin" || role === "SuperAdmin") {
           setLocation("/agency");
         } else if (role === "Client") {
           setLocation("/client");
@@ -38,7 +38,7 @@ export function ProtectedRoute({ children, allowedRoles, requireSuperAdmin }: Pr
       const authUser = getAuthUser();
       if (!authUser?.profile?.isSuperAdmin) {
         const role = getUserRole();
-        if (role === "Admin") {
+        if (role === "Admin" || role === "SuperAdmin") {
           setLocation("/agency");
         } else if (role === "Client") {
           setLocation("/client");
