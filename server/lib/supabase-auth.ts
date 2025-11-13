@@ -11,9 +11,11 @@ export async function createUserWithProfile(
   email: string,
   password: string,
   fullName: string,
-  role: 'Client' | 'Staff' | 'Admin',
+  role: 'Client' | 'Staff' | 'Admin' | 'SuperAdmin',
   agencyId?: string
 ): Promise<{ user: SupabaseUser; profileId: string }> {
+  const isSuperAdmin = role === 'SuperAdmin';
+  
   // Create user in Supabase Auth
   const { data, error } = await supabaseAdmin.auth.admin.createUser({
     email,
@@ -25,7 +27,8 @@ export async function createUserWithProfile(
     // CRITICAL: Use app_metadata for security-critical fields (secure, user cannot modify)
     app_metadata: {
       agency_id: agencyId || null,
-      role: role // Store role in app_metadata for security
+      role: role, // Store role in app_metadata for security
+      is_super_admin: isSuperAdmin // Set SuperAdmin flag for stateless JWT auth
     }
   });
 
@@ -38,7 +41,8 @@ export async function createUserWithProfile(
     id: data.user.id, // Use Supabase Auth user ID
     fullName,
     role,
-    agencyId: agencyId || null
+    agencyId: agencyId || null,
+    isSuperAdmin // Set SuperAdmin flag in profiles table
   }).returning();
 
   return {

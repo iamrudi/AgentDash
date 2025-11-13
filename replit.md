@@ -21,7 +21,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
   - Responsive touch-friendly navigation with proper dismissal UX
 
 ### Technical Implementations
-- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation. Agency ID and role stored in secure `app_metadata` (immutable by users). OAuth race condition resolved at root cause via stateless authentication - agencyId always available in token. AuthProvider `authReady` flag provides additional safety layer. Backward compatible fallback to profile table for legacy users.
+- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation. Agency ID and role stored in secure `app_metadata` (immutable by users). OAuth race condition resolved at root cause via stateless authentication - agencyId always available in token. AuthProvider `authReady` flag provides additional safety layer. Backward compatible fallback to profile table for legacy users. SuperAdmin role with cross-agency access: `is_super_admin` flag stored in both profiles table and Supabase app_metadata for stateless JWT auth. SuperAdmin users can create users/clients for any agency via agency selector in creation forms.
 - **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies and a `auth.get_agency_id()` helper.
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates and toast notifications.
@@ -43,6 +43,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
 - **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, and AI Provider Settings. Full CRM system available at agency level for managing Companies, Contacts, Deals, Forms, and Proposals.
 - **Staff Portal**: View and update assigned tasks.
+- **SuperAdmin Portal**: Platform-wide user and agency management with comprehensive audit logging, cross-tenant data access, and client deletion capabilities. SuperAdmin users see agency selector dropdown in user/client creation forms (with frontend validation requiring selection), enabling cross-agency user management.
 - **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
 - **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data. Enriches AI recommendations with real-time CRM insights for sales pipeline analysis, lead nurturing, and conversion optimization.
