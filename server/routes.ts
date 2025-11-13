@@ -4755,11 +4755,8 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
         agencyId: profile.agencyId
       };
 
-      // Perform promotion
-      await promoteUserToSuperAdmin(userId);
-
-      // Get updated profile to return to frontend
-      const updatedProfile = await storage.getProfileById(userId);
+      // Perform promotion and get updated profile
+      const updatedProfile = await promoteUserToSuperAdmin(userId);
 
       // Log audit event
       await logAuditEvent(

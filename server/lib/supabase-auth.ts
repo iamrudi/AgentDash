@@ -191,7 +191,7 @@ export async function updateUserPassword(
  * Promote user to SuperAdmin (SuperAdmin only)
  * Only Admin and Staff users can be promoted. Clients cannot be promoted due to agency-scoped constraints.
  */
-export async function promoteUserToSuperAdmin(userId: string): Promise<void> {
+export async function promoteUserToSuperAdmin(userId: string): Promise<Profile> {
   // 1. Fetch current profile to validate eligibility
   const [profile] = await db
     .select()
@@ -269,6 +269,19 @@ export async function promoteUserToSuperAdmin(userId: string): Promise<void> {
       oldAgencyId: oldState.agencyId,
       newAgencyId: null
     });
+
+    // 6. Fetch and return updated profile
+    const [updatedProfile] = await db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.id, userId))
+      .limit(1);
+
+    if (!updatedProfile) {
+      throw new Error('Failed to fetch updated profile');
+    }
+
+    return updatedProfile;
   } catch (dbError: any) {
     // Rollback Supabase Auth changes if DB update fails
     console.error('[PROMOTE_SUPERADMIN] Database update failed, attempting rollback...', {
