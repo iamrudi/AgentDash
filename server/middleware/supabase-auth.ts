@@ -122,6 +122,11 @@ export function requireRole(...roles: string[]) {
       return res.status(401).json({ message: "Authentication required" });
     }
 
+    // SuperAdmin users bypass all role restrictions
+    if (req.user.isSuperAdmin) {
+      return next();
+    }
+
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: "Insufficient permissions" });
     }
