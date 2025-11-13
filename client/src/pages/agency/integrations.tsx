@@ -265,9 +265,9 @@ export default function AgencyIntegrationsPage() {
         headers["Authorization"] = `Bearer ${token}`;
       }
 
-      // Include returnTo parameter to return to integrations page after OAuth
+      // Include returnTo parameter and popup indicator for OAuth callback
       const returnTo = encodeURIComponent(window.location.pathname);
-      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}&service=${service}&returnTo=${returnTo}`, {
+      const response = await fetch(`/api/oauth/google/initiate?clientId=${clientId}&service=${service}&returnTo=${returnTo}&popup=true`, {
         headers,
         credentials: "include",
       });
@@ -277,7 +277,76 @@ export default function AgencyIntegrationsPage() {
       }
 
       const data = await response.json();
-      window.location.href = data.authUrl;
+      
+      // Open OAuth in popup window to avoid iframe X-Frame-Options issues
+      const width = 600;
+      const height = 700;
+      const left = (window.screen.width / 2) - (width / 2);
+      const top = (window.screen.height / 2) - (height / 2);
+      
+      const popup = window.open(
+        data.authUrl,
+        'GoogleOAuth',
+        `width=${width},height=${height},top=${top},left=${left},popup=1`
+      );
+
+      if (!popup) {
+        // Popup blocked - fall back to top-level navigation
+        if (window.top) {
+          window.top.location.href = data.authUrl;
+        } else {
+          window.location.href = data.authUrl;
+        }
+        return;
+      }
+
+      // Listen for OAuth completion message from popup
+      const messageHandler = (event: MessageEvent) => {
+        // Verify message origin matches our domain
+        if (event.origin !== window.location.origin) {
+          return;
+        }
+
+        if (event.data?.type === 'GOOGLE_OAUTH_SUCCESS') {
+          window.removeEventListener('message', messageHandler);
+          popup.close();
+          
+          // Trigger the same flow as if we returned from redirect
+          const { clientId: receivedClientId, service: receivedService } = event.data;
+          setCurrentClientId(receivedClientId);
+          
+          if (receivedService === 'GA4') {
+            setGa4DialogOpen(true);
+          } else if (receivedService === 'GSC') {
+            setGscDialogOpen(true);
+          }
+          
+          toast({
+            title: "OAuth Successful",
+            description: "Google integration connected. Please select a property/site.",
+          });
+        } else if (event.data?.type === 'GOOGLE_OAUTH_ERROR') {
+          window.removeEventListener('message', messageHandler);
+          popup.close();
+          
+          toast({
+            title: "OAuth Failed",
+            description: `Authentication error: ${event.data.error}`,
+            variant: "destructive",
+          });
+        }
+      };
+
+      window.addEventListener('message', messageHandler);
+      
+      // Clean up listener if popup is closed manually
+      const popupCheckInterval = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(popupCheckInterval);
+          window.removeEventListener('message', messageHandler);
+        }
+      }, 1000);
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to initiate OAuth";
       toast({

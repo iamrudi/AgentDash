@@ -1830,8 +1830,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only Admin and Client can initiate OAuth" });
       }
 
+      // Check if OAuth is initiated in popup mode
+      const popup = req.query.popup === 'true';
+      const origin = popup ? req.get('origin') || req.get('referer')?.split('/').slice(0, 3).join('/') : undefined;
+
       // Create cryptographically signed state parameter for CSRF protection
-      const state = generateOAuthState(clientId, profile.role, service, returnTo);
+      const state = generateOAuthState(clientId, profile.role, service, returnTo, popup, origin);
 
       const authUrl = getAuthUrl(state, service);
       res.json({ authUrl });
@@ -1899,11 +1903,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Redirect to the original page with success message
+      // Check if this was a popup flow
+      if (stateData.popup && stateData.origin) {
+        // Return HTML page that posts message to opener window
+        const htmlResponse = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'self';">
+  <title>OAuth Success</title>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!window.opener) {
+        document.body.innerHTML = '<h1>OAuth Complete</h1><p>You can close this window.</p>';
+        return;
+      }
+      
+      try {
+        window.opener.postMessage({
+          type: 'GOOGLE_OAUTH_SUCCESS',
+          clientId: ${JSON.stringify(clientId)},
+          service: ${JSON.stringify(service)}
+        }, ${JSON.stringify(stateData.origin)});
+        
+        // Close window after posting message
+        setTimeout(function() {
+          window.close();
+        }, 100);
+      } catch (e) {
+        console.error('Failed to post message:', e);
+        document.body.innerHTML = '<h1>OAuth Complete</h1><p>You can close this window.</p>';
+      }
+    })();
+  </script>
+  <p>OAuth successful. Closing window...</p>
+</body>
+</html>`;
+        return res.type('text/html').send(htmlResponse);
+      }
+
+      // Standard redirect flow (non-popup)
       const separator = returnTo.includes('?') ? '&' : '?';
       res.redirect(`${returnTo}${separator}success=google_connected&clientId=${clientId}&service=${service}`);
     } catch (error: any) {
       console.error("OAuth callback error:", error);
+      
+      // Check if this was a popup flow
+      let stateData;
+      try {
+        stateData = verifyOAuthState(req.query.state as string);
+      } catch (e) {
+        // State verification failed, use standard redirect
+        return res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
+      }
+      
+      if (stateData?.popup && stateData?.origin) {
+        // Return HTML page that posts error message to opener
+        const htmlResponse = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'self';">
+  <title>OAuth Error</title>
+</head>
+<body>
+  <script>
+    (function() {
+      if (!window.opener) {
+        document.body.innerHTML = '<h1>OAuth Error</h1><p>${error.message || 'Authentication failed'}. You can close this window.</p>';
+        return;
+      }
+      
+      try {
+        window.opener.postMessage({
+          type: 'GOOGLE_OAUTH_ERROR',
+          error: ${JSON.stringify(error.message || 'Authentication failed')}
+        }, ${JSON.stringify(stateData.origin)});
+        
+        setTimeout(function() {
+          window.close();
+        }, 100);
+      } catch (e) {
+        console.error('Failed to post message:', e);
+        document.body.innerHTML = '<h1>OAuth Error</h1><p>You can close this window.</p>';
+      }
+    })();
+  </script>
+  <p>OAuth failed. Closing window...</p>
+</body>
+</html>`;
+        return res.type('text/html').send(htmlResponse);
+      }
+      
+      // Standard redirect flow
       res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
     }
   });

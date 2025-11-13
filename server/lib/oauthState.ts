@@ -9,6 +9,8 @@ interface OAuthState {
   service: 'GA4' | 'GSC' | 'BOTH';
   returnTo: string;
   timestamp: number;
+  popup?: boolean;
+  origin?: string;
 }
 
 /**
@@ -17,15 +19,19 @@ interface OAuthState {
  * @param initiatedBy - The role of the user who initiated (Admin/Client)
  * @param service - Which Google service(s) to authenticate (GA4, GSC, or BOTH)
  * @param returnTo - The path to redirect to after successful authentication
+ * @param popup - Whether OAuth is initiated in a popup window
+ * @param origin - The origin of the initiating window (for postMessage security)
  * @returns Signed state string
  */
-export function generateOAuthState(clientId: string, initiatedBy: string, service: 'GA4' | 'GSC' | 'BOTH' = 'BOTH', returnTo: string = '/agency/integrations'): string {
+export function generateOAuthState(clientId: string, initiatedBy: string, service: 'GA4' | 'GSC' | 'BOTH' = 'BOTH', returnTo: string = '/agency/integrations', popup?: boolean, origin?: string): string {
   const state: OAuthState = {
     clientId,
     initiatedBy,
     service,
     returnTo,
     timestamp: Date.now(),
+    ...(popup && { popup }),
+    ...(origin && { origin }),
   };
 
   const payload = JSON.stringify(state);
