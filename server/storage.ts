@@ -1855,12 +1855,11 @@ export class DbStorage implements IStorage {
         leadEvents: clients.leadEvents,
         createdAt: clients.createdAt,
         agencyName: agencies.name,
-        userEmail: users.email,
+        userEmail: profiles.email,
       })
       .from(clients)
       .leftJoin(agencies, eq(clients.agencyId, agencies.id))
       .leftJoin(profiles, eq(clients.profileId, profiles.id))
-      .leftJoin(users, eq(profiles.userId, users.id))
       .orderBy(desc(clients.createdAt));
 
     return result.map(row => ({
