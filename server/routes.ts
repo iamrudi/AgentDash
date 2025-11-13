@@ -13,6 +13,7 @@ import {
   requireSuperAdmin,
   type AuthRequest 
 } from "./middleware/supabase-auth";
+import { resolveAgencyContext } from "./middleware/agency-context";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -551,14 +552,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Agency Portal Routes (protected - Admin only)
   app.get("/api/agency/clients", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
-      }
-      console.log(`[GET /api/agency/clients] User ${req.user!.email} requesting clients for agency: ${req.user!.agencyId}`);
-      const clients = await storage.getAllClientsWithDetails(req.user!.agencyId);
-      console.log(`[GET /api/agency/clients] Returned ${clients.length} clients:`, clients.map(c => ({ id: c.id, name: c.companyName, agencyId: c.agencyId })));
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      const clients = await storage.getAllClientsWithDetails(agencyId);
       res.json(clients);
     } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
       res.status(500).json({ message: error.message });
     }
   });
@@ -4074,18 +4074,16 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       // Create user in Supabase Auth
       const { createUserWithProfile } = await import("./lib/supabase-auth");
       
-      // Create user and profile in admin's agency
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Admin user has no agency association" });
-      }
+      // Resolve agency context (SuperAdmin must provide agencyId in body)
+      const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
       
-      const authResult = await createUserWithProfile(email, password, fullName, "Client", req.user!.agencyId);
+      const authResult = await createUserWithProfile(email, password, fullName, "Client", agencyId!);
       
-      // Create client record in the admin's agency
+      // Create client record in the resolved agency
       const client = await storage.createClient({
         companyName,
         profileId: authResult.profileId, // Supabase Auth user ID
-        agencyId: req.user!.agencyId,
+        agencyId: agencyId!,
       });
 
       res.status(201).json({ 
@@ -4114,12 +4112,13 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   // Get all users (Admin only)
   app.get("/api/agency/users", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
-      }
-      const users = await storage.getAllUsersWithProfiles(req.user!.agencyId);
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      const users = await storage.getAllUsersWithProfiles(agencyId);
       res.json(users);
     } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
       console.error("Get users error:", error);
       res.status(500).json({ message: error.message || "Failed to fetch users" });
     }
@@ -4174,12 +4173,10 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       // Create user in Supabase Auth
       const { createUserWithProfile } = await import("./lib/supabase-auth");
       
-      // Ensure admin has agencyId for Staff/Admin users
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Admin user has no agency association" });
-      }
+      // Resolve agency context (SuperAdmin must provide agencyId in body)
+      const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
       
-      const authResult = await createUserWithProfile(email, password, fullName, role, req.user!.agencyId);
+      const authResult = await createUserWithProfile(email, password, fullName, role, agencyId!);
 
       res.status(201).json({ 
         message: `${role} user created successfully`,
@@ -4191,6 +4188,9 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
         }
       });
     } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           message: "Validation failed", 
