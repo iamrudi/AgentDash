@@ -1793,7 +1793,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let returnTo = req.query.returnTo as string;
       
       // Default fallback based on role
-      const defaultReturnTo = profile.role === "Admin" ? "/agency/integrations" : "/client";
+      const defaultReturnTo = (profile.role === "Admin" || profile.role === "SuperAdmin") 
+        ? "/agency/integrations" 
+        : "/client";
       
       // Validate returnTo is a safe internal path (must start with "/" and not be a protocol URL)
       if (returnTo) {
@@ -1809,14 +1811,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         returnTo = defaultReturnTo;
       }
 
-      // Get client ID - for Admin, use query param; for Client, use their own
+      // Get client ID - for Admin/SuperAdmin, use query param; for Client, use their own
       let clientId: string;
       
-      if (profile.role === "Admin") {
-        // Admin is setting up integration for a specific client
+      if (profile.role === "Admin" || profile.role === "SuperAdmin") {
+        // Admin/SuperAdmin is setting up integration for a specific client
         const targetClientId = req.query.clientId as string;
         if (!targetClientId) {
-          return res.status(400).json({ message: "clientId query parameter required for Admin" });
+          return res.status(400).json({ message: "clientId query parameter required for Admin/SuperAdmin" });
         }
         clientId = targetClientId;
       } else if (profile.role === "Client") {
@@ -1827,7 +1829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         clientId = client.id;
       } else {
-        return res.status(403).json({ message: "Only Admin and Client can initiate OAuth" });
+        return res.status(403).json({ message: "Only Admin, SuperAdmin, and Client can initiate OAuth" });
       }
 
       // Check if OAuth is initiated in popup mode
@@ -1871,7 +1873,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Security: Defensive validation of returnTo even though it was validated before signing
       let returnTo = stateReturnTo;
-      const defaultReturnTo = stateData.initiatedBy === "Admin" ? "/agency/integrations" : "/client";
+      const defaultReturnTo = (stateData.initiatedBy === "Admin" || stateData.initiatedBy === "SuperAdmin") 
+        ? "/agency/integrations" 
+        : "/client";
       
       if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('://')) {
         console.warn(`[OAuth Security] Invalid returnTo in callback, using fallback: ${returnTo}`);
