@@ -203,6 +203,20 @@ export async function promoteUserToSuperAdmin(userId: string): Promise<void> {
     throw new Error('User not found');
   }
 
+  // Store pre-promotion state for logging and rollback
+  const oldState = {
+    role: profile.role,
+    isSuperAdmin: profile.isSuperAdmin,
+    agencyId: profile.agencyId
+  };
+
+  console.log('[PROMOTE_SUPERADMIN] Starting promotion for user', {
+    userId,
+    email: profile.email,
+    oldRole: oldState.role,
+    oldAgencyId: oldState.agencyId
+  });
+
   // 2. Check if already SuperAdmin
   if (profile.isSuperAdmin) {
     throw new Error('User is already a SuperAdmin');
@@ -227,33 +241,62 @@ export async function promoteUserToSuperAdmin(userId: string): Promise<void> {
   });
 
   if (authError) {
+    console.error('[PROMOTE_SUPERADMIN] Supabase Auth update failed', { userId, error: authError.message });
     throw new Error(`Failed to update Supabase Auth metadata: ${authError.message}`);
   }
 
-  // 5. Update profiles table in transaction
+  console.log('[PROMOTE_SUPERADMIN] Supabase Auth updated successfully', { userId });
+
+  // 5. Update profiles table in transaction (future-proof for multi-step DB updates)
   try {
-    await db.update(profiles)
-      .set({
-        role: 'SuperAdmin',
-        isSuperAdmin: true,
-        agencyId: null // Clear agency association
-      })
-      .where(eq(profiles.id, userId));
+    await db.transaction(async (tx) => {
+      await tx.update(profiles)
+        .set({
+          role: 'SuperAdmin',
+          isSuperAdmin: true,
+          agencyId: null // Clear agency association
+        })
+        .where(eq(profiles.id, userId));
+      
+      // Future: Add additional cleanup steps here (e.g., clearing agency-scoped relations)
+    });
+
+    console.log('[PROMOTE_SUPERADMIN] Promotion successful', {
+      userId,
+      email: profile.email,
+      oldRole: oldState.role,
+      newRole: 'SuperAdmin',
+      oldAgencyId: oldState.agencyId,
+      newAgencyId: null
+    });
   } catch (dbError: any) {
     // Rollback Supabase Auth changes if DB update fails
-    console.error('[PROMOTE_SUPERADMIN] Database update failed, attempting rollback...', dbError);
+    console.error('[PROMOTE_SUPERADMIN] Database update failed, attempting rollback...', {
+      userId,
+      error: dbError.message
+    });
     
     try {
       await supabaseAdmin.auth.admin.updateUserById(userId, {
         app_metadata: {
-          role: profile.role,
-          is_super_admin: false,
-          agency_id: profile.agencyId
+          role: oldState.role,
+          is_super_admin: oldState.isSuperAdmin,
+          agency_id: oldState.agencyId
         }
       });
-      console.error('[PROMOTE_SUPERADMIN] Rollback successful');
+      console.log('[PROMOTE_SUPERADMIN] Rollback successful', {
+        userId,
+        restoredState: oldState
+      });
     } catch (rollbackError: any) {
-      console.error('[PROMOTE_SUPERADMIN] CRITICAL: Rollback failed!', rollbackError);
+      console.error('[PROMOTE_SUPERADMIN] CRITICAL: Rollback failed!', {
+        userId,
+        email: profile.email,
+        rollbackError: rollbackError.message,
+        originalError: dbError.message,
+        oldState,
+        message: 'Manual intervention required - Supabase Auth and DB are out of sync'
+      });
       throw new Error(`Promotion failed and rollback unsuccessful: ${dbError.message}`);
     }
     

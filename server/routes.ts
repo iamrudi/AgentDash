@@ -4737,6 +4737,58 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Promote user to SuperAdmin (Super Admin only)
+  app.patch("/api/superadmin/users/:userId/promote-superadmin", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { promoteUserToSuperAdmin } = await import("./lib/supabase-auth");
+      const { userId } = req.params;
+
+      // Get user data before promotion for audit log
+      const profile = await storage.getProfileById(userId);
+      if (!profile) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const oldState = {
+        role: profile.role,
+        isSuperAdmin: profile.isSuperAdmin,
+        agencyId: profile.agencyId
+      };
+
+      // Perform promotion
+      await promoteUserToSuperAdmin(userId);
+
+      // Get updated profile to return to frontend
+      const updatedProfile = await storage.getProfileById(userId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'user.promote_superadmin',
+        'user',
+        userId,
+        { 
+          oldRole: oldState.role,
+          newRole: 'SuperAdmin',
+          oldAgencyId: oldState.agencyId,
+          newAgencyId: null,
+          oldIsSuperAdmin: oldState.isSuperAdmin,
+          newIsSuperAdmin: true
+        },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ 
+        message: "User promoted to SuperAdmin successfully",
+        profile: updatedProfile
+      });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error promoting user to SuperAdmin:', error);
+      res.status(500).json({ message: error.message || "Failed to promote user" });
+    }
+  });
+
   // Delete user (Super Admin only)
   app.delete("/api/superadmin/users/:userId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {
