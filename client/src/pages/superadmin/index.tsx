@@ -62,6 +62,7 @@ export default function SuperAdminPage() {
   const [deletingUser, setDeletingUser] = useState<UserWithAgency | null>(null);
   const [deletingAgency, setDeletingAgency] = useState<AgencyWithCounts | null>(null);
   const [deletingClient, setDeletingClient] = useState<ClientWithDetails | null>(null);
+  const [promotingUser, setPromotingUser] = useState<UserWithAgency | null>(null);
   const { toast } = useToast();
 
   const { data: users, isLoading: usersLoading } = useQuery<UserWithAgency[]>({
@@ -161,6 +162,27 @@ export default function SuperAdminPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const promoteSuperAdminMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("PATCH", `/api/superadmin/users/${userId}/promote-superadmin`);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/users"] });
+      setPromotingUser(null);
+      toast({
+        title: "Success",
+        description: "User promoted to SuperAdmin successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to promote user",
         variant: "destructive",
       });
     },
@@ -349,6 +371,16 @@ export default function SuperAdminPage() {
                               >
                                 <Key className="w-4 h-4" />
                               </Button>
+                              {!user.isSuperAdmin && (user.role === 'Admin' || user.role === 'Staff') && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setPromotingUser(user)}
+                                  data-testid={`button-promote-superadmin-${user.id}`}
+                                >
+                                  <Shield className="w-4 h-4 text-primary" />
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -671,6 +703,42 @@ export default function SuperAdminPage() {
                 data-testid="button-confirm-password"
               >
                 Update Password
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Promote to SuperAdmin Dialog */}
+      {promotingUser && (
+        <AlertDialog open={!!promotingUser} onOpenChange={() => setPromotingUser(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Promote to SuperAdmin</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to promote <span className="font-semibold">{promotingUser.fullName}</span> to SuperAdmin?
+                <br /><br />
+                <span className="text-sm font-medium">This will:</span>
+                <ul className="list-disc list-inside text-sm mt-2 space-y-1">
+                  <li>Grant platform-wide access across all agencies</li>
+                  <li>Remove their agency assignment</li>
+                  <li>Give them full administrative privileges</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-promote">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (promotingUser) {
+                    promoteSuperAdminMutation.mutate(promotingUser.id);
+                  }
+                }}
+                disabled={promoteSuperAdminMutation.isPending}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                data-testid="button-confirm-promote"
+              >
+                {promoteSuperAdminMutation.isPending ? "Promoting..." : "Promote to SuperAdmin"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
