@@ -2,9 +2,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Profile, Agency, AuditLog, Client } from "@shared/schema";
-import { Shield, Users, Building2, ScrollText, Trash2, UserCog } from "lucide-react";
+import { Shield, Users, Building2, ScrollText, Trash2, UserCog, Mail, Key } from "lucide-react";
 import { useState } from "react";
 import {
   Table,
@@ -53,6 +55,10 @@ type ClientWithDetails = Client & {
 export default function SuperAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithAgency | null>(null);
   const [newRole, setNewRole] = useState<string>("");
+  const [editingUserEmail, setEditingUserEmail] = useState<UserWithAgency | null>(null);
+  const [newEmail, setNewEmail] = useState<string>("");
+  const [editingUserPassword, setEditingUserPassword] = useState<UserWithAgency | null>(null);
+  const [newPassword, setNewPassword] = useState<string>("");
   const [deletingUser, setDeletingUser] = useState<UserWithAgency | null>(null);
   const [deletingAgency, setDeletingAgency] = useState<AgencyWithCounts | null>(null);
   const [deletingClient, setDeletingClient] = useState<ClientWithDetails | null>(null);
@@ -90,6 +96,50 @@ export default function SuperAdminPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to update user role",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateEmailMutation = useMutation({
+    mutationFn: async ({ userId, email }: { userId: string; email: string }) => {
+      return await apiRequest("PATCH", `/api/superadmin/users/${userId}/email`, { email });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/users"] });
+      setEditingUserEmail(null);
+      setNewEmail("");
+      toast({
+        title: "Success",
+        description: "User email updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user email",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      return await apiRequest("PATCH", `/api/superadmin/users/${userId}/password`, { password });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/users"] });
+      setEditingUserPassword(null);
+      setNewPassword("");
+      toast({
+        title: "Success",
+        description: "User password updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user password",
         variant: "destructive",
       });
     },
@@ -276,6 +326,28 @@ export default function SuperAdminPage() {
                                 data-testid={`button-edit-user-${user.id}`}
                               >
                                 <UserCog className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingUserEmail(user);
+                                  setNewEmail("");
+                                }}
+                                data-testid={`button-edit-email-${user.id}`}
+                              >
+                                <Mail className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingUserPassword(user);
+                                  setNewPassword("");
+                                }}
+                                data-testid={`button-edit-password-${user.id}`}
+                              >
+                                <Key className="w-4 h-4" />
                               </Button>
                               <Button
                                 size="sm"
@@ -515,6 +587,90 @@ export default function SuperAdminPage() {
                 data-testid="button-confirm-role"
               >
                 Update Role
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Update Email Dialog */}
+      {editingUserEmail && (
+        <AlertDialog open={!!editingUserEmail} onOpenChange={() => setEditingUserEmail(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Update User Email</AlertDialogTitle>
+              <AlertDialogDescription>
+                Change the email address for {editingUserEmail.fullName}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+              <Label htmlFor="new-email">New Email Address</Label>
+              <Input
+                id="new-email"
+                type="email"
+                placeholder="user@example.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                data-testid="input-new-email"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-email">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (editingUserEmail && newEmail) {
+                    updateEmailMutation.mutate({
+                      userId: editingUserEmail.id,
+                      email: newEmail,
+                    });
+                  }
+                }}
+                disabled={!newEmail || !newEmail.includes('@')}
+                data-testid="button-confirm-email"
+              >
+                Update Email
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Update Password Dialog */}
+      {editingUserPassword && (
+        <AlertDialog open={!!editingUserPassword} onOpenChange={() => setEditingUserPassword(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Update User Password</AlertDialogTitle>
+              <AlertDialogDescription>
+                Set a new password for {editingUserPassword.fullName}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Enter new password (min 6 characters)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                data-testid="input-new-password"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-password">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (editingUserPassword && newPassword) {
+                    updatePasswordMutation.mutate({
+                      userId: editingUserPassword.id,
+                      password: newPassword,
+                    });
+                  }
+                }}
+                disabled={!newPassword || newPassword.length < 6}
+                data-testid="button-confirm-password"
+              >
+                Update Password
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

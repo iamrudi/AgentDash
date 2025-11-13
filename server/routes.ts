@@ -4645,6 +4645,98 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Update user email (Super Admin only)
+  app.patch("/api/superadmin/users/:userId/email", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { updateUserEmail } = await import("./lib/supabase-auth");
+      const { updateUserEmailSchema } = await import("@shared/schema");
+      const { userId } = req.params;
+
+      // Validate request body with Zod
+      const validation = updateUserEmailSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid email address", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { email } = validation.data;
+
+      // Get old user data for audit log
+      const oldUser = await storage.getUserById(userId);
+      if (!oldUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get old email from user's auth record
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const oldEmail = authUser?.user?.email || 'unknown';
+
+      await updateUserEmail(userId, email);
+
+      // Log audit event with old and new email
+      await logAuditEvent(
+        req.user!.id,
+        'user.update_email',
+        'user',
+        userId,
+        { oldEmail, newEmail: email },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "User email updated successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user email:', error);
+      res.status(500).json({ message: error.message || "Failed to update user email" });
+    }
+  });
+
+  // Update user password (Super Admin only)
+  app.patch("/api/superadmin/users/:userId/password", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { updateUserPassword } = await import("./lib/supabase-auth");
+      const { updateUserPasswordSchema } = await import("@shared/schema");
+      const { userId } = req.params;
+
+      // Validate request body with Zod
+      const validation = updateUserPasswordSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid password", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { password } = validation.data;
+
+      // Get user data for audit log
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await updateUserPassword(userId, password);
+
+      // Log audit event (never log actual password)
+      await logAuditEvent(
+        req.user!.id,
+        'user.update_password',
+        'user',
+        userId,
+        { passwordChanged: true },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({ message: "User password updated successfully" });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user password:', error);
+      res.status(500).json({ message: error.message || "Failed to update user password" });
+    }
+  });
+
   // Delete user (Super Admin only)
   app.delete("/api/superadmin/users/:userId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {

@@ -48,6 +48,7 @@ export const users = pgTable("users", {
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(), // This IS the Supabase Auth user ID (no default, set explicitly)
   fullName: text("full_name").notNull(),
+  email: text("email").notNull(), // Mirrored from Supabase Auth for query performance
   role: text("role").notNull(), // 'Admin', 'Client', 'Staff', 'SuperAdmin'
   isSuperAdmin: boolean("is_super_admin").default(false).notNull(), // Platform-wide super admin flag
   agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client/SuperAdmin users
@@ -755,6 +756,24 @@ export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
 
 // Extended form types
 export type FormWithFields = Form & { fields?: FormField[] };
+
+// SuperAdmin credential update schemas
+export const updateUserEmailSchema = z.object({
+  email: z.string().email("Invalid email address").min(1, "Email is required"),
+});
+
+export const updateUserPasswordSchema = z.object({
+  password: z.string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[^a-zA-Z0-9]/, "Password must contain at least one special character")
+    .refine(val => !/\s/.test(val), "Password must not contain whitespace"),
+});
+
+export type UpdateUserEmail = z.infer<typeof updateUserEmailSchema>;
+export type UpdateUserPassword = z.infer<typeof updateUserPasswordSchema>;
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };

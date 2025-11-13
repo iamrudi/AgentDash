@@ -43,7 +43,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
 - **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, and AI Provider Settings. Full CRM system available at agency level for managing Companies, Contacts, Deals, Forms, and Proposals.
 - **Staff Portal**: View and update assigned tasks.
-- **SuperAdmin Portal**: Platform-wide user and agency management with comprehensive audit logging, cross-tenant data access, and client deletion capabilities. SuperAdmin users see agency selector dropdown in user/client creation forms (with frontend validation requiring selection), enabling cross-agency user management.
+- **SuperAdmin Portal**: Platform-wide user and agency management with comprehensive audit logging, cross-tenant data access, and client deletion capabilities. SuperAdmin users see agency selector dropdown in user/client creation forms (with frontend validation requiring selection), enabling cross-agency user management. **User Credential Management**: Email and password updates with strong validation (12+ character passwords with complexity requirements) and enhanced audit logging that captures old/new email values.
 - **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
 - **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data. Enriches AI recommendations with real-time CRM insights for sales pipeline analysis, lead nurturing, and conversion optimization.

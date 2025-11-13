@@ -40,6 +40,7 @@ export async function createUserWithProfile(
   const [profile] = await db.insert(profiles).values({
     id: data.user.id, // Use Supabase Auth user ID
     fullName,
+    email, // Mirror email from Supabase Auth
     role,
     agencyId: agencyId || null,
     isSuperAdmin // Set SuperAdmin flag in profiles table
@@ -144,5 +145,44 @@ export async function updateUserMetadata(
     await db.update(profiles)
       .set(profileUpdates)
       .where(eq(profiles.id, userId));
+  }
+}
+
+/**
+ * Update user email in Supabase Auth and profiles table (SuperAdmin only)
+ */
+export async function updateUserEmail(
+  userId: string,
+  newEmail: string
+): Promise<void> {
+  // Update email in Supabase Auth
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    email: newEmail,
+    email_confirm: true // Skip confirmation email
+  });
+
+  if (error) {
+    throw new Error(`Failed to update user email: ${error.message}`);
+  }
+
+  // Also update email in profiles table to keep in sync
+  await db.update(profiles)
+    .set({ email: newEmail })
+    .where(eq(profiles.id, userId));
+}
+
+/**
+ * Update user password in Supabase Auth (SuperAdmin only)
+ */
+export async function updateUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<void> {
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password: newPassword
+  });
+
+  if (error) {
+    throw new Error(`Failed to update user password: ${error.message}`);
   }
 }
