@@ -2,7 +2,8 @@
 -- TASK LISTS ROW LEVEL SECURITY (RLS) POLICIES
 -- ================================================================
 -- This migration enables database-level tenant isolation for task_lists table
--- PREREQUISITE: auth.get_agency_id() function must exist (from 0001_enable_rls_policies.sql)
+-- Uses Supabase's built-in auth.jwt() function to access app_metadata
+-- No prerequisite migrations needed - uses built-in Supabase functions
 -- ================================================================
 
 -- Enable RLS on task_lists table
@@ -16,23 +17,23 @@ ALTER TABLE task_lists ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view task lists in their agency"
 ON task_lists FOR SELECT
 TO authenticated
-USING (agency_id = auth.get_agency_id());
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can insert task lists in their agency"
 ON task_lists FOR INSERT
 TO authenticated
-WITH CHECK (agency_id = auth.get_agency_id());
+WITH CHECK (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can update task lists in their agency"
 ON task_lists FOR UPDATE
 TO authenticated
-USING (agency_id = auth.get_agency_id())
-WITH CHECK (agency_id = auth.get_agency_id());
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid)
+WITH CHECK (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can delete task lists in their agency"
 ON task_lists FOR DELETE
 TO authenticated
-USING (agency_id = auth.get_agency_id());
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 -- ================================================================
 -- PERFORMANCE INDEXES FOR RLS
@@ -56,5 +57,6 @@ COMMENT ON POLICY "Admins can delete task lists in their agency" ON task_lists I
 -- ================================================================
 -- Task lists table now has database-level tenant isolation
 -- Users can only access task lists belonging to their agency
+-- Uses Supabase's built-in auth.jwt() for JWT app_metadata access
 -- Even direct SQL queries will respect tenant boundaries
 -- ================================================================
