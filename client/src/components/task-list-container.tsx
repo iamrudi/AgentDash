@@ -18,7 +18,7 @@ interface TaskListContainerProps {
   onEditList: (listId: string) => void;
   onDeleteList: (listId: string) => void;
   onCreateTask: (listId: string) => void;
-  onEditTask: (task: TaskWithAssignments) => void;
+  onViewTask: (task: TaskWithAssignments) => void;
   onDeleteTask: (task: TaskWithAssignments) => void;
   onAssignStaff: (task: TaskWithAssignments) => void;
 }
@@ -50,7 +50,7 @@ export function TaskListContainer({
   onEditList,
   onDeleteList,
   onCreateTask,
-  onEditTask,
+  onViewTask,
   onDeleteTask,
   onAssignStaff,
 }: TaskListContainerProps) {
@@ -106,12 +106,21 @@ export function TaskListContainer({
           </div>
         ) : (
           listTasks.map(task => (
-            <Card key={task.id} className="hover-elevate" data-testid={`card-task-${task.id}`}>
+            <Card 
+              key={task.id} 
+              className="hover-elevate cursor-pointer" 
+              onClick={() => onViewTask(task)}
+              data-testid={`card-task-${task.id}`}
+            >
               <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 space-y-2 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-sm truncate" data-testid={`text-task-description-${task.id}`}>
+                    <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                      <p 
+                        className="font-medium text-sm truncate cursor-text" 
+                        data-testid={`text-task-description-${task.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {task.description}
                       </p>
                       <TaskStatusControl 
@@ -124,7 +133,7 @@ export function TaskListContainer({
                       />
                     </div>
                     
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                       <TaskDateControl 
                         task={task} 
                         projectId={projectId}
@@ -150,16 +159,10 @@ export function TaskListContainer({
                       variant="ghost" 
                       size="icon"
                       className="h-7 w-7"
-                      onClick={() => onEditTask(task)}
-                      data-testid={`button-edit-task-${task.id}`}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => onDeleteTask(task)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTask(task);
+                      }}
                       data-testid={`button-delete-task-${task.id}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />

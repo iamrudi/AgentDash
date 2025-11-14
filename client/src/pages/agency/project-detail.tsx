@@ -8,10 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil, Trash2, UserPlus, X } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import { EditProjectDialog } from "@/components/edit-project-dialog";
-import { EditTaskDialog } from "@/components/edit-task-dialog";
+import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { CreateTaskDialog } from "@/components/create-task-dialog";
 import { TaskListContainer } from "@/components/task-list-container";
 import { CreateTaskListDialog } from "@/components/create-task-list-dialog";
@@ -136,13 +136,13 @@ function AssignmentDialogBody({ taskToAssign, tasks, staffList, onAssign, onUnas
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [showEditProject, setShowEditProject] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [defaultListId, setDefaultListId] = useState<string | undefined>(undefined);
-  const [showEditTask, setShowEditTask] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<TaskWithAssignments | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [showDeleteTask, setShowDeleteTask] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<TaskWithAssignments | null>(null);
   const [showAssignStaff, setShowAssignStaff] = useState(false);
@@ -172,6 +172,62 @@ export default function ProjectDetail() {
   const { data: clients } = useQuery<Array<{ id: string; companyName: string }>>({
     queryKey: ["/api/agency/clients"],
   });
+
+  // Derived state for tasks and selected task
+  const tasks = projectData?.tasks || [];
+  const selectedTask = useMemo(() => 
+    tasks.find(t => t.id === selectedTaskId) ?? null, 
+    [tasks, selectedTaskId]
+  );
+
+  // URL sync helper - keeps ?task query param in sync with state
+  const syncTaskParam = useCallback((taskId?: string) => {
+    const [pathname, search = ""] = location.split("?");
+    const params = new URLSearchParams(search);
+    taskId ? params.set("task", taskId) : params.delete("task");
+    const next = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    if (next !== location) setLocation(next, { replace: true });
+  }, [location, setLocation]);
+
+  // Deep link support: sync URL ?task param with dialog state
+  useEffect(() => {
+    if (!tasks) return;
+    const [, search = ""] = location.split("?");
+    const params = new URLSearchParams(search);
+    const taskParam = params.get("task");
+    if (!taskParam) {
+      if (selectedTaskId) setSelectedTaskId(null);
+      if (showTaskDetail) setShowTaskDetail(false);
+      return;
+    }
+    const exists = tasks.some(t => t.id === taskParam);
+    if (exists) {
+      if (selectedTaskId !== taskParam) setSelectedTaskId(taskParam);
+      if (!showTaskDetail) setShowTaskDetail(true);
+    } else {
+      toast({
+        title: "Task not found",
+        description: "The requested task is unavailable.",
+        variant: "destructive"
+      });
+      syncTaskParam();
+    }
+  }, [location, tasks, selectedTaskId, showTaskDetail, syncTaskParam, toast]);
+
+  // Event handlers for task detail dialog
+  const handleViewTask = (task: TaskWithAssignments) => {
+    setSelectedTaskId(task.id);
+    setShowTaskDetail(true);
+    syncTaskParam(task.id);
+  };
+
+  const handleTaskDialogOpenChange = (open: boolean) => {
+    setShowTaskDetail(open);
+    if (!open) {
+      setSelectedTaskId(null);
+      syncTaskParam();
+    }
+  };
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
@@ -295,7 +351,7 @@ export default function ProjectDetail() {
     );
   }
 
-  const { project, tasks } = projectData;
+  const { project } = projectData;
   const client = clients?.find(c => c.id === project?.clientId);
 
   const getStatusColor = (status: string) => {
@@ -417,10 +473,7 @@ export default function ProjectDetail() {
                   }
                 }}
                 onCreateTask={handleCreateTaskForList}
-                onEditTask={(task) => {
-                  setSelectedTask(task);
-                  setShowEditTask(true);
-                }}
+                onViewTask={(task) => handleViewTask(task)}
                 onDeleteTask={(task) => {
                   setTaskToDelete(task);
                   setShowDeleteTask(true);
@@ -464,11 +517,11 @@ export default function ProjectDetail() {
         projectId={id || ""}
       />
 
-      <EditTaskDialog 
-        open={showEditTask}
-        onOpenChange={setShowEditTask}
+      <TaskDetailDialog
         task={selectedTask}
-        projectId={id}
+        projectId={id!}
+        open={showTaskDetail}
+        onOpenChange={handleTaskDialogOpenChange}
       />
 
       <AlertDialog open={showDeleteTask} onOpenChange={setShowDeleteTask}>
