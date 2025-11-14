@@ -4,27 +4,8 @@
 -- ================================================================
 -- This migration enables database-level tenant isolation using RLS
 -- All queries are automatically filtered by agency_id from JWT
+-- Uses Supabase's built-in auth.jwt() function to access app_metadata
 -- ================================================================
-
--- ================================================================
--- HELPER FUNCTIONS
--- ================================================================
-
--- Extract agency_id from Supabase Auth JWT (app_metadata)
--- This is the secure way to get tenant context for RLS policies
-CREATE OR REPLACE FUNCTION auth.get_agency_id()
-RETURNS UUID AS $$
-  SELECT COALESCE(
-    (auth.jwt() -> 'app_metadata' ->> 'agency_id')::UUID,
-    NULL
-  );
-$$ LANGUAGE SQL STABLE;
-
--- Helper to check if current user is authenticated
-CREATE OR REPLACE FUNCTION auth.is_authenticated()
-RETURNS BOOLEAN AS $$
-  SELECT auth.uid() IS NOT NULL;
-$$ LANGUAGE SQL STABLE;
 
 -- ================================================================
 -- ENABLE RLS ON ALL TABLES
@@ -53,7 +34,7 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view their own agency"
 ON agencies FOR SELECT
 TO authenticated
-USING (id = (SELECT auth.get_agency_id()));
+USING (id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 -- ================================================================
 -- PROFILES TABLE POLICIES
@@ -65,7 +46,7 @@ ON profiles FOR SELECT
 TO authenticated
 USING (
   -- Admin/Staff: can see profiles in same agency
-  (agency_id = (SELECT auth.get_agency_id()))
+  (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid)
   OR
   -- Client users: can see their own profile
   (id = auth.uid())
@@ -85,23 +66,23 @@ WITH CHECK (id = auth.uid());
 CREATE POLICY "Users can view clients in their agency"
 ON clients FOR SELECT
 TO authenticated
-USING (agency_id = (SELECT auth.get_agency_id()));
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can insert clients in their agency"
 ON clients FOR INSERT
 TO authenticated
-WITH CHECK (agency_id = (SELECT auth.get_agency_id()));
+WITH CHECK (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can update clients in their agency"
 ON clients FOR UPDATE
 TO authenticated
-USING (agency_id = (SELECT auth.get_agency_id()))
-WITH CHECK (agency_id = (SELECT auth.get_agency_id()));
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid)
+WITH CHECK (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 CREATE POLICY "Admins can delete clients in their agency"
 ON clients FOR DELETE
 TO authenticated
-USING (agency_id = (SELECT auth.get_agency_id()));
+USING (agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid);
 
 -- ================================================================
 -- PROJECTS TABLE POLICIES
@@ -113,7 +94,7 @@ ON projects FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -122,7 +103,7 @@ ON projects FOR INSERT
 TO authenticated
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -131,12 +112,12 @@ ON projects FOR UPDATE
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -145,7 +126,7 @@ ON projects FOR DELETE
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -160,7 +141,7 @@ TO authenticated
 USING (
   project_id IN (
     SELECT id FROM projects WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -171,7 +152,7 @@ TO authenticated
 WITH CHECK (
   project_id IN (
     SELECT id FROM projects WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -182,14 +163,14 @@ TO authenticated
 USING (
   project_id IN (
     SELECT id FROM projects WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 )
 WITH CHECK (
   project_id IN (
     SELECT id FROM projects WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -200,7 +181,7 @@ TO authenticated
 USING (
   project_id IN (
     SELECT id FROM projects WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -217,7 +198,7 @@ USING (
   task_id IN (
     SELECT id FROM tasks WHERE project_id IN (
       SELECT id FROM projects WHERE client_id IN (
-        SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+        SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
       )
     )
   )
@@ -230,7 +211,7 @@ USING (
   task_id IN (
     SELECT id FROM tasks WHERE project_id IN (
       SELECT id FROM projects WHERE client_id IN (
-        SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+        SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
       )
     )
   )
@@ -239,7 +220,7 @@ WITH CHECK (
   task_id IN (
     SELECT id FROM tasks WHERE project_id IN (
       SELECT id FROM projects WHERE client_id IN (
-        SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+        SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
       )
     )
   )
@@ -255,7 +236,7 @@ ON invoices FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -264,12 +245,12 @@ ON invoices FOR ALL
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -284,7 +265,7 @@ TO authenticated
 USING (
   invoice_id IN (
     SELECT id FROM invoices WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -295,14 +276,14 @@ TO authenticated
 USING (
   invoice_id IN (
     SELECT id FROM invoices WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 )
 WITH CHECK (
   invoice_id IN (
     SELECT id FROM invoices WHERE client_id IN (
-      SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+      SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
     )
   )
 );
@@ -317,7 +298,7 @@ ON initiatives FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -326,12 +307,12 @@ ON initiatives FOR ALL
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -345,7 +326,7 @@ ON daily_metrics FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -354,12 +335,12 @@ ON daily_metrics FOR ALL
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -373,7 +354,7 @@ ON client_integrations FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -382,12 +363,12 @@ ON client_integrations FOR ALL
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -401,7 +382,7 @@ ON client_objectives FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -410,12 +391,12 @@ ON client_objectives FOR ALL
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -429,7 +410,7 @@ ON client_messages FOR SELECT
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -438,7 +419,7 @@ ON client_messages FOR INSERT
 TO authenticated
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -447,12 +428,12 @@ ON client_messages FOR UPDATE
 TO authenticated
 USING (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 )
 WITH CHECK (
   client_id IN (
-    SELECT id FROM clients WHERE agency_id = (SELECT auth.get_agency_id())
+    SELECT id FROM clients WHERE agency_id = (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid
   )
 );
 
@@ -460,7 +441,6 @@ WITH CHECK (
 -- NOTIFICATIONS TABLE POLICIES
 -- ================================================================
 -- Special case: users can only see their own notifications
--- Note: notifications.user_id references old users table, should reference profiles.id
 
 CREATE POLICY "Users can view their own notifications"
 ON notifications FOR SELECT
@@ -470,7 +450,7 @@ USING (user_id = auth.uid());
 CREATE POLICY "System can create notifications for users"
 ON notifications FOR INSERT
 TO authenticated
-WITH CHECK (user_id = auth.uid() OR auth.get_agency_id() IS NOT NULL);
+WITH CHECK (user_id = auth.uid() OR (auth.jwt() -> 'app_metadata' ->> 'agency_id')::uuid IS NOT NULL);
 
 CREATE POLICY "Users can update their own notifications"
 ON notifications FOR UPDATE
@@ -514,24 +494,10 @@ CREATE INDEX IF NOT EXISTS idx_invoice_line_items_invoice_id_rls ON invoice_line
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id_rls ON notifications(user_id);
 
 -- ================================================================
--- GRANT PERMISSIONS
--- ================================================================
--- Ensure authenticated users can execute helper functions
-
-GRANT EXECUTE ON FUNCTION auth.get_agency_id() TO authenticated;
-GRANT EXECUTE ON FUNCTION auth.is_authenticated() TO authenticated;
-
--- ================================================================
--- COMMENTS FOR DOCUMENTATION
--- ================================================================
-
-COMMENT ON FUNCTION auth.get_agency_id() IS 'Extracts agency_id from Supabase Auth JWT app_metadata for RLS policies';
-COMMENT ON FUNCTION auth.is_authenticated() IS 'Checks if current user is authenticated via Supabase Auth';
-
--- ================================================================
 -- RLS IMPLEMENTATION COMPLETE
 -- ================================================================
 -- All tables now have database-level tenant isolation
 -- Users can only access data belonging to their agency
+-- Uses Supabase's built-in auth.jwt() for JWT app_metadata access
 -- Even direct SQL queries will respect tenant boundaries
 -- ================================================================
