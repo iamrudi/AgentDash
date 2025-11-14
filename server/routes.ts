@@ -1194,6 +1194,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all staff members (for assignment dropdowns)
   app.get("/api/agency/staff", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
+      // SuperAdmin users can view all staff across all agencies
+      if (req.user!.isSuperAdmin) {
+        const staff = await storage.getAllStaff();
+        const staffList = staff.map(s => ({ id: s.id, name: s.fullName }));
+        return res.json(staffList);
+      }
+
+      // Regular Admin users need an agency association
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Agency association required" });
       }

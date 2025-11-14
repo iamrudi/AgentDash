@@ -39,7 +39,10 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Analytics Dashboard**: GA4 and GSC metrics visualization.
 - **Performance Optimizations**: Server-side caching (in-memory, 1-hour TTL), aggregated API endpoints, frontend query optimization, table virtualization (`@tanstack/react-virtual`), code splitting, component memoization, and hover-based prefetching.
 - **Developer Tools**: In-memory runtime rate limiter toggle for testing and debugging.
-- **SuperAdmin Project Access**: SuperAdmin users can view all projects across all agencies without requiring an agencyId association. The `/api/agency/projects` endpoint automatically returns all projects for SuperAdmins while maintaining agency-scoped access for regular Admin users.
+- **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies without requiring an agencyId association:
+  - `/api/agency/projects` endpoint returns all projects for SuperAdmins
+  - `/api/agency/staff` endpoint returns all staff members for SuperAdmins (enables staff assignment to tasks)
+  - Existing middleware (`verifyClientAccess`, `verifyProjectAccess`, `verifyTaskAccess`) automatically grants SuperAdmins access to all client resources, projects, and tasks across agencies
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
