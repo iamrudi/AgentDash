@@ -37,6 +37,12 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Performance Optimizations**: Server-side caching, aggregated API endpoints, frontend query optimization, and component memoization.
 - **Task Lists & Hierarchical Tasks**: ClickUp-inspired flexible task hierarchy with robust CRUD operations and five-layer defense-in-depth security.
   - **Task List Management (Phase 2, Task 1 - Completed)**: Full CRUD operations for task lists with kanban layout, SuperAdmin authorization via project-to-agency join, defense-in-depth tenant isolation, and proper UI integration with create/edit dialogs. **Deferred**: Drag-and-drop list reordering (requires dnd-kit integration).
+  - **Enhanced Task Detail Dialog (Completed)**: Full-featured modal with URL deep linking, tabbed interface (Details/Subtasks/Activity), inline editing for all task properties (status, priority, dates, assignees, description), and comprehensive testing coverage.
+  - **Subtask Management (Completed)**: Complete parent-child task hierarchy with:
+    - **Backend**: GET `/api/agency/tasks/:taskId/subtasks` for fetching, POST `/api/tasks/:taskId/subtasks` for creation with Staff access, auto-assignment of creator via idempotent `onConflictDoNothing`, and inheritance of parent's projectId/listId.
+    - **Frontend**: Visual hierarchy indicators (CornerDownRight icon, "Subtask" label, lighter background), checkbox toggles for quick status changes, create form with Enter key support, and proper loading/empty states.
+    - **Security**: Staff can only create subtasks for tasks they're assigned to; tenant isolation via `requireTaskAccess` middleware; null-safe profile handling in storage layer.
+    - **Deferred**: Full inline editing for subtasks, delete functionality, drag-and-drop reordering.
 - **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies, including task lists and tasks.
 
 ### Feature Specifications
