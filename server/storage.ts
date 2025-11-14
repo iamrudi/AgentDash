@@ -125,11 +125,11 @@ export interface IStorage {
   updateProject(id: string, data: Partial<Project>): Promise<Project>;
   
   // Task Lists
-  getTaskListById(id: string): Promise<TaskList | undefined>;
-  getTaskListsByProjectId(projectId: string): Promise<TaskList[]>;
+  getTaskListById(id: string, agencyId?: string): Promise<TaskList | undefined>;
+  getTaskListsByProjectId(projectId: string, agencyId?: string): Promise<TaskList[]>;
   createTaskList(taskList: InsertTaskList): Promise<TaskList>;
-  updateTaskList(id: string, data: Partial<TaskList>): Promise<TaskList>;
-  deleteTaskList(id: string): Promise<void>;
+  updateTaskList(id: string, data: Partial<TaskList>, agencyId?: string): Promise<TaskList>;
+  deleteTaskList(id: string, agencyId?: string): Promise<void>;
   
   // Tasks
   getTaskById(id: string): Promise<Task | undefined>;
@@ -615,6 +615,94 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  // Task Lists
+  async getTaskListById(id: string, agencyId?: string): Promise<TaskList | undefined> {
+    if (agencyId) {
+      // Enforce tenant isolation: verify list belongs to agency
+      const result = await db.select().from(taskLists)
+        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
+        .limit(1);
+      return result[0];
+    }
+    // SuperAdmin path (no agencyId) - access any list
+    const result = await db.select().from(taskLists).where(eq(taskLists.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTaskListsByProjectId(projectId: string, agencyId?: string): Promise<TaskList[]> {
+    if (agencyId) {
+      // Enforce tenant isolation: verify lists belong to agency's project
+      return await db.select().from(taskLists)
+        .where(and(eq(taskLists.projectId, projectId), eq(taskLists.agencyId, agencyId)))
+        .orderBy(desc(taskLists.createdAt));
+    }
+    // SuperAdmin path - get all lists for project
+    return await db.select().from(taskLists)
+      .where(eq(taskLists.projectId, projectId))
+      .orderBy(desc(taskLists.createdAt));
+  }
+
+  async createTaskList(taskList: InsertTaskList): Promise<TaskList> {
+    const result = await db.insert(taskLists).values(taskList).returning();
+    return result[0];
+  }
+
+  async updateTaskList(id: string, data: Partial<TaskList>, agencyId?: string): Promise<TaskList> {
+    // SECURITY: Sanitize update payload - prevent tampering with immutable/audit fields
+    const { id: _id, agencyId: _agencyId, projectId: _projectId, createdAt: _createdAt, updatedAt: _updatedAt, ...sanitizedData } = data as any;
+    
+    if (agencyId) {
+      // Enforce tenant isolation: update only if list belongs to agency
+      const result = await db.update(taskLists)
+        .set(sanitizedData)
+        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
+        .returning();
+      
+      // Throw if no rows affected (list not found or wrong agency)
+      if (!result || result.length === 0) {
+        throw new Error(`Task list ${id} not found or access denied`);
+      }
+      
+      return result[0];
+    }
+    
+    // SuperAdmin path - update any list
+    const result = await db.update(taskLists)
+      .set(sanitizedData)
+      .where(eq(taskLists.id, id))
+      .returning();
+    
+    if (!result || result.length === 0) {
+      throw new Error(`Task list ${id} not found`);
+    }
+    
+    return result[0];
+  }
+
+  async deleteTaskList(id: string, agencyId?: string): Promise<void> {
+    if (agencyId) {
+      // Enforce tenant isolation: delete only if list belongs to agency
+      // CASCADE will handle task deletion via foreign key constraint
+      const result = await db.delete(taskLists)
+        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
+        .returning();
+      
+      // Throw if no rows affected (list not found or wrong agency)
+      if (!result || result.length === 0) {
+        throw new Error(`Task list ${id} not found or access denied`);
+      }
+    } else {
+      // SuperAdmin path - delete any list
+      const result = await db.delete(taskLists)
+        .where(eq(taskLists.id, id))
+        .returning();
+      
+      if (!result || result.length === 0) {
+        throw new Error(`Task list ${id} not found`);
+      }
+    }
+  }
+
   // Tasks
   async getTaskById(id: string): Promise<Task | undefined> {
     const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
@@ -623,6 +711,10 @@ export class DbStorage implements IStorage {
 
   async getTasksByProjectId(projectId: string): Promise<Task[]> {
     return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.createdAt));
+  }
+
+  async getTasksByListId(listId: string): Promise<Task[]> {
+    return await db.select().from(tasks).where(eq(tasks.listId, listId)).orderBy(desc(tasks.createdAt));
   }
 
   async getTasksByStaffId(staffProfileId: string): Promise<Task[]> {

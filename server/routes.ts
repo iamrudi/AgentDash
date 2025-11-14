@@ -903,7 +903,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get task lists for a project
   app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
-      const taskLists = await storage.getTaskListsByProjectId(req.params.projectId);
+      const taskLists = await storage.getTaskListsByProjectId(req.params.projectId, req.user!.agencyId);
       res.json(taskLists);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -946,31 +946,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Agency association required" });
       }
 
-      // CRITICAL: Verify ownership before mutating
-      const existingList = await storage.getTaskListById(req.params.id);
-      if (!existingList) {
-        return res.status(404).json({ message: "Task list not found" });
-      }
-      
-      if (existingList.agencyId !== req.user!.agencyId) {
-        return res.status(403).json({ message: "Cannot update task list from another agency" });
-      }
-
-      // Reject any agencyId modification attempts
-      if (req.body.agencyId && req.body.agencyId !== req.user!.agencyId) {
-        return res.status(403).json({ message: "Cannot change task list agency" });
-      }
-
       const { insertTaskListSchema } = await import("@shared/schema");
       const updateData = insertTaskListSchema.partial().parse(req.body);
-      const updatedTaskList = await storage.updateTaskList(req.params.id, updateData);
+      const updatedTaskList = await storage.updateTaskList(req.params.id, updateData, req.user!.agencyId);
 
       res.json(updatedTaskList);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
-      res.status(500).json({ message: error.message });
+      // Map storage errors to proper HTTP codes (not found vs access denied)
+      if (error.message?.includes('not found or access denied')) {
+        return res.status(404).json({ message: "Task list not found" });
+      }
+      res.status(500).json({ message: "Failed to update task list" });
     }
   });
 
@@ -981,20 +970,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Agency association required" });
       }
 
-      // CRITICAL: Verify ownership before deleting
-      const existingList = await storage.getTaskListById(req.params.id);
-      if (!existingList) {
-        return res.status(404).json({ message: "Task list not found" });
-      }
-      
-      if (existingList.agencyId !== req.user!.agencyId) {
-        return res.status(403).json({ message: "Cannot delete task list from another agency" });
-      }
-
-      await storage.deleteTaskList(req.params.id);
+      await storage.deleteTaskList(req.params.id, req.user!.agencyId);
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      // Map storage errors to proper HTTP codes
+      if (error.message?.includes('not found or access denied')) {
+        return res.status(404).json({ message: "Task list not found" });
+      }
+      res.status(500).json({ message: "Failed to delete task list" });
     }
   });
 

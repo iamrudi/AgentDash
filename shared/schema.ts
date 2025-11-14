@@ -128,7 +128,7 @@ export const tasks = pgTable("tasks", {
   startDate: timestamp("start_date"), // Start date for calendar view
   dueDate: date("due_date"), // Due date
   priority: text("priority").default("Medium"), // 'Low', 'Medium', 'High', 'Urgent'
-  listId: uuid("list_id").notNull().references(() => taskLists.id, { onDelete: "cascade" }), // REQUIRED: Task MUST belong to a list
+  listId: uuid("list_id").references(() => taskLists.id, { onDelete: "cascade" }), // NULLABLE TEMPORARILY: Will be enforced after backfill migration
   parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
   initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
