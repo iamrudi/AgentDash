@@ -1033,6 +1033,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get subtasks by parent task ID
+  app.get("/api/agency/tasks/:taskId/subtasks", requireAuth, requireRole("Admin", "Staff", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const subtasks = await storage.getSubtasksByParentId(req.params.taskId);
+      res.json(subtasks);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new task
   app.post("/api/agency/tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
@@ -1362,6 +1372,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       res.json(tasksWithProjects);
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create subtask (Staff can create subtasks for tasks they're assigned to)
+  app.post("/api/tasks/:taskId/subtasks", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      
+      // Get current user's profile
+      const profile = await storage.getProfileById(req.user!.id);
+      if (!profile) {
+        return res.status(403).json({ message: "Profile not found" });
+      }
+      
+      // For Staff users, verify they're assigned to the parent task
+      if (req.user!.role === "Staff") {
+        const assignments = await storage.getAssignmentsByTaskId(taskId);
+        const isAssigned = assignments.some(a => a.staffProfileId === profile.id);
+        
+        if (!isAssigned) {
+          return res.status(403).json({ message: "Not assigned to parent task" });
+        }
+      }
+
+      // Get parent task to inherit projectId and listId
+      const parentTask = await storage.getTaskById(taskId);
+      if (!parentTask) {
+        return res.status(404).json({ message: "Parent task not found" });
+      }
+
+      // Validate and create subtask
+      const { insertTaskSchema } = await import("@shared/schema");
+      const subtaskData = insertTaskSchema.parse({
+        ...req.body,
+        parentId: taskId,
+        projectId: parentTask.projectId,
+        listId: parentTask.listId,
+      });
+      
+      const newSubtask = await storage.createTask(subtaskData);
+
+      // Auto-assign the creating user to the subtask (so they can edit/toggle it)
+      if (req.user!.role === "Staff" || req.user!.role === "Admin") {
+        await storage.createStaffAssignment({
+          taskId: newSubtask.id,
+          staffProfileId: profile.id,
+        });
+      }
+
+      res.status(201).json(newSubtask);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       res.status(500).json({ message: error.message });
     }
   });

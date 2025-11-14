@@ -140,6 +140,7 @@ export interface IStorage {
   getTasksByProjectId(projectId: string): Promise<Task[]>;
   getTasksByListId(listId: string): Promise<Task[]>;
   getTasksByStaffId(staffProfileId: string): Promise<Task[]>;
+  getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>>;
   getAllTasks(): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task>;
@@ -748,6 +749,43 @@ export class DbStorage implements IStorage {
     if (taskIds.length === 0) return [];
     
     return await db.select().from(tasks).where(eq(tasks.id, taskIds[0])).orderBy(desc(tasks.createdAt));
+  }
+
+  async getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>> {
+    // Fetch all subtasks for the parent task
+    const subtasks = await db.select().from(tasks).where(eq(tasks.parentId, parentId));
+    
+    // Fetch assignments and staff profiles for each subtask
+    const subtasksWithAssignments = await Promise.all(
+      subtasks.map(async (subtask) => {
+        const assignments = await db
+          .select({
+            id: staffAssignments.id,
+            taskId: staffAssignments.taskId,
+            staffProfileId: staffAssignments.staffProfileId,
+            createdAt: staffAssignments.createdAt,
+            staffProfile: profiles,
+          })
+          .from(staffAssignments)
+          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
+          .where(eq(staffAssignments.taskId, subtask.id));
+
+        return {
+          ...subtask,
+          assignments: assignments
+            .filter((a) => a.staffProfile !== null)
+            .map((a) => ({
+              id: a.id,
+              taskId: a.taskId,
+              staffProfileId: a.staffProfileId,
+              createdAt: a.createdAt,
+              staffProfile: a.staffProfile as Profile,
+            })),
+        };
+      })
+    );
+
+    return subtasksWithAssignments;
   }
 
   async getAllTasks(agencyId?: string): Promise<Task[]> {

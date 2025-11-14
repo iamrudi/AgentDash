@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Trash2, X } from "lucide-react";
+import { Trash2, X, Plus, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,9 +10,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +72,15 @@ export function TaskDetailDialog({
     enabled: open,
   });
 
+  // Fetch subtasks
+  const { data: subtasks = [], isLoading: subtasksLoading } = useQuery<TaskWithAssignments[]>({
+    queryKey: ["/api/agency/tasks", task?.id, "subtasks"],
+    enabled: open && !!task?.id,
+  });
+
+  // State for new subtask form
+  const [newSubtaskDescription, setNewSubtaskDescription] = useState("");
+
   // Update description mutation
   const updateDescriptionMutation = useMutation({
     mutationFn: async (newDescription: string) => {
@@ -107,6 +118,55 @@ export function TaskDetailDialog({
         description: "Task deleted",
       });
       onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create subtask mutation (uses Staff-accessible endpoint)
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (description: string) => {
+      if (!task) throw new Error("No parent task");
+      return await apiRequest("POST", `/api/tasks/${task.id}/subtasks`, {
+        description,
+        status: "To Do",
+        priority: "Medium",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/tasks", task?.id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+      setNewSubtaskDescription("");
+      toast({
+        title: "Subtask created",
+        description: "New subtask has been added.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle subtask status mutation (uses Staff-accessible endpoint)
+  const toggleSubtaskStatusMutation = useMutation({
+    mutationFn: async ({ subtaskId, currentStatus }: { subtaskId: string; currentStatus: string }) => {
+      const newStatus = currentStatus === "Completed" ? "To Do" : "Completed";
+      return await apiRequest("PATCH", `/api/tasks/${subtaskId}`, {
+        status: newStatus,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/tasks", task?.id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
     },
     onError: (error: Error) => {
       toast({
@@ -272,9 +332,91 @@ export function TaskDetailDialog({
                 </div>
               </TabsContent>
 
-              <TabsContent value="subtasks" className="p-6 m-0">
-                <div className="flex items-center justify-center h-64 text-muted-foreground">
-                  <p>Subtask management coming soon...</p>
+              <TabsContent value="subtasks" className="p-6 m-0 space-y-4">
+                {/* Create subtask form */}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Add a subtask..."
+                    value={newSubtaskDescription}
+                    onChange={(e) => setNewSubtaskDescription(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newSubtaskDescription.trim()) {
+                        createSubtaskMutation.mutate(newSubtaskDescription);
+                      }
+                    }}
+                    disabled={createSubtaskMutation.isPending}
+                    data-testid="input-new-subtask"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (newSubtaskDescription.trim()) {
+                        createSubtaskMutation.mutate(newSubtaskDescription);
+                      }
+                    }}
+                    disabled={!newSubtaskDescription.trim() || createSubtaskMutation.isPending}
+                    data-testid="button-create-subtask"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Subtask list */}
+                <div className="space-y-2">
+                  {subtasksLoading ? (
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      Loading subtasks...
+                    </div>
+                  ) : subtasks.length === 0 ? (
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      No subtasks yet. Add one above to get started.
+                    </div>
+                  ) : (
+                    subtasks.map((subtask) => (
+                      <div
+                        key={subtask.id}
+                        className="flex items-start gap-3 p-3 rounded-md border bg-card hover-elevate"
+                        data-testid={`subtask-item-${subtask.id}`}
+                      >
+                        <Checkbox
+                          checked={subtask.status === "Completed"}
+                          onCheckedChange={() =>
+                            toggleSubtaskStatusMutation.mutate({
+                              subtaskId: subtask.id,
+                              currentStatus: subtask.status,
+                            })
+                          }
+                          disabled={toggleSubtaskStatusMutation.isPending}
+                          data-testid={`checkbox-subtask-${subtask.id}`}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className={`text-sm ${
+                              subtask.status === "Completed"
+                                ? "line-through text-muted-foreground"
+                                : ""
+                            }`}
+                            data-testid={`text-subtask-description-${subtask.id}`}
+                          >
+                            {subtask.description}
+                          </p>
+                          {subtask.assignments.length > 0 && (
+                            <div className="flex items-center gap-1 mt-1">
+                              {subtask.assignments.slice(0, 3).map((assignment) => (
+                                <span
+                                  key={assignment.id}
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  {assignment.staffProfile.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </TabsContent>
 
