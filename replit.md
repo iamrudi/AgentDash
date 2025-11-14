@@ -11,68 +11,56 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 
 ### UI/UX Decisions
 - **Frontend Framework**: React 18 with Wouter for routing and TanStack Query for state management.
-- **Design System**: macOS-inspired aesthetic (Apple Blue primary color, San Francisco font, macOS standard border-radius) with Tailwind CSS and Shadcn/UI for styling, supporting dark mode and mobile-first responsiveness.
+- **Design System**: macOS-inspired aesthetic with Tailwind CSS and Shadcn/UI for styling, supporting dark mode and mobile-first responsiveness.
 - **Icons**: Lucide React for consistent line-art styling.
 - **Navigation**: Collapsible sidebar with icon-only mode and portal-specific branding.
-- **Mobile Responsiveness**: 
-  - Sidebar renders as Sheet overlay on mobile (<768px) with auto-close on navigation
-  - Touch targets meet WCAG AA standards (44x44px minimum)
-  - useIsMobile hook with lazy initialization for accurate viewport detection
-  - Responsive touch-friendly navigation with proper dismissal UX
+- **Mobile Responsiveness**: Comprehensive support with touch targets meeting WCAG AA standards.
 
 ### Technical Implementations
-- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation. Agency ID and role stored in secure `app_metadata` (immutable by users). OAuth race condition resolved at root cause via stateless authentication - agencyId always available in token. AuthProvider `authReady` flag provides additional safety layer. Backward compatible fallback to profile table for legacy users. SuperAdmin role with cross-agency access: `is_super_admin` flag stored in both profiles table and Supabase app_metadata for stateless JWT auth. SuperAdmin users can create users/clients for any agency via agency selector in creation forms.
-- **Atomic Transaction Enforcement**: **CRITICAL ARCHITECTURAL PRINCIPLE** - All operations modifying multiple data stores (especially Supabase Auth + Postgres) MUST enforce atomicity through `db.transaction()` with explicit verification and rollback mechanisms. Every database mutation inside a transaction MUST use `.returning()` to retrieve the affected row, verify the row exists and values are correct, and throw `Error()` on verification failure to trigger automatic rollback. This prevents silent failures and ensures data consistency across Supabase Auth and database operations. Applied to all critical functions: `promoteUserToSuperAdmin`, `updateUserRole`, `updateUserEmail`, and `provisionUser` (server/lib/supabase-auth.ts and server/lib/user-provisioning.ts).
-- **Orphaned User Prevention**: Production-ready compensation-based transaction system preventing orphaned Supabase Auth users. Centralized `userProvisioningService` (server/lib/user-provisioning.ts) with fail-fast email validation (checks profiles table first, then paginates through ALL Supabase Auth users), atomic database transactions (profile + client inserts with explicit verification), and automatic rollback compensation (deletes auth user if DB operations fail). Nightly cron job (2:00 AM) detects and cleans up any orphaned users via pagination-aware batch processing. All 4 user creation routes refactored to use unified provisioning service. Comprehensive logging with prefixed tags for debugging and audit trails.
-- **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies and a `auth.get_agency_id()` helper.
+- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation, including a SuperAdmin role with cross-agency access.
+- **Atomic Transaction Enforcement**: Critical principle for all operations modifying multiple data stores, using `db.transaction()` with explicit verification and rollback.
+- **Orphaned User Prevention**: Compensation-based transaction system and nightly cron job for cleanup of Supabase Auth users.
+- **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies.
 - **Forms**: React Hook Form with Zod validation.
-- **Notifications**: Unified notification center with real-time updates and toast notifications.
+- **Notifications**: Unified notification center with real-time updates.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
-- **OAuth Reliability**: Production-ready error handling, reserve-and-release rate limiting, and retry logic with exponential backoff for Google API calls. Context-aware OAuth redirects with secure `returnTo` validation (prevents open redirect vulnerabilities).
-- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture (OpenAI or Gemini) for strategic initiatives and task lists based on real-time connection status, competitor analysis, HubSpot CRM data, and LinkedIn social metrics. Agency-level provider preference stored in database with in-app settings UI toggle. Falls back to AI_PROVIDER environment variable if not set. Provider selection cached per agency for performance. Automatically incorporates HubSpot contacts, deals, and companies data plus LinkedIn engagement metrics when configured.
+- **OAuth Reliability**: Production-ready error handling, rate limiting, and retry logic for Google API calls, with secure context-aware redirects.
+- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture for strategic initiatives and task lists, incorporating CRM and social metrics.
 - **Client Strategy Card**: AI-powered consolidated client view.
-- **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events sync between client.leadEvents and integration.ga4LeadEventName to ensure conversion tracking works correctly across all update paths.
+- **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events.
 - **Trash System**: Soft delete for strategic initiatives with 30-day retention.
 - **Invoice Automation**: Node-cron for retainers and Puppeteer for PDF generation.
-- **Proposal PDF Export**: Secure browser-native PDF printing with short-lived token system (64-char hex, 5-minute TTL, single-use), tenant isolation validation, and token masking in logs.
-- **Client-to-Account Manager Chat**: Real-time messaging with Server-Sent Events (SSE), multi-tenant filtering, and AI-powered conversation analysis.
-- **Chat with your Data**: AI-powered analytics data querying and recommendation generation.
+- **Proposal PDF Export**: Secure browser-native PDF printing with short-lived tokens and tenant isolation.
+- **Client-to-Account Manager Chat**: Real-time messaging with Server-Sent Events (SSE) and AI-powered conversation analysis.
+- **Chat with your Data**: AI-powered analytics data querying.
 - **Analytics Dashboard**: GA4 and GSC metrics visualization.
-- **Performance Optimizations**: Server-side caching (in-memory, 1-hour TTL), aggregated API endpoints, frontend query optimization, table virtualization (`@tanstack/react-virtual`), code splitting, component memoization, and hover-based prefetching.
-- **Developer Tools**: In-memory runtime rate limiter toggle for testing and debugging.
-- **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies without requiring an agencyId association:
-  - `/api/agency/projects` endpoint returns all projects for SuperAdmins
-  - `/api/agency/staff` endpoint returns all staff members for SuperAdmins (enables staff assignment to tasks)
-  - Existing middleware (`verifyClientAccess`, `verifyProjectAccess`, `verifyTaskAccess`) automatically grants SuperAdmins access to all client resources, projects, and tasks across agencies
+- **Performance Optimizations**: Server-side caching, aggregated API endpoints, frontend query optimization, and component memoization.
+- **Task Lists & Hierarchical Tasks**: ClickUp-inspired flexible task hierarchy with robust CRUD operations and five-layer defense-in-depth security.
+- **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies.
 
 ### Feature Specifications
 - **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, and AI Provider Settings. Full CRM system available at agency level for managing Companies, Contacts, Deals, Forms, and Proposals.
+- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, AI Provider Settings, and a full CRM system.
 - **Staff Portal**: View and update assigned tasks.
-- **SuperAdmin Portal**: Platform-wide user and agency management with comprehensive audit logging, cross-tenant data access, and client deletion capabilities. SuperAdmin users see agency selector dropdown in user/client creation forms (with frontend validation requiring selection), enabling cross-agency user management. **User Credential Management**: Email and password updates with strong validation (12+ character passwords with complexity requirements) and enhanced audit logging that captures old/new email values. **User Promotion to SuperAdmin**: Ability to promote Admin/Staff users to SuperAdmin role with eligibility validation, transactional database updates, Supabase Auth app_metadata synchronization, automatic rollback on failure, and comprehensive audit logging (see `promoteUserToSuperAdmin` in server/lib/supabase-auth.ts). **User Role Management & SuperAdmin Demotion**: Comprehensive role change system with `updateUserRole` function supporting role changes including SuperAdmin demotion. Features transaction-safe row locking (SELECT FOR UPDATE) preventing race conditions on concurrent demotions, last SuperAdmin protection ensuring at least one SuperAdmin always exists, Client → SuperAdmin bypass prevention (must be Staff/Admin first), strict agency validation requiring all non-SuperAdmin roles to have valid agencyId for tenant isolation, database transaction execution before Supabase Auth updates with automatic rollback on failure, and comprehensive audit logging of old/new role/agency state (see `updateUserRole` in server/lib/supabase-auth.ts and PATCH `/api/superadmin/users/:userId/role`).
-- **Strategic Initiative Workflow**: A defined lifecycle from `Needs Review` to `Measured`.
+- **SuperAdmin Portal**: Platform-wide user and agency management, including user credential management, promotion/demotion to SuperAdmin, and comprehensive audit logging.
+- **Strategic Initiative Workflow**: Defined lifecycle from `Needs Review` to `Measured`.
 - **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
-- **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data. Enriches AI recommendations with real-time CRM insights for sales pipeline analysis, lead nurturing, and conversion optimization.
-- **LinkedIn Integration**: Agency-wide social media integration for organization page metrics and post engagement data. Enriches AI recommendations with social selling strategies, thought leadership insights, and professional network growth tactics.
-- **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules at agency level, including CRUD operations and multi-layer tenant isolation.
-- **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints for submissions, auto-creation of CRM records, honeypot bot detection, embed options, API documentation, and automatic production URL adaptation (uses VITE_PUBLIC_URL env variable or falls back to current domain).
-- **AI-Powered Proposal Builder**: Professional proposal creation tool with reusable templates, AI content generation (Gemini AI), merge tags, Markdown support, integration with CRM deals, workflow states, and secure PDF export.
+- **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data.
+- **LinkedIn Integration**: Agency-wide social media integration for organization page metrics.
+- **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules.
+- **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints, and CRM integration.
+- **AI-Powered Proposal Builder**: Professional proposal creation tool with AI content generation, templates, and secure PDF export.
 
 ### System Design Choices
-- **Multi-tenancy**: Achieved through a three-layer approach: Application Layer middleware, Database Layer (Postgres RLS), and Resource-Level Protection on routes.
+- **Multi-tenancy**: Achieved through Application Layer middleware, Database Layer (Postgres RLS), and Resource-Level Protection on routes.
 - **API Structure**: RESTful endpoints with role-based access.
 - **Project Structure**: Separate frontend, backend, and shared codebases.
-- **Production Readiness**: All critical security issues resolved, including tenant isolation middleware, staff authorization fixes, and robust JWT secret security.
 
 ## External Dependencies
 - **Database**: PostgreSQL (via Supabase)
 - **Authentication**: Supabase Auth
 - **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
-- **OAuth Integrations**: Google OAuth (for GA4, Google Search Console), HubSpot (CRM data integration via API token), LinkedIn (social media metrics via API token)
-- **AI Services**: Pluggable AI provider system supporting:
-  - Google Gemini AI (gemini-2.5-pro, gemini-2.5-flash) - Default
-  - OpenAI (gpt-4o, gpt-4o-mini)
-  - Configured per-agency via Settings UI or globally via `AI_PROVIDER` environment variable (values: "gemini" or "openai")
-  - Agency preferences stored in `agency_settings` table with cache invalidation
+- **OAuth Integrations**: Google OAuth (GA4, Google Search Console), HubSpot (CRM data), LinkedIn (social media metrics)
+- **AI Services**: Pluggable provider system supporting Google Gemini AI (default) and OpenAI.
 - **PDF Generation**: Puppeteer
 - **Scheduling**: `node-cron`
