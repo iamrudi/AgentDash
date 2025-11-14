@@ -120,7 +120,7 @@ export interface IStorage {
   // Projects
   getProjectById(id: string): Promise<Project | undefined>;
   getProjectsByClientId(clientId: string): Promise<Project[]>;
-  getAllProjects(): Promise<Project[]>;
+  getAllProjects(agencyId?: string): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<Project>): Promise<Project>;
   

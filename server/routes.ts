@@ -866,6 +866,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
+      // SuperAdmin users can view all projects across all agencies
+      if (req.user!.isSuperAdmin) {
+        const allProjects = await storage.getAllProjects();
+        return res.json(allProjects);
+      }
+
+      // Regular Admin users need an agency association
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Agency association required" });
       }
