@@ -247,39 +247,41 @@ export async function promoteUserToSuperAdmin(userId: string): Promise<Profile> 
 
   console.log('[PROMOTE_SUPERADMIN] Supabase Auth updated successfully', { userId });
 
-  // 5. Update profiles table in transaction (future-proof for multi-step DB updates)
+  // 5. Update profiles table in transaction with explicit verification
   try {
-    await db.transaction(async (tx) => {
-      await tx.update(profiles)
+    const updatedProfile = await db.transaction(async (tx) => {
+      // Update and return the modified row to verify success
+      const [updated] = await tx.update(profiles)
         .set({
           role: 'SuperAdmin',
           isSuperAdmin: true,
           agencyId: null // Clear agency association
         })
-        .where(eq(profiles.id, userId));
+        .where(eq(profiles.id, userId))
+        .returning(); // CRITICAL: Get the updated row back
       
-      // Future: Add additional cleanup steps here (e.g., clearing agency-scoped relations)
+      // CRITICAL: Verify the update actually happened
+      if (!updated) {
+        throw new Error('Database update failed - no rows were affected. Transaction will be rolled back.');
+      }
+      
+      // Verify the values are correct
+      if (updated.role !== 'SuperAdmin' || !updated.isSuperAdmin || updated.agencyId !== null) {
+        throw new Error(`Database update verification failed - values not set correctly. Transaction will be rolled back.`);
+      }
+      
+      return updated;
     });
 
+    // 6. Log success ONLY after transaction commits and verification passes
     console.log('[PROMOTE_SUPERADMIN] Promotion successful', {
       userId,
       email: profile.email,
       oldRole: oldState.role,
-      newRole: 'SuperAdmin',
+      newRole: updatedProfile.role,
       oldAgencyId: oldState.agencyId,
-      newAgencyId: null
+      newAgencyId: updatedProfile.agencyId
     });
-
-    // 6. Fetch and return updated profile
-    const [updatedProfile] = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, userId))
-      .limit(1);
-
-    if (!updatedProfile) {
-      throw new Error('Failed to fetch updated profile');
-    }
 
     return updatedProfile;
   } catch (dbError: any) {
