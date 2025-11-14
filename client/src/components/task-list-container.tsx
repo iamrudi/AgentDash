@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, GripVertical, UserPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, GripVertical } from "lucide-react";
 import { format } from "date-fns";
 import type { Task, TaskList, Profile, StaffAssignment } from "@shared/schema";
-import { TaskStatusControl, TaskPriorityControl } from "./task-inline-editors";
+import { TaskStatusControl, TaskPriorityControl, TaskDateControl, TaskAssigneesControl } from "./task-inline-editors";
 
 type TaskWithAssignments = Task & {
   assignments: Array<StaffAssignment & { staffProfile: Profile }>;
@@ -124,38 +124,28 @@ export function TaskListContainer({
                       />
                     </div>
                     
-                    {task.dueDate && (
-                      <p className="text-xs text-muted-foreground" data-testid={`text-task-due-${task.id}`}>
-                        Due: {format(new Date(task.dueDate), "MMM d, yyyy")}
-                      </p>
-                    )}
-
-                    {task.assignments && task.assignments.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {task.assignments.map(assignment => (
-                          <Badge
-                            key={assignment.id}
-                            variant="outline"
-                            className="text-xs"
-                            data-testid={`badge-assigned-${assignment.staffProfile.id}`}
-                          >
-                            {assignment.staffProfile.fullName}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <TaskDateControl 
+                        task={task} 
+                        projectId={projectId}
+                        dateType="startDate"
+                        label="Start"
+                      />
+                      <TaskDateControl 
+                        task={task} 
+                        projectId={projectId}
+                        dateType="dueDate"
+                        label="Due"
+                      />
+                      <TaskAssigneesControl 
+                        task={task}
+                        projectId={projectId}
+                        onAssignStaff={() => onAssignStaff(task)}
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1">
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => onAssignStaff(task)}
-                      data-testid={`button-assign-staff-${task.id}`}
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                    </Button>
                     <Button 
                       variant="ghost" 
                       size="icon"

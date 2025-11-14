@@ -220,20 +220,9 @@ export function TaskDateControl({ task, projectId, dateType, label }: TaskDateCo
       });
     },
     onMutate: async (newDate) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
-      const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
-
-      queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks?.map((t: Task) =>
-            t.id === task.id ? { ...t, [dateType]: newDate ? newDate.toISOString() : null } : t
-          ),
-        };
+      return await updateProjectTaskField(projectId, task.id, {
+        [dateType]: newDate ? newDate.toISOString() : null
       });
-
-      return { previousData };
     },
     onError: (error: Error, _newDate, context) => {
       if (context?.previousData) {
