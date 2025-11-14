@@ -108,17 +108,34 @@ export const projects = pgTable("projects", {
   clientIdIdx: index("projects_client_id_idx").on(table.clientId),
 }));
 
-// TASKS
+// TASK LISTS (Projects > Task Lists > Tasks hierarchy)
+export const taskLists = pgTable("task_lists", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }), // For RLS tenant isolation
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdIdx: index("task_lists_project_id_idx").on(table.projectId),
+  agencyIdIdx: index("task_lists_agency_id_idx").on(table.agencyId),
+}));
+
+// TASKS (Now supports: Lists, Subtasks, Start Dates)
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   description: text("description").notNull(),
-  status: text("status").notNull(), // 'Pending', 'In Progress', 'Completed'
-  dueDate: date("due_date"),
-  priority: text("priority").default("Medium"), // 'High', 'Medium', 'Low'
-  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  status: text("status").notNull(), // 'To Do', 'In Progress', 'Completed', 'Blocked'
+  startDate: timestamp("start_date"), // Start date for calendar view
+  dueDate: date("due_date"), // Due date
+  priority: text("priority").default("Medium"), // 'Low', 'Medium', 'High', 'Urgent'
+  listId: uuid("list_id").notNull().references(() => taskLists.id, { onDelete: "cascade" }), // REQUIRED: Task MUST belong to a list
+  parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
   initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
+  listIdIdx: index("tasks_list_id_idx").on(table.listId),
+  parentIdIdx: index("tasks_parent_id_idx").on(table.parentId),
   projectIdIdx: index("tasks_project_id_idx").on(table.projectId),
 }));
 
@@ -516,6 +533,11 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   createdAt: true,
 });
 
+export const insertTaskListSchema = createInsertSchema(taskLists).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
@@ -685,6 +707,9 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 
+export type TaskList = typeof taskLists.$inferSelect;
+export type InsertTaskList = z.infer<typeof insertTaskListSchema>;
+
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 
@@ -777,12 +802,22 @@ export type UpdateUserPassword = z.infer<typeof updateUserPasswordSchema>;
 
 // Extended types for frontend use
 export type ProjectWithClient = Project & { client?: Client };
+export type ProjectWithLists = Project & { taskLists?: TaskList[] };
+export type TaskListWithTasks = TaskList & { tasks?: Task[] };
 export type TaskWithProject = Task & { project?: Project };
+export type TaskWithList = Task & { taskList?: TaskList };
+export type TaskWithSubtasks = Task & { subtasks?: Task[] };
+export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };
+export type TaskWithDetails = Task & { 
+  taskList?: TaskList; 
+  project?: Project; 
+  assignments?: StaffAssignment[];
+  subtasks?: Task[];
+};
 export type InvoiceWithClient = Invoice & { client?: Client };
 export type InvoiceWithLineItems = Invoice & { lineItems?: InvoiceLineItem[] };
 export type InvoiceWithClientAndLineItems = Invoice & { client?: Client; lineItems?: InvoiceLineItem[] };
 export type InitiativeWithClient = Initiative & { client?: Client };
-export type TaskWithAssignments = Task & { assignments?: StaffAssignment[] };
 export type CompanyWithContacts = Company & { contacts?: Contact[] };
 export type DealWithContact = Deal & { contact?: Contact };
 export type DealWithCompany = Deal & { company?: Company };

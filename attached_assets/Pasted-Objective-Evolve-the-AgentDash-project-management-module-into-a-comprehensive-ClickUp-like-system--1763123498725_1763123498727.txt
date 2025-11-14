@@ -1,0 +1,98 @@
+Objective: Evolve the AgentDash project management module into a comprehensive, ClickUp-like system. This includes implementing a flexible data hierarchy, multiple data views (List, Board, Calendar), and rich task properties.
+
+Core Requirements:
+
+Flexible Hierarchy: Implement a Projects > Task Lists > Tasks > Subtasks structure.
+
+Rich Properties: Tasks must support Status (e.g., 'To Do', 'In Progress'), Priority (e.g., 'Low', 'High'), Start Date, Due Date, and multiple Assignees.
+
+Multiple Views: The same data must be viewable as a List, a Board (Kanban), and a Calendar.
+
+Atomicity & Security: All database operations must be atomic, using Drizzle transactions to ensure data integrity on Supabase. All new tables and modified endpoints must be protected by our existing RLS and tenant-isolation framework (agencyId checks).
+
+Role-Based Dashboards: The new system must feed data to both the Agency Dashboard (high-level, macro view) and the Staff Dashboard (a filtered "My Tasks" micro view).
+
+Implementation Plan:
+Phase 1: Database Schema & Backend API (The Foundation)
+Modify shared/schema.ts:
+
+tasks Table:
+
+Add status (text enum), priority (text enum), startDate (timestamp, nullable), dueDate (timestamp, nullable).
+
+Add parentId (self-referencing UUID foreign key to tasks.id) for subtasks.
+
+Add listId (UUID foreign key) to link to taskLists.
+
+Remove the direct projectId foreign key.
+
+New Table: taskLists:
+
+Create taskLists table with id, name, projectId (foreign key to projects), and agencyId (for RLS).
+
+New Table: taskAssignees:
+
+Create a many-to-many join table taskAssignees with taskId (foreign key to tasks) and userId (foreign key to users).
+
+Apply Row-Level Security (RLS):
+
+Implement strict RLS policies on taskLists and taskAssignees based on auth.get_agency_id().
+
+Update all RLS policies for tasks and projects to reflect the new hierarchy, ensuring tenant isolation is perfectly maintained.
+
+Refactor Backend API (server/routes.ts):
+
+Update all task and project CRUD endpoints to support the new schema.
+
+Critically: Wrap all complex database writes (e.g., creating a task with subtasks and assignees) in db.transaction(async (tx) => { ... }) blocks to guarantee atomicity.
+
+Create a new dedicated endpoint to fetch "My Tasks" for the Staff dashboard (joins tasks and taskAssignees on the current user's ID).
+
+Run Migrations: Generate and apply the Drizzle migration.
+
+Phase 2: Core UI Refactor (List View & Modals)
+Refactor Modals:
+
+Update client/src/components/create-task-dialog.tsx and edit-task-dialog.tsx.
+
+Add new form fields using Shadcn/UI components: Select for status/priority, Calendar (in a Popover) for dates, and a Combobox (multi-select) for assignees.
+
+Update Sidebar:
+
+Modify client/src/components/agency-sidebar.tsx to fetch and display taskLists as a collapsible accordion under each Project.
+
+Implement "List" View:
+
+Upgrade client/src/pages/agency/tasks.tsx to be the primary "List" view. Use a Shadcn DataTable to display all new task properties.
+
+Update Dashboards:
+
+Modify client/src/pages/agency-dashboard.tsx to aggregate data from the new structure.
+
+Modify client/src/pages/staff-dashboard.tsx to primarily show the "My Tasks" component.
+
+Phase 3: Implement Board (Kanban) View
+Add Dependency: npm install @dnd-kit/core
+
+Create New Page: Create a new route and page (e.g., /agency/projects/:id/board).
+
+Build Board UI:
+
+Render columns dynamically based on the available status options.
+
+Use @dnd-kit/core to implement drag-and-drop functionality for tasks between columns.
+
+On drop, trigger an API call to update the task's status (this must be an atomic update).
+
+Phase 4: Implement Calendar View
+Add Dependency: npm install @fullcalendar/react @fullcalendar/daygrid @fullcalendar/timegrid @fullcalendar/interaction
+
+Create New Page: Create a new route and page (e.g., /agency/calendar).
+
+Build Calendar UI:
+
+Fetch all tasks (with startDate and dueDate) for the agency.
+
+Render them on the @fullcalendar/react component.
+
+Enable drag-and-drop resizing/moving to allow users to reschedule tasks, triggering an API call to update the task's dates.

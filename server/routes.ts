@@ -900,6 +900,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get task lists for a project
+  app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const taskLists = await storage.getTaskListsByProjectId(req.params.projectId);
+      res.json(taskLists);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new task list
+  app.post("/api/agency/task-lists", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      // CRITICAL: Enforce agencyId from auth context BEFORE validation
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // Reject any agencyId spoofing attempts
+      if (req.body.agencyId && req.body.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Cannot create task list for another agency" });
+      }
+
+      const { insertTaskListSchema } = await import("@shared/schema");
+      const taskListData = insertTaskListSchema.parse({
+        ...req.body,
+        agencyId: req.user!.agencyId // Force agencyId from auth context
+      });
+
+      const newTaskList = await storage.createTaskList(taskListData);
+      res.status(201).json(newTaskList);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Update task list
+  app.patch("/api/agency/task-lists/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // CRITICAL: Verify ownership before mutating
+      const existingList = await storage.getTaskListById(req.params.id);
+      if (!existingList) {
+        return res.status(404).json({ message: "Task list not found" });
+      }
+      
+      if (existingList.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Cannot update task list from another agency" });
+      }
+
+      // Reject any agencyId modification attempts
+      if (req.body.agencyId && req.body.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Cannot change task list agency" });
+      }
+
+      const { insertTaskListSchema } = await import("@shared/schema");
+      const updateData = insertTaskListSchema.partial().parse(req.body);
+      const updatedTaskList = await storage.updateTaskList(req.params.id, updateData);
+
+      res.json(updatedTaskList);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete task list
+  app.delete("/api/agency/task-lists/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // CRITICAL: Verify ownership before deleting
+      const existingList = await storage.getTaskListById(req.params.id);
+      if (!existingList) {
+        return res.status(404).json({ message: "Task list not found" });
+      }
+      
+      if (existingList.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Cannot delete task list from another agency" });
+      }
+
+      await storage.deleteTaskList(req.params.id);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get tasks for a task list
+  app.get("/api/agency/task-lists/:listId/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const tasks = await storage.getTasksByListId(req.params.listId);
+      res.json(tasks);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new task
   app.post("/api/agency/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {

@@ -124,9 +124,17 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<Project>): Promise<Project>;
   
+  // Task Lists
+  getTaskListById(id: string): Promise<TaskList | undefined>;
+  getTaskListsByProjectId(projectId: string): Promise<TaskList[]>;
+  createTaskList(taskList: InsertTaskList): Promise<TaskList>;
+  updateTaskList(id: string, data: Partial<TaskList>): Promise<TaskList>;
+  deleteTaskList(id: string): Promise<void>;
+  
   // Tasks
   getTaskById(id: string): Promise<Task | undefined>;
   getTasksByProjectId(projectId: string): Promise<Task[]>;
+  getTasksByListId(listId: string): Promise<Task[]>;
   getTasksByStaffId(staffProfileId: string): Promise<Task[]>;
   getAllTasks(): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
