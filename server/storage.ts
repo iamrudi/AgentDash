@@ -7,6 +7,8 @@ import {
   type InsertClient,
   type Project,
   type InsertProject,
+  type TaskList,
+  type InsertTaskList,
   type Task,
   type InsertTask,
   type StaffAssignment,
@@ -56,6 +58,7 @@ import {
   profiles,
   clients,
   projects,
+  taskLists,
   tasks,
   staffAssignments,
   invoices,
@@ -119,6 +122,7 @@ export interface IStorage {
   
   // Projects
   getProjectById(id: string): Promise<Project | undefined>;
+  getProjectWithAgency(id: string): Promise<{ project: Project; agencyId: string } | undefined>;
   getProjectsByClientId(clientId: string): Promise<Project[]>;
   getAllProjects(agencyId?: string): Promise<Project[]>;
   createProject(project: InsertProject): Promise<Project>;
@@ -603,6 +607,26 @@ export class DbStorage implements IStorage {
       return results;
     }
     return await db.select().from(projects).orderBy(desc(projects.createdAt));
+  }
+
+  async getProjectWithAgency(id: string): Promise<{ project: Project; agencyId: string } | undefined> {
+    const result = await db.select({
+      project: projects,
+      agencyId: clients.agencyId
+    })
+      .from(projects)
+      .innerJoin(clients, eq(projects.clientId, clients.id))
+      .where(eq(projects.id, id))
+      .limit(1);
+    
+    if (!result || result.length === 0) {
+      return undefined;
+    }
+    
+    return {
+      project: result[0].project,
+      agencyId: result[0].agencyId
+    };
   }
 
   async createProject(project: InsertProject): Promise<Project> {

@@ -901,32 +901,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get task lists for a project
-  app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin", "Staff"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
+  app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin", "Staff", "SuperAdmin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
+      console.log("[GET_TASK_LISTS] ProjectId:", req.params.projectId, "AgencyId:", req.user!.agencyId);
       const taskLists = await storage.getTaskListsByProjectId(req.params.projectId, req.user!.agencyId);
+      console.log("[GET_TASK_LISTS] Success, returned", taskLists.length, "lists");
       res.json(taskLists);
     } catch (error: any) {
+      console.error("[GET_TASK_LISTS_ERROR] ProjectId:", req.params.projectId, "Error:", error.message, "Stack:", error.stack);
       res.status(500).json({ message: error.message });
     }
   });
 
   // Create new task list
-  app.post("/api/agency/task-lists", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/task-lists", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
-      // CRITICAL: Enforce agencyId from auth context BEFORE validation
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
+      // Require projectId in request body
+      if (!req.body.projectId) {
+        return res.status(400).json({ message: "projectId is required" });
       }
 
-      // Reject any agencyId spoofing attempts
-      if (req.body.agencyId && req.body.agencyId !== req.user!.agencyId) {
-        return res.status(403).json({ message: "Cannot create task list for another agency" });
+      // Fetch project with agency to determine agencyId
+      const projectWithAgency = await storage.getProjectWithAgency(req.body.projectId);
+      if (!projectWithAgency) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Determine agencyId based on user role
+      let agencyId: string;
+      
+      if (req.user!.isSuperAdmin) {
+        // SuperAdmin: use the project's agencyId
+        agencyId = projectWithAgency.agencyId;
+      } else {
+        // Regular Admin: verify project belongs to user's agency
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        
+        if (projectWithAgency.agencyId !== req.user!.agencyId) {
+          return res.status(403).json({ message: "Cannot create task list for another agency's project" });
+        }
+        
+        agencyId = req.user!.agencyId;
+      }
+
+      // Reject any agencyId spoofing attempts in request body
+      if (req.body.agencyId && req.body.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Cannot specify different agencyId" });
       }
 
       const { insertTaskListSchema } = await import("@shared/schema");
       const taskListData = insertTaskListSchema.parse({
         ...req.body,
-        agencyId: req.user!.agencyId // Force agencyId from auth context
+        agencyId // Force agencyId from derived value
       });
 
       const newTaskList = await storage.createTaskList(taskListData);
@@ -940,15 +968,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update task list
-  app.patch("/api/agency/task-lists/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/task-lists/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
+      // SuperAdmin can update any task list; Regular Admin needs agencyId
+      let agencyId: string | undefined;
+      if (req.user!.isSuperAdmin) {
+        agencyId = undefined; // SuperAdmin: no tenant restriction
+      } else {
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        agencyId = req.user!.agencyId;
       }
 
       const { insertTaskListSchema } = await import("@shared/schema");
       const updateData = insertTaskListSchema.partial().parse(req.body);
-      const updatedTaskList = await storage.updateTaskList(req.params.id, updateData, req.user!.agencyId);
+      const updatedTaskList = await storage.updateTaskList(req.params.id, updateData, agencyId);
 
       res.json(updatedTaskList);
     } catch (error: any) {
@@ -964,13 +999,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete task list
-  app.delete("/api/agency/task-lists/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.delete("/api/agency/task-lists/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
+      // SuperAdmin can delete any task list; Regular Admin needs agencyId
+      let agencyId: string | undefined;
+      if (req.user!.isSuperAdmin) {
+        agencyId = undefined; // SuperAdmin: no tenant restriction
+      } else {
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        agencyId = req.user!.agencyId;
       }
 
-      await storage.deleteTaskList(req.params.id, req.user!.agencyId);
+      await storage.deleteTaskList(req.params.id, agencyId);
       res.status(204).send();
     } catch (error: any) {
       // Map storage errors to proper HTTP codes
@@ -982,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get tasks for a task list
-  app.get("/api/agency/task-lists/:listId/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/task-lists/:listId/tasks", requireAuth, requireRole("Admin", "Staff", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const tasks = await storage.getTasksByListId(req.params.listId);
       res.json(tasks);
@@ -992,7 +1034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new task
-  app.post("/api/agency/tasks", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.post("/api/agency/tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       // Validate request body with Zod schema
       const taskData = insertTaskSchema.parse(req.body);
@@ -1039,7 +1081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update task
-  app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+  app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       const updateData = insertTaskSchema.partial().parse(req.body);
       const updatedTask = await storage.updateTask(req.params.id, updateData);
@@ -1054,7 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete task
-  app.delete("/api/agency/tasks/:id", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+  app.delete("/api/agency/tasks/:id", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       await storage.deleteTask(req.params.id);
       res.status(204).send();
@@ -1064,7 +1106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Assign staff to task
-  app.post("/api/agency/tasks/:taskId/assign", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+  app.post("/api/agency/tasks/:taskId/assign", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       const { staffProfileId } = req.body;
       
@@ -1084,7 +1126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Remove staff assignment
-  app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+  app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
       await storage.deleteStaffAssignment(req.params.taskId, req.params.staffProfileId);
       res.status(204).send();
