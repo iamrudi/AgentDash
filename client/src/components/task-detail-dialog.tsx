@@ -42,6 +42,7 @@ interface TaskDetailDialogProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onAssignStaff: (task: TaskWithAssignments) => void;
 }
 
 export function TaskDetailDialog({
@@ -49,6 +50,7 @@ export function TaskDetailDialog({
   projectId,
   open,
   onOpenChange,
+  onAssignStaff,
 }: TaskDetailDialogProps) {
   const { toast } = useToast();
   const [description, setDescription] = useState("");
@@ -136,12 +138,12 @@ export function TaskDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0">
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0" data-testid="dialog-task-detail">
           <DialogHeader className="px-6 pt-6 pb-4 space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-1">
-                <DialogTitle className="text-xl">Task Details</DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground">
+                <DialogTitle className="text-xl" data-testid="text-task-title">Task Details</DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground" data-testid="text-task-type">
                   {task.listId ? `List Task` : task.parentId ? `Subtask` : `Unassigned Task`}
                 </DialogDescription>
               </div>
@@ -243,7 +245,7 @@ export function TaskDetailDialog({
                     <TaskAssigneesControl
                       task={task}
                       projectId={projectId}
-                      availableStaff={staffProfiles}
+                      onAssignStaff={onAssignStaff}
                     />
                   </div>
 
@@ -310,7 +312,7 @@ export function TaskDetailDialog({
       </Dialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent data-testid="dialog-confirm-delete-task">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Task</AlertDialogTitle>
             <AlertDialogDescription>

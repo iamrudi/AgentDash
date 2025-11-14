@@ -522,6 +522,10 @@ export default function ProjectDetail() {
         projectId={id!}
         open={showTaskDetail}
         onOpenChange={handleTaskDialogOpenChange}
+        onAssignStaff={(task) => {
+          setTaskToAssign(task);
+          setShowAssignStaff(true);
+        }}
       />
 
       <AlertDialog open={showDeleteTask} onOpenChange={setShowDeleteTask}>
