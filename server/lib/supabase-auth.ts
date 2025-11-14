@@ -400,9 +400,10 @@ export async function updateUserRole(
     return profile;
   }
 
-  // 3. Update profiles table in transaction (CRITICAL: Must happen before Supabase Auth)
+  // 3. Update profiles table in transaction with explicit verification (CRITICAL: Must happen before Supabase Auth)
+  let updatedProfile: typeof profiles.$inferSelect;
   try {
-    await db.transaction(async (tx) => {
+    updatedProfile = await db.transaction(async (tx) => {
       // CRITICAL: If demoting from SuperAdmin, lock and count SuperAdmins first
       if (isDemotingFromSuperAdmin) {
         const superadmins = await tx
@@ -416,17 +417,35 @@ export async function updateUserRole(
         }
       }
 
-      // Update profile
-      await tx.update(profiles)
+      // Update profile and return the modified row to verify success
+      const [updated] = await tx.update(profiles)
         .set({
           role: newRole,
           isSuperAdmin: isNewSuperAdmin,
           agencyId: isNewSuperAdmin ? null : (agencyId || null)
         })
-        .where(eq(profiles.id, userId));
+        .where(eq(profiles.id, userId))
+        .returning(); // CRITICAL: Get the updated row back
+      
+      // CRITICAL: Verify the update actually happened
+      if (!updated) {
+        throw new Error('Database update failed - no rows were affected. Transaction will be rolled back.');
+      }
+      
+      // Verify the values are correct
+      if (updated.role !== newRole || updated.isSuperAdmin !== isNewSuperAdmin) {
+        throw new Error(`Database update verification failed - role or isSuperAdmin not set correctly. Transaction will be rolled back.`);
+      }
+      
+      const expectedAgencyId = isNewSuperAdmin ? null : (agencyId || null);
+      if (updated.agencyId !== expectedAgencyId) {
+        throw new Error(`Database update verification failed - agencyId not set correctly. Transaction will be rolled back.`);
+      }
+      
+      return updated;
     });
     
-    console.log('[UPDATE_USER_ROLE] Database transaction completed successfully', { userId });
+    console.log('[UPDATE_USER_ROLE] Database transaction completed and verified successfully', { userId });
   } catch (dbError: any) {
     console.error('[UPDATE_USER_ROLE] Database transaction failed', {
       userId,
@@ -484,25 +503,15 @@ export async function updateUserRole(
     throw new Error(`Failed to update Supabase Auth: ${authError.message}`);
   }
 
+  // 5. Log final success ONLY after both DB and Auth updates succeed
   console.log('[UPDATE_USER_ROLE] Role update successful', {
     userId,
     email: profile.email,
     oldRole: oldState.role,
-    newRole,
+    newRole: updatedProfile.role,
     oldAgencyId: oldState.agencyId,
-    newAgencyId: isNewSuperAdmin ? null : (agencyId || null)
+    newAgencyId: updatedProfile.agencyId
   });
-
-  // 5. Fetch and return updated profile
-  const [updatedProfile] = await db
-    .select()
-    .from(profiles)
-    .where(eq(profiles.id, userId))
-    .limit(1);
-
-  if (!updatedProfile) {
-    throw new Error('Failed to fetch updated profile');
-  }
 
   return updatedProfile;
 }
