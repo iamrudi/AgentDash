@@ -864,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/agency/projects", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  app.get("/api/agency/projects", requireAuth, requireRole("Admin", "Staff"), async (req: AuthRequest, res) => {
     try {
       // SuperAdmin users can view all projects across all agencies
       if (req.user!.isSuperAdmin) {
@@ -872,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json(allProjects);
       }
 
-      // Regular Admin users need an agency association
+      // Regular Admin/Staff users need an agency association
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Agency association required" });
       }
@@ -901,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get task lists for a project
-  app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
+  app.get("/api/agency/projects/:projectId/lists", requireAuth, requireRole("Admin", "Staff"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
       const taskLists = await storage.getTaskListsByProjectId(req.params.projectId, req.user!.agencyId);
       res.json(taskLists);
@@ -1009,7 +1009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get project with tasks
-  app.get("/api/agency/projects/:id", requireAuth, requireRole("Admin"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
+  app.get("/api/agency/projects/:id", requireAuth, requireRole("Admin", "Staff"), requireProjectAccess(storage), async (req: AuthRequest, res) => {
     try {
       const projectData = await storage.getProjectWithTasks(req.params.id);
       
