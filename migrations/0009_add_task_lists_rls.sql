@@ -4,6 +4,20 @@
 -- This migration enables database-level tenant isolation for task_lists table
 -- Uses Supabase's built-in auth.jwt() function to access app_metadata
 -- No prerequisite migrations needed - uses built-in Supabase functions
+-- IDEMPOTENT: Safe to re-run - drops existing policies first
+-- ================================================================
+
+-- ================================================================
+-- CLEANUP: Drop all existing task_lists RLS policies (makes migration idempotent)
+-- ================================================================
+
+DROP POLICY IF EXISTS "Users can view task lists in their agency" ON task_lists;
+DROP POLICY IF EXISTS "Admins can insert task lists in their agency" ON task_lists;
+DROP POLICY IF EXISTS "Admins can update task lists in their agency" ON task_lists;
+DROP POLICY IF EXISTS "Admins can delete task lists in their agency" ON task_lists;
+
+-- ================================================================
+-- ENABLE RLS ON task_lists TABLE
 -- ================================================================
 
 -- Enable RLS on task_lists table

@@ -5,7 +5,76 @@
 -- This migration enables database-level tenant isolation using RLS
 -- All queries are automatically filtered by agency_id from JWT
 -- Uses Supabase's built-in auth.jwt() function to access app_metadata
+-- IDEMPOTENT: Safe to re-run - drops existing policies first
 -- ================================================================
+
+-- ================================================================
+-- CLEANUP: Drop all existing RLS policies (makes migration idempotent)
+-- ================================================================
+
+-- Agencies
+DROP POLICY IF EXISTS "Users can view their own agency" ON agencies;
+
+-- Profiles
+DROP POLICY IF EXISTS "Users can view profiles in their agency" ON profiles;
+DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+
+-- Clients
+DROP POLICY IF EXISTS "Users can view clients in their agency" ON clients;
+DROP POLICY IF EXISTS "Admins can insert clients in their agency" ON clients;
+DROP POLICY IF EXISTS "Admins can update clients in their agency" ON clients;
+DROP POLICY IF EXISTS "Admins can delete clients in their agency" ON clients;
+
+-- Projects
+DROP POLICY IF EXISTS "Users can view projects in their agency" ON projects;
+DROP POLICY IF EXISTS "Admins can insert projects in their agency" ON projects;
+DROP POLICY IF EXISTS "Admins can update projects in their agency" ON projects;
+DROP POLICY IF EXISTS "Admins can delete projects in their agency" ON projects;
+
+-- Tasks
+DROP POLICY IF EXISTS "Users can view tasks in their agency" ON tasks;
+DROP POLICY IF EXISTS "Admins can insert tasks in their agency" ON tasks;
+DROP POLICY IF EXISTS "Users can update tasks in their agency" ON tasks;
+DROP POLICY IF EXISTS "Admins can delete tasks in their agency" ON tasks;
+
+-- Staff Assignments
+DROP POLICY IF EXISTS "Users can view staff assignments in their agency" ON staff_assignments;
+DROP POLICY IF EXISTS "Admins can manage staff assignments in their agency" ON staff_assignments;
+
+-- Invoices
+DROP POLICY IF EXISTS "Users can view invoices in their agency" ON invoices;
+DROP POLICY IF EXISTS "Admins can manage invoices in their agency" ON invoices;
+
+-- Invoice Line Items
+DROP POLICY IF EXISTS "Users can view invoice line items in their agency" ON invoice_line_items;
+DROP POLICY IF EXISTS "Admins can manage invoice line items in their agency" ON invoice_line_items;
+
+-- Initiatives
+DROP POLICY IF EXISTS "Users can view initiatives in their agency" ON initiatives;
+DROP POLICY IF EXISTS "Admins can manage initiatives in their agency" ON initiatives;
+
+-- Daily Metrics
+DROP POLICY IF EXISTS "Users can view metrics in their agency" ON daily_metrics;
+DROP POLICY IF EXISTS "System can manage metrics in their agency" ON daily_metrics;
+
+-- Client Integrations
+DROP POLICY IF EXISTS "Users can view integrations in their agency" ON client_integrations;
+DROP POLICY IF EXISTS "Admins can manage integrations in their agency" ON client_integrations;
+
+-- Client Objectives
+DROP POLICY IF EXISTS "Users can view objectives in their agency" ON client_objectives;
+DROP POLICY IF EXISTS "Admins can manage objectives in their agency" ON client_objectives;
+
+-- Client Messages
+DROP POLICY IF EXISTS "Users can view messages in their agency" ON client_messages;
+DROP POLICY IF EXISTS "Users can send messages in their agency" ON client_messages;
+DROP POLICY IF EXISTS "Users can update messages in their agency" ON client_messages;
+
+-- Notifications
+DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
+DROP POLICY IF EXISTS "System can create notifications for users" ON notifications;
+DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can delete their own notifications" ON notifications;
 
 -- ================================================================
 -- ENABLE RLS ON ALL TABLES
