@@ -97,11 +97,11 @@ export async function provisionUser(options: UserProvisioningOptions): Promise<U
     authUserId = authData.user.id;
     logger.info(`[USER_PROVISIONING] Auth user created successfully: ${authUserId}`);
     
-    // STEP 3: Create database records in transaction
+    // STEP 3: Create database records in transaction with explicit verification
     logger.info(`[USER_PROVISIONING] Step 3: Creating database records in transaction`);
     
     const result = await db.transaction(async (tx) => {
-      // Create profile
+      // Create profile and verify success
       const [profile] = await tx.insert(profiles).values({
         id: authData.user.id,
         fullName,
@@ -111,7 +111,17 @@ export async function provisionUser(options: UserProvisioningOptions): Promise<U
         isSuperAdmin
       }).returning();
       
-      logger.info(`[USER_PROVISIONING] Profile created: ${profile.id}`);
+      // CRITICAL: Verify profile was created
+      if (!profile) {
+        throw new Error('Profile creation failed - no row returned. Transaction will be rolled back.');
+      }
+      
+      // Verify profile values are correct
+      if (profile.id !== authData.user.id || profile.email !== email.toLowerCase() || profile.role !== role) {
+        throw new Error('Profile creation verification failed - values not set correctly. Transaction will be rolled back.');
+      }
+      
+      logger.info(`[USER_PROVISIONING] Profile created and verified: ${profile.id}`);
       
       // Create client record if provided
       let clientId: string | undefined;
@@ -125,8 +135,18 @@ export async function provisionUser(options: UserProvisioningOptions): Promise<U
           billingDay: clientData.billingDay || 1,
         }).returning();
         
+        // CRITICAL: Verify client was created
+        if (!client) {
+          throw new Error('Client creation failed - no row returned. Transaction will be rolled back.');
+        }
+        
+        // Verify client values are correct
+        if (client.profileId !== profile.id || client.agencyId !== agencyId) {
+          throw new Error('Client creation verification failed - values not set correctly. Transaction will be rolled back.');
+        }
+        
         clientId = client.id;
-        logger.info(`[USER_PROVISIONING] Client record created: ${clientId}`);
+        logger.info(`[USER_PROVISIONING] Client record created and verified: ${clientId}`);
       }
       
       return {
