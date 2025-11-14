@@ -401,6 +401,7 @@ export default function ProjectDetail() {
                 key={list.id}
                 taskList={list}
                 tasks={tasks}
+                projectId={id!}
                 onEditList={(listId) => {
                   const list = taskLists.find(l => l.id === listId);
                   if (list) {

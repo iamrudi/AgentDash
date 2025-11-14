@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, GripVertical, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import type { Task, TaskList, Profile, StaffAssignment } from "@shared/schema";
+import { TaskStatusControl, TaskPriorityControl } from "./task-inline-editors";
 
 type TaskWithAssignments = Task & {
   assignments: Array<StaffAssignment & { staffProfile: Profile }>;
@@ -13,6 +14,7 @@ type TaskWithAssignments = Task & {
 interface TaskListContainerProps {
   taskList: TaskList;
   tasks: TaskWithAssignments[];
+  projectId: string; // Added for inline editors
   onEditList: (listId: string) => void;
   onDeleteList: (listId: string) => void;
   onCreateTask: (listId: string) => void;
@@ -44,6 +46,7 @@ const getPriorityColor = (priority: string) => {
 export function TaskListContainer({
   taskList,
   tasks,
+  projectId,
   onEditList,
   onDeleteList,
   onCreateTask,
@@ -111,12 +114,14 @@ export function TaskListContainer({
                       <p className="font-medium text-sm truncate" data-testid={`text-task-description-${task.id}`}>
                         {task.description}
                       </p>
-                      <Badge className={`${getStatusColor(task.status)} text-xs`} data-testid={`badge-task-status-${task.id}`}>
-                        {task.status}
-                      </Badge>
-                      <Badge className={`${getPriorityColor(task.priority || 'Medium')} text-xs`} data-testid={`badge-task-priority-${task.id}`}>
-                        {task.priority || 'Medium'}
-                      </Badge>
+                      <TaskStatusControl 
+                        task={task} 
+                        projectId={projectId}
+                      />
+                      <TaskPriorityControl 
+                        task={task} 
+                        projectId={projectId}
+                      />
                     </div>
                     
                     {task.dueDate && (
