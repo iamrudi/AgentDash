@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Trash2, X, Plus, Check } from "lucide-react";
+import { Trash2, X, Plus, Check, CornerDownRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -375,9 +375,10 @@ export function TaskDetailDialog({
                     subtasks.map((subtask) => (
                       <div
                         key={subtask.id}
-                        className="flex items-start gap-3 p-3 rounded-md border bg-card hover-elevate"
+                        className="flex items-start gap-3 p-3 pl-4 rounded-md border bg-card/50 hover-elevate"
                         data-testid={`subtask-item-${subtask.id}`}
                       >
+                        <CornerDownRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                         <Checkbox
                           checked={subtask.status === "Completed"}
                           onCheckedChange={() =>
@@ -391,16 +392,21 @@ export function TaskDetailDialog({
                           className="mt-0.5"
                         />
                         <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-sm ${
-                              subtask.status === "Completed"
-                                ? "line-through text-muted-foreground"
-                                : ""
-                            }`}
-                            data-testid={`text-subtask-description-${subtask.id}`}
-                          >
-                            {subtask.description}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p
+                              className={`text-sm ${
+                                subtask.status === "Completed"
+                                  ? "line-through text-muted-foreground"
+                                  : ""
+                              }`}
+                              data-testid={`text-subtask-description-${subtask.id}`}
+                            >
+                              {subtask.description}
+                            </p>
+                            <span className="text-xs text-muted-foreground/60 font-medium">
+                              Subtask
+                            </span>
+                          </div>
                           {subtask.assignments.length > 0 && (
                             <div className="flex items-center gap-1 mt-1">
                               {subtask.assignments.slice(0, 3).map((assignment) => (
