@@ -155,20 +155,95 @@ export async function updateUserEmail(
   userId: string,
   newEmail: string
 ): Promise<void> {
-  // Update email in Supabase Auth
+  // 1. Fetch current email for rollback if needed
+  const [profile] = await db
+    .select()
+    .from(profiles)
+    .where(eq(profiles.id, userId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('User not found');
+  }
+
+  const oldEmail = profile.email;
+
+  console.log('[UPDATE_USER_EMAIL] Starting email update', {
+    userId,
+    oldEmail,
+    newEmail
+  });
+
+  // 2. Update email in Supabase Auth first
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     email: newEmail,
     email_confirm: true // Skip confirmation email
   });
 
   if (error) {
+    console.error('[UPDATE_USER_EMAIL] Supabase Auth update failed', {
+      userId,
+      error: error.message
+    });
     throw new Error(`Failed to update user email: ${error.message}`);
   }
 
-  // Also update email in profiles table to keep in sync
-  await db.update(profiles)
-    .set({ email: newEmail })
-    .where(eq(profiles.id, userId));
+  console.log('[UPDATE_USER_EMAIL] Supabase Auth updated successfully', { userId });
+
+  // 3. Update profiles table in transaction with explicit verification
+  try {
+    await db.transaction(async (tx) => {
+      const [updated] = await tx.update(profiles)
+        .set({ email: newEmail })
+        .where(eq(profiles.id, userId))
+        .returning(); // CRITICAL: Get the updated row back
+      
+      // CRITICAL: Verify the update actually happened
+      if (!updated) {
+        throw new Error('Database update failed - no rows were affected. Transaction will be rolled back.');
+      }
+      
+      // Verify the email was set correctly
+      if (updated.email !== newEmail) {
+        throw new Error('Database update verification failed - email not set correctly. Transaction will be rolled back.');
+      }
+    });
+
+    console.log('[UPDATE_USER_EMAIL] Email update successful', {
+      userId,
+      oldEmail,
+      newEmail
+    });
+  } catch (dbError: any) {
+    // Rollback Supabase Auth changes if DB update fails
+    console.error('[UPDATE_USER_EMAIL] Database update failed, attempting rollback...', {
+      userId,
+      error: dbError.message
+    });
+    
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(userId, {
+        email: oldEmail,
+        email_confirm: true
+      });
+      console.log('[UPDATE_USER_EMAIL] Rollback successful', {
+        userId,
+        restoredEmail: oldEmail
+      });
+    } catch (rollbackError: any) {
+      console.error('[UPDATE_USER_EMAIL] CRITICAL: Rollback failed!', {
+        userId,
+        rollbackError: rollbackError.message,
+        originalError: dbError.message,
+        oldEmail,
+        newEmail,
+        message: 'Manual intervention required - Supabase Auth and DB are out of sync'
+      });
+      throw new Error(`Email update failed and rollback unsuccessful: ${dbError.message}`);
+    }
+    
+    throw new Error(`Failed to update email in database: ${dbError.message}`);
+  }
 }
 
 /**
