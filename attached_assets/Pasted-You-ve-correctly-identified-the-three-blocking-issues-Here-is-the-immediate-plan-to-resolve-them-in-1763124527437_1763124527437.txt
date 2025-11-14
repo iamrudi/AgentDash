@@ -1,0 +1,52 @@
+You've correctly identified the three blocking issues. Here is the immediate plan to resolve them in order of priority.
+
+1. Data Migration: Fix tasks.listId Constraint
+First, I will fix the data migration issue. Making listId non-nullable now is untenable as it will break all existing tasks.
+
+I will edit shared/schema.ts to make the listId column nullable. This ensures the schema update can be applied without data loss. We will handle the backfill of existing tasks and add the NOT NULL constraint in a separate, future task after this core feature is stable.
+
+2. Runtime Failure: Implement Storage Methods
+Second, I will implement the missing storage methods. The new taskLists routes are non-functional without them.
+
+I will open server/db.ts (where our DbStorage class is implemented) and add the six required methods I previously defined in the IStorage interface:
+
+createTaskList
+
+getTaskListById
+
+updateTaskList
+
+deleteTaskList
+
+getTaskListsByProjectId
+
+getTasksByListId
+
+As we discussed, all create, update, and delete operations will be wrapped in db.transaction to guarantee atomicity and data integrity.
+
+3. Critical RLS Blocker
+Third, and most critically, we must resolve the RLS blocker.
+
+We will not proceed with application-layer security alone. This violates our core defense-in-depth tenant isolation principle. <DOCS-REF> My attempt to re-create the auth.get_agency_id() function was incorrect; I must use the one defined by our project's setup.
+
+This function is created by the existing migration: migrations/0001_enable_rls_policies.sql.
+
+Action Required From You: Please go to your Supabase SQL Editor and run the contents of migrations/0001_enable_rls_policies.sql. This will create the critical auth.get_agency_id() helper function.
+
+My Next Step (After You Confirm): Once you confirm that function is in place, I will create a new, correct migration file (migrations/0009_add_task_lists_rls.sql) with the following policy. This new policy will fail until you complete your action.
+
+SQL
+
+-- Enable RLS on the new table
+ALTER TABLE public.task_lists ENABLE ROW LEVEL SECURITY;
+
+-- Grant all access to users *within the same agency*
+-- This relies on the auth.get_agency_id() function.
+CREATE POLICY "Allow full access based on agency_id"
+ON public.task_lists
+FOR ALL
+USING (agency_id = auth.get_agency_id())
+WITH CHECK (agency_id = auth.get_agency_id());
+I will begin with Step 1 (schema fix) and Step 2 (storage implementation) now.
+
+Please let me know as soon as you have run the RLS helper function migration.
