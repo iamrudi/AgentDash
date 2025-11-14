@@ -280,37 +280,43 @@ export function TaskDateControl({ task, projectId, dateType, label }: TaskDateCo
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-auto px-2 py-1 text-xs justify-start font-normal hover-elevate"
-          data-testid={`button-task-${dateType}-${task.id}`}
+    <div className="flex items-center gap-0.5">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto px-2 py-1 text-xs justify-start font-normal hover-elevate"
+            data-testid={`button-task-${dateType}-${task.id}`}
+          >
+            <CalendarIcon className="mr-1.5 h-3 w-3" />
+            {currentDate ? (
+              <span>{label}: {format(currentDate, "MMM d, yyyy")}</span>
+            ) : (
+              <span className="text-muted-foreground">Set {label}</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={currentDate}
+            onSelect={handleDateChange}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      {currentDate && (
+        <button
+          onClick={handleClear}
+          className="h-4 w-4 rounded-sm opacity-50 hover:opacity-100 hover:bg-accent flex items-center justify-center"
+          data-testid={`button-clear-${dateType}-${task.id}`}
+          aria-label={`Clear ${label}`}
         >
-          <CalendarIcon className="mr-1.5 h-3 w-3" />
-          {currentDate ? (
-            <>
-              <span className="mr-1">{label}: {format(currentDate, "MMM d, yyyy")}</span>
-              <X 
-                className="h-3 w-3 opacity-50 hover:opacity-100" 
-                onClick={handleClear}
-              />
-            </>
-          ) : (
-            <span className="text-muted-foreground">Set {label}</span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={currentDate}
-          onSelect={handleDateChange}
-          initialFocus
-        />
-      </PopoverContent>
-    </Popover>
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
   );
 }
 

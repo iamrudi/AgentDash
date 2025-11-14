@@ -549,8 +549,8 @@ const baseTaskSchema = createInsertSchema(tasks).omit({
 }).extend({
   status: z.enum(taskStatusEnum),
   priority: z.enum(taskPriorityEnum).optional(),
-  startDate: z.coerce.date().optional().nullable(),
-  dueDate: z.coerce.date().optional().nullable(),
+  startDate: z.string().datetime().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
 });
 
 // Complete insert schema with date validation
