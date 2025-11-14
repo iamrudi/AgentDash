@@ -125,8 +125,8 @@ export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   description: text("description").notNull(),
   status: text("status").notNull(), // 'To Do', 'In Progress', 'Completed', 'Blocked'
-  startDate: timestamp("start_date"), // Start date for calendar view
-  dueDate: date("due_date"), // Due date
+  startDate: date("start_date"), // Start date for calendar view (ISO date string)
+  dueDate: date("due_date"), // Due date (ISO date string)
   priority: text("priority").default("Medium"), // 'Low', 'Medium', 'High', 'Urgent'
   listId: uuid("list_id").references(() => taskLists.id, { onDelete: "cascade" }), // NULLABLE TEMPORARILY: Will be enforced after backfill migration
   parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
