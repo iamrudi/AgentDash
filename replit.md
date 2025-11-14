@@ -20,7 +20,7 @@ The platform is a full-stack JavaScript application utilizing React for the fron
 - **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation, including a SuperAdmin role with cross-agency access.
 - **Atomic Transaction Enforcement**: Critical principle for all operations modifying multiple data stores, using `db.transaction()` with explicit verification and rollback.
 - **Orphaned User Prevention**: Compensation-based transaction system and nightly cron job for cleanup of Supabase Auth users.
-- **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies.
+- **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies with idempotent migrations (safe to re-run). Covers all 14 tables with 40 policies total, using Supabase's built-in `auth.jwt()` for app_metadata access.
 - **Forms**: React Hook Form with Zod validation.
 - **Notifications**: Unified notification center with real-time updates.
 - **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
