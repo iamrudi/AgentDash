@@ -538,10 +538,48 @@ export const insertTaskListSchema = createInsertSchema(taskLists).omit({
   createdAt: true,
 });
 
-export const insertTaskSchema = createInsertSchema(tasks).omit({
+// Task status and priority enums for validation and type safety
+export const taskStatusEnum = ['To Do', 'In Progress', 'Completed', 'Blocked'] as const;
+export const taskPriorityEnum = ['Low', 'Medium', 'High', 'Urgent'] as const;
+
+// Base task schema without refinements (for partial updates)
+const baseTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
+}).extend({
+  status: z.enum(taskStatusEnum),
+  priority: z.enum(taskPriorityEnum).optional(),
+  startDate: z.coerce.date().optional().nullable(),
+  dueDate: z.coerce.date().optional().nullable(),
 });
+
+// Complete insert schema with date validation
+export const insertTaskSchema = baseTaskSchema.refine(
+  (data) => {
+    if (data.startDate && data.dueDate) {
+      return new Date(data.dueDate) >= new Date(data.startDate);
+    }
+    return true;
+  },
+  {
+    message: "Due date must be after or equal to start date",
+    path: ["dueDate"],
+  }
+);
+
+// Schema for updating tasks (partial updates with same validation)
+export const updateTaskSchema = baseTaskSchema.partial().refine(
+  (data) => {
+    if (data.startDate && data.dueDate) {
+      return new Date(data.dueDate) >= new Date(data.startDate);
+    }
+    return true;
+  },
+  {
+    message: "Due date must be after or equal to start date",
+    path: ["dueDate"],
+  }
+);
 
 export const insertStaffAssignmentSchema = createInsertSchema(staffAssignments).omit({
   id: true,
@@ -712,6 +750,9 @@ export type InsertTaskList = z.infer<typeof insertTaskListSchema>;
 
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type UpdateTask = z.infer<typeof updateTaskSchema>;
+export type TaskStatus = typeof taskStatusEnum[number];
+export type TaskPriority = typeof taskPriorityEnum[number];
 
 export type StaffAssignment = typeof staffAssignments.$inferSelect;
 export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;

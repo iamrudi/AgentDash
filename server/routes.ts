@@ -17,7 +17,7 @@ import { resolveAgencyContext } from "./middleware/agency-context";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, agencySettings, updateAgencySettingSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { encrypt, decrypt, safeDecryptCredential } from "./lib/encryption";
@@ -1083,7 +1083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update task
   app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
-      const updateData = insertTaskSchema.partial().parse(req.body);
+      const updateData = updateTaskSchema.parse(req.body);
       const updatedTask = await storage.updateTask(req.params.id, updateData);
 
       res.json(updatedTask);
