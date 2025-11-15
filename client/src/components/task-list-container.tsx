@@ -108,8 +108,7 @@ export function TaskListContainer({
           listTasks.map(task => (
             <Card 
               key={task.id} 
-              className="hover-elevate cursor-pointer" 
-              onClick={() => onViewTask(task)}
+              className="hover-elevate" 
               data-testid={`card-task-${task.id}`}
             >
               <CardContent className="p-3">

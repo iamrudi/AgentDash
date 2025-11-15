@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Trash2, X, Plus, Check, CornerDownRight } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -294,6 +294,7 @@ export function TaskDetailDialog({
                         task={task}
                         projectId={projectId}
                         dateType="startDate"
+                        label="Start"
                       />
                     </div>
 
@@ -303,6 +304,7 @@ export function TaskDetailDialog({
                         task={task}
                         projectId={projectId}
                         dateType="dueDate"
+                        label="Due"
                       />
                     </div>
                   </div>
@@ -421,7 +423,7 @@ export function TaskDetailDialog({
                                   key={assignment.id}
                                   className="text-xs text-muted-foreground"
                                 >
-                                  {assignment.staffProfile.name}
+                                  {assignment.staffProfile.fullName}
                                 </span>
                               ))}
                             </div>
@@ -460,14 +462,14 @@ export function TaskDetailDialog({
                         const hasNewValue = activity.newValue && activity.newValue.trim() !== '';
                         
                         if (hasOldValue && hasNewValue) {
-                          const oldDate = format(new Date(activity.oldValue), 'PP');
-                          const newDate = format(new Date(activity.newValue), 'PP');
+                          const oldDate = format(new Date(activity.oldValue!), 'PP');
+                          const newDate = format(new Date(activity.newValue!), 'PP');
                           message = `changed ${fieldLabel} from ${oldDate} to ${newDate}`;
                         } else if (hasNewValue) {
-                          const newDate = format(new Date(activity.newValue), 'PP');
+                          const newDate = format(new Date(activity.newValue!), 'PP');
                           message = `set ${fieldLabel} to ${newDate}`;
                         } else if (hasOldValue) {
-                          const oldDate = format(new Date(activity.oldValue), 'PP');
+                          const oldDate = format(new Date(activity.oldValue!), 'PP');
                           message = `cleared ${fieldLabel} (was ${oldDate})`;
                         } else {
                           message = `updated ${fieldLabel}`;

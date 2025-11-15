@@ -357,9 +357,9 @@ export function TaskAssigneesControl({ task, projectId, onAssignStaff }: TaskAss
     <div className="flex items-center gap-1 flex-wrap">
       {assignees.slice(0, maxDisplay).map((assignment) => {
         const staff = assignment.staffProfile;
-        const initials = staff.name
+        const initials = staff.fullName
           ?.split(" ")
-          .map((n) => n[0])
+          .map((n: string) => n[0])
           .join("")
           .toUpperCase()
           .slice(0, 2) || "?";
@@ -367,7 +367,7 @@ export function TaskAssigneesControl({ task, projectId, onAssignStaff }: TaskAss
         return (
           <div key={assignment.id} className="relative group">
             <Avatar className="h-6 w-6" data-testid={`avatar-assignee-${staff.id}`}>
-              <AvatarImage src={staff.avatarUrl || undefined} alt={staff.name || "Staff"} />
+              <AvatarImage src={undefined} alt={staff.fullName || "Staff"} />
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>
             <button
