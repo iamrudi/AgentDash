@@ -115,22 +115,24 @@ export function TaskListContainer({
               <CardContent className="p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 space-y-2 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p 
-                        className="font-medium text-sm truncate cursor-text" 
+                        className="font-medium text-sm truncate cursor-pointer hover:text-primary transition-colors" 
                         data-testid={`text-task-description-${task.id}`}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={() => onViewTask(task)}
                       >
                         {task.description}
                       </p>
-                      <TaskStatusControl 
-                        task={task} 
-                        projectId={projectId}
-                      />
-                      <TaskPriorityControl 
-                        task={task} 
-                        projectId={projectId}
-                      />
+                      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2 flex-wrap">
+                        <TaskStatusControl 
+                          task={task} 
+                          projectId={projectId}
+                        />
+                        <TaskPriorityControl 
+                          task={task} 
+                          projectId={projectId}
+                        />
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
