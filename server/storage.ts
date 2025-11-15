@@ -13,6 +13,8 @@ import {
   type InsertTask,
   type StaffAssignment,
   type InsertStaffAssignment,
+  type TaskActivity,
+  type InsertTaskActivity,
   type Invoice,
   type InsertInvoice,
   type InvoiceLineItem,
@@ -61,6 +63,7 @@ import {
   taskLists,
   tasks,
   staffAssignments,
+  taskActivities,
   invoices,
   invoiceLineItems,
   initiatives,
@@ -847,6 +850,26 @@ export class DbStorage implements IStorage {
           eq(staffAssignments.staffProfileId, staffProfileId)
         )
       );
+  }
+
+  // Task Activities
+  async createTaskActivity(activity: InsertTaskActivity): Promise<TaskActivity> {
+    const result = await db.insert(taskActivities).values(activity).returning();
+    return result[0];
+  }
+
+  async getTaskActivities(taskId: string): Promise<Array<TaskActivity & { user: Profile }>> {
+    const activities = await db
+      .select()
+      .from(taskActivities)
+      .leftJoin(profiles, eq(taskActivities.userId, profiles.id))
+      .where(eq(taskActivities.taskId, taskId))
+      .orderBy(desc(taskActivities.createdAt));
+
+    return activities.map(a => ({
+      ...a.task_activities,
+      user: a.profiles!
+    }));
   }
 
   // Project with Tasks

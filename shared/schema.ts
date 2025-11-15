@@ -150,6 +150,22 @@ export const staffAssignments = pgTable("staff_assignments", {
   staffProfileIdIdx: index("staff_assignments_staff_profile_id_idx").on(table.staffProfileId),
 }));
 
+// TASK ACTIVITIES (Track all changes to tasks for audit trail)
+export const taskActivities = pgTable("task_activities", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // 'created', 'status_changed', 'priority_changed', 'date_changed', 'assignee_added', 'assignee_removed', 'description_changed', 'subtask_created'
+  fieldName: text("field_name"), // Name of the field that changed (e.g., 'status', 'priority', 'dueDate')
+  oldValue: text("old_value"), // Previous value (stored as string)
+  newValue: text("new_value"), // New value (stored as string)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdIdx: index("task_activities_task_id_idx").on(table.taskId),
+  userIdIdx: index("task_activities_user_id_idx").on(table.userId),
+  createdAtIdx: index("task_activities_created_at_idx").on(table.createdAt),
+}));
+
 // INVOICES
 export const invoices = pgTable("invoices", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -586,6 +602,11 @@ export const insertStaffAssignmentSchema = createInsertSchema(staffAssignments).
   createdAt: true,
 });
 
+export const insertTaskActivitySchema = createInsertSchema(taskActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({
   id: true,
   createdAt: true,
@@ -756,6 +777,9 @@ export type TaskPriority = typeof taskPriorityEnum[number];
 
 export type StaffAssignment = typeof staffAssignments.$inferSelect;
 export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;
+
+export type TaskActivity = typeof taskActivities.$inferSelect;
+export type InsertTaskActivity = z.infer<typeof insertTaskActivitySchema>;
 
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
