@@ -780,6 +780,7 @@ export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;
 
 export type TaskActivity = typeof taskActivities.$inferSelect;
 export type InsertTaskActivity = z.infer<typeof insertTaskActivitySchema>;
+export type TaskActivityWithUser = TaskActivity & { user: Profile };
 
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;

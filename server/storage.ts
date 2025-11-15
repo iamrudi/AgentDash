@@ -15,6 +15,7 @@ import {
   type InsertStaffAssignment,
   type TaskActivity,
   type InsertTaskActivity,
+  type TaskActivityWithUser,
   type Invoice,
   type InsertInvoice,
   type InvoiceLineItem,
@@ -858,7 +859,7 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getTaskActivities(taskId: string): Promise<Array<TaskActivity & { user: Profile }>> {
+  async getTaskActivities(taskId: string): Promise<TaskActivityWithUser[]> {
     const activities = await db
       .select()
       .from(taskActivities)
@@ -866,10 +867,13 @@ export class DbStorage implements IStorage {
       .where(eq(taskActivities.taskId, taskId))
       .orderBy(desc(taskActivities.createdAt));
 
-    return activities.map(a => ({
-      ...a.task_activities,
-      user: a.profiles!
-    }));
+    // Filter out activities with null users (shouldn't happen, but defensive)
+    return activities
+      .filter(a => a.profiles !== null)
+      .map(a => ({
+        ...a.task_activities,
+        user: a.profiles as Profile
+      }));
   }
 
   // Project with Tasks

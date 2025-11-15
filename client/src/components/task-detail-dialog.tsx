@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Trash2, X, Plus, Check, CornerDownRight } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Task, Profile, StaffAssignment } from "@shared/schema";
+import type { Task, Profile, StaffAssignment, TaskActivityWithUser } from "@shared/schema";
 import {
   TaskStatusControl,
   TaskPriorityControl,
@@ -75,6 +76,12 @@ export function TaskDetailDialog({
   // Fetch subtasks
   const { data: subtasks = [], isLoading: subtasksLoading } = useQuery<TaskWithAssignments[]>({
     queryKey: ["/api/agency/tasks", task?.id, "subtasks"],
+    enabled: open && !!task?.id,
+  });
+
+  // Fetch task activities (timeline)
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery<TaskActivityWithUser[]>({
+    queryKey: ["/api/agency/tasks", task?.id, "activities"],
     enabled: open && !!task?.id,
   });
 
@@ -426,10 +433,78 @@ export function TaskDetailDialog({
                 </div>
               </TabsContent>
 
-              <TabsContent value="activity" className="p-6 m-0">
-                <div className="flex items-center justify-center h-64 text-muted-foreground">
-                  <p>Activity tracking coming soon...</p>
-                </div>
+              <TabsContent value="activity" className="p-6 m-0 space-y-4">
+                {activitiesLoading ? (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    Loading activities...
+                  </div>
+                ) : activities.length === 0 ? (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    No activity yet. Changes to this task will appear here.
+                  </div>
+                ) : (
+                  <div className="space-y-4" data-testid="task-activity-timeline">
+                    {activities.map((activity) => {
+                      const date = new Date(activity.createdAt);
+                      const timeAgo = formatDistanceToNow(date, { addSuffix: true });
+                      
+                      // Format activity message based on action type
+                      let message = '';
+                      if (activity.action === 'status_changed') {
+                        message = `changed status from "${activity.oldValue}" to "${activity.newValue}"`;
+                      } else if (activity.action === 'priority_changed') {
+                        message = `changed priority from "${activity.oldValue || 'None'}" to "${activity.newValue || 'None'}"`;
+                      } else if (activity.action === 'date_changed') {
+                        const fieldLabel = activity.fieldName === 'startDate' ? 'start date' : 'due date';
+                        const hasOldValue = activity.oldValue && activity.oldValue.trim() !== '';
+                        const hasNewValue = activity.newValue && activity.newValue.trim() !== '';
+                        
+                        if (hasOldValue && hasNewValue) {
+                          const oldDate = format(new Date(activity.oldValue), 'PP');
+                          const newDate = format(new Date(activity.newValue), 'PP');
+                          message = `changed ${fieldLabel} from ${oldDate} to ${newDate}`;
+                        } else if (hasNewValue) {
+                          const newDate = format(new Date(activity.newValue), 'PP');
+                          message = `set ${fieldLabel} to ${newDate}`;
+                        } else if (hasOldValue) {
+                          const oldDate = format(new Date(activity.oldValue), 'PP');
+                          message = `cleared ${fieldLabel} (was ${oldDate})`;
+                        } else {
+                          message = `updated ${fieldLabel}`;
+                        }
+                      } else if (activity.action === 'description_changed') {
+                        message = `updated the task description`;
+                      } else if (activity.action === 'assignee_added') {
+                        message = `added assignee: ${activity.newValue}`;
+                      } else if (activity.action === 'assignee_removed') {
+                        message = `removed assignee: ${activity.oldValue}`;
+                      } else if (activity.action === 'subtask_created') {
+                        message = `created subtask: "${activity.newValue}"`;
+                      } else {
+                        message = activity.action.replace(/_/g, ' ');
+                      }
+
+                      return (
+                        <div key={activity.id} className="flex gap-3" data-testid={`activity-${activity.id}`}>
+                          <div className="flex flex-col items-center">
+                            <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
+                            {activities[activities.length - 1].id !== activity.id && (
+                              <div className="w-px h-full bg-border" />
+                            )}
+                          </div>
+                          <div className="flex-1 pb-6">
+                            <div className="text-sm">
+                              <span className="font-medium">{activity.user.fullName}</span>
+                              {' '}
+                              <span className="text-muted-foreground">{message}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">{timeAgo}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </TabsContent>
             </ScrollArea>
           </Tabs>

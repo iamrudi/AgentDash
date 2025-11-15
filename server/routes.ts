@@ -1043,6 +1043,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get task activities (timeline)
+  app.get("/api/agency/tasks/:taskId/activities", requireAuth, requireRole("Admin", "Staff", "Client", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const activities = await storage.getTaskActivities(req.params.taskId);
+      res.json(activities);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new task
   app.post("/api/agency/tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
@@ -1124,10 +1134,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Staff profile ID is required" });
       }
 
+      // Get staff profile for activity log
+      const staffProfile = await storage.getStaffProfileById(staffProfileId);
+      if (!staffProfile) {
+        return res.status(404).json({ message: "Staff profile not found" });
+      }
+
       const assignment = await storage.createStaffAssignment({
         taskId: req.params.taskId,
         staffProfileId,
       });
+
+      // Log assignee addition
+      try {
+        await storage.createTaskActivity({
+          taskId: req.params.taskId,
+          userId: req.user!.id,
+          action: 'assignee_added',
+          fieldName: 'assignees',
+          newValue: staffProfile.fullName
+        });
+      } catch (error) {
+        console.error('Failed to log assignee addition:', error);
+      }
 
       res.status(201).json(assignment);
     } catch (error: any) {
@@ -1138,7 +1167,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Remove staff assignment
   app.delete("/api/agency/tasks/:taskId/assign/:staffProfileId", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
+      // Get staff profile for activity log before deletion
+      const staffProfile = await storage.getStaffProfileById(req.params.staffProfileId);
+      
       await storage.deleteStaffAssignment(req.params.taskId, req.params.staffProfileId);
+
+      // Log assignee removal
+      if (staffProfile) {
+        try {
+          await storage.createTaskActivity({
+            taskId: req.params.taskId,
+            userId: req.user!.id,
+            action: 'assignee_removed',
+            fieldName: 'assignees',
+            oldValue: staffProfile.fullName
+          });
+        } catch (error) {
+          console.error('Failed to log assignee removal:', error);
+        }
+      }
+
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1422,6 +1470,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Log subtask creation activity on the parent task
+      await storage.createTaskActivity({
+        taskId: taskId,
+        userId: req.user!.id,
+        action: 'subtask_created',
+        newValue: newSubtask.description
+      });
+
       res.status(201).json(newSubtask);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -1430,6 +1486,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // Helper function to log task changes
+  async function logTaskActivity(taskId: string, userId: string, oldTask: Task, newTask: Task) {
+    try {
+      const changes: Array<{action: string, fieldName?: string, oldValue?: string, newValue?: string}> = [];
+      
+      // Check each field for changes (comparing persisted states)
+      if (oldTask.status !== newTask.status) {
+        changes.push({
+          action: 'status_changed',
+          fieldName: 'status',
+          oldValue: oldTask.status,
+          newValue: newTask.status
+        });
+      }
+      
+      if (oldTask.priority !== newTask.priority) {
+        changes.push({
+          action: 'priority_changed',
+          fieldName: 'priority',
+          oldValue: oldTask.priority || '',
+          newValue: newTask.priority || ''
+        });
+      }
+      
+      if (oldTask.startDate !== newTask.startDate) {
+        changes.push({
+          action: 'date_changed',
+          fieldName: 'startDate',
+          oldValue: oldTask.startDate || '',
+          newValue: newTask.startDate || ''
+        });
+      }
+      
+      if (oldTask.dueDate !== newTask.dueDate) {
+        changes.push({
+          action: 'date_changed',
+          fieldName: 'dueDate',
+          oldValue: oldTask.dueDate || '',
+          newValue: newTask.dueDate || ''
+        });
+      }
+      
+      if (oldTask.description !== newTask.description) {
+        changes.push({
+          action: 'description_changed',
+          fieldName: 'description',
+          oldValue: oldTask.description?.substring(0, 100) || '',
+          newValue: newTask.description?.substring(0, 100) || ''
+        });
+      }
+      
+      // Create activity records for all changes
+      for (const change of changes) {
+        await storage.createTaskActivity({
+          taskId,
+          userId,
+          ...change
+        });
+      }
+    } catch (error) {
+      // Log error but don't fail the request - activity logging is non-critical
+      console.error('Failed to log task activity:', error);
+    }
+  }
 
   app.patch("/api/tasks/:id", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
     try {
@@ -1451,7 +1572,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Get old task state before update
+      const oldTask = await storage.getTaskById(id);
+      if (!oldTask) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
       const updatedTask = await storage.updateTask(id, req.body);
+      
+      // Log activity for the changes
+      await logTaskActivity(id, req.user!.id, oldTask, updatedTask);
+      
       res.json(updatedTask);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
