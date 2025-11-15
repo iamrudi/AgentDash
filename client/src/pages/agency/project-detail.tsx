@@ -191,7 +191,9 @@ export default function ProjectDetail() {
 
   // Deep link support: sync URL ?task param with dialog state
   useEffect(() => {
-    if (!tasks) return;
+    // Don't run effect while data is still loading
+    if (isLoading || !projectData) return;
+    
     const [, search = ""] = location.split("?");
     const params = new URLSearchParams(search);
     const taskParam = params.get("task");
@@ -212,7 +214,7 @@ export default function ProjectDetail() {
       });
       syncTaskParam();
     }
-  }, [location, tasks, selectedTaskId, showTaskDetail, syncTaskParam, toast]);
+  }, [location, tasks, selectedTaskId, showTaskDetail, syncTaskParam, toast, isLoading, projectData]);
 
   // Event handlers for task detail dialog
   const handleViewTask = (task: TaskWithAssignments) => {

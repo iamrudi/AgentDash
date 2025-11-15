@@ -200,40 +200,44 @@ export function TaskDetailDialog({
     setShowDeleteDialog(false);
   };
 
-  if (!task) return null;
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0" data-testid="dialog-task-detail">
-          <DialogHeader className="px-6 pt-6 pb-4 space-y-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-1">
-                <DialogTitle className="text-xl" data-testid="text-task-title">Task Details</DialogTitle>
-                <DialogDescription className="text-sm text-muted-foreground" data-testid="text-task-type">
-                  {task.listId ? `List Task` : task.parentId ? `Subtask` : `Unassigned Task`}
-                </DialogDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onOpenChange(false)}
-                data-testid="button-close-dialog"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+          {!task ? (
+            <div className="flex items-center justify-center p-12">
+              <p className="text-muted-foreground">Loading task details...</p>
             </div>
+          ) : (
+            <>
+              <DialogHeader className="px-6 pt-6 pb-4 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-1">
+                    <DialogTitle className="text-xl" data-testid="text-task-title">Task Details</DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground" data-testid="text-task-type">
+                      {task.listId ? `List Task` : task.parentId ? `Subtask` : `Unassigned Task`}
+                    </DialogDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onOpenChange(false)}
+                    data-testid="button-close-dialog"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter task description..."
-                className="resize-none min-h-[80px]"
-                data-testid="input-task-description"
-              />
-              {description !== task.description && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter task description..."
+                    className="resize-none min-h-[80px]"
+                    data-testid="input-task-description"
+                  />
+                  {description !== task.description && (
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -533,30 +537,34 @@ export function TaskDetailDialog({
               Close
             </Button>
           </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent data-testid="dialog-confirm-delete-task">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this task? This action cannot be undone.
-              {task.parentId && " All subtasks will also be deleted."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {task && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent data-testid="dialog-confirm-delete-task">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Task</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this task? This action cannot be undone.
+                {task.parentId && " All subtasks will also be deleted."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }
