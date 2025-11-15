@@ -43,6 +43,11 @@ The platform is a full-stack JavaScript application utilizing React for the fron
     - **Frontend**: Visual hierarchy indicators (CornerDownRight icon, "Subtask" label, lighter background), checkbox toggles for quick status changes, create form with Enter key support, and proper loading/empty states.
     - **Security**: Staff can only create subtasks for tasks they're assigned to; tenant isolation via `requireTaskAccess` middleware; null-safe profile handling in storage layer.
     - **Deferred**: Full inline editing for subtasks, delete functionality, drag-and-drop reordering.
+  - **Activity Tracking (Completed)**: Comprehensive audit trail system tracking all task changes:
+    - **Backend**: `task_activities` table with TaskActivityWithUser type, `logTaskActivity()` helper function, integrated into task updates (PATCH /api/tasks/:id), subtask creation, and assignment operations (POST/DELETE /api/agency/tasks/:taskId/assign).
+    - **Frontend**: Activity tab in task detail dialog with timeline UI, formatted messages for 8 action types (status, priority, dates, description, assignees, subtasks), defensive date formatting with human-readable output (e.g., "Nov 20, 2025"), and relative timestamps.
+    - **Activity Types**: status_changed, priority_changed, date_changed, description_changed, assignee_added, assignee_removed, subtask_created.
+    - **Security**: Type-safe with TaskActivityWithUser[], null filtering in storage layer, try/catch error handling, tenant isolation via requireTaskAccess middleware.
 - **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies, including task lists and tasks.
 
 ### Feature Specifications
