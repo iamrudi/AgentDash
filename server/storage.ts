@@ -34,6 +34,9 @@ import {
   type InsertClientObjective,
   type ClientMessage,
   type InsertClientMessage,
+  type TaskMessage,
+  type InsertTaskMessage,
+  type TaskMessageWithSender,
   type Notification,
   type InsertNotification,
   type Agency,
@@ -74,6 +77,7 @@ import {
   agencyIntegrationClientAccess,
   clientObjectives,
   clientMessages,
+  taskMessages,
   notifications,
   agencies,
   companies,
@@ -222,6 +226,11 @@ export interface IStorage {
   createMessage(message: InsertClientMessage): Promise<ClientMessage>;
   getAllMessages(agencyId?: string): Promise<ClientMessage[]>;
   markMessageAsRead(id: string): Promise<void>;
+  
+  // Task Messages
+  getTaskMessagesByTaskId(taskId: string): Promise<TaskMessageWithSender[]>;
+  createTaskMessage(message: InsertTaskMessage): Promise<TaskMessage>;
+  markTaskMessageAsRead(messageId: string): Promise<void>;
   
   // Notifications (Legacy counts for badges)
   getNotificationCounts(agencyId?: string): Promise<{ unreadMessages: number; unviewedResponses: number }>;
@@ -1512,6 +1521,44 @@ export class DbStorage implements IStorage {
     await db.update(clientMessages)
       .set({ isRead: "true" })
       .where(eq(clientMessages.id, id));
+  }
+
+  // Task Messages
+  async getTaskMessagesByTaskId(taskId: string): Promise<TaskMessageWithSender[]> {
+    const messages = await db.select({
+      id: taskMessages.id,
+      taskId: taskMessages.taskId,
+      senderId: taskMessages.senderId,
+      message: taskMessages.message,
+      isRead: taskMessages.isRead,
+      createdAt: taskMessages.createdAt,
+      sender: profiles,
+    })
+      .from(taskMessages)
+      .leftJoin(profiles, eq(taskMessages.senderId, profiles.id))
+      .where(eq(taskMessages.taskId, taskId))
+      .orderBy(taskMessages.createdAt);
+
+    return messages.map(row => ({
+      id: row.id,
+      taskId: row.taskId,
+      senderId: row.senderId,
+      message: row.message,
+      isRead: row.isRead,
+      createdAt: row.createdAt,
+      sender: row.sender || undefined,
+    }));
+  }
+
+  async createTaskMessage(message: InsertTaskMessage): Promise<TaskMessage> {
+    const result = await db.insert(taskMessages).values(message).returning();
+    return result[0];
+  }
+
+  async markTaskMessageAsRead(messageId: string): Promise<void> {
+    await db.update(taskMessages)
+      .set({ isRead: "true" })
+      .where(eq(taskMessages.id, messageId));
   }
 
   // Notifications

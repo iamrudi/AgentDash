@@ -476,6 +476,20 @@ export const clientMessages = pgTable("client_messages", {
   clientIdIdx: index("client_messages_client_id_idx").on(table.clientId),
 }));
 
+// TASK MESSAGES (Communication between staff and account managers on specific tasks)
+export const taskMessages = pgTable("task_messages", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  senderId: uuid("sender_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  isRead: text("is_read").default("false"), // Using text for boolean compatibility
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdIdx: index("task_messages_task_id_idx").on(table.taskId),
+  senderIdIdx: index("task_messages_sender_id_idx").on(table.senderId),
+  createdAtIdx: index("task_messages_created_at_idx").on(table.createdAt),
+}));
+
 // NOTIFICATIONS (Centralized notification system)
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -655,6 +669,12 @@ export const insertClientMessageSchema = createInsertSchema(clientMessages).omit
   createdAt: true,
 });
 
+export const insertTaskMessageSchema = createInsertSchema(taskMessages).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+});
+
 export const insertNotificationSchema = createInsertSchema(notifications).omit({
   id: true,
   createdAt: true,
@@ -808,6 +828,8 @@ export type InsertClientObjective = z.infer<typeof insertClientObjectiveSchema>;
 
 export type ClientMessage = typeof clientMessages.$inferSelect;
 export type InsertClientMessage = z.infer<typeof insertClientMessageSchema>;
+export type TaskMessage = typeof taskMessages.$inferSelect;
+export type InsertTaskMessage = z.infer<typeof insertTaskMessageSchema>;
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
@@ -888,3 +910,4 @@ export type CompanyWithContacts = Company & { contacts?: Contact[] };
 export type DealWithContact = Deal & { contact?: Contact };
 export type DealWithCompany = Deal & { company?: Company };
 export type ProposalWithSections = Proposal & { sections?: ProposalSection[] };
+export type TaskMessageWithSender = TaskMessage & { sender?: Profile };

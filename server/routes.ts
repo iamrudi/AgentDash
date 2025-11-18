@@ -1537,6 +1537,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get task messages
+  app.get("/api/tasks/:taskId/messages", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      
+      // Verify task exists
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      const messages = await storage.getTaskMessagesByTaskId(taskId);
+      res.json(messages);
+    } catch (error: any) {
+      console.error("Get task messages error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch task messages" });
+    }
+  });
+
+  // Create task message
+  app.post("/api/tasks/:taskId/messages", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      
+      // Verify task exists
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+
+      // Get current user's profile
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      if (!profile) {
+        return res.status(403).json({ message: "Profile not found" });
+      }
+
+      // Validate message data
+      const { insertTaskMessageSchema } = await import("@shared/schema");
+      const messageData = insertTaskMessageSchema.parse({
+        ...req.body,
+        taskId,
+        senderId: profile.id,
+      });
+
+      const newMessage = await storage.createTaskMessage(messageData);
+      
+      // Return the message with sender profile
+      const messageWithSender = {
+        ...newMessage,
+        sender: profile,
+      };
+
+      res.status(201).json(messageWithSender);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Create task message error:", error);
+      res.status(500).json({ message: error.message || "Failed to create task message" });
+    }
+  });
+
+  // Mark task message as read
+  app.patch("/api/tasks/messages/:messageId/read", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const { messageId } = req.params;
+      
+      await storage.markTaskMessageAsRead(messageId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Mark task message as read error:", error);
+      res.status(500).json({ message: error.message || "Failed to mark message as read" });
+    }
+  });
+
   // Helper function to log task changes
   async function logTaskActivity(taskId: string, userId: string, oldTask: Task, newTask: Task) {
     try {

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthUser } from "@/lib/auth";
 import type { Task, Profile, StaffAssignment, TaskActivityWithUser } from "@shared/schema";
 import {
   TaskStatusControl,
@@ -35,6 +36,7 @@ import {
   TaskDateControl,
   TaskAssigneesControl,
 } from "./task-inline-editors";
+import { TaskMessages } from "./task-messages";
 
 type TaskWithAssignments = Task & {
   assignments: Array<StaffAssignment & { staffProfile: Profile }>;
@@ -56,6 +58,7 @@ export function TaskDetailDialog({
   onAssignStaff,
 }: TaskDetailDialogProps) {
   const { toast } = useToast();
+  const authUser = getAuthUser();
   const [description, setDescription] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -261,6 +264,9 @@ export function TaskDetailDialog({
               </TabsTrigger>
               <TabsTrigger value="activity" data-testid="tab-activity">
                 Activity
+              </TabsTrigger>
+              <TabsTrigger value="messages" data-testid="tab-messages">
+                Messages
               </TabsTrigger>
             </TabsList>
 
@@ -498,6 +504,12 @@ export function TaskDetailDialog({
                       );
                     })}
                   </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="messages" className="p-0 m-0 flex-1 flex flex-col">
+                {authUser?.profile?.id && (
+                  <TaskMessages taskId={task.id} currentUserId={authUser.profile.id} />
                 )}
               </TabsContent>
             </ScrollArea>
