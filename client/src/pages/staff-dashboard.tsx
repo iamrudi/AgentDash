@@ -1,20 +1,29 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TaskItem } from "@/components/dashboard/task-item";
+import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAuthUser } from "@/lib/auth";
-import { TaskWithProject } from "@shared/schema";
+import { TaskWithProject, Task, Profile, StaffAssignment } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CheckSquare, Clock, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+type TaskWithAssignments = Task & {
+  assignments: Array<StaffAssignment & { staffProfile: Profile }>;
+};
+
 export default function StaffDashboard() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
   const { toast } = useToast();
 
@@ -35,12 +44,87 @@ export default function StaffDashboard() {
     },
   });
 
+  // Query for full task data with assignments (for detail dialog)
+  const { data: fullTaskData } = useQuery<TaskWithAssignments[]>({
+    queryKey: ["/api/staff/tasks/full"],
+    enabled: !!tasks,
+  });
+
   const handleToggleTask = (taskId: string, completed: boolean) => {
     updateTaskMutation.mutate({
       taskId,
       status: completed ? "Completed" : "Pending",
     });
   };
+
+  // Task click handler
+  const handleViewTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    setShowTaskDetail(true);
+    syncTaskParam(taskId);
+  };
+
+  // URL sync helper
+  const syncTaskParam = useCallback((taskId?: string) => {
+    const [pathname, search = ""] = location.split("?");
+    const params = new URLSearchParams(search);
+    taskId ? params.set("task", taskId) : params.delete("task");
+    const next = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    if (next !== location) {
+      setLocation(next, { replace: true });
+    }
+  }, [location, setLocation]);
+
+  const handleTaskDialogOpenChange = (open: boolean) => {
+    setShowTaskDetail(open);
+    if (!open) {
+      // Clear state and URL when closing
+      setSelectedTaskId(null);
+      // Directly clear the task param from URL
+      const [pathname] = location.split("?");
+      setLocation(pathname, { replace: true });
+    }
+  };
+
+  // URL sync effect - waits for tasks to load before validating
+  useEffect(() => {
+    const [, search = ""] = location.split("?");
+    const params = new URLSearchParams(search);
+    const taskParam = params.get("task");
+    
+    if (!taskParam) {
+      setSelectedTaskId(null);
+      setShowTaskDetail(false);
+      return;
+    }
+    
+    // Wait for tasks to load before validating
+    if (isLoading || !tasks) {
+      return; // Don't do anything until tasks are loaded
+    }
+    
+    // Validate task exists
+    const exists = tasks.some(t => t.id === taskParam);
+    if (exists) {
+      setSelectedTaskId(taskParam);
+      setShowTaskDetail(true);
+    } else {
+      // Task doesn't exist - clear param and show error
+      const [pathname] = location.split("?");
+      setLocation(pathname, { replace: true });
+      toast({
+        title: "Task not found",
+        description: "The requested task is unavailable.",
+        variant: "destructive"
+      });
+    }
+  }, [location, tasks, isLoading, setLocation, toast]);
+
+  // Selected task - now waits for fullTaskData to load
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId || !fullTaskData) return null;
+    return fullTaskData.find(t => t.id === selectedTaskId) ?? null;
+  }, [fullTaskData, selectedTaskId]);
 
   const filteredTasks = tasks?.filter((task) => {
     if (filterStatus === "all") return true;
@@ -170,6 +254,7 @@ export default function StaffDashboard() {
                       key={task.id}
                       task={task}
                       onToggle={handleToggleTask}
+                      onClick={() => handleViewTask(task.id)}
                       showProject={true}
                     />
                   ))
@@ -184,6 +269,21 @@ export default function StaffDashboard() {
             </div>
           </main>
         </div>
+
+        {/* Task Detail Sheet - render when showTaskDetail is true, even if selectedTask is loading */}
+        {showTaskDetail && selectedTaskId && (
+          selectedTask ? (
+            <TaskDetailDialog
+              task={selectedTask}
+              projectId={selectedTask.projectId || ""}
+              open={showTaskDetail}
+              onOpenChange={handleTaskDialogOpenChange}
+              onAssignStaff={() => {}}
+            />
+          ) : (
+            <div data-testid="loading-task-detail" className="hidden" />
+          )
+        )}
       </div>
     </SidebarProvider>
   );

@@ -1424,6 +1424,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tasks with full assignment details (for task detail dialog)
+  // Staff users only get tasks they're assigned to
+  app.get("/api/staff/tasks/full", requireAuth, requireRole("Staff", "Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      // Get user's profile
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      if (!profile) {
+        return res.status(403).json({ message: "Profile not found" });
+      }
+
+      // Get all tasks for the agency
+      const allTasks = await storage.getAllTasks(req.user!.agencyId);
+      
+      // For Staff users, filter to only tasks they're assigned to
+      // For Admin users, return all tasks
+      const tasksToReturn = req.user!.role === "Staff" 
+        ? await Promise.all(
+            allTasks.map(async (task) => {
+              const assignments = await storage.getAssignmentsByTaskId(task.id);
+              // Only include this task if the staff member is assigned to it
+              const isAssigned = assignments.some(a => a.staffProfileId === profile.id);
+              return isAssigned ? task : null;
+            })
+          ).then(tasks => tasks.filter((t): t is typeof allTasks[number] => t !== null))
+        : allTasks;
+
+      // Add full assignment details to each task
+      const tasksWithAssignments = await Promise.all(
+        tasksToReturn.map(async (task) => {
+          const assignments = await storage.getAssignmentsByTaskId(task.id);
+          const assignmentsWithProfiles = await Promise.all(
+            assignments.map(async (assignment) => {
+              const assigneeProfile = await storage.getProfileById(assignment.staffProfileId);
+              return { ...assignment, staffProfile: assigneeProfile };
+            })
+          );
+          return { ...task, assignments: assignmentsWithProfiles };
+        })
+      );
+      
+      res.json(tasksWithAssignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create subtask (Staff can create subtasks for tasks they're assigned to)
   app.post("/api/tasks/:taskId/subtasks", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {

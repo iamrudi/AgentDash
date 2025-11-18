@@ -8,10 +8,11 @@ import { format, isPast, parseISO } from "date-fns";
 interface TaskItemProps {
   task: TaskWithProject;
   onToggle?: (taskId: string, completed: boolean) => void;
+  onClick?: () => void;
   showProject?: boolean;
 }
 
-export function TaskItem({ task, onToggle, showProject = false }: TaskItemProps) {
+export function TaskItem({ task, onToggle, onClick, showProject = false }: TaskItemProps) {
   const isCompleted = task.status === "Completed";
   const isOverdue = task.dueDate && isPast(parseISO(task.dueDate)) && !isCompleted;
 
@@ -29,8 +30,25 @@ export function TaskItem({ task, onToggle, showProject = false }: TaskItemProps)
 
   return (
     <Card
-      className={`border-l-4 ${priorityColors[task.priority || "Medium"]}`}
+      className={`border-l-4 ${priorityColors[task.priority || "Medium"]} ${onClick ? "cursor-pointer hover-elevate" : ""}`}
       data-testid={`card-task-${task.id}`}
+      onClick={(e) => {
+        // Only trigger onClick if not clicking the checkbox
+        const target = e.target as HTMLElement;
+        if (!target.closest('[role="checkbox"]') && onClick) {
+          onClick();
+        }
+      }}
+      onKeyDown={(e) => {
+        // Handle keyboard accessibility (Enter/Space)
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? "button" : undefined}
+      aria-label={onClick ? `View details for ${task.description}` : undefined}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
