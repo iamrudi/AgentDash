@@ -17,7 +17,7 @@ import { resolveAgencyContext } from "./middleware/agency-context";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema, projects, taskLists, tasks } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { encrypt, decrypt, safeDecryptCredential } from "./lib/encryption";
@@ -2099,22 +2099,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (response === "approved") {
         // Create project if not already created
         if (!projectId) {
-          try {
-            const project = await storage.createProject({
-              name: existingInitiative.title,
-              description: existingInitiative.proposedAction || existingInitiative.observation,
-              status: "Active",
-              clientId: existingInitiative.clientId,
+          // Validate client exists BEFORE creating any resources
+          const client = await storage.getClientById(existingInitiative.clientId);
+          if (!client) {
+            return res.status(400).json({ 
+              message: "Cannot create project: client not found for this initiative" 
             });
-            projectId = project.id;
+          }
+          
+          // Use transaction for atomic project+task creation
+          try {
+            let createdProjectId: string | undefined;
             
-            // Persist project reference in initiative
-            await storage.updateInitiative(id, { projectId: project.id });
+            await db.transaction(async (tx) => {
+              // Create project
+              const [project] = await tx.insert(projects).values({
+                name: existingInitiative.title,
+                description: existingInitiative.observation,
+                status: "Active",
+                clientId: existingInitiative.clientId,
+              }).returning();
+              
+              if (!project?.id) {
+                throw new Error("Failed to create project: no ID returned");
+              }
+              
+              createdProjectId = project.id;
+              console.log(`Created project ${project.id} from approved initiative ${id}`);
+              
+              // Create task list
+              const [taskList] = await tx.insert(taskLists).values({
+                name: existingInitiative.title,
+                projectId: project.id,
+                agencyId: client.agencyId,
+              }).returning();
+              
+              console.log(`Created task list ${taskList.id} for project ${project.id}`);
+              
+              // Create tasks from actionTasks array
+              if (existingInitiative.actionTasks && Array.isArray(existingInitiative.actionTasks) && existingInitiative.actionTasks.length > 0) {
+                const taskValues = existingInitiative.actionTasks.map(taskDescription => ({
+                  description: taskDescription,
+                  status: "To Do" as const,
+                  priority: "Medium" as const,
+                  projectId: project.id,
+                  listId: taskList.id,
+                  startDate: null,
+                  dueDate: null,
+                  parentId: null,
+                  initiativeId: existingInitiative.id,
+                }));
+                
+                await tx.insert(tasks).values(taskValues);
+                console.log(`Created ${existingInitiative.actionTasks.length} tasks from initiative ${id}`);
+              }
+            });
             
-            console.log(`Created project ${project.id} from approved initiative ${id}`);
-          } catch (projectError) {
-            console.error("Failed to create project from initiative:", projectError);
-            // Don't fail the approval, just log the error
+            // Guard: Ensure transaction set the ID before proceeding
+            if (!createdProjectId) {
+              throw new Error("Transaction completed but project ID was not set");
+            }
+            
+            // Only assign projectId to outer scope AFTER transaction commits successfully
+            projectId = createdProjectId;
+            
+            // Persist project reference in initiative (outside transaction)
+            await storage.updateInitiative(id, { projectId });
+            
+          } catch (autoCreateError: any) {
+            console.error("Failed to auto-create project/tasks from initiative:", autoCreateError);
+            return res.status(500).json({ 
+              message: `Initiative approved, but failed to create project: ${autoCreateError.message}` 
+            });
           }
         }
         
@@ -2169,7 +2225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         invoiceId,
         message: response === "approved" 
-          ? `Initiative approved successfully${projectId ? ', project created' : ''}${invoiceId ? ', invoice generated' : ''}` 
+          ? `Initiative approved successfully${projectId ? ', project and tasks created' : ''}${invoiceId ? ', invoice generated' : ''}` 
           : undefined
       });
     } catch (error: any) {

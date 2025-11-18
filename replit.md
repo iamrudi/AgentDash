@@ -53,6 +53,17 @@ The platform is a full-stack JavaScript application utilizing React for the fron
     - **Frontend**: Messages tab in task detail dialog with chat-style UI, 1-second polling for near real-time updates (`refetchInterval: 1000`, `refetchIntervalInBackground: true`), automatic read receipts on view, auto-scroll to newest messages, Enter-to-send functionality.
     - **Security**: All endpoints protected by requireTaskAccess middleware ensuring users can only message on tasks they're assigned to; tenant isolation via task access verification.
     - **Future Enhancement**: Consider upgrading from polling to WebSockets/SSE for true real-time message delivery.
+  - **Auto-Creation Workflow (Completed)**: Automated project, task list, and task generation from approved AI recommendations:
+    - **Backend** (server/routes.ts, lines 2102-2177): POST `/api/initiatives/:id/respond` with `response="approved"` triggers atomic workflow.
+    - **Transaction-Based Implementation**: Wrapped in `db.transaction()` for all-or-nothing semantics:
+      1. Client validation BEFORE any DB writes (returns 400 if client not found)
+      2. Project creation with initiative title/observation
+      3. Task list creation with required `agencyId` for RLS tenant isolation
+      4. Batch task creation from `actionTasks` array (all tasks created atomically)
+      5. Scoped variable handling: uses local `createdProjectId` inside transaction, only assigns to outer `projectId` after commit
+    - **Invoice Generation**: Separate flow for fixed-cost initiatives or those with specified costs, uses InvoiceGeneratorService
+    - **Error Handling**: Returns 500 with descriptive message on failure, preventing silent errors; defensive guards ensure IDs are set before proceeding
+    - **Defensive Programming**: Explicit null checks for project.id and createdProjectId to prevent undefined state propagation
 - **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies, including task lists and tasks.
 
 ### Feature Specifications
