@@ -3,12 +3,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Trash2, X, Plus, Check, CornerDownRight } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -202,30 +202,20 @@ export function TaskDetailDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0" data-testid="dialog-task-detail">
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:w-[600px] sm:max-w-[600px] p-0 pr-6 flex flex-col overflow-hidden" data-testid="sheet-task-detail">
           {!task ? (
             <div className="flex items-center justify-center p-12">
               <p className="text-muted-foreground">Loading task details...</p>
             </div>
           ) : (
             <>
-              <DialogHeader className="px-6 pt-6 pb-4 space-y-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 space-y-1">
-                    <DialogTitle className="text-xl" data-testid="text-task-title">Task Details</DialogTitle>
-                    <DialogDescription className="text-sm text-muted-foreground" data-testid="text-task-type">
-                      {task.listId ? `List Task` : task.parentId ? `Subtask` : `Unassigned Task`}
-                    </DialogDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenChange(false)}
-                    data-testid="button-close-dialog"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+              <SheetHeader className="px-6 pt-10 pb-4 space-y-3 border-b">
+                <div className="space-y-1">
+                  <SheetTitle className="text-xl" data-testid="text-task-title">Task Details</SheetTitle>
+                  <SheetDescription className="text-sm text-muted-foreground" data-testid="text-task-type">
+                    {task.listId ? `List Task` : task.parentId ? `Subtask` : `Unassigned Task`}
+                  </SheetDescription>
                 </div>
 
                 <div className="space-y-2">
@@ -259,11 +249,9 @@ export function TaskDetailDialog({
                 </div>
               )}
             </div>
-          </DialogHeader>
+          </SheetHeader>
 
-          <Separator />
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
             <TabsList className="px-6 py-2 bg-background rounded-none border-b justify-start">
               <TabsTrigger value="details" data-testid="tab-details">
                 Details
@@ -515,9 +503,7 @@ export function TaskDetailDialog({
             </ScrollArea>
           </Tabs>
 
-          <Separator />
-
-          <div className="px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 border-t flex items-center justify-between mt-auto">
             <Button
               variant="destructive"
               size="sm"
@@ -539,8 +525,8 @@ export function TaskDetailDialog({
           </div>
             </>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {task && (
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
