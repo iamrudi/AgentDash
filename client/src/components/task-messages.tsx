@@ -19,10 +19,12 @@ export function TaskMessages({ taskId, currentUserId }: TaskMessagesProps) {
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Fetch messages
+  // Fetch messages with aggressive polling for near real-time updates
   const { data: messages = [], isLoading } = useQuery<TaskMessageWithSender[]>({
     queryKey: ["/api/tasks", taskId, "messages"],
     enabled: !!taskId,
+    refetchInterval: 1000, // Poll every 1 second for near real-time updates
+    refetchIntervalInBackground: true, // Continue polling even when tab is in background
   });
 
   // Auto-scroll to bottom when messages change
@@ -31,6 +33,23 @@ export function TaskMessages({ taskId, currentUserId }: TaskMessagesProps) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  // Mark unread messages as read when viewing
+  useEffect(() => {
+    if (!messages.length) return;
+    
+    // Filter for messages from other users that haven't been read
+    // isRead is stored as text "true"/"false" in the database
+    const unreadMessages = messages.filter(
+      (msg) => msg.senderId !== currentUserId && msg.isRead !== "true"
+    );
+
+    unreadMessages.forEach((msg) => {
+      apiRequest("PATCH", `/api/tasks/messages/${msg.id}/read`, {}).catch((error) => {
+        console.error("Failed to mark message as read:", error);
+      });
+    });
+  }, [messages, currentUserId]);
 
   // Send message mutation
   const sendMessageMutation = useMutation({
