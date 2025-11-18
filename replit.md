@@ -48,6 +48,11 @@ The platform is a full-stack JavaScript application utilizing React for the fron
     - **Frontend**: Activity tab in task detail dialog with timeline UI, formatted messages for 8 action types (status, priority, dates, description, assignees, subtasks), defensive date formatting with human-readable output (e.g., "Nov 20, 2025"), and relative timestamps.
     - **Activity Types**: status_changed, priority_changed, date_changed, description_changed, assignee_added, assignee_removed, subtask_created.
     - **Security**: Type-safe with TaskActivityWithUser[], null filtering in storage layer, try/catch error handling, tenant isolation via requireTaskAccess middleware.
+  - **Task Messaging (Completed)**: Staff-to-account-manager communication system integrated into task detail dialog:
+    - **Backend**: `task_messages` table with TaskMessageWithSender type, GET `/api/tasks/:taskId/messages`, POST `/api/tasks/:taskId/messages`, PATCH `/api/tasks/messages/:messageId/read` endpoints.
+    - **Frontend**: Messages tab in task detail dialog with chat-style UI, 1-second polling for near real-time updates (`refetchInterval: 1000`, `refetchIntervalInBackground: true`), automatic read receipts on view, auto-scroll to newest messages, Enter-to-send functionality.
+    - **Security**: All endpoints protected by requireTaskAccess middleware ensuring users can only message on tasks they're assigned to; tenant isolation via task access verification.
+    - **Future Enhancement**: Consider upgrading from polling to WebSockets/SSE for true real-time message delivery.
 - **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies, including task lists and tasks.
 
 ### Feature Specifications
