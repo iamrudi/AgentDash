@@ -197,15 +197,19 @@ export default function ProjectDetail() {
     const [, search = ""] = location.split("?");
     const params = new URLSearchParams(search);
     const taskParam = params.get("task");
+    
     if (!taskParam) {
-      if (selectedTaskId) setSelectedTaskId(null);
-      if (showTaskDetail) setShowTaskDetail(false);
+      // URL has no task param - close the sheet if it's open
+      setSelectedTaskId(null);
+      setShowTaskDetail(false);
       return;
     }
+    
+    // URL has a task param - check if it exists and open the sheet
     const exists = tasks.some(t => t.id === taskParam);
     if (exists) {
-      if (selectedTaskId !== taskParam) setSelectedTaskId(taskParam);
-      if (!showTaskDetail) setShowTaskDetail(true);
+      setSelectedTaskId(taskParam);
+      setShowTaskDetail(true);
     } else {
       toast({
         title: "Task not found",
@@ -214,7 +218,7 @@ export default function ProjectDetail() {
       });
       syncTaskParam();
     }
-  }, [location, tasks, selectedTaskId, showTaskDetail, syncTaskParam, toast, isLoading, projectData]);
+  }, [location, tasks, syncTaskParam, toast, isLoading, projectData]);
 
   // Event handlers for task detail dialog
   const handleViewTask = (task: TaskWithAssignments) => {
