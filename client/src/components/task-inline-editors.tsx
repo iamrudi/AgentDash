@@ -1,8 +1,9 @@
 import { useState, useEffect, type MouseEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CalendarIcon, UserPlus, X, Plus, Minus } from "lucide-react";
+import { CalendarIcon, UserPlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -424,18 +425,21 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     ? task.timeEstimate 
     : 0;
 
+  const [inputValue, setInputValue] = useState(currentEstimate.toString());
+
+  // Sync input when task changes
+  useEffect(() => {
+    setInputValue(currentEstimate.toString());
+  }, [currentEstimate]);
+
   const updateMutation = useMutation({
     mutationFn: async (timeEstimate: number) => {
       return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate });
     },
     onMutate: async (newTimeEstimate) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
-      
-      // Snapshot previous value
       const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
       
-      // Optimistically update the cache
       queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
         if (!old) return old;
         return {
@@ -449,7 +453,6 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
       return { previousData };
     },
     onError: (error: Error, _newTimeEstimate, context: any) => {
-      // Rollback on error
       if (context?.previousData) {
         queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
       }
@@ -458,9 +461,9 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
         description: error.message,
         variant: "destructive",
       });
+      setInputValue(currentEstimate.toString());
     },
     onSuccess: async () => {
-      // Refetch to ensure server and client are in sync
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
@@ -469,53 +472,55 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     },
   });
 
-  const handleIncrement = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[Time Estimate] Increment clicked, current:', currentEstimate);
-    updateMutation.mutate(currentEstimate + 0.5);
+  const handleBlur = () => {
+    const value = parseFloat(inputValue);
+    
+    if (isNaN(value) || value < 0) {
+      toast({
+        title: "Invalid input",
+        description: "Please enter a valid number (e.g., 1.5 for 1.5 hours)",
+        variant: "destructive",
+      });
+      setInputValue(currentEstimate.toString());
+      return;
+    }
+
+    // Check if it's in 0.5 hour increments
+    if (value % 0.5 !== 0) {
+      toast({
+        title: "Invalid increment",
+        description: "Time must be in 0.5 hour increments (e.g., 0.5, 1, 1.5, 2)",
+        variant: "destructive",
+      });
+      setInputValue(currentEstimate.toString());
+      return;
+    }
+
+    if (value !== currentEstimate) {
+      updateMutation.mutate(value);
+    }
   };
 
-  const handleDecrement = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[Time Estimate] Decrement clicked, current:', currentEstimate);
-    if (currentEstimate >= 0.5) {
-      updateMutation.mutate(currentEstimate - 0.5);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
     }
   };
 
   return (
     <div data-testid={`control-time-estimate-${task.id}`} className="flex items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleDecrement}
-        disabled={currentEstimate < 0.5 || updateMutation.isPending}
-        data-testid={`button-decrement-time-estimate-${task.id}`}
-        className="h-9 w-9"
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      
-      <div className="flex-1 flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-3 text-sm">
-        <span data-testid={`text-time-estimate-${task.id}`}>
-          {currentEstimate > 0 ? formatHours(currentEstimate) : <span className="text-muted-foreground">No estimate</span>}
-        </span>
-      </div>
-      
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleIncrement}
+      <Input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         disabled={updateMutation.isPending}
-        data-testid={`button-increment-time-estimate-${task.id}`}
-        className="h-9 w-9"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
+        placeholder="0"
+        className="h-9 text-center"
+        data-testid={`input-time-estimate-${task.id}`}
+      />
+      <span className="text-sm text-muted-foreground">hours</span>
     </div>
   );
 }
@@ -534,18 +539,21 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     ? task.timeTracked 
     : 0;
 
+  const [inputValue, setInputValue] = useState(currentTime.toString());
+
+  // Sync input when task changes
+  useEffect(() => {
+    setInputValue(currentTime.toString());
+  }, [currentTime]);
+
   const updateMutation = useMutation({
     mutationFn: async (timeTracked: number) => {
       return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeTracked });
     },
     onMutate: async (newTimeTracked) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
-      
-      // Snapshot previous value
       const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
       
-      // Optimistically update the cache
       queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
         if (!old) return old;
         return {
@@ -559,7 +567,6 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
       return { previousData };
     },
     onError: (error: Error, _newTimeTracked, context: any) => {
-      // Rollback on error
       if (context?.previousData) {
         queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
       }
@@ -568,9 +575,9 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
         description: error.message,
         variant: "destructive",
       });
+      setInputValue(currentTime.toString());
     },
     onSuccess: async () => {
-      // Refetch to ensure server and client are in sync
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
@@ -579,53 +586,55 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     },
   });
 
-  const handleIncrement = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[Time Tracked] Increment clicked, current:', currentTime);
-    updateMutation.mutate(currentTime + 0.5);
+  const handleBlur = () => {
+    const value = parseFloat(inputValue);
+    
+    if (isNaN(value) || value < 0) {
+      toast({
+        title: "Invalid input",
+        description: "Please enter a valid number (e.g., 1.5 for 1.5 hours)",
+        variant: "destructive",
+      });
+      setInputValue(currentTime.toString());
+      return;
+    }
+
+    // Check if it's in 0.5 hour increments
+    if (value % 0.5 !== 0) {
+      toast({
+        title: "Invalid increment",
+        description: "Time must be in 0.5 hour increments (e.g., 0.5, 1, 1.5, 2)",
+        variant: "destructive",
+      });
+      setInputValue(currentTime.toString());
+      return;
+    }
+
+    if (value !== currentTime) {
+      updateMutation.mutate(value);
+    }
   };
 
-  const handleDecrement = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('[Time Tracked] Decrement clicked, current:', currentTime);
-    if (currentTime >= 0.5) {
-      updateMutation.mutate(currentTime - 0.5);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
     }
   };
 
   return (
     <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleDecrement}
-        disabled={currentTime < 0.5 || updateMutation.isPending}
-        data-testid={`button-decrement-time-tracked-${task.id}`}
-        className="h-9 w-9"
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
-      
-      <div className="flex-1 flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-3 text-sm">
-        <span data-testid={`text-time-tracked-${task.id}`}>
-          {currentTime > 0 ? formatHours(currentTime) : <span className="text-muted-foreground">No time tracked</span>}
-        </span>
-      </div>
-      
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        onClick={handleIncrement}
+      <Input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         disabled={updateMutation.isPending}
-        data-testid={`button-increment-time-tracked-${task.id}`}
-        className="h-9 w-9"
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
+        placeholder="0"
+        className="h-9 text-center"
+        data-testid={`input-time-tracked-${task.id}`}
+      />
+      <span className="text-sm text-muted-foreground">hours</span>
     </div>
   );
 }
