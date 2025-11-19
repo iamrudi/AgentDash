@@ -43,6 +43,7 @@ const AgencyUsers = lazy(() => import("@/pages/agency/users"));
 const AgencyInvoices = lazy(() => import("@/pages/agency/invoices"));
 const AgencyTrash = lazy(() => import("@/pages/agency/trash"));
 const AgencySettings = lazy(() => import("@/pages/agency/settings"));
+const AgencyHoursReport = lazy(() => import("@/pages/agency/hours-report"));
 
 // Super Admin Portal Pages (lazy-loaded)
 const SuperAdminPortal = lazy(() => import("@/pages/superadmin/index"));
@@ -155,6 +156,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencyTasks />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/hours">
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
+          <AgencyLayout>
+            <AgencyHoursReport />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

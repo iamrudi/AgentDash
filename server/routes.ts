@@ -1103,6 +1103,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update task
   app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
+      // Validate time tracking increments (must be 0.5 hour increments)
+      if (req.body.timeTracked !== undefined && req.body.timeTracked !== null) {
+        const tracked = Number(req.body.timeTracked);
+        if (!Number.isFinite(tracked) || tracked < 0 || (tracked * 2) % 1 !== 0) {
+          return res.status(400).json({ 
+            message: "Time tracked must be a non-negative number in 0.5 hour increments (0, 0.5, 1, 1.5, etc.)" 
+          });
+        }
+      }
+      
+      if (req.body.timeEstimate !== undefined && req.body.timeEstimate !== null) {
+        const estimate = Number(req.body.timeEstimate);
+        if (!Number.isFinite(estimate) || estimate < 0 || (estimate * 2) % 1 !== 0) {
+          return res.status(400).json({ 
+            message: "Time estimate must be a non-negative number in 0.5 hour increments (0, 0.5, 1, 1.5, etc.)" 
+          });
+        }
+      }
+      
       const updateData = updateTaskSchema.parse(req.body);
       const updatedTask = await storage.updateTask(req.params.id, updateData);
 
@@ -1840,6 +1859,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oldTask = await storage.getTaskById(id);
       if (!oldTask) {
         return res.status(404).json({ message: "Task not found" });
+      }
+      
+      // Validate time tracking increments (must be 0.5 hour increments)
+      if (req.body.timeTracked !== undefined && req.body.timeTracked !== null) {
+        const tracked = Number(req.body.timeTracked);
+        if (!Number.isFinite(tracked) || tracked < 0 || (tracked * 2) % 1 !== 0) {
+          return res.status(400).json({ 
+            message: "Time tracked must be a non-negative number in 0.5 hour increments (0, 0.5, 1, 1.5, etc.)" 
+          });
+        }
+      }
+      
+      if (req.body.timeEstimate !== undefined && req.body.timeEstimate !== null) {
+        const estimate = Number(req.body.timeEstimate);
+        if (!Number.isFinite(estimate) || estimate < 0 || (estimate * 2) % 1 !== 0) {
+          return res.status(400).json({ 
+            message: "Time estimate must be a non-negative number in 0.5 hour increments (0, 0.5, 1, 1.5, etc.)" 
+          });
+        }
       }
       
       const updatedTask = await storage.updateTask(id, req.body);

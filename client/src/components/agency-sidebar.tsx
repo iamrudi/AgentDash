@@ -20,6 +20,7 @@ import {
   DollarSign,
   BarChart2,
   Building,
+  Clock,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -58,6 +59,12 @@ const menuGroups = [
         title: "Tasks & Projects",
         url: "/agency/tasks",
         icon: FolderKanban,
+        notificationKey: null,
+      },
+      {
+        title: "Hours Report",
+        url: "/agency/hours",
+        icon: Clock,
         notificationKey: null,
       },
     ],
