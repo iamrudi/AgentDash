@@ -1079,6 +1079,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
+      // Log first task to debug time tracking fields
+      if (projectData.tasks && projectData.tasks.length > 0) {
+        const firstTask = projectData.tasks[0];
+        console.log('[GET /api/agency/projects/:id] First task data:', JSON.stringify({
+          id: firstTask.id,
+          timeEstimate: firstTask.timeEstimate,
+          timeTracked: firstTask.timeTracked,
+          hasTimeEstimate: 'timeEstimate' in firstTask,
+          hasTimeTracked: 'timeTracked' in firstTask,
+          allKeys: Object.keys(firstTask)
+        }, null, 2));
+      }
+
       res.json(projectData);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1881,6 +1894,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedTask = await storage.updateTask(id, req.body);
+      
+      console.log('[PATCH /api/tasks/:id] Updated task data:', JSON.stringify({
+        id: updatedTask.id,
+        timeEstimate: updatedTask.timeEstimate,
+        timeTracked: updatedTask.timeTracked,
+        hasTimeEstimate: 'timeEstimate' in updatedTask,
+        hasTimeTracked: 'timeTracked' in updatedTask,
+        allKeys: Object.keys(updatedTask)
+      }, null, 2));
       
       // Log activity for the changes
       await logTaskActivity(id, req.user!.id, oldTask, updatedTask);
