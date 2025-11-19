@@ -128,8 +128,8 @@ export const tasks = pgTable("tasks", {
   startDate: date("start_date"), // Start date for calendar view (ISO date string)
   dueDate: date("due_date"), // Due date (ISO date string)
   priority: text("priority").default("Medium"), // 'Low', 'Medium', 'High', 'Urgent'
-  timeEstimate: text("time_estimate"), // Estimated time (e.g., "15h", "2d", "1w")
-  timeTracked: numeric("time_tracked").default("0"), // Actual time tracked in hours
+  timeEstimate: numeric("time_estimate").default(sql`0`), // Estimated time in hours (decimal: 2.5 = 2h 30m)
+  timeTracked: numeric("time_tracked").default(sql`0`), // Actual time tracked in hours (decimal: 2.5 = 2h 30m)
   listId: uuid("list_id").references(() => taskLists.id, { onDelete: "cascade" }), // NULLABLE TEMPORARILY: Will be enforced after backfill migration
   parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
@@ -596,7 +596,7 @@ const baseTaskSchema = createInsertSchema(tasks).omit({
   priority: z.enum(taskPriorityEnum).optional(),
   startDate: z.string().datetime().optional().nullable(),
   dueDate: z.string().datetime().optional().nullable(),
-  timeEstimate: z.string().optional().nullable(),
+  timeEstimate: z.coerce.number().optional().nullable(),
   timeTracked: z.coerce.number().optional().nullable(),
 });
 
