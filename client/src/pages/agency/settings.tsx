@@ -32,20 +32,34 @@ type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 function AIProviderManager() {
   const { toast } = useToast();
 
-  const { data: settings, isLoading } = useQuery<{ aiProvider: string; isDefault: boolean }>({
+  const { data: settings, isLoading } = useQuery<{ aiProvider: string; isDefault: boolean; isSuperAdminGlobal?: boolean; message?: string }>({
     queryKey: ['/api/agency/settings'],
   });
 
   const updateProviderMutation = useMutation({
     mutationFn: async (aiProvider: string) => {
-      return await apiRequest('PUT', '/api/agency/settings', { aiProvider });
+      const response = await apiRequest('PUT', '/api/agency/settings', { aiProvider });
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      console.log('[AI Provider] PUT response data:', data);
+      console.log('[AI Provider] isSuperAdminGlobal:', data?.isSuperAdminGlobal);
+      console.log('[AI Provider] message:', data?.message);
+      
+      // Check if this is a SuperAdmin trying to change global settings
+      if (data?.isSuperAdminGlobal && data?.message) {
+        toast({
+          title: "Information",
+          description: data.message,
+        });
+      } else {
+        toast({
+          title: "AI Provider Updated",
+          description: "Your AI provider preference has been saved successfully",
+        });
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['/api/agency/settings'] });
-      toast({
-        title: "AI Provider Updated",
-        description: "Your AI provider preference has been saved successfully",
-      });
     },
     onError: (error: any) => {
       toast({
@@ -101,7 +115,15 @@ function AIProviderManager() {
 
         {settings?.isDefault && (
           <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
-            Currently using default provider from environment configuration
+            {settings?.isSuperAdminGlobal ? (
+              <>
+                <strong>SuperAdmin View:</strong> You are viewing the global default AI provider. 
+                To change settings for a specific agency, please log in as an Admin of that agency. 
+                To change the global default, update the AI_PROVIDER environment variable.
+              </>
+            ) : (
+              "Currently using default provider from environment configuration"
+            )}
           </div>
         )}
       </div>

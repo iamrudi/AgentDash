@@ -1324,6 +1324,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get agency settings (AI provider configuration)
   app.get("/api/agency/settings", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
+      // SuperAdmins: return global environment default (they manage platform-wide settings)
+      if (req.user!.isSuperAdmin && !req.user!.agencyId) {
+        return res.json({
+          aiProvider: (process.env.AI_PROVIDER?.toLowerCase() || "gemini"),
+          isDefault: true,
+          isSuperAdminGlobal: true,
+        });
+      }
+
+      // Regular Admins: require agency association
       if (!req.user!.agencyId) {
         return res.status(403).json({ message: "Agency association required" });
       }
@@ -1356,10 +1366,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update agency settings (AI provider configuration)
   app.put("/api/agency/settings", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
-      if (!req.user!.agencyId) {
-        return res.status(403).json({ message: "Agency association required" });
-      }
-
       // Validate request body
       const validationResult = updateAgencySettingSchema.safeParse(req.body);
       if (!validationResult.success) {
@@ -1370,6 +1376,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { aiProvider } = validationResult.data;
+
+      // SuperAdmins without agency: inform them they're viewing global defaults
+      // (In practice, they would need to modify environment variables directly)
+      if (req.user!.isSuperAdmin && !req.user!.agencyId) {
+        return res.json({
+          aiProvider: aiProvider,
+          isDefault: true,
+          isSuperAdminGlobal: true,
+          message: "SuperAdmins can view AI provider preferences, but changing the global default requires updating the AI_PROVIDER environment variable. To change settings for a specific agency, please log in as an Admin of that agency."
+        });
+      }
+
+      // Regular Admins: require agency association
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
 
       // Check if settings already exist for this agency
       const existingSettings = await db
