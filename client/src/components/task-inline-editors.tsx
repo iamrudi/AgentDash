@@ -421,9 +421,14 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
   const { toast } = useToast();
 
   // Safely parse timeEstimate as a number, defaulting to 0
-  const currentEstimate = typeof task.timeEstimate === 'number' && !isNaN(task.timeEstimate) 
-    ? task.timeEstimate 
-    : 0;
+  // Note: Drizzle's numeric type returns strings, so we need to parse them
+  const currentEstimate = (() => {
+    if (task.timeEstimate === null || task.timeEstimate === undefined) return 0;
+    const parsed = typeof task.timeEstimate === 'string' 
+      ? parseFloat(task.timeEstimate) 
+      : Number(task.timeEstimate);
+    return isNaN(parsed) ? 0 : parsed;
+  })();
 
   const [inputValue, setInputValue] = useState(currentEstimate.toString());
   const [isEditing, setIsEditing] = useState(false);
@@ -582,9 +587,14 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
   const { toast } = useToast();
 
   // Safely parse timeTracked as a number, defaulting to 0
-  const currentTime = typeof task.timeTracked === 'number' && !isNaN(task.timeTracked) 
-    ? task.timeTracked 
-    : 0;
+  // Note: Drizzle's numeric type returns strings, so we need to parse them
+  const currentTime = (() => {
+    if (task.timeTracked === null || task.timeTracked === undefined) return 0;
+    const parsed = typeof task.timeTracked === 'string' 
+      ? parseFloat(task.timeTracked) 
+      : Number(task.timeTracked);
+    return isNaN(parsed) ? 0 : parsed;
+  })();
 
   const [inputValue, setInputValue] = useState(currentTime.toString());
   const [isEditing, setIsEditing] = useState(false);
