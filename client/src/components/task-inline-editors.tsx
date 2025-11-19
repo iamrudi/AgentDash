@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { useState, useEffect, type MouseEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon, UserPlus, X } from "lucide-react";
@@ -84,23 +84,21 @@ export function TaskStatusControl({ task, projectId }: TaskStatusControlProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (status: TaskStatus) => {
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, { status });
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { status });
     },
-    onMutate: async (newStatus) => {
-      return await updateProjectTaskField(projectId, task.id, { status: newStatus });
-    },
-    onError: (error: Error, _newStatus, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
     },
   });
 
@@ -147,23 +145,21 @@ export function TaskPriorityControl({ task, projectId }: TaskPriorityControlProp
 
   const updateMutation = useMutation({
     mutationFn: async (priority: TaskPriority) => {
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, { priority });
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { priority });
     },
-    onMutate: async (newPriority) => {
-      return await updateProjectTaskField(projectId, task.id, { priority: newPriority });
-    },
-    onError: (error: Error, _newPriority, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
     },
   });
 
@@ -215,27 +211,23 @@ export function TaskDateControl({ task, projectId, dateType, label }: TaskDateCo
 
   const updateMutation = useMutation({
     mutationFn: async (date: Date | null) => {
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, { 
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { 
         [dateType]: date ? date.toISOString() : null 
       });
     },
-    onMutate: async (newDate) => {
-      return await updateProjectTaskField(projectId, task.id, {
-        [dateType]: newDate ? newDate.toISOString() : null
-      });
-    },
-    onError: (error: Error, _newDate, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
       setOpen(false);
     },
   });
@@ -413,15 +405,9 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
 
   const updateMutation = useMutation({
     mutationFn: async (timeEstimate: string) => {
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, { timeEstimate: timeEstimate || null });
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate: timeEstimate || null });
     },
-    onMutate: async (newTimeEstimate) => {
-      return await updateProjectTaskField(projectId, task.id, { timeEstimate: newTimeEstimate || null });
-    },
-    onError: (error: Error, _newTimeEstimate, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message,
@@ -429,8 +415,12 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
       });
       setValue(task.timeEstimate || "");
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
       setIsEditing(false);
     },
   });
@@ -495,71 +485,148 @@ interface TaskTimeTrackedControlProps {
   projectId: string;
 }
 
-export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedControlProps) {
-  const { toast } = useToast();
+// Helper function to parse time strings like "2h 30m" into hours
+function parseTimeToHours(timeStr: string): number {
+  if (!timeStr || timeStr.trim() === '') return 0;
+  
+  let totalHours = 0;
+  const hourMatch = timeStr.match(/(\d+(?:\.\d+)?)\s*h/i);
+  const minMatch = timeStr.match(/(\d+(?:\.\d+)?)\s*m/i);
+  
+  if (hourMatch) {
+    totalHours += parseFloat(hourMatch[1]);
+  }
+  if (minMatch) {
+    totalHours += parseFloat(minMatch[1]) / 60;
+  }
+  
+  // If no h or m found, try parsing as a plain number (assume hours)
+  if (!hourMatch && !minMatch) {
+    const num = parseFloat(timeStr);
+    if (!isNaN(num)) {
+      totalHours = num;
+    }
+  }
+  
+  return Math.max(0, totalHours);
+}
 
-  const updateMutation = useMutation({
-    mutationFn: async (timeTracked: number) => {
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, { timeTracked });
-    },
-    onMutate: async (newTimeTracked) => {
-      return await updateProjectTaskField(projectId, task.id, { timeTracked: newTimeTracked });
-    },
-    onError: (error: Error, _newTimeTracked, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
-    },
-  });
+// Helper function to format hours into readable string
+function formatHours(hours: number): string {
+  if (hours === 0) return '0h';
+  
+  const wholeHours = Math.floor(hours);
+  const minutes = Math.round((hours - wholeHours) * 60);
+  
+  if (minutes === 0) {
+    return `${wholeHours}h`;
+  }
+  
+  if (wholeHours === 0) {
+    return `${minutes}m`;
+  }
+  
+  return `${wholeHours}h ${minutes}m`;
+}
+
+export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedControlProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const { toast } = useToast();
 
   // Safely parse timeTracked as a number, defaulting to 0
   const currentTime = typeof task.timeTracked === 'number' && !isNaN(task.timeTracked) 
     ? task.timeTracked 
     : 0;
 
-  const increment = () => {
-    updateMutation.mutate(currentTime + 0.5);
+  // Sync value state with task prop when it updates
+  useEffect(() => {
+    if (!isEditing) {
+      const formatted = formatHours(currentTime);
+      console.log('[TimeTracked useEffect] Syncing value. currentTime:', currentTime, 'formatted:', formatted, 'isEditing:', isEditing);
+      setValue(formatted);
+    }
+  }, [currentTime, isEditing]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (timeTracked: number) => {
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeTracked });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setValue(formatHours(currentTime));
+    },
+    onSuccess: async () => {
+      console.log('[TimeTracked] Mutation succeeded, invalidating queries...');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
+      console.log('[TimeTracked] Queries invalidated, closing edit mode');
+      setIsEditing(false);
+    },
+  });
+
+  const handleSave = () => {
+    const parsedHours = parseTimeToHours(value);
+    console.log('[TimeTracked] Saving value:', value, 'parsed:', parsedHours);
+    if (parsedHours === currentTime) {
+      setIsEditing(false);
+      return;
+    }
+    updateMutation.mutate(parsedHours);
   };
 
-  const decrement = () => {
-    if (currentTime > 0) {
-      updateMutation.mutate(Math.max(0, currentTime - 0.5));
-    }
+  const handleCancel = () => {
+    setValue(formatHours(currentTime));
+    setIsEditing(false);
   };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") handleCancel();
+          }}
+          placeholder="e.g., 2h 30m, 1.5h, 90m"
+          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          autoFocus
+          data-testid={`input-time-tracked-${task.id}`}
+        />
+        <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} data-testid={`button-save-time-tracked-${task.id}`}>
+          Save
+        </Button>
+        <Button size="sm" variant="outline" onClick={handleCancel} disabled={updateMutation.isPending}>
+          Cancel
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={decrement}
-        disabled={currentTime === 0 || updateMutation.isPending}
-        data-testid={`button-decrement-time-${task.id}`}
-        className="h-9 w-9 p-0"
+    <div data-testid={`control-time-tracked-${task.id}`}>
+      <button
+        onClick={() => {
+          setValue(formatHours(currentTime));
+          setIsEditing(true);
+        }}
+        className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm text-left hover-elevate"
+        data-testid={`button-edit-time-tracked-${task.id}`}
       >
-        -
-      </Button>
-      <div className="flex h-9 min-w-[80px] items-center justify-center rounded-md border border-input bg-transparent px-3 py-1 text-sm">
-        <span data-testid={`text-time-tracked-${task.id}`}>{currentTime}h</span>
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={increment}
-        disabled={updateMutation.isPending}
-        data-testid={`button-increment-time-${task.id}`}
-        className="h-9 w-9 p-0"
-      >
-        +
-      </Button>
+        <span data-testid={`text-time-tracked-${task.id}`}>
+          {currentTime > 0 ? formatHours(currentTime) : <span className="text-muted-foreground">No time tracked</span>}
+        </span>
+      </button>
     </div>
   );
 }

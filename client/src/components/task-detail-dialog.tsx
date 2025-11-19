@@ -98,12 +98,16 @@ export function TaskDetailDialog({
   const updateDescriptionMutation = useMutation({
     mutationFn: async (newDescription: string) => {
       if (!task) return;
-      return await apiRequest("PATCH", `/api/agency/tasks/${task.id}`, {
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, {
         description: newDescription,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
       toast({
         title: "Success",
         description: "Task description updated",
@@ -122,10 +126,14 @@ export function TaskDetailDialog({
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!task) return;
-      return await apiRequest("DELETE", `/api/agency/tasks/${task.id}`);
+      return await apiRequest("DELETE", `/api/tasks/${task.id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
       toast({
         title: "Success",
         description: "Task deleted",

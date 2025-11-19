@@ -50,6 +50,14 @@ export default function StaffDashboard() {
     enabled: !!tasks,
   });
 
+  // Debug logging for task data changes
+  useEffect(() => {
+    if (fullTaskData && selectedTaskId) {
+      const task = fullTaskData.find(t => t.id === selectedTaskId);
+      console.log('[StaffDashboard] fullTaskData updated, selectedTask timeTracked:', task?.timeTracked);
+    }
+  }, [fullTaskData, selectedTaskId]);
+
   const handleToggleTask = (taskId: string, completed: boolean) => {
     updateTaskMutation.mutate({
       taskId,
@@ -123,7 +131,9 @@ export default function StaffDashboard() {
   // Selected task - now waits for fullTaskData to load
   const selectedTask = useMemo(() => {
     if (!selectedTaskId || !fullTaskData) return null;
-    return fullTaskData.find(t => t.id === selectedTaskId) ?? null;
+    const task = fullTaskData.find(t => t.id === selectedTaskId) ?? null;
+    console.log('[StaffDashboard useMemo] Recomputing selectedTask. timeTracked:', task?.timeTracked);
+    return task;
   }, [fullTaskData, selectedTaskId]);
 
   const filteredTasks = tasks?.filter((task) => {

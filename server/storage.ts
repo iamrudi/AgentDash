@@ -818,6 +818,11 @@ export class DbStorage implements IStorage {
           projectId: tasks.projectId,
           initiativeId: tasks.initiativeId,
           createdAt: tasks.createdAt,
+          startDate: tasks.startDate,
+          listId: tasks.listId,
+          parentId: tasks.parentId,
+          timeEstimate: tasks.timeEstimate,
+          timeTracked: tasks.timeTracked,
         })
         .from(tasks)
         .innerJoin(projects, eq(tasks.projectId, projects.id))
