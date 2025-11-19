@@ -474,7 +474,11 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     },
   });
 
-  const handleSave = () => {
+  const handleSave = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('[Time Estimate] Save clicked, inputValue:', inputValue, 'currentEstimate:', currentEstimate);
+    
     const value = parseFloat(inputValue);
     
     if (isNaN(value) || value < 0) {
@@ -497,15 +501,29 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     }
 
     if (value !== currentEstimate) {
+      console.log('[Time Estimate] Triggering mutation with value:', value);
       updateMutation.mutate(value);
     } else {
+      console.log('[Time Estimate] No change, hiding buttons');
       setIsEditing(false);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('[Time Estimate] Cancel clicked');
     setInputValue(currentEstimate.toString());
     setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[Time Estimate] Enter pressed, preventing default');
+      handleSave();
+    }
   };
 
   return (
@@ -518,6 +536,7 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
             setInputValue(e.target.value);
             setIsEditing(true);
           }}
+          onKeyDown={handleKeyDown}
           disabled={updateMutation.isPending}
           placeholder="0"
           className="h-9 text-center"
@@ -615,7 +634,11 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     },
   });
 
-  const handleSave = () => {
+  const handleSave = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('[Time Tracked] Save clicked, inputValue:', inputValue, 'currentTime:', currentTime);
+    
     const value = parseFloat(inputValue);
     
     if (isNaN(value) || value < 0) {
@@ -638,15 +661,29 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     }
 
     if (value !== currentTime) {
+      console.log('[Time Tracked] Triggering mutation with value:', value);
       updateMutation.mutate(value);
     } else {
+      console.log('[Time Tracked] No change, hiding buttons');
       setIsEditing(false);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    console.log('[Time Tracked] Cancel clicked');
     setInputValue(currentTime.toString());
     setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[Time Tracked] Enter pressed, preventing default');
+      handleSave();
+    }
   };
 
   return (
@@ -659,6 +696,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
             setInputValue(e.target.value);
             setIsEditing(true);
           }}
+          onKeyDown={handleKeyDown}
           disabled={updateMutation.isPending}
           placeholder="0"
           className="h-9 text-center"
