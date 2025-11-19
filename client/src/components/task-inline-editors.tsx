@@ -426,6 +426,7 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     : 0;
 
   const [inputValue, setInputValue] = useState(currentEstimate.toString());
+  const [isEditing, setIsEditing] = useState(false);
 
   // Sync input when task changes
   useEffect(() => {
@@ -469,10 +470,11 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
       ]);
+      setIsEditing(false);
     },
   });
 
-  const handleBlur = () => {
+  const handleSave = () => {
     const value = parseFloat(inputValue);
     
     if (isNaN(value) || value < 0) {
@@ -481,7 +483,6 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
         description: "Please enter a valid number (e.g., 1.5 for 1.5 hours)",
         variant: "destructive",
       });
-      setInputValue(currentEstimate.toString());
       return;
     }
 
@@ -492,35 +493,61 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
         description: "Time must be in 0.5 hour increments (e.g., 0.5, 1, 1.5, 2)",
         variant: "destructive",
       });
-      setInputValue(currentEstimate.toString());
       return;
     }
 
     if (value !== currentEstimate) {
       updateMutation.mutate(value);
+    } else {
+      setIsEditing(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
+  const handleCancel = () => {
+    setInputValue(currentEstimate.toString());
+    setIsEditing(false);
   };
 
   return (
-    <div data-testid={`control-time-estimate-${task.id}`} className="flex items-center gap-2">
-      <Input
-        type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        disabled={updateMutation.isPending}
-        placeholder="0"
-        className="h-9 text-center"
-        data-testid={`input-time-estimate-${task.id}`}
-      />
-      <span className="text-sm text-muted-foreground">hours</span>
+    <div data-testid={`control-time-estimate-${task.id}`} className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Input
+          type="text"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setIsEditing(true);
+          }}
+          disabled={updateMutation.isPending}
+          placeholder="0"
+          className="h-9 text-center"
+          data-testid={`input-time-estimate-${task.id}`}
+        />
+        <span className="text-sm text-muted-foreground">hours</span>
+      </div>
+      {isEditing && (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            data-testid="button-save-time-estimate"
+          >
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={handleCancel}
+            disabled={updateMutation.isPending}
+            data-testid="button-cancel-time-estimate"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -540,6 +567,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     : 0;
 
   const [inputValue, setInputValue] = useState(currentTime.toString());
+  const [isEditing, setIsEditing] = useState(false);
 
   // Sync input when task changes
   useEffect(() => {
@@ -583,10 +611,11 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
       ]);
+      setIsEditing(false);
     },
   });
 
-  const handleBlur = () => {
+  const handleSave = () => {
     const value = parseFloat(inputValue);
     
     if (isNaN(value) || value < 0) {
@@ -595,7 +624,6 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
         description: "Please enter a valid number (e.g., 1.5 for 1.5 hours)",
         variant: "destructive",
       });
-      setInputValue(currentTime.toString());
       return;
     }
 
@@ -606,35 +634,61 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
         description: "Time must be in 0.5 hour increments (e.g., 0.5, 1, 1.5, 2)",
         variant: "destructive",
       });
-      setInputValue(currentTime.toString());
       return;
     }
 
     if (value !== currentTime) {
       updateMutation.mutate(value);
+    } else {
+      setIsEditing(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
+  const handleCancel = () => {
+    setInputValue(currentTime.toString());
+    setIsEditing(false);
   };
 
   return (
-    <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
-      <Input
-        type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        disabled={updateMutation.isPending}
-        placeholder="0"
-        className="h-9 text-center"
-        data-testid={`input-time-tracked-${task.id}`}
-      />
-      <span className="text-sm text-muted-foreground">hours</span>
+    <div data-testid={`control-time-tracked-${task.id}`} className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Input
+          type="text"
+          value={inputValue}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            setIsEditing(true);
+          }}
+          disabled={updateMutation.isPending}
+          placeholder="0"
+          className="h-9 text-center"
+          data-testid={`input-time-tracked-${task.id}`}
+        />
+        <span className="text-sm text-muted-foreground">hours</span>
+      </div>
+      {isEditing && (
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSave}
+            disabled={updateMutation.isPending}
+            data-testid="button-save-time-tracked"
+          >
+            {updateMutation.isPending ? "Saving..." : "Save"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={handleCancel}
+            disabled={updateMutation.isPending}
+            data-testid="button-cancel-time-tracked"
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
