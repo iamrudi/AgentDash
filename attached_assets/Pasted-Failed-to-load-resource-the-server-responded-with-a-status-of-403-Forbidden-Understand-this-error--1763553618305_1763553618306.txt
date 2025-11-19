@@ -1,0 +1,172 @@
+Failed to load resource: the server responded with a status of 403 (Forbidden)Understand this error
+/api/agency/metrics:1  Failed to load resource: the server responded with a status of 403 (Forbidden)Understand this error
+/api/agency/messages:1  Failed to load resource: the server responded with a status of 403 (Forbidden)Understand this error
+/api/agency/notifications/counts:1  Failed to load resource: the server responded with a status of 403 (Forbidden)Understand this error
+Grammarly.js:2 grm ERROR [iterable] ░░ Not supported: in app messages from Iterable
+write @ Grammarly.js:2Understand this error
+queryClient.ts:134  GET https://6c759fdd-8fa5-4ac7-8e2e-8969091e8055-00-1kcgek74olqt2.riker.replit.dev/api/agency/notifications/counts 403 (Forbidden)
+(anonymous) @ queryClient.ts:134
+await in (anonymous)
+fetchFn @ @tanstack_react-query.js?v=4c1b6ad1:840
+run @ @tanstack_react-query.js?v=4c1b6ad1:494
+start @ @tanstack_react-query.js?v=4c1b6ad1:536
+fetch @ @tanstack_react-query.js?v=4c1b6ad1:926
+executeFetch_fn @ @tanstack_react-query.js?v=4c1b6ad1:2211
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:2245Understand this error
+task-inline-editors.tsx:527 [Time Tracked] Increment clicked, current: 0
+Grammarly.js:2 grm ERROR [iterable] ░░ Not supported: in app messages from Iterable
+write @ Grammarly.js:2
+handleEvent @ Grammarly.js:2
+_logMessage @ Grammarly.js:2
+error @ Grammarly.js:2
+error @ Grammarly.js:2
+onTrigger @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+t._execute @ Grammarly.js:2
+t.execute @ Grammarly.js:2
+t.flush @ Grammarly.js:2
+setInterval
+setInterval @ Grammarly.js:2
+t.requestAsyncId @ Grammarly.js:2
+t.schedule @ Grammarly.js:2
+e.schedule @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e._trySubscribe @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+e.subscribe @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+t.next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+set @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+_processObservableMessage @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+t @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+fire @ Grammarly.js:2
+_onBgPortMessage @ Grammarly.js:2Understand this error
+task-inline-editors.tsx:448 [Time Estimate] Increment clicked, current: 0
+queryClient.ts:134  GET https://6c759fdd-8fa5-4ac7-8e2e-8969091e8055-00-1kcgek74olqt2.riker.replit.dev/api/agency/notifications/counts 403 (Forbidden)
+(anonymous) @ queryClient.ts:134
+await in (anonymous)
+fetchFn @ @tanstack_react-query.js?v=4c1b6ad1:840
+run @ @tanstack_react-query.js?v=4c1b6ad1:494
+start @ @tanstack_react-query.js?v=4c1b6ad1:536
+fetch @ @tanstack_react-query.js?v=4c1b6ad1:926
+executeFetch_fn @ @tanstack_react-query.js?v=4c1b6ad1:2211
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:2245
+setInterval
+updateRefetchInterval_fn @ @tanstack_react-query.js?v=4c1b6ad1:2243
+updateTimers_fn @ @tanstack_react-query.js?v=4c1b6ad1:2250
+onQueryUpdate @ @tanstack_react-query.js?v=4c1b6ad1:2206
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:998
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:997
+batch @ @tanstack_react-query.js?v=4c1b6ad1:583
+dispatch_fn @ @tanstack_react-query.js?v=4c1b6ad1:996
+onError @ @tanstack_react-query.js?v=4c1b6ad1:861
+reject @ @tanstack_react-query.js?v=4c1b6ad1:465
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:508
+Promise.catch
+run @ @tanstack_react-query.js?v=4c1b6ad1:498
+start @ @tanstack_react-query.js?v=4c1b6ad1:536
+fetch @ @tanstack_react-query.js?v=4c1b6ad1:926
+executeFetch_fn @ @tanstack_react-query.js?v=4c1b6ad1:2211
+(anonymous) @ @tanstack_react-query.js?v=4c1b6ad1:2245Understand this error
+Grammarly.js:2 grm ERROR [iterable] ░░ Not supported: in app messages from Iterable
+write @ Grammarly.js:2
+handleEvent @ Grammarly.js:2
+_logMessage @ Grammarly.js:2
+error @ Grammarly.js:2
+error @ Grammarly.js:2
+onTrigger @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+t._execute @ Grammarly.js:2
+t.execute @ Grammarly.js:2
+t.flush @ Grammarly.js:2
+setInterval
+setInterval @ Grammarly.js:2
+t.requestAsyncId @ Grammarly.js:2
+t.schedule @ Grammarly.js:2
+e.schedule @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e._trySubscribe @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+e.subscribe @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+t.next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+set @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+o @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+_processObservableMessage @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+e.next @ Grammarly.js:2
+t._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+a._next @ Grammarly.js:2
+t.next @ Grammarly.js:2
+t @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+(anonymous) @ Grammarly.js:2
+fire @ Grammarly.js:2
+_onBgPortMessage @ Grammarly.js:2Understand this error
+queryClient.ts:134  GET https://6c759fdd-8fa5-4ac7-8e2e-8969091e8055-00-1kcgek74olqt2.riker.replit.dev/api/agency/notifications/counts 403 (Forbidden)

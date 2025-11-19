@@ -428,7 +428,31 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     mutationFn: async (timeEstimate: number) => {
       return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate });
     },
-    onError: (error: Error) => {
+    onMutate: async (newTimeEstimate) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
+      
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
+      
+      // Optimistically update the cache
+      queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks?.map((t: any) => 
+            t.id === task.id ? { ...t, timeEstimate: newTimeEstimate } : t
+          ),
+        };
+      });
+      
+      return { previousData };
+    },
+    onError: (error: Error, _newTimeEstimate, context: any) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message,
@@ -436,6 +460,7 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
       });
     },
     onSuccess: async () => {
+      // Refetch to ensure server and client are in sync
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
@@ -507,7 +532,31 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     mutationFn: async (timeTracked: number) => {
       return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeTracked });
     },
-    onError: (error: Error) => {
+    onMutate: async (newTimeTracked) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
+      
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
+      
+      // Optimistically update the cache
+      queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks?.map((t: any) => 
+            t.id === task.id ? { ...t, timeTracked: newTimeTracked } : t
+          ),
+        };
+      });
+      
+      return { previousData };
+    },
+    onError: (error: Error, _newTimeTracked, context: any) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
+      }
       toast({
         title: "Error",
         description: error.message,
@@ -515,6 +564,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
       });
     },
     onSuccess: async () => {
+      // Refetch to ensure server and client are in sync
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
