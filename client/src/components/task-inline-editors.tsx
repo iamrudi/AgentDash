@@ -488,6 +488,7 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
   return (
     <div data-testid={`control-time-estimate-${task.id}`} className="flex items-center gap-2">
       <Button
+        type="button"
         variant="outline"
         size="icon"
         onClick={handleDecrement}
@@ -505,6 +506,7 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
       </div>
       
       <Button
+        type="button"
         variant="outline"
         size="icon"
         onClick={handleIncrement}
@@ -596,6 +598,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
   return (
     <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
       <Button
+        type="button"
         variant="outline"
         size="icon"
         onClick={handleDecrement}
@@ -613,6 +616,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
       </div>
       
       <Button
+        type="button"
         variant="outline"
         size="icon"
         onClick={handleIncrement}
