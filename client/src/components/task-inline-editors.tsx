@@ -469,12 +469,16 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
     },
   });
 
-  const handleIncrement = () => {
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('[Time Estimate] Increment clicked, current:', currentEstimate);
     updateMutation.mutate(currentEstimate + 0.5);
   };
 
-  const handleDecrement = () => {
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('[Time Estimate] Decrement clicked, current:', currentEstimate);
     if (currentEstimate >= 0.5) {
       updateMutation.mutate(currentEstimate - 0.5);
@@ -573,12 +577,16 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     },
   });
 
-  const handleIncrement = () => {
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('[Time Tracked] Increment clicked, current:', currentTime);
     updateMutation.mutate(currentTime + 0.5);
   };
 
-  const handleDecrement = () => {
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('[Time Tracked] Decrement clicked, current:', currentTime);
     if (currentTime >= 0.5) {
       updateMutation.mutate(currentTime - 0.5);
