@@ -1,7 +1,7 @@
 import { useState, useEffect, type MouseEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CalendarIcon, UserPlus, X } from "lucide-react";
+import { CalendarIcon, UserPlus, X, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -392,125 +392,6 @@ export function TaskAssigneesControl({ task, projectId, onAssignStaff }: TaskAss
   );
 }
 
-// Task Time Estimate Inline Editor
-interface TaskTimeEstimateControlProps {
-  task: Task;
-  projectId: string;
-}
-
-export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateControlProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(task.timeEstimate || "");
-  const { toast } = useToast();
-
-  const updateMutation = useMutation({
-    mutationFn: async (timeEstimate: string) => {
-      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate: timeEstimate || null });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-      setValue(task.timeEstimate || "");
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
-      ]);
-      setIsEditing(false);
-    },
-  });
-
-  const handleSave = () => {
-    if (value === task.timeEstimate) {
-      setIsEditing(false);
-      return;
-    }
-    updateMutation.mutate(value.trim());
-  };
-
-  const handleCancel = () => {
-    setValue(task.timeEstimate || "");
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") handleCancel();
-          }}
-          placeholder="e.g., 15h, 2d, 30m"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          autoFocus
-          data-testid={`input-time-estimate-${task.id}`}
-        />
-        <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} data-testid={`button-save-time-estimate-${task.id}`}>
-          Save
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleCancel} disabled={updateMutation.isPending}>
-          Cancel
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div data-testid={`control-time-estimate-${task.id}`}>
-      <button
-        onClick={() => setIsEditing(true)}
-        className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm text-left hover-elevate"
-        data-testid={`button-edit-time-estimate-${task.id}`}
-      >
-        <span data-testid={`text-time-estimate-${task.id}`}>
-          {task.timeEstimate || <span className="text-muted-foreground">No estimate</span>}
-        </span>
-      </button>
-    </div>
-  );
-}
-
-// Task Time Tracked Inline Editor
-interface TaskTimeTrackedControlProps {
-  task: Task;
-  projectId: string;
-}
-
-// Helper function to parse time strings like "2h 30m" into hours
-function parseTimeToHours(timeStr: string): number {
-  if (!timeStr || timeStr.trim() === '') return 0;
-  
-  let totalHours = 0;
-  const hourMatch = timeStr.match(/(\d+(?:\.\d+)?)\s*h/i);
-  const minMatch = timeStr.match(/(\d+(?:\.\d+)?)\s*m/i);
-  
-  if (hourMatch) {
-    totalHours += parseFloat(hourMatch[1]);
-  }
-  if (minMatch) {
-    totalHours += parseFloat(minMatch[1]) / 60;
-  }
-  
-  // If no h or m found, try parsing as a plain number (assume hours)
-  if (!hourMatch && !minMatch) {
-    const num = parseFloat(timeStr);
-    if (!isNaN(num)) {
-      totalHours = num;
-    }
-  }
-  
-  return Math.max(0, totalHours);
-}
-
 // Helper function to format hours into readable string
 function formatHours(hours: number): string {
   if (hours === 0) return '0h';
@@ -529,24 +410,96 @@ function formatHours(hours: number): string {
   return `${wholeHours}h ${minutes}m`;
 }
 
+// Task Time Estimate Inline Editor
+interface TaskTimeEstimateControlProps {
+  task: Task;
+  projectId: string;
+}
+
+export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateControlProps) {
+  const { toast } = useToast();
+
+  // Safely parse timeEstimate as a number, defaulting to 0
+  const currentEstimate = typeof task.timeEstimate === 'number' && !isNaN(task.timeEstimate) 
+    ? task.timeEstimate 
+    : 0;
+
+  const updateMutation = useMutation({
+    mutationFn: async (timeEstimate: number) => {
+      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
+      ]);
+    },
+  });
+
+  const handleIncrement = () => {
+    updateMutation.mutate(currentEstimate + 0.5);
+  };
+
+  const handleDecrement = () => {
+    if (currentEstimate >= 0.5) {
+      updateMutation.mutate(currentEstimate - 0.5);
+    }
+  };
+
+  return (
+    <div data-testid={`control-time-estimate-${task.id}`} className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleDecrement}
+        disabled={currentEstimate < 0.5 || updateMutation.isPending}
+        data-testid={`button-decrement-time-estimate-${task.id}`}
+        className="h-9 w-9"
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      
+      <div className="flex-1 flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-3 text-sm">
+        <span data-testid={`text-time-estimate-${task.id}`}>
+          {currentEstimate > 0 ? formatHours(currentEstimate) : <span className="text-muted-foreground">No estimate</span>}
+        </span>
+      </div>
+      
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleIncrement}
+        disabled={updateMutation.isPending}
+        data-testid={`button-increment-time-estimate-${task.id}`}
+        className="h-9 w-9"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// Task Time Tracked Inline Editor
+interface TaskTimeTrackedControlProps {
+  task: Task;
+  projectId: string;
+}
+
 export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedControlProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState("");
   const { toast } = useToast();
 
   // Safely parse timeTracked as a number, defaulting to 0
   const currentTime = typeof task.timeTracked === 'number' && !isNaN(task.timeTracked) 
     ? task.timeTracked 
     : 0;
-
-  // Sync value state with task prop when it updates
-  useEffect(() => {
-    if (!isEditing) {
-      const formatted = formatHours(currentTime);
-      console.log('[TimeTracked useEffect] Syncing value. currentTime:', currentTime, 'formatted:', formatted, 'isEditing:', isEditing);
-      setValue(formatted);
-    }
-  }, [currentTime, isEditing]);
 
   const updateMutation = useMutation({
     mutationFn: async (timeTracked: number) => {
@@ -558,75 +511,55 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
         description: error.message,
         variant: "destructive",
       });
-      setValue(formatHours(currentTime));
     },
     onSuccess: async () => {
-      console.log('[TimeTracked] Mutation succeeded, invalidating queries...');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
       ]);
-      console.log('[TimeTracked] Queries invalidated, closing edit mode');
-      setIsEditing(false);
     },
   });
 
-  const handleSave = () => {
-    const parsedHours = parseTimeToHours(value);
-    console.log('[TimeTracked] Saving value:', value, 'parsed:', parsedHours);
-    if (parsedHours === currentTime) {
-      setIsEditing(false);
-      return;
+  const handleIncrement = () => {
+    updateMutation.mutate(currentTime + 0.5);
+  };
+
+  const handleDecrement = () => {
+    if (currentTime >= 0.5) {
+      updateMutation.mutate(currentTime - 0.5);
     }
-    updateMutation.mutate(parsedHours);
   };
-
-  const handleCancel = () => {
-    setValue(formatHours(currentTime));
-    setIsEditing(false);
-  };
-
-  if (isEditing) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSave();
-            if (e.key === "Escape") handleCancel();
-          }}
-          placeholder="e.g., 2h 30m, 1.5h, 90m"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          autoFocus
-          data-testid={`input-time-tracked-${task.id}`}
-        />
-        <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} data-testid={`button-save-time-tracked-${task.id}`}>
-          Save
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleCancel} disabled={updateMutation.isPending}>
-          Cancel
-        </Button>
-      </div>
-    );
-  }
 
   return (
-    <div data-testid={`control-time-tracked-${task.id}`}>
-      <button
-        onClick={() => {
-          setValue(formatHours(currentTime));
-          setIsEditing(true);
-        }}
-        className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm text-left hover-elevate"
-        data-testid={`button-edit-time-tracked-${task.id}`}
+    <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleDecrement}
+        disabled={currentTime < 0.5 || updateMutation.isPending}
+        data-testid={`button-decrement-time-tracked-${task.id}`}
+        className="h-9 w-9"
       >
+        <Minus className="h-4 w-4" />
+      </Button>
+      
+      <div className="flex-1 flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-3 text-sm">
         <span data-testid={`text-time-tracked-${task.id}`}>
           {currentTime > 0 ? formatHours(currentTime) : <span className="text-muted-foreground">No time tracked</span>}
         </span>
-      </button>
+      </div>
+      
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleIncrement}
+        disabled={updateMutation.isPending}
+        data-testid={`button-increment-time-tracked-${task.id}`}
+        className="h-9 w-9"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
     </div>
   );
 }
