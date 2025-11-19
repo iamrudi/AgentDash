@@ -475,13 +475,17 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
   }
 
   return (
-    <button
-      onClick={() => setIsEditing(true)}
-      className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm text-left hover-elevate"
-      data-testid={`button-edit-time-estimate-${task.id}`}
-    >
-      {task.timeEstimate || <span className="text-muted-foreground">No estimate</span>}
-    </button>
+    <div data-testid={`control-time-estimate-${task.id}`}>
+      <button
+        onClick={() => setIsEditing(true)}
+        className="flex h-9 w-full items-center rounded-md border border-input bg-transparent px-3 py-1 text-sm text-left hover-elevate"
+        data-testid={`button-edit-time-estimate-${task.id}`}
+      >
+        <span data-testid={`text-time-estimate-${task.id}`}>
+          {task.timeEstimate || <span className="text-muted-foreground">No estimate</span>}
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -516,7 +520,10 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
     },
   });
 
-  const currentTime = task.timeTracked || 0;
+  // Safely parse timeTracked as a number, defaulting to 0
+  const currentTime = typeof task.timeTracked === 'number' && !isNaN(task.timeTracked) 
+    ? task.timeTracked 
+    : 0;
 
   const increment = () => {
     updateMutation.mutate(currentTime + 0.5);
@@ -529,7 +536,7 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div data-testid={`control-time-tracked-${task.id}`} className="flex items-center gap-2">
       <Button
         size="sm"
         variant="outline"
