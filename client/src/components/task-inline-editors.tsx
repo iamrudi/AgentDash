@@ -435,42 +435,43 @@ export function TaskTimeEstimateControl({ task, projectId }: TaskTimeEstimateCon
 
   const updateMutation = useMutation({
     mutationFn: async (timeEstimate: number) => {
-      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate });
+      console.log('[Time Estimate] Sending PATCH request with value:', timeEstimate);
+      const response = await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeEstimate });
+      console.log('[Time Estimate] PATCH response:', response);
+      return response;
     },
-    onMutate: async (newTimeEstimate) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
-      const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
-      
-      queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks?.map((t: any) => 
-            t.id === task.id ? { ...t, timeEstimate: newTimeEstimate } : t
-          ),
-        };
+    onSuccess: async (data) => {
+      console.log('[Time Estimate] Mutation succeeded, invalidating queries');
+      // Invalidate and refetch the project data
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/agency/projects", projectId],
+        refetchType: 'active'
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/staff/tasks"],
+        refetchType: 'active'
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/staff/tasks/full"],
+        refetchType: 'active'
       });
       
-      return { previousData };
+      console.log('[Time Estimate] Queries invalidated, hiding edit buttons');
+      setIsEditing(false);
+      
+      toast({
+        title: "Success",
+        description: "Time estimate saved",
+      });
     },
-    onError: (error: Error, _newTimeEstimate, context: any) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
+      console.error('[Time Estimate] Mutation failed:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
       setInputValue(currentEstimate.toString());
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
-      ]);
-      setIsEditing(false);
     },
   });
 
@@ -595,42 +596,43 @@ export function TaskTimeTrackedControl({ task, projectId }: TaskTimeTrackedContr
 
   const updateMutation = useMutation({
     mutationFn: async (timeTracked: number) => {
-      return await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeTracked });
+      console.log('[Time Tracked] Sending PATCH request with value:', timeTracked);
+      const response = await apiRequest("PATCH", `/api/tasks/${task.id}`, { timeTracked });
+      console.log('[Time Tracked] PATCH response:', response);
+      return response;
     },
-    onMutate: async (newTimeTracked) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/agency/projects", projectId] });
-      const previousData = queryClient.getQueryData(["/api/agency/projects", projectId]);
-      
-      queryClient.setQueryData(["/api/agency/projects", projectId], (old: any) => {
-        if (!old) return old;
-        return {
-          ...old,
-          tasks: old.tasks?.map((t: any) => 
-            t.id === task.id ? { ...t, timeTracked: newTimeTracked } : t
-          ),
-        };
+    onSuccess: async (data) => {
+      console.log('[Time Tracked] Mutation succeeded, invalidating queries');
+      // Invalidate and refetch the project data
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/agency/projects", projectId],
+        refetchType: 'active'
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/staff/tasks"],
+        refetchType: 'active'
+      });
+      await queryClient.invalidateQueries({ 
+        queryKey: ["/api/staff/tasks/full"],
+        refetchType: 'active'
       });
       
-      return { previousData };
+      console.log('[Time Tracked] Queries invalidated, hiding edit buttons');
+      setIsEditing(false);
+      
+      toast({
+        title: "Success",
+        description: "Time tracked saved",
+      });
     },
-    onError: (error: Error, _newTimeTracked, context: any) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(["/api/agency/projects", projectId], context.previousData);
-      }
+    onError: (error: Error) => {
+      console.error('[Time Tracked] Mutation failed:', error);
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
       setInputValue(currentTime.toString());
-    },
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/agency/projects", projectId] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
-      ]);
-      setIsEditing(false);
     },
   });
 
