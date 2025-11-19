@@ -224,14 +224,6 @@ export function TaskDetailDialog({
         <SheetContent 
           className="w-full sm:w-[600px] sm:max-w-[600px] p-0 pr-6 flex flex-col overflow-hidden" 
           data-testid="sheet-task-detail"
-          onInteractOutside={(e) => {
-            // Allow clicking outside to close
-            onOpenChange(false);
-          }}
-          onEscapeKeyDown={(e) => {
-            // Allow Escape key to close
-            onOpenChange(false);
-          }}
         >
           {!task ? (
             <div className="flex items-center justify-center p-12">
