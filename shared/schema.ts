@@ -120,7 +120,7 @@ export const taskLists = pgTable("task_lists", {
   agencyIdIdx: index("task_lists_agency_id_idx").on(table.agencyId),
 }));
 
-// TASKS (Now supports: Lists, Subtasks, Start Dates)
+// TASKS (Now supports: Lists, Subtasks, Start Dates, Time Tracking)
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   description: text("description").notNull(),
@@ -128,6 +128,8 @@ export const tasks = pgTable("tasks", {
   startDate: date("start_date"), // Start date for calendar view (ISO date string)
   dueDate: date("due_date"), // Due date (ISO date string)
   priority: text("priority").default("Medium"), // 'Low', 'Medium', 'High', 'Urgent'
+  timeEstimate: text("time_estimate"), // Estimated time (e.g., "15h", "2d", "1w")
+  timeTracked: numeric("time_tracked").default("0"), // Actual time tracked in hours
   listId: uuid("list_id").references(() => taskLists.id, { onDelete: "cascade" }), // NULLABLE TEMPORARILY: Will be enforced after backfill migration
   parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
@@ -164,6 +166,19 @@ export const taskActivities = pgTable("task_activities", {
   taskIdIdx: index("task_activities_task_id_idx").on(table.taskId),
   userIdIdx: index("task_activities_user_id_idx").on(table.userId),
   createdAtIdx: index("task_activities_created_at_idx").on(table.createdAt),
+}));
+
+// TASK RELATIONSHIPS (Links tasks to related tasks)
+export const taskRelationships = pgTable("task_relationships", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  relatedTaskId: uuid("related_task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  relationshipType: text("relationship_type").notNull(), // 'blocks', 'blocked_by', 'relates_to', 'duplicates'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdIdx: index("task_relationships_task_id_idx").on(table.taskId),
+  relatedTaskIdIdx: index("task_relationships_related_task_id_idx").on(table.relatedTaskId),
+  uniqueRelationship: uniqueIndex("task_relationships_unique").on(table.taskId, table.relatedTaskId, table.relationshipType),
 }));
 
 // INVOICES
@@ -581,6 +596,8 @@ const baseTaskSchema = createInsertSchema(tasks).omit({
   priority: z.enum(taskPriorityEnum).optional(),
   startDate: z.string().datetime().optional().nullable(),
   dueDate: z.string().datetime().optional().nullable(),
+  timeEstimate: z.string().optional().nullable(),
+  timeTracked: z.coerce.number().optional().nullable(),
 });
 
 // Complete insert schema with date validation
@@ -617,6 +634,11 @@ export const insertStaffAssignmentSchema = createInsertSchema(staffAssignments).
 });
 
 export const insertTaskActivitySchema = createInsertSchema(taskActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskRelationshipSchema = createInsertSchema(taskRelationships).omit({
   id: true,
   createdAt: true,
 });
@@ -801,6 +823,10 @@ export type InsertStaffAssignment = z.infer<typeof insertStaffAssignmentSchema>;
 export type TaskActivity = typeof taskActivities.$inferSelect;
 export type InsertTaskActivity = z.infer<typeof insertTaskActivitySchema>;
 export type TaskActivityWithUser = TaskActivity & { user: Profile };
+
+export type TaskRelationship = typeof taskRelationships.$inferSelect;
+export type InsertTaskRelationship = z.infer<typeof insertTaskRelationshipSchema>;
+export type TaskRelationshipWithTask = TaskRelationship & { relatedTask: Task };
 
 export type Invoice = typeof invoices.$inferSelect;
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;

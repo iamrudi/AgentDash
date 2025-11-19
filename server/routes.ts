@@ -1612,6 +1612,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get task relationships
+  app.get("/api/tasks/:taskId/relationships", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      const relationships = await storage.getTaskRelationships(taskId);
+      res.json(relationships);
+    } catch (error: any) {
+      console.error("Get task relationships error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch task relationships" });
+    }
+  });
+
+  // Create task relationship
+  app.post("/api/tasks/:taskId/relationships", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      const { relatedTaskId, relationshipType } = req.body;
+
+      if (!relatedTaskId || !relationshipType) {
+        return res.status(400).json({ message: "relatedTaskId and relationshipType are required" });
+      }
+
+      // Validate relationshipType
+      const validTypes = ["blocks", "blocked_by", "relates_to", "duplicates"];
+      if (!validTypes.includes(relationshipType)) {
+        return res.status(400).json({ message: `Invalid relationshipType. Must be one of: ${validTypes.join(", ")}` });
+      }
+
+      // Get both tasks to verify access and tenant isolation
+      const sourceTask = await storage.getTaskById(taskId);
+      const relatedTask = await storage.getTaskById(relatedTaskId);
+      
+      if (!sourceTask) {
+        return res.status(404).json({ message: "Source task not found" });
+      }
+      
+      if (!relatedTask) {
+        return res.status(404).json({ message: "Related task not found" });
+      }
+
+      // Get projects for both tasks to verify they belong to the same agency
+      const sourceProject = await storage.getProjectById(sourceTask.projectId);
+      const relatedProject = await storage.getProjectById(relatedTask.projectId);
+
+      if (!sourceProject || !relatedProject) {
+        return res.status(404).json({ message: "Project not found for one or both tasks" });
+      }
+
+      // Fail closed: Reject if either project lacks agencyId (for ALL roles including SuperAdmin)
+      // This prevents cross-tenant bypass on legacy/orphaned projects
+      if (!sourceProject.agencyId || !relatedProject.agencyId) {
+        return res.status(403).json({ message: "Cannot create relationships for tasks without agency association" });
+      }
+
+      // Ensure both tasks belong to the same agency (tenant isolation)
+      if (sourceProject.agencyId !== relatedProject.agencyId) {
+        return res.status(403).json({ message: "Cannot create relationships between tasks from different agencies" });
+      }
+
+      // For non-SuperAdmin users, verify they have access to their specific agency
+      // SuperAdmin can link tasks across agencies they manage, but only if both have valid agencyIds (checked above)
+      if (req.user!.role !== "SuperAdmin" && sourceProject.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Access denied: Tasks do not belong to your agency" });
+      }
+
+      // Validate import schema
+      const { insertTaskRelationshipSchema } = await import("@shared/schema");
+      const relationshipData = insertTaskRelationshipSchema.parse({
+        taskId,
+        relatedTaskId,
+        relationshipType,
+      });
+
+      const relationship = await storage.createTaskRelationship(relationshipData);
+      
+      // Get the relationship with full task data
+      const relationships = await storage.getTaskRelationships(taskId);
+      const createdRelationship = relationships.find(r => r.id === relationship.id);
+
+      res.status(201).json(createdRelationship);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("Create task relationship error:", error);
+      res.status(500).json({ message: error.message || "Failed to create task relationship" });
+    }
+  });
+
+  // Delete task relationship
+  app.delete("/api/tasks/relationships/:relationshipId", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const { relationshipId } = req.params;
+      
+      // First, get the relationship to verify access
+      const allRelationships = await db
+        .select()
+        .from(taskRelationships)
+        .where(eq(taskRelationships.id, relationshipId))
+        .limit(1);
+      
+      if (allRelationships.length === 0) {
+        return res.status(404).json({ message: "Relationship not found" });
+      }
+      
+      const relationship = allRelationships[0];
+      
+      // Get the source task and verify access
+      const sourceTask = await storage.getTaskById(relationship.taskId);
+      if (!sourceTask) {
+        return res.status(404).json({ message: "Source task not found" });
+      }
+      
+      // Get project to verify agency access
+      const project = await storage.getProjectById(sourceTask.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Fail closed: Reject if project lacks agencyId (for ALL roles including SuperAdmin)
+      // This prevents cross-tenant bypass on legacy/orphaned projects
+      if (!project.agencyId) {
+        return res.status(403).json({ message: "Cannot delete relationships for tasks without agency association" });
+      }
+      
+      // For non-SuperAdmin users, verify they have access to their specific agency
+      // SuperAdmin can delete relationships for tasks across agencies they manage, but only if project has valid agencyId (checked above)
+      if (req.user!.role !== "SuperAdmin" && project.agencyId !== req.user!.agencyId) {
+        return res.status(403).json({ message: "Access denied: Task does not belong to your agency" });
+      }
+      
+      await storage.deleteTaskRelationship(relationshipId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Delete task relationship error:", error);
+      res.status(500).json({ message: error.message || "Failed to delete task relationship" });
+    }
+  });
+
   // Helper function to log task changes
   async function logTaskActivity(taskId: string, userId: string, oldTask: Task, newTask: Task) {
     try {

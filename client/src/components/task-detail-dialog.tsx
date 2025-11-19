@@ -35,8 +35,11 @@ import {
   TaskPriorityControl,
   TaskDateControl,
   TaskAssigneesControl,
+  TaskTimeEstimateControl,
+  TaskTimeTrackedControl,
 } from "./task-inline-editors";
 import { TaskMessages } from "./task-messages";
+import { TaskRelationships } from "./task-relationships";
 
 type TaskWithAssignments = Task & {
   assignments: Array<StaffAssignment & { staffProfile: Profile }>;
@@ -307,6 +310,18 @@ export function TaskDetailDialog({
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Time Estimate</label>
+                      <TaskTimeEstimateControl task={task} projectId={projectId} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Time Tracked</label>
+                      <TaskTimeTrackedControl task={task} projectId={projectId} />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Assignees</label>
                     <TaskAssigneesControl
@@ -315,6 +330,10 @@ export function TaskDetailDialog({
                       onAssignStaff={onAssignStaff}
                     />
                   </div>
+
+                  <Separator />
+
+                  <TaskRelationships task={task} projectId={projectId} />
 
                   <Separator />
 

@@ -16,6 +16,9 @@ import {
   type TaskActivity,
   type InsertTaskActivity,
   type TaskActivityWithUser,
+  type TaskRelationship,
+  type InsertTaskRelationship,
+  type TaskRelationshipWithTask,
   type Invoice,
   type InsertInvoice,
   type InvoiceLineItem,
@@ -68,6 +71,7 @@ import {
   tasks,
   staffAssignments,
   taskActivities,
+  taskRelationships,
   invoices,
   invoiceLineItems,
   initiatives,
@@ -883,6 +887,31 @@ export class DbStorage implements IStorage {
         ...a.task_activities,
         user: a.profiles as Profile
       }));
+  }
+
+  async createTaskRelationship(relationship: InsertTaskRelationship): Promise<TaskRelationship> {
+    const result = await db.insert(taskRelationships).values(relationship).returning();
+    return result[0];
+  }
+
+  async getTaskRelationships(taskId: string): Promise<TaskRelationshipWithTask[]> {
+    const relationships = await db
+      .select()
+      .from(taskRelationships)
+      .leftJoin(tasks, eq(taskRelationships.relatedTaskId, tasks.id))
+      .where(eq(taskRelationships.taskId, taskId))
+      .orderBy(desc(taskRelationships.createdAt));
+
+    return relationships
+      .filter(r => r.tasks !== null)
+      .map(r => ({
+        ...r.task_relationships,
+        relatedTask: r.tasks as Task
+      }));
+  }
+
+  async deleteTaskRelationship(id: string): Promise<void> {
+    await db.delete(taskRelationships).where(eq(taskRelationships.id, id));
   }
 
   // Project with Tasks
