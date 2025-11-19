@@ -212,8 +212,14 @@ export function TaskDateControl({ task, projectId, dateType, label }: TaskDateCo
 
   const updateMutation = useMutation({
     mutationFn: async (date: Date | null) => {
+      // Format date as YYYY-MM-DD to avoid timezone issues
+      // Using toISOString() can shift the date by 1 day due to UTC conversion
+      const dateString = date 
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        : null;
+      
       return await apiRequest("PATCH", `/api/tasks/${task.id}`, { 
-        [dateType]: date ? date.toISOString() : null 
+        [dateType]: dateString
       });
     },
     onError: (error: Error) => {
@@ -230,6 +236,12 @@ export function TaskDateControl({ task, projectId, dateType, label }: TaskDateCo
         queryClient.invalidateQueries({ queryKey: ["/api/staff/tasks/full"] }),
       ]);
       setOpen(false);
+      
+      // Show success toast
+      toast({
+        title: "Date Updated",
+        description: `${label} has been updated successfully`,
+      });
     },
   });
 
