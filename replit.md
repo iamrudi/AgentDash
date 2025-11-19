@@ -64,11 +64,13 @@ The platform is a full-stack JavaScript application utilizing React for the fron
     - **Invoice Generation**: Separate flow for fixed-cost initiatives or those with specified costs, uses InvoiceGeneratorService
     - **Error Handling**: Returns 500 with descriptive message on failure, preventing silent errors; defensive guards ensure IDs are set before proceeding
     - **Defensive Programming**: Explicit null checks for project.id and createdProjectId to prevent undefined state propagation
-  - **Time Tracking (Completed)**: Inline editing controls for task time management:
-    - **Backend**: Added `timeEstimate` (text) and `timeTracked` (numeric with z.coerce.number()) fields to tasks table, PATCH `/api/agency/tasks/:id` endpoint updated.
-    - **Frontend**: `TaskTimeEstimateControl` with text input (formats: "8h", "2d", "30m") and `TaskTimeTrackedControl` with increment/decrement buttons (±0.5h per click).
-    - **UI**: Inline editing in Details tab with optimistic updates, Save/Cancel controls for time estimate, defensive NaN handling for time tracked.
+  - **Time Tracking (Completed)**: Simplified numeric time tracking with +/- controls:
+    - **Backend**: Both `timeEstimate` and `timeTracked` use `numeric` type with default 0; server-side validation enforces 0.5 hour increments (0, 0.5, 1, 1.5, etc.) on both PATCH endpoints (/api/agency/tasks/:id and /api/tasks/:id).
+    - **Frontend**: Both controls use increment/decrement buttons (±0.5h per click); formatted display shows hours in human-readable format (e.g., "2.5h").
+    - **UI**: Inline editing in Details tab with optimistic updates, disabled buttons during mutations prevent dialog close during save.
     - **Security**: Tenant isolation via project access validation.
+    - **Task Hours Report Dashboard (Completed)**: Comprehensive time tracking analytics with project and staff breakdowns, showing time tracked vs estimated; staff hours are divided proportionally among assignees to prevent double-counting; unassigned tasks excluded from staff totals (noted in UI).
+    - **Enhancement Opportunities**: Move 0.5 increment validation into Zod schema for stronger guarantees across all code paths; surface unassigned task hours explicitly in report; add automated tests for validation and aggregation logic.
   - **Task Relationships (Completed)**: Task-to-task relationship system with five-layer security:
     - **Backend**: `task_relationships` table with unique index on (sourceTaskId, relatedTaskId, relationshipType), CRUD endpoints at GET/POST `/api/tasks/:taskId/relationships` and DELETE `/api/tasks/relationships/:relationshipId`.
     - **Relationship Types**: blocks, blocked_by, relates_to, duplicates (duplicated_by removed from schema).
