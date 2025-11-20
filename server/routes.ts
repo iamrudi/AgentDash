@@ -2286,22 +2286,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { response, feedback } = req.body;
       
+      console.log(`[INITIATIVE_RESPOND] Received request for initiative ${id}:`, { response, feedback, hasResponse: !!response });
+      
       if (!["approved", "rejected", "discussing"].includes(response)) {
+        console.log(`[INITIATIVE_RESPOND] Invalid response value: "${response}"`);
         return res.status(400).json({ message: "Invalid response. Must be 'approved', 'rejected', or 'discussing'" });
       }
       
       // Get initiative to check billing type
       const existingInitiative = await storage.getInitiativeById(id);
       if (!existingInitiative) {
+        console.log(`[INITIATIVE_RESPOND] Initiative not found: ${id}`);
         return res.status(404).json({ message: "Initiative not found" });
       }
+      
+      console.log(`[INITIATIVE_RESPOND] Initiative details:`, {
+        billingType: existingInitiative.billingType,
+        estimatedHours: existingInitiative.estimatedHours,
+        clientId: existingInitiative.clientId
+      });
       
       // If approving an hours-based initiative, check and deduct retainer hours
       if (response === "approved" && existingInitiative.billingType === "hours" && existingInitiative.estimatedHours) {
         const hoursNeeded = parseFloat(existingInitiative.estimatedHours);
         const hoursInfo = await storage.checkRetainerHours(existingInitiative.clientId);
         
+        console.log(`[INITIATIVE_RESPOND] Retainer hours check:`, {
+          hoursNeeded,
+          hoursAvailable: hoursInfo.available,
+          hoursTotal: hoursInfo.total,
+          hoursUsed: hoursInfo.used
+        });
+        
         if (hoursInfo.available < hoursNeeded) {
+          console.log(`[INITIATIVE_RESPOND] Insufficient retainer hours!`);
           return res.status(400).json({ 
             message: `Insufficient retainer hours. You have ${hoursInfo.available} hours available but need ${hoursNeeded} hours. Please contact your account manager to purchase additional hours.` 
           });
@@ -2309,6 +2327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Deduct the hours
         await storage.deductRetainerHours(existingInitiative.clientId, hoursNeeded);
+        console.log(`[INITIATIVE_RESPOND] Deducted ${hoursNeeded} retainer hours`);
       }
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);

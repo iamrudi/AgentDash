@@ -41,10 +41,11 @@ export default function Recommendations() {
 
   const respondMutation = useMutation({
     mutationFn: async (data: { id: string; response: string; feedback?: string }) => {
-      return await apiRequest("POST", `/api/initiatives/${data.id}/respond`, {
+      const response = await apiRequest("POST", `/api/initiatives/${data.id}/respond`, {
         response: data.response,
         feedback: data.feedback
       });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/client/initiatives"] });
@@ -54,6 +55,13 @@ export default function Recommendations() {
       toast({
         title: "Response recorded",
         description: "Your feedback has been shared with your account manager.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit response",
+        variant: "destructive",
       });
     },
   });
