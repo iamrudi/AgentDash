@@ -17,7 +17,7 @@ import { resolveAgencyContext } from "./middleware/agency-context";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema, projects, taskLists, tasks } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema, projects, taskLists, tasks, taskRelationships, type Task } from "@shared/schema";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
 import { generateOAuthState, verifyOAuthState } from "./lib/oauthState";
 import { encrypt, decrypt, safeDecryptCredential } from "./lib/encryption";
@@ -1136,7 +1136,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updateData = updateTaskSchema.parse(req.body);
-      const updatedTask = await storage.updateTask(req.params.id, updateData);
+      
+      // Convert numeric time values to strings for database storage
+      const storageData: Partial<Task> = {
+        ...updateData,
+        timeEstimate: updateData.timeEstimate !== undefined && updateData.timeEstimate !== null 
+          ? String(updateData.timeEstimate) 
+          : updateData.timeEstimate as string | null | undefined,
+        timeTracked: updateData.timeTracked !== undefined && updateData.timeTracked !== null 
+          ? String(updateData.timeTracked) 
+          : updateData.timeTracked as string | null | undefined,
+      };
+      
+      const updatedTask = await storage.updateTask(req.params.id, storageData);
 
       res.json(updatedTask);
     } catch (error: any) {
@@ -1468,7 +1480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allTasks = await storage.getAllTasks(req.user!.agencyId);
       const tasksWithProjects = await Promise.all(
         allTasks.map(async (task) => {
-          const project = await storage.getProjectById(task.projectId);
+          const project = task.projectId ? await storage.getProjectById(task.projectId) : undefined;
           return { ...task, project };
         })
       );
@@ -1706,28 +1718,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Related task not found" });
       }
 
-      // Get projects for both tasks to verify they belong to the same agency
-      const sourceProject = await storage.getProjectById(sourceTask.projectId);
-      const relatedProject = await storage.getProjectById(relatedTask.projectId);
+      // Validate projectIds exist
+      if (!sourceTask.projectId || !relatedTask.projectId) {
+        return res.status(400).json({ message: "Tasks must be associated with projects" });
+      }
 
-      if (!sourceProject || !relatedProject) {
+      // Get projects with agency info for both tasks
+      const sourceProjectData = await storage.getProjectWithAgency(sourceTask.projectId);
+      const relatedProjectData = await storage.getProjectWithAgency(relatedTask.projectId);
+
+      if (!sourceProjectData || !relatedProjectData) {
         return res.status(404).json({ message: "Project not found for one or both tasks" });
       }
 
+      const sourceAgencyId = sourceProjectData.agencyId;
+      const relatedAgencyId = relatedProjectData.agencyId;
+
       // Fail closed: Reject if either project lacks agencyId (for ALL roles including SuperAdmin)
       // This prevents cross-tenant bypass on legacy/orphaned projects
-      if (!sourceProject.agencyId || !relatedProject.agencyId) {
+      if (!sourceAgencyId || !relatedAgencyId) {
         return res.status(403).json({ message: "Cannot create relationships for tasks without agency association" });
       }
 
       // Ensure both tasks belong to the same agency (tenant isolation)
-      if (sourceProject.agencyId !== relatedProject.agencyId) {
+      if (sourceAgencyId !== relatedAgencyId) {
         return res.status(403).json({ message: "Cannot create relationships between tasks from different agencies" });
       }
 
       // For non-SuperAdmin users, verify they have access to their specific agency
       // SuperAdmin can link tasks across agencies they manage, but only if both have valid agencyIds (checked above)
-      if (req.user!.role !== "SuperAdmin" && sourceProject.agencyId !== req.user!.agencyId) {
+      if (req.user!.role !== "SuperAdmin" && sourceAgencyId !== req.user!.agencyId) {
         return res.status(403).json({ message: "Access denied: Tasks do not belong to your agency" });
       }
 
@@ -1779,21 +1799,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Source task not found" });
       }
       
-      // Get project to verify agency access
-      const project = await storage.getProjectById(sourceTask.projectId);
-      if (!project) {
+      // Validate projectId exists
+      if (!sourceTask.projectId) {
+        return res.status(400).json({ message: "Task must be associated with a project" });
+      }
+      
+      // Get project with agency info to verify access
+      const projectData = await storage.getProjectWithAgency(sourceTask.projectId);
+      if (!projectData) {
         return res.status(404).json({ message: "Project not found" });
       }
       
+      const projectAgencyId = projectData.agencyId;
+      
       // Fail closed: Reject if project lacks agencyId (for ALL roles including SuperAdmin)
       // This prevents cross-tenant bypass on legacy/orphaned projects
-      if (!project.agencyId) {
+      if (!projectAgencyId) {
         return res.status(403).json({ message: "Cannot delete relationships for tasks without agency association" });
       }
       
       // For non-SuperAdmin users, verify they have access to their specific agency
       // SuperAdmin can delete relationships for tasks across agencies they manage, but only if project has valid agencyId (checked above)
-      if (req.user!.role !== "SuperAdmin" && project.agencyId !== req.user!.agencyId) {
+      if (req.user!.role !== "SuperAdmin" && projectAgencyId !== req.user!.agencyId) {
         return res.status(403).json({ message: "Access denied: Task does not belong to your agency" });
       }
       
@@ -3176,7 +3203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Encrypt the access token
       const { encrypt } = await import("./lib/encryption");
-      const { encryptedData, iv, authTag } = encrypt(accessToken);
+      const { encrypted, iv, authTag } = encrypt(accessToken);
 
       // Save to agency settings
       const existing = await db
@@ -3190,7 +3217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db
           .update(agencySettings)
           .set({
-            hubspotAccessToken: encryptedData,
+            hubspotAccessToken: encrypted,
             hubspotAccessTokenIv: iv,
             hubspotAccessTokenAuthTag: authTag,
             hubspotConnectedAt: new Date(),
@@ -3203,7 +3230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .insert(agencySettings)
           .values({
             agencyId,
-            hubspotAccessToken: encryptedData,
+            hubspotAccessToken: encrypted,
             hubspotAccessTokenIv: iv,
             hubspotAccessTokenAuthTag: authTag,
             hubspotConnectedAt: new Date(),
@@ -3300,7 +3327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Encrypt the access token
       const { encrypt } = await import("./lib/encryption");
-      const { encryptedData, iv, authTag } = encrypt(accessToken);
+      const { encrypted, iv, authTag } = encrypt(accessToken);
 
       // Save to agency settings
       const existing = await db
@@ -3314,7 +3341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db
           .update(agencySettings)
           .set({
-            linkedinAccessToken: encryptedData,
+            linkedinAccessToken: encrypted,
             linkedinAccessTokenIv: iv,
             linkedinAccessTokenAuthTag: authTag,
             linkedinOrganizationId: organizationId,
@@ -3328,7 +3355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .insert(agencySettings)
           .values({
             agencyId,
-            linkedinAccessToken: encryptedData,
+            linkedinAccessToken: encrypted,
             linkedinAccessTokenIv: iv,
             linkedinAccessTokenAuthTag: authTag,
             linkedinOrganizationId: organizationId,
@@ -5061,7 +5088,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Generate short-lived print token (requires authentication)
-  app.post("/api/proposals/:id/print-token", requireAuth, async (req, res) => {
+  app.post("/api/proposals/:id/print-token", requireAuth, async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       
@@ -5399,6 +5426,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       }
 
       // Get old email from user's auth record
+      const { supabaseAdmin } = await import("./lib/supabase");
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
       const oldEmail = authUser?.user?.email || 'unknown';
 
