@@ -62,28 +62,37 @@ Generate strategic recommendations that are:
 - Include estimated costs where applicable
 - Aligned with the ${preset} preset requirements
 
-For each recommendation, provide:
-1. A concise title (max 60 characters)
-2. A summary observation (1-2 sentences overview)
-3. Structured observation insights - key data points as an array of objects with:
-   - label: the metric or insight name (e.g., "Current CTR", "Sessions Lost", "Opportunity")
-   - value: the specific value or finding
-   - context (optional): brief explanation if needed
-4. A summary of the proposed action (1-2 sentences)
-5. Action tasks - specific, actionable steps (${presetConfig.taskComplexity})
-6. Impact level (High/Medium/Low)
-7. Estimated cost in USD (or 0 if no cost)
-8. The metric that triggered this recommendation
-9. Baseline value of that metric
+CRITICAL: You MUST respond with a JSON object containing a "recommendations" array. Each recommendation MUST use these EXACT field names:
 
-The observationInsights should contain 2-4 key data points that support your recommendation.
+{
+  "recommendations": [
+    {
+      "title": "string - concise title (max 60 characters)",
+      "observation": "string - 1-2 sentence summary observation",
+      "observationInsights": [
+        {"label": "string", "value": "string or number", "context": "optional string"}
+      ],
+      "proposedAction": "string - 1-2 sentence summary of the proposed action",
+      "actionTasks": ["string - specific actionable step 1", "step 2", "..."],
+      "impact": "High" | "Medium" | "Low",
+      "estimatedCost": number (0 if no cost),
+      "triggerMetric": "string - the metric that triggered this",
+      "baselineValue": number
+    }
+  ]
+}
+
+REQUIRED FIELD NAMES (use EXACTLY these, no variations):
+- "observation" (NOT "summaryObservation")
+- "proposedAction" (NOT "summaryAction" or "action")
+- "impact" (NOT "impactLevel")
+- "observationInsights" must be an array of objects with "label" and "value"
+- "actionTasks" must be an array of strings (${presetConfig.taskComplexity})
 
 PRESET REQUIREMENTS:
 - Focus areas: ${presetConfig.areas.join(", ")}
 - Number of recommendations: ${presetConfig.count}
-- Implementation timeframe: ${presetConfig.timeframe}
-
-Respond with a JSON array of recommendations.`;
+- Implementation timeframe: ${presetConfig.timeframe}`;
 
       const userPrompt = `
 CLIENT: ${clientName}
@@ -166,22 +175,35 @@ ${linkedinData ? '\nIncorporate LinkedIn data to recommend social selling strate
   ): Promise<RecommendationOutput> {
     try {
       const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.
-The client is asking a question about a specific dataset. Your task is to:
-1. Analyze the provided data in the context of their question.
-2. Provide a clear observation summary (1-2 sentences) that DIRECTLY answers their question.
-3. Provide structured observation insights - key data points as an array of objects with label, value, and optional context.
-4. Provide a proposed action summary (1-2 sentences).
-5. Provide action tasks - a numbered list of 3-5 specific, actionable steps the agency will take.
-6. Estimate the impact and a reasonable one-time cost for this action.
+The client is asking a question about a specific dataset. Your task is to analyze and respond with a JSON object.
+
+CRITICAL: You MUST respond with a JSON object using these EXACT field names:
+
+{
+  "title": "string - concise action-oriented summary",
+  "observation": "string - 1-2 sentence summary answering their question",
+  "observationInsights": [
+    {"label": "string", "value": "string or number", "context": "optional string"}
+  ],
+  "proposedAction": "string - 1-2 sentence summary of what the agency will do",
+  "actionTasks": ["string - specific step 1", "step 2", "..."],
+  "impact": "High" | "Medium" | "Low",
+  "estimatedCost": number,
+  "triggerMetric": "string",
+  "baselineValue": number
+}
+
+REQUIRED FIELD NAMES (use EXACTLY these, no variations):
+- "observation" (NOT "summaryObservation")
+- "proposedAction" (NOT "summaryAction" or "action")
+- "impact" (NOT "impactLevel")
 
 IMPORTANT: 
 - Use SPECIFIC numbers and metrics from the data in your observation insights
-- The observationInsights should contain 2-4 key data points (e.g., {label: "Current CTR", value: "2.3%", context: "Industry average is 3.5%"})
-- The actionTasks should be specific steps (e.g., "Audit all meta descriptions for keyword optimization")
+- The observationInsights should contain 2-4 key data points
+- The actionTasks should be 3-5 specific steps
 - If data is sparse, identify data gaps as opportunities
-- NEVER return empty strings or arrays - always provide meaningful, data-driven content
-
-Respond with a single JSON object matching the required schema.`;
+- NEVER return empty strings or arrays`;
 
       const userPrompt = `
 CLIENT: ${clientName}
@@ -190,15 +212,7 @@ ${JSON.stringify(contextData, null, 2)}
 
 CLIENT'S QUESTION: "${question}"
 
-Based on the data and the question, generate a single, actionable recommendation.
-- The title should be a concise, action-oriented summary (e.g., "Improve Organic Search Visibility")
-- The observation should be a 1-2 sentence summary directly answering their question
-- The observationInsights should be 2-4 key data points in structured format (e.g., {label: "Organic Clicks", value: "1,234", context: "Down 15% from last month"})
-- The proposedAction should be a 1-2 sentence summary of what the agency will do
-- The actionTasks should be 3-5 specific, numbered steps (e.g., "Audit all meta descriptions for target keywords", "Implement schema markup on key landing pages")
-- The trigger metric should be the primary metric from the context (e.g., 'Organic Clicks', 'CTR', 'Conversions', 'Average Position')
-- The baseline value should be the current value of that metric from the data
-- If data is limited, identify this as an opportunity
+Generate a single, actionable recommendation using the exact JSON schema specified.
 `;
 
       const response = await openai.chat.completions.create({
