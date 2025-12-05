@@ -28,9 +28,44 @@ import { getAIProvider, invalidateAIProviderCache } from "./ai/provider";
 import { cache, CACHE_TTL } from "./lib/cache";
 import express from "express";
 import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { EventEmitter } from "events";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
+
+// Configure multer for logo uploads
+const logoStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    cb(null, uploadsDir);
+  },
+  filename: (req: AuthRequest, file, cb) => {
+    const agencyId = req.user?.agencyId || 'unknown';
+    const type = req.body?.type || 'logo';
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `${agencyId}-${type}-${Date.now()}${ext}`;
+    cb(null, filename);
+  }
+});
+
+const logoUpload = multer({
+  storage: logoStorage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB max
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, SVG, and WebP images are allowed.'));
+    }
+  }
+});
 
 // SSE event emitter for real-time message updates
 const messageEmitter = new EventEmitter();
@@ -1505,6 +1540,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("Error updating agency settings:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Upload agency branding logo
+  app.post("/api/agency/settings/logo", requireAuth, requireRole("Admin"), logoUpload.single('logo'), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      const { type } = req.body;
+      if (!type || !['agencyLogo', 'clientLogo', 'staffLogo'].includes(type)) {
+        // Delete the uploaded file since type is invalid
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ message: "Invalid logo type. Must be agencyLogo, clientLogo, or staffLogo" });
+      }
+
+      // Create public URL for the logo
+      const logoUrl = `/uploads/logos/${req.file.filename}`;
+
+      // Check if settings already exist for this agency
+      const existingSettings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, req.user!.agencyId))
+        .limit(1);
+
+      // Build update object with the specific logo field
+      const updateData: Record<string, any> = {
+        [type]: logoUrl,
+        updatedAt: sql`now()`,
+      };
+
+      if (existingSettings.length === 0) {
+        // Create new settings with the logo
+        const [newSettings] = await db
+          .insert(agencySettings)
+          .values({
+            agencyId: req.user!.agencyId,
+            aiProvider: 'gemini',
+            [type]: logoUrl,
+          })
+          .returning();
+
+        res.json({
+          message: "Logo uploaded successfully",
+          logoUrl,
+          settings: newSettings,
+        });
+      } else {
+        // Delete old logo file if exists
+        const oldLogoUrl = existingSettings[0][type as keyof typeof existingSettings[0]] as string | null;
+        if (oldLogoUrl) {
+          const oldLogoPath = path.join(process.cwd(), oldLogoUrl);
+          if (fs.existsSync(oldLogoPath)) {
+            fs.unlinkSync(oldLogoPath);
+          }
+        }
+
+        // Update existing settings
+        const [updatedSettings] = await db
+          .update(agencySettings)
+          .set(updateData)
+          .where(eq(agencySettings.agencyId, req.user!.agencyId))
+          .returning();
+
+        res.json({
+          message: "Logo uploaded successfully",
+          logoUrl,
+          settings: updatedSettings,
+        });
+      }
+    } catch (error: any) {
+      console.error("Error uploading logo:", error);
+      // Clean up uploaded file on error
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      res.status(500).json({ message: error.message || "Failed to upload logo" });
+    }
+  });
+
+  // Delete agency branding logo
+  app.delete("/api/agency/settings/logo/:type", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      if (!req.user!.agencyId) {
+        return res.status(403).json({ message: "Agency association required" });
+      }
+
+      const { type } = req.params;
+      if (!['agencyLogo', 'clientLogo', 'staffLogo'].includes(type)) {
+        return res.status(400).json({ message: "Invalid logo type. Must be agencyLogo, clientLogo, or staffLogo" });
+      }
+
+      // Get current settings
+      const existingSettings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, req.user!.agencyId))
+        .limit(1);
+
+      if (existingSettings.length === 0) {
+        return res.status(404).json({ message: "Agency settings not found" });
+      }
+
+      // Delete the logo file if exists
+      const logoUrl = existingSettings[0][type as keyof typeof existingSettings[0]] as string | null;
+      if (logoUrl) {
+        const logoPath = path.join(process.cwd(), logoUrl);
+        if (fs.existsSync(logoPath)) {
+          fs.unlinkSync(logoPath);
+        }
+      }
+
+      // Update settings to remove logo
+      const [updatedSettings] = await db
+        .update(agencySettings)
+        .set({
+          [type]: null,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(agencySettings.agencyId, req.user!.agencyId))
+        .returning();
+
+      res.json({
+        message: "Logo removed successfully",
+        settings: updatedSettings,
+      });
+    } catch (error: any) {
+      console.error("Error deleting logo:", error);
+      res.status(500).json({ message: error.message || "Failed to delete logo" });
+    }
+  });
+
+  // Get branding settings (logos)
+  app.get("/api/agency/settings/branding", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      // Determine agency ID from user context
+      let agencyId = req.user!.agencyId;
+      
+      // For Client users, get agency ID from client association
+      if (!agencyId && req.user!.clientId) {
+        const client = await storage.getClientById(req.user!.clientId);
+        agencyId = client?.agencyId;
+      }
+
+      if (!agencyId) {
+        return res.json({
+          agencyLogo: null,
+          clientLogo: null,
+          staffLogo: null,
+        });
+      }
+
+      const settings = await db
+        .select({
+          agencyLogo: agencySettings.agencyLogo,
+          clientLogo: agencySettings.clientLogo,
+          staffLogo: agencySettings.staffLogo,
+        })
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1);
+
+      if (settings.length === 0) {
+        return res.json({
+          agencyLogo: null,
+          clientLogo: null,
+          staffLogo: null,
+        });
+      }
+
+      res.json(settings[0]);
+    } catch (error: any) {
+      console.error("Error fetching branding settings:", error);
       res.status(500).json({ message: error.message });
     }
   });
