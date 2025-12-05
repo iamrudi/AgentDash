@@ -1,0 +1,57 @@
+Act as a Senior Full Stack Developer and Systems Architect. We are upgrading the **Staff Portal** to include user personalization and performance analytics.
+
+**Objective:**
+Implement a `StaffSettings` page for interface/profile management and a `StaffHours` page for personal time tracking analysis.
+
+**Constraints & Architecture:**
+* **Stack:** React (Vite), Tailwind/Shadcn UI, Express, Drizzle ORM, Supabase Auth.
+* **Security:** Strict Tenant Isolation. Users can only update their own profiles and view their own hours.
+* **Styling:** Adhere to the existing macOS-inspired design system.
+
+### Phase 1: Database & Schema Update
+1.  Modify `shared/schema.ts`:
+    * Add a `skills` column to the `profiles` table. Use `text("skills").array()` if supported, or `jsonb("skills")` to store an array of strings.
+2.  Generate the migration file.
+
+### Phase 2: Backend API (Profile Management)
+1.  In `server/routes.ts`, create a protected route `PATCH /api/user/profile`:
+    * **Middleware:** `requireAuth` (Any authenticated role).
+    * **Logic:** Allow the user to update their own `fullName` and `skills`.
+    * **Validation:** Ensure `skills` is an array of strings.
+    * **Security:** Verify `req.user.id` matches the target profile ID to prevent IDOR.
+
+### Phase 3: Frontend - Staff Settings Page (`client/src/pages/staff/settings.tsx`)
+Create a new page with two main sections:
+
+**1. Interface Settings (Sidebar Control)**
+* Implement a **Sidebar Display Mode** selector using a Radio Group or Select component.
+* **Options:**
+    * `Expanded`: Sidebar always open.
+    * `Collapsed`: Sidebar shows icons only.
+    * `Expand on hover`: Collapsed by default, expands on mouse enter.
+* **Implementation:** Persist selection to `localStorage` key `sidebarMode` and dispatch a custom event `sidebarModeChange` (which `AppSidebar` already listens for).
+
+**2. Profile Management**
+* Form to edit `Full Name`.
+* **Skills Input:** A multi-value input component (like a tag input) to add/remove skills (e.g., "React", "SEO", "Copywriting").
+* Use `useMutation` to call the new `PATCH /api/user/profile` endpoint.
+
+### Phase 4: Frontend - Staff Hours Report (`client/src/pages/staff/hours.tsx`)
+Create a read-only analytics dashboard for the staff member:
+* **Data Source:** Query all tasks where the *current user* is assigned.
+* **Metrics Cards:**
+    * *Total Hours Tracked* (vs Estimated).
+    * *Utilization Rate* (Tracked / Estimated %).
+* **Breakdown Table:** List tasks with columns: Project Name, Task Name, Time Estimate, Time Tracked, and Variance.
+* *Note:* Reuse logic from `AgencyHoursReport` but filter strictly for the current user's assignments.
+
+### Phase 5: Routing & Navigation
+1.  Update `client/src/App.tsx`:
+    * Add routes `/staff/settings` and `/staff/hours` protected by `requireRole("Staff")`.
+2.  Update `client/src/components/app-sidebar.tsx`:
+    * Update `staffMenuItems` to include:
+        * "My Hours" (Icon: `Clock` or `PieChart`).
+        * "Settings" (Icon: `Settings`).
+
+**Implementation Strategy:**
+Please implement these changes iteratively, starting with the Schema update, then the API, and finally the Frontend components.
