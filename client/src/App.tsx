@@ -295,14 +295,12 @@ function Router() {
 }
 
 function RecoveryRedirect() {
-  const [, setLocation] = useLocation();
-  
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("access_token") && hash.includes("type=recovery")) {
-      setLocation(`/reset-password${hash}`);
+      window.location.href = `/reset-password${hash}`;
     }
-  }, [setLocation]);
+  }, []);
   
   return null;
 }

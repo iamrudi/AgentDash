@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, Loader2, CheckCircle } from "lucide-react";
+import { KeyRound, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -20,27 +20,69 @@ export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.includes("access_token")) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get("access_token");
-      const refreshToken = params.get("refresh_token");
-      const type = params.get("type");
+    const initSession = async () => {
+      try {
+        const hash = window.location.hash;
+        
+        if (hash && hash.includes("access_token")) {
+          const params = new URLSearchParams(hash.substring(1));
+          const accessToken = params.get("access_token");
+          const refreshToken = params.get("refresh_token");
+          const type = params.get("type");
 
-      if (type === "recovery" && accessToken && refreshToken) {
-        supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
+          if (type === "recovery" && accessToken && refreshToken) {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (sessionError) {
+              console.error("Session error:", sessionError);
+              setSessionError(sessionError.message);
+            } else {
+              setSessionReady(true);
+              window.history.replaceState(null, "", window.location.pathname);
+            }
+          } else {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              setSessionReady(true);
+            } else {
+              setSessionError("Invalid or expired recovery link. Please request a new password reset.");
+            }
+          }
+        } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            setSessionReady(true);
+          } else {
+            setSessionError("No recovery token found. Please use the link from your email or request a new password reset.");
+          }
+        }
+      } catch (err: any) {
+        console.error("Init error:", err);
+        setSessionError(err.message || "Failed to initialize session");
+      } finally {
+        setIsInitializing(false);
       }
-    }
+    };
+
+    initSession();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!sessionReady) {
+      setError("Session not ready. Please try the recovery link again.");
+      return;
+    }
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
@@ -63,6 +105,8 @@ export default function ResetPassword() {
         throw updateError;
       }
 
+      await supabase.auth.signOut();
+
       setIsSuccess(true);
       toast({
         title: "Password updated",
@@ -73,6 +117,7 @@ export default function ResetPassword() {
         setLocation("/login");
       }, 2000);
     } catch (err: any) {
+      console.error("Update error:", err);
       setError(err.message || "Failed to update password");
       toast({
         title: "Error",
@@ -83,6 +128,52 @@ export default function ResetPassword() {
       setIsLoading(false);
     }
   };
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <CardTitle>Verifying Recovery Link</CardTitle>
+            <CardDescription>
+              Please wait while we verify your recovery token...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (sessionError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <CardTitle>Recovery Link Invalid</CardTitle>
+            <CardDescription className="text-destructive">
+              {sessionError}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Button
+              onClick={() => setLocation("/login")}
+              variant="outline"
+              className="mt-4"
+              data-testid="button-back-to-login"
+            >
+              Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isSuccess) {
     return (
