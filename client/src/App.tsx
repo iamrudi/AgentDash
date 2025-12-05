@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { Switch, Route } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -294,12 +294,26 @@ function Router() {
   );
 }
 
+function RecoveryRedirect() {
+  const [, setLocation] = useLocation();
+  
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token") && hash.includes("type=recovery")) {
+      setLocation(`/reset-password${hash}`);
+    }
+  }, [setLocation]);
+  
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ThemeProvider defaultTheme="light">
           <TooltipProvider>
+            <RecoveryRedirect />
             <Toaster />
             <Suspense fallback={<PageLoader />}>
               <Router />
