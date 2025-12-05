@@ -17,6 +17,8 @@ const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
 const ClientDetail = lazy(() => import("@/pages/client-detail"));
 const StaffDashboard = lazy(() => import("@/pages/staff-dashboard"));
+const StaffSettings = lazy(() => import("@/pages/staff-settings"));
+const StaffHours = lazy(() => import("@/pages/staff-hours"));
 const EmbedForm = lazy(() => import("@/pages/forms/embed"));
 
 // Client Portal Pages (lazy-loaded)
@@ -269,6 +271,18 @@ function Router() {
       <Route path="/staff">
         <ProtectedRoute allowedRoles={["Staff"]}>
           <StaffDashboard />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/staff/settings">
+        <ProtectedRoute allowedRoles={["Staff"]}>
+          <StaffSettings />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route path="/staff/hours">
+        <ProtectedRoute allowedRoles={["Staff"]}>
+          <StaffHours />
         </ProtectedRoute>
       </Route>
       

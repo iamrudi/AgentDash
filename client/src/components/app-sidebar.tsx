@@ -164,6 +164,18 @@ export function AppSidebar() {
       icon: CheckSquare,
       notificationKey: "newTasks" as const,
     },
+    {
+      title: "My Hours",
+      url: "/staff/hours",
+      icon: BarChart3,
+      notificationKey: null,
+    },
+    {
+      title: "Settings",
+      url: "/staff/settings",
+      icon: Settings,
+      notificationKey: null,
+    },
   ];
 
   const menuItems = role === "Admin" ? agencyMenuItems : staffMenuItems;
