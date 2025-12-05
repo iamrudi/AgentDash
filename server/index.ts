@@ -2,6 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
+import path from "path";
+import fs from "fs";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { InvoiceScheduler } from "./services/invoiceScheduler";
@@ -16,6 +18,13 @@ import { metricsMiddleware, metricsHandler } from "./middleware/metrics";
 import { swaggerSpec } from "./config/swagger";
 import { features } from "./config/features";
 import { env } from "./env";
+
+// Ensure uploads directory exists for branding logos
+const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('Created uploads/logos directory for branding');
+}
 
 const app = express();
 
@@ -44,6 +53,9 @@ app.use(metricsMiddleware);
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Serve static files from /uploads directory (for branding logos)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Request logging (after body parsing)
 app.use(requestLogger);
