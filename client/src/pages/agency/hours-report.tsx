@@ -3,7 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Clock, TrendingUp, Users, Briefcase } from "lucide-react";
-import type { Task, Project, Profile } from "@shared/schema";
+import type { Task, Project, Profile, StaffAssignment } from "@shared/schema";
+
+// Helper function to parse numeric values (Drizzle returns strings for numeric columns)
+function parseNumeric(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? 0 : num;
+}
 
 // Helper function to format hours into readable string
 function formatHours(hours: number): string {
@@ -61,8 +68,8 @@ export default function HoursReport() {
   // Calculate project-level hours
   const projectHours: ProjectHours[] = allProjects?.map(project => {
     const projectTasks = allTasks?.filter(task => task.projectId === project.id) || [];
-    const totalTracked = projectTasks.reduce((sum, task) => sum + (task.timeTracked || 0), 0);
-    const totalEstimated = projectTasks.reduce((sum, task) => sum + (task.timeEstimate || 0), 0);
+    const totalTracked = projectTasks.reduce((sum, task) => sum + parseNumeric(task.timeTracked), 0);
+    const totalEstimated = projectTasks.reduce((sum, task) => sum + parseNumeric(task.timeEstimate), 0);
     const variance = totalEstimated - totalTracked;
 
     return {
@@ -76,7 +83,7 @@ export default function HoursReport() {
   }) || [];
 
   // Fetch staff assignments for all tasks
-  const { data: allAssignments } = useQuery({
+  const { data: allAssignments } = useQuery<StaffAssignment[]>({
     queryKey: ["/api/agency/staff-assignments"],
   });
 
@@ -99,8 +106,8 @@ export default function HoursReport() {
     if (!staff) return;
 
     const assigneeCount = taskAssignmentCounts.get(assignment.taskId) || 1;
-    const proportionalTracked = (task.timeTracked || 0) / assigneeCount;
-    const proportionalEstimated = (task.timeEstimate || 0) / assigneeCount;
+    const proportionalTracked = parseNumeric(task.timeTracked) / assigneeCount;
+    const proportionalEstimated = parseNumeric(task.timeEstimate) / assigneeCount;
 
     if (!staffHoursMap.has(staff.id)) {
       staffHoursMap.set(staff.id, {
@@ -122,8 +129,8 @@ export default function HoursReport() {
   const staffHours = Array.from(staffHoursMap.values());
 
   // Calculate overall totals
-  const totalTracked = allTasks?.reduce((sum, task) => sum + (task.timeTracked || 0), 0) || 0;
-  const totalEstimated = allTasks?.reduce((sum, task) => sum + (task.timeEstimate || 0), 0) || 0;
+  const totalTracked = allTasks?.reduce((sum, task) => sum + parseNumeric(task.timeTracked), 0) || 0;
+  const totalEstimated = allTasks?.reduce((sum, task) => sum + parseNumeric(task.timeEstimate), 0) || 0;
   const totalVariance = totalEstimated - totalTracked;
   const utilizationRate = totalEstimated > 0 ? (totalTracked / totalEstimated) * 100 : 0;
 

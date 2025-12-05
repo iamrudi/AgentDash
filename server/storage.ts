@@ -163,6 +163,7 @@ export interface IStorage {
   // Staff Assignments
   createStaffAssignment(assignment: InsertStaffAssignment): Promise<StaffAssignment>;
   getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]>;
+  getAllTaskAssignments(agencyId?: string): Promise<StaffAssignment[]>;
   deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void>;
   
   // Project with Tasks
@@ -891,6 +892,26 @@ export class DbStorage implements IStorage {
 
   async getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]> {
     return await db.select().from(staffAssignments).where(eq(staffAssignments.taskId, taskId));
+  }
+
+  async getAllTaskAssignments(agencyId?: string): Promise<StaffAssignment[]> {
+    if (agencyId) {
+      // Filter by agency through the task -> project -> client -> agency relationship
+      const results = await db
+        .select({
+          id: staffAssignments.id,
+          taskId: staffAssignments.taskId,
+          staffProfileId: staffAssignments.staffProfileId,
+          createdAt: staffAssignments.createdAt,
+        })
+        .from(staffAssignments)
+        .innerJoin(tasks, eq(staffAssignments.taskId, tasks.id))
+        .innerJoin(projects, eq(tasks.projectId, projects.id))
+        .innerJoin(clients, eq(projects.clientId, clients.id))
+        .where(eq(clients.agencyId, agencyId));
+      return results;
+    }
+    return await db.select().from(staffAssignments);
   }
 
   async deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void> {

@@ -1149,6 +1149,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all tasks for agency (used by hours report)
+  app.get("/api/agency/tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      let agencyId: string | undefined;
+      if (req.user!.isSuperAdmin) {
+        agencyId = undefined; // SuperAdmin: fetch all tasks across agencies
+      } else {
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        agencyId = req.user!.agencyId;
+      }
+
+      const tasks = await storage.getAllTasks(agencyId);
+      
+      // Include project info with each task
+      const tasksWithProject = await Promise.all(
+        tasks.map(async (task) => {
+          const project = task.projectId ? await storage.getProjectById(task.projectId) : null;
+          return { ...task, project };
+        })
+      );
+      
+      res.json(tasksWithProject);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get all staff assignments for agency (used by hours report)
+  app.get("/api/agency/staff-assignments", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      let agencyId: string | undefined;
+      if (req.user!.isSuperAdmin) {
+        agencyId = undefined;
+      } else {
+        if (!req.user!.agencyId) {
+          return res.status(403).json({ message: "Agency association required" });
+        }
+        agencyId = req.user!.agencyId;
+      }
+
+      const assignments = await storage.getAllTaskAssignments(agencyId);
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Create new task
   app.post("/api/agency/tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
