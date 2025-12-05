@@ -25,6 +25,12 @@ import {
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+
+interface BrandingSettings {
+  agencyLogo: string | null;
+  clientLogo: string | null;
+  staffLogo: string | null;
+}
 import {
   Sidebar,
   SidebarContent,
@@ -148,6 +154,11 @@ export function AgencySidebar() {
     refetchInterval: 10000,
   });
 
+  const { data: branding } = useQuery<BrandingSettings>({
+    queryKey: ['/api/agency/settings/branding'],
+    staleTime: 5 * 60 * 1000,
+  });
+
   // Listen for sidebar mode changes from Settings
   useEffect(() => {
     const handleSidebarModeChange = (event: CustomEvent<SidebarMode>) => {
@@ -196,12 +207,22 @@ export function AgencySidebar() {
     >
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
-            <Shield className="h-5 w-5 text-primary group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
-          </div>
+          {branding?.agencyLogo ? (
+            <div className="h-10 w-auto max-w-[120px] flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px]">
+              <img 
+                src={branding.agencyLogo} 
+                alt="Agency Logo" 
+                className="h-full w-auto object-contain"
+                data-testid="img-agency-logo"
+              />
+            </div>
+          ) : (
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
+              <Shield className="h-5 w-5 text-primary group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
+            </div>
+          )}
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm">Team manager
-</span>
+            <span className="font-semibold text-sm">Team manager</span>
             <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
         </div>

@@ -38,6 +38,12 @@ import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser, getUserRole } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+interface BrandingSettings {
+  agencyLogo: string | null;
+  clientLogo: string | null;
+  staffLogo: string | null;
+}
+
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
 export function AppSidebar() {
@@ -54,6 +60,11 @@ export function AppSidebar() {
     queryKey: ["/api/staff/notifications/counts"],
     refetchInterval: 10000, // Refresh every 10 seconds
     enabled: role === "Staff", // Only fetch for staff users
+  });
+
+  const { data: branding } = useQuery<BrandingSettings>({
+    queryKey: ['/api/agency/settings/branding'],
+    staleTime: 5 * 60 * 1000,
   });
 
   // Listen for sidebar mode changes from Settings
@@ -197,9 +208,29 @@ export function AppSidebar() {
     >
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
-            <Building2 className="h-4 w-4 text-sidebar-primary-foreground" />
-          </div>
+          {role === "Staff" && branding?.staffLogo ? (
+            <div className="h-8 w-auto max-w-[120px] flex items-center">
+              <img 
+                src={branding.staffLogo} 
+                alt="Staff Portal Logo" 
+                className="h-full w-auto object-contain"
+                data-testid="img-staff-logo"
+              />
+            </div>
+          ) : role === "Admin" && branding?.agencyLogo ? (
+            <div className="h-8 w-auto max-w-[120px] flex items-center">
+              <img 
+                src={branding.agencyLogo} 
+                alt="Agency Logo" 
+                className="h-full w-auto object-contain"
+                data-testid="img-agency-logo"
+              />
+            </div>
+          ) : (
+            <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-sidebar-primary-foreground" />
+            </div>
+          )}
           <div>
             <h2 className="font-semibold text-sm">{role === "Staff" ? "Staff Portal" : "Agency Portal"}</h2>
             <p className="text-xs text-muted-foreground">{role}</p>
