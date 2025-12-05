@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getAuthUser } from "@/lib/auth";
 
 interface LogoUploaderProps {
   type: "agencyLogo" | "clientLogo" | "staffLogo";
@@ -21,6 +22,11 @@ export function LogoUploader({ type, currentLogo, label, description, testIdPref
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      const authUser = getAuthUser();
+      if (!authUser?.token) {
+        throw new Error('Authentication required');
+      }
+
       const formData = new FormData();
       formData.append('logo', file);
       formData.append('type', type);
@@ -28,7 +34,9 @@ export function LogoUploader({ type, currentLogo, label, description, testIdPref
       const response = await fetch('/api/agency/settings/logo', {
         method: 'POST',
         body: formData,
-        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${authUser.token}`,
+        },
       });
 
       if (!response.ok) {
@@ -58,9 +66,16 @@ export function LogoUploader({ type, currentLogo, label, description, testIdPref
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
+      const authUser = getAuthUser();
+      if (!authUser?.token) {
+        throw new Error('Authentication required');
+      }
+
       const response = await fetch(`/api/agency/settings/logo/${type}`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${authUser.token}`,
+        },
       });
 
       if (!response.ok) {
