@@ -1,0 +1,50 @@
+Act as a Senior Full Stack Developer. We need to add **Agency Branding/White-labeling** capabilities to the platform, allowing agencies to upload distinct logos for different portals.
+
+**Objective:**
+Implement a "Branding" section in the Agency Settings page to upload and manage logos for the Agency Portal, Client Portal, and Staff/Talent Portal. Update the respective layouts to display these logos dynamically.
+
+**Constraints & Architecture:**
+* **Stack:** React, Tailwind/Shadcn UI, Express, Drizzle ORM.
+* **Storage:** Local filesystem storage (persistent in Replit). Store files in a root `uploads` directory and serve them via Express.
+* **Database:** Extend the `agency_settings` table.
+
+### Phase 1: Database Schema
+1.  Modify `shared/schema.ts`:
+    * Update `agencySettings` table to include:
+        * `agencyLogo` (text, nullable) - URL/path for the internal agency portal header.
+        * `clientLogo` (text, nullable) - URL/path for the external client portal header.
+        * `staffLogo` (text, nullable) - URL/path for the staff/talent portal header.
+2.  Update the `insertAgencySettingSchema` and `updateAgencySettingSchema` Zod schemas accordingly.
+3.  Generate the migration.
+
+### Phase 2: Backend API (File Uploads)
+1.  **Dependency:** Install `multer` and `@types/multer` for handling `multipart/form-data`.
+2.  **Server Setup (`server/index.ts`):**
+    * Configure Express to serve a new static directory `/uploads` pointing to `process.cwd() + '/uploads'`.
+    * Ensure the `uploads/logos` directory exists on startup.
+3.  **Routes (`server/routes/settings.ts` or new `routes/upload.ts`):**
+    * Create a POST route `/api/agency/settings/logo`.
+    * **Middleware:** `requireAuth`, `requireRole("Admin")`, `multer` single file upload.
+    * **Logic:**
+        * Validate file type (images only) and size (max 2MB).
+        * Save file to `uploads/logos/` with a unique name (e.g., `${agencyId}-${type}-${timestamp}.png`).
+        * Update the specific column (`agencyLogo`, `clientLogo`, or `staffLogo`) in the `agency_settings` table for the authenticated user's agency.
+        * Return the public URL of the uploaded image.
+
+### Phase 3: Frontend - Agency Settings (`client/src/pages/agency/settings.tsx`)
+1.  Add a new **"Branding & White-labeling"** card/section.
+2.  Create a reusable `LogoUploader` component that features:
+    * **Preview Area:** Shows the current logo or a placeholder.
+    * **Upload Button:** Triggers file selection.
+    * **Remove Button:** Clears the logo (updates DB to null).
+    * **Context:** Label (e.g., "Client Portal Header").
+3.  Implement three instances of this uploader for the three specific logo types.
+
+### Phase 4: Frontend - Dynamic Header Updates
+Modify the following layout components to fetch `agency_settings` and display the correct logo if available. If no logo is set, fall back to the existing text/icon.
+
+1.  **Agency Portal:** Update `client/src/components/agency-sidebar.tsx` (or the top header in `agency-layout.tsx`) to use `agencyLogo`.
+2.  **Client Portal:** Update `client/src/components/client-layout.tsx` (Sidebar header or Top nav) to use `clientLogo`.
+3.  **Staff Portal:** Update `client/src/pages/staff-dashboard.tsx` (or `app-sidebar.tsx`) to use `staffLogo`.
+
+**Note:** Ensure `useQuery` hooks for fetching settings include `staleTime` to avoid flickering, but invalidate correctly after a new upload.
