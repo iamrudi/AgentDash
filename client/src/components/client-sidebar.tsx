@@ -92,9 +92,7 @@ export function ClientSidebar() {
               <span className="group-data-[collapsible=icon]:hidden">agency</span>
             </span>
           </div>
-          <Badge variant="outline" className="w-fit text-xs px-2 py-0 group-data-[collapsible=icon]:hidden">
-            Client Portal
-          </Badge>
+          <Badge variant="outline" className="w-fit text-xs px-2 py-0 group-data-[collapsible=icon]:hidden">Client / Stakeholder</Badge>
         </div>
       </SidebarHeader>
       <SidebarContent>
