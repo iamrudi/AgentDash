@@ -108,25 +108,25 @@ export function ClientSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center">
-            {branding?.clientLogo ? (
-              <div className="h-8 w-auto max-w-[120px] flex items-center group-data-[collapsible=icon]:max-w-[32px]">
-                <img 
-                  src={branding.clientLogo} 
-                  alt="Client Portal Logo" 
-                  className="h-full w-auto object-contain"
-                  data-testid="img-client-logo"
-                />
-              </div>
-            ) : (
-              <span className="font-bold text-lg group-data-[collapsible=icon]:text-base">
-                <span className="text-primary">mm</span>
-                <span className="group-data-[collapsible=icon]:hidden">agency</span>
-              </span>
-            )}
+        <div className="flex flex-col gap-3">
+          {branding?.clientLogo ? (
+            <div className="h-10 w-auto max-w-[120px] flex items-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px] group-data-[collapsible=icon]:justify-center">
+              <img 
+                src={branding.clientLogo} 
+                alt="Client Portal Logo" 
+                className="h-full w-auto object-contain"
+                data-testid="img-client-logo"
+              />
+            </div>
+          ) : (
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
+              <Building2 className="h-5 w-5 text-primary group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
+            </div>
+          )}
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <span className="font-semibold text-sm">Client Portal</span>
+            <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
-          <Badge variant="outline" className="w-fit text-xs px-2 py-0 group-data-[collapsible=icon]:hidden">Client / Stakeholder</Badge>
         </div>
       </SidebarHeader>
       <SidebarContent>

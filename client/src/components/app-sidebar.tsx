@@ -207,9 +207,9 @@ export function AppSidebar() {
       onMouseLeave={() => sidebarMode === 'hover' && setOpen(false)}
     >
       <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3">
           {role === "Staff" && branding?.staffLogo ? (
-            <div className="h-8 w-auto max-w-[120px] flex items-center">
+            <div className="h-10 w-auto max-w-[120px] flex items-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px] group-data-[collapsible=icon]:justify-center">
               <img 
                 src={branding.staffLogo} 
                 alt="Staff Portal Logo" 
@@ -218,7 +218,7 @@ export function AppSidebar() {
               />
             </div>
           ) : role === "Admin" && branding?.agencyLogo ? (
-            <div className="h-8 w-auto max-w-[120px] flex items-center">
+            <div className="h-10 w-auto max-w-[120px] flex items-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px] group-data-[collapsible=icon]:justify-center">
               <img 
                 src={branding.agencyLogo} 
                 alt="Agency Logo" 
@@ -227,13 +227,13 @@ export function AppSidebar() {
               />
             </div>
           ) : (
-            <div className="w-8 h-8 bg-sidebar-primary rounded-md flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-sidebar-primary-foreground" />
+            <div className="w-10 h-10 bg-sidebar-primary rounded-md flex items-center justify-center group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+              <Building2 className="h-5 w-5 text-sidebar-primary-foreground group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
             </div>
           )}
-          <div>
-            <h2 className="font-semibold text-sm">{role === "Staff" ? "Staff Portal" : "Agency Portal"}</h2>
-            <p className="text-xs text-muted-foreground">{role}</p>
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <span className="font-semibold text-sm">{role === "Staff" ? "Staff Portal" : "Agency Portal"}</span>
+            <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
         </div>
       </SidebarHeader>
