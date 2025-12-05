@@ -13,7 +13,8 @@ import {
   Globe,
   Plus,
   X,
-  Bot
+  Bot,
+  Palette
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { LogoUploader } from "@/components/logo-uploader";
 
 type SidebarMode = 'expanded' | 'collapsed' | 'hover';
 
@@ -257,6 +259,76 @@ function CorsDomainsManager() {
   );
 }
 
+// Branding Manager Component
+interface BrandingSettings {
+  agencyLogo: string | null;
+  clientLogo: string | null;
+  staffLogo: string | null;
+}
+
+function BrandingManager() {
+  const { data: branding, isLoading } = useQuery<BrandingSettings>({
+    queryKey: ['/api/agency/settings/branding'],
+  });
+
+  if (isLoading) {
+    return (
+      <Card className="p-6">
+        <div className="text-sm text-muted-foreground">Loading branding settings...</div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="p-6">
+      <div className="space-y-6">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+            <Palette className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-medium mb-1">Branding & White-Labeling</h3>
+            <p className="text-xs text-muted-foreground">
+              Upload custom logos to personalize each portal with your agency branding
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <LogoUploader
+            type="agencyLogo"
+            currentLogo={branding?.agencyLogo || null}
+            label="Agency Portal Logo"
+            description="Displayed in the admin sidebar"
+            testIdPrefix="logo-agency"
+          />
+          
+          <LogoUploader
+            type="clientLogo"
+            currentLogo={branding?.clientLogo || null}
+            label="Client Portal Logo"
+            description="Displayed in client dashboards"
+            testIdPrefix="logo-client"
+          />
+          
+          <LogoUploader
+            type="staffLogo"
+            currentLogo={branding?.staffLogo || null}
+            label="Staff Portal Logo"
+            description="Displayed in staff dashboard"
+            testIdPrefix="logo-staff"
+          />
+        </div>
+
+        <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+          <strong>Tip:</strong> Use PNG or SVG files with transparent backgrounds for best results. 
+          Maximum file size is 2MB. Recommended dimensions: 200x50 pixels.
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const [, setLocation] = useLocation();
 
@@ -360,6 +432,15 @@ export default function Settings() {
             AI CONFIGURATION
           </h2>
           <AIProviderManager />
+        </div>
+
+        <Separator className="my-6" />
+
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold text-muted-foreground tracking-wider">
+            BRANDING
+          </h2>
+          <BrandingManager />
         </div>
 
         <Separator className="my-6" />
