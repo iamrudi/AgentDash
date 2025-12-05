@@ -124,7 +124,8 @@ export function ClientSidebar() {
             </div>
           )}
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm">Client Portal</span>
+            <span className="font-semibold text-sm">Client / Stakeholder
+</span>
             <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
         </div>
