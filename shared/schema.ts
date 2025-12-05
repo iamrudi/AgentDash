@@ -18,6 +18,10 @@ export const agencySettings = pgTable("agency_settings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
   aiProvider: text("ai_provider").notNull().default("gemini"), // 'gemini' or 'openai'
+  // Branding / White-labeling logos
+  agencyLogo: text("agency_logo"), // URL/path for internal agency portal header
+  clientLogo: text("client_logo"), // URL/path for external client portal header
+  staffLogo: text("staff_logo"), // URL/path for staff/talent portal header
   // HubSpot CRM Integration (agency-wide)
   hubspotAccessToken: text("hubspot_access_token"), // Encrypted before storage
   hubspotAccessTokenIv: text("hubspot_access_token_iv"), // IV for encryption
@@ -557,7 +561,10 @@ export const insertAgencySettingSchema = createInsertSchema(agencySettings)
   });
 
 export const updateAgencySettingSchema = z.object({
-  aiProvider: z.enum(aiProviderEnum),
+  aiProvider: z.enum(aiProviderEnum).optional(),
+  agencyLogo: z.string().nullable().optional(),
+  clientLogo: z.string().nullable().optional(),
+  staffLogo: z.string().nullable().optional(),
 });
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({
