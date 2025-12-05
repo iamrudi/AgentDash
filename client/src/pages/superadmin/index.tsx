@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Profile, Agency, AuditLog, Client } from "@shared/schema";
-import { Shield, Users, Building2, ScrollText, Trash2, UserCog, Mail, Key } from "lucide-react";
+import { Profile, Agency, AuditLog, Client, Initiative } from "@shared/schema";
+import { Shield, Users, Building2, ScrollText, Trash2, UserCog, Mail, Key, Bot, Lightbulb, Sparkles, Loader2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState } from "react";
 import {
   Table,
@@ -52,6 +53,18 @@ type ClientWithDetails = Client & {
   userEmail?: string;
 };
 
+type AgencySettings = {
+  agencyId: string;
+  agencyName: string;
+  aiProvider: string;
+  isDefault: boolean;
+};
+
+type InitiativeWithClient = Initiative & {
+  client?: Client;
+  agencyName?: string;
+};
+
 export default function SuperAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithAgency | null>(null);
   const [newRole, setNewRole] = useState<string>("");
@@ -64,6 +77,9 @@ export default function SuperAdminPage() {
   const [deletingAgency, setDeletingAgency] = useState<AgencyWithCounts | null>(null);
   const [deletingClient, setDeletingClient] = useState<ClientWithDetails | null>(null);
   const [promotingUser, setPromotingUser] = useState<UserWithAgency | null>(null);
+  const [selectedAgencyForSettings, setSelectedAgencyForSettings] = useState<string>("");
+  const [selectedClientForRecommendations, setSelectedClientForRecommendations] = useState<string>("");
+  const [recommendationPreset, setRecommendationPreset] = useState<string>("quick-wins");
   const { toast } = useToast();
 
   const { data: users, isLoading: usersLoading } = useQuery<UserWithAgency[]>({
@@ -80,6 +96,56 @@ export default function SuperAdminPage() {
 
   const { data: clients, isLoading: clientsLoading } = useQuery<ClientWithDetails[]>({
     queryKey: ["/api/superadmin/clients"],
+  });
+
+  const { data: recommendations, isLoading: recommendationsLoading } = useQuery<InitiativeWithClient[]>({
+    queryKey: ["/api/superadmin/recommendations"],
+  });
+
+  const { data: agencySettings, isLoading: settingsLoading } = useQuery<AgencySettings>({
+    queryKey: ["/api/superadmin/agencies", selectedAgencyForSettings, "settings"],
+    enabled: !!selectedAgencyForSettings,
+  });
+
+  const updateAIProviderMutation = useMutation({
+    mutationFn: async ({ agencyId, aiProvider }: { agencyId: string; aiProvider: string }) => {
+      return await apiRequest("PUT", `/api/superadmin/agencies/${agencyId}/settings`, { aiProvider });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/agencies", selectedAgencyForSettings, "settings"] });
+      toast({
+        title: "Success",
+        description: "AI provider updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update AI provider",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const generateRecommendationsMutation = useMutation({
+    mutationFn: async ({ clientId, preset }: { clientId: string; preset: string }) => {
+      return await apiRequest("POST", `/api/superadmin/clients/${clientId}/generate-recommendations`, { preset });
+    },
+    onSuccess: async (response) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/recommendations"] });
+      const data = await response.json();
+      toast({
+        title: "Success",
+        description: data.message || "Recommendations generated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate recommendations",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateRoleMutation = useMutation({
@@ -267,7 +333,7 @@ export default function SuperAdminPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-6 max-w-4xl">
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -279,6 +345,14 @@ export default function SuperAdminPage() {
           <TabsTrigger value="clients" data-testid="tab-clients">
             <UserCog className="w-4 h-4 mr-2" />
             Clients
+          </TabsTrigger>
+          <TabsTrigger value="ai-settings" data-testid="tab-ai-settings">
+            <Bot className="w-4 h-4 mr-2" />
+            AI Settings
+          </TabsTrigger>
+          <TabsTrigger value="recommendations" data-testid="tab-recommendations">
+            <Lightbulb className="w-4 h-4 mr-2" />
+            Recommendations
           </TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">
             <ScrollText className="w-4 h-4 mr-2" />
@@ -537,6 +611,248 @@ export default function SuperAdminPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="ai-settings" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>AI Provider Settings</CardTitle>
+              <CardDescription>
+                Configure AI provider settings for each agency
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="agency-settings-select">Select Agency</Label>
+                  <Select value={selectedAgencyForSettings} onValueChange={setSelectedAgencyForSettings}>
+                    <SelectTrigger id="agency-settings-select" data-testid="select-agency-settings">
+                      <SelectValue placeholder="Choose an agency to manage..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agencies?.map((agency) => (
+                        <SelectItem key={agency.id} value={agency.id}>
+                          {agency.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedAgencyForSettings && (
+                  <div className="border rounded-md p-4 space-y-4">
+                    {settingsLoading ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                        Loading settings...
+                      </div>
+                    ) : agencySettings ? (
+                      <>
+                        <div className="flex items-start gap-3">
+                          <div className="w-9 h-9 bg-muted rounded-md flex items-center justify-center flex-shrink-0">
+                            <Bot className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-medium mb-1">AI Provider for {agencySettings.agencyName}</h3>
+                            <p className="text-xs text-muted-foreground mb-4">
+                              Choose which AI provider to use for recommendations and analysis
+                              {agencySettings.isDefault && (
+                                <span className="ml-2 text-yellow-600 dark:text-yellow-500">(Using default)</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <RadioGroup 
+                          value={agencySettings.aiProvider}
+                          onValueChange={(value) => {
+                            updateAIProviderMutation.mutate({ 
+                              agencyId: selectedAgencyForSettings, 
+                              aiProvider: value 
+                            });
+                          }}
+                          disabled={updateAIProviderMutation.isPending}
+                          data-testid="radio-ai-provider"
+                        >
+                          <div className="flex items-center space-x-2 p-3 rounded-md hover-elevate">
+                            <RadioGroupItem value="gemini" id="gemini" data-testid="radio-gemini" />
+                            <Label htmlFor="gemini" className="flex-1 cursor-pointer">
+                              <span className="font-medium">Google Gemini</span>
+                              <span className="block text-xs text-muted-foreground">
+                                Uses Google's Gemini AI model for recommendations
+                              </span>
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2 p-3 rounded-md hover-elevate">
+                            <RadioGroupItem value="openai" id="openai" data-testid="radio-openai" />
+                            <Label htmlFor="openai" className="flex-1 cursor-pointer">
+                              <span className="font-medium">OpenAI</span>
+                              <span className="block text-xs text-muted-foreground">
+                                Uses OpenAI's GPT model for recommendations
+                              </span>
+                            </Label>
+                          </div>
+                        </RadioGroup>
+
+                        {updateAIProviderMutation.isPending && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Updating...
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-4 text-muted-foreground">
+                        Unable to load settings
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="recommendations" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Generate Recommendations</CardTitle>
+                <CardDescription>
+                  Generate AI-powered recommendations for any client
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-2 flex-1 min-w-[200px]">
+                    <Label htmlFor="client-recommendations-select">Select Client</Label>
+                    <Select value={selectedClientForRecommendations} onValueChange={setSelectedClientForRecommendations}>
+                      <SelectTrigger id="client-recommendations-select" data-testid="select-client-recommendations">
+                        <SelectValue placeholder="Choose a client..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients?.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.companyName} ({client.agencyName})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2 flex-1 min-w-[200px]">
+                    <Label htmlFor="preset-select">Preset</Label>
+                    <Select value={recommendationPreset} onValueChange={setRecommendationPreset}>
+                      <SelectTrigger id="preset-select" data-testid="select-preset">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quick-wins">Quick Wins</SelectItem>
+                        <SelectItem value="strategic-growth">Strategic Growth</SelectItem>
+                        <SelectItem value="full-audit">Full Audit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (selectedClientForRecommendations) {
+                        generateRecommendationsMutation.mutate({
+                          clientId: selectedClientForRecommendations,
+                          preset: recommendationPreset,
+                        });
+                      }
+                    }}
+                    disabled={!selectedClientForRecommendations || generateRecommendationsMutation.isPending}
+                    data-testid="button-generate-recommendations"
+                  >
+                    {generateRecommendationsMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>All Recommendations</CardTitle>
+                <CardDescription>
+                  View recommendations across all agencies and clients
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {recommendationsLoading ? (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="loading-recommendations">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                    Loading recommendations...
+                  </div>
+                ) : recommendations && recommendations.length > 0 ? (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Client</TableHead>
+                          <TableHead>Agency</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Impact</TableHead>
+                          <TableHead>Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {recommendations.map((rec) => (
+                          <TableRow key={rec.id} data-testid={`row-recommendation-${rec.id}`}>
+                            <TableCell className="font-medium max-w-[200px] truncate" data-testid={`text-rec-title-${rec.id}`}>
+                              {rec.title}
+                            </TableCell>
+                            <TableCell data-testid={`text-rec-client-${rec.id}`}>
+                              {rec.client?.companyName || 'Unknown'}
+                            </TableCell>
+                            <TableCell data-testid={`text-rec-agency-${rec.id}`}>
+                              <Badge variant="secondary">
+                                <Building2 className="w-3 h-3 mr-1" />
+                                {rec.agencyName || 'Unknown'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell data-testid={`text-rec-status-${rec.id}`}>
+                              <Badge 
+                                variant={
+                                  rec.status === 'approved' ? 'default' : 
+                                  rec.status === 'rejected' ? 'destructive' : 
+                                  'secondary'
+                                }
+                              >
+                                {rec.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell data-testid={`text-rec-impact-${rec.id}`}>
+                              <Badge variant="outline">{rec.impact || 'N/A'}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground" data-testid={`text-rec-created-${rec.id}`}>
+                              {format(new Date(rec.createdAt), "MMM d, yyyy")}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="empty-recommendations">
+                    No recommendations found
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="audit" className="mt-6">
           <Card>
             <CardHeader>
@@ -571,9 +887,12 @@ export default function SuperAdminPage() {
                             Resource ID: {log.resourceId}
                           </p>
                         )}
-                        {log.details && (
+                        {log.details != null && (
                           <p className="text-sm text-muted-foreground" data-testid={`text-log-details-${log.id}`}>
-                            {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
+                            {(() => {
+                              const d = log.details;
+                              return typeof d === 'string' ? d : JSON.stringify(d);
+                            })()}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground" data-testid={`text-log-created-${log.id}`}>

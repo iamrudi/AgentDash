@@ -5993,6 +5993,214 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Get AI settings for a specific agency (Super Admin only)
+  app.get("/api/superadmin/agencies/:agencyId/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = req.params;
+
+      // Verify agency exists
+      const agencies = await storage.getAllAgenciesForSuperAdmin();
+      const agency = agencies.find(a => a.id === agencyId);
+      if (!agency) {
+        return res.status(404).json({ message: "Agency not found" });
+      }
+
+      // Query agency settings
+      const settings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1);
+
+      if (settings.length === 0) {
+        return res.json({
+          agencyId,
+          agencyName: agency.name,
+          aiProvider: (process.env.AI_PROVIDER?.toLowerCase() || "gemini"),
+          isDefault: true,
+        });
+      }
+
+      res.json({
+        agencyId,
+        agencyName: agency.name,
+        aiProvider: settings[0].aiProvider.toLowerCase(),
+        isDefault: false,
+      });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching agency settings:', error);
+      res.status(500).json({ message: "Failed to fetch agency settings" });
+    }
+  });
+
+  // Update AI settings for a specific agency (Super Admin only)
+  app.put("/api/superadmin/agencies/:agencyId/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = req.params;
+
+      // Validate request body
+      const validationResult = updateAgencySettingSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Invalid settings data",
+          errors: validationResult.error.errors,
+        });
+      }
+
+      const { aiProvider } = validationResult.data;
+
+      // Verify agency exists
+      const agencies = await storage.getAllAgenciesForSuperAdmin();
+      const agency = agencies.find(a => a.id === agencyId);
+      if (!agency) {
+        return res.status(404).json({ message: "Agency not found" });
+      }
+
+      // Check if settings already exist for this agency
+      const existingSettings = await db
+        .select()
+        .from(agencySettings)
+        .where(eq(agencySettings.agencyId, agencyId))
+        .limit(1);
+
+      let result;
+      if (existingSettings.length === 0) {
+        // Create new settings
+        [result] = await db
+          .insert(agencySettings)
+          .values({
+            agencyId,
+            aiProvider,
+          })
+          .returning();
+      } else {
+        // Update existing settings
+        [result] = await db
+          .update(agencySettings)
+          .set({
+            aiProvider,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(agencySettings.agencyId, agencyId))
+          .returning();
+      }
+
+      // Invalidate AI provider cache for this agency
+      invalidateAIProviderCache(agencyId);
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'agency.settings.update',
+        'agency',
+        agencyId,
+        { aiProvider, agencyName: agency.name },
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.json({
+        ...result,
+        agencyName: agency.name,
+      });
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating agency settings:', error);
+      res.status(500).json({ message: "Failed to update agency settings" });
+    }
+  });
+
+  // Get all recommendations/initiatives across all agencies (Super Admin only)
+  app.get("/api/superadmin/recommendations", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      // Get all initiatives without agency filter
+      const allInitiatives = await storage.getAllInitiatives();
+      
+      // Enrich with client data
+      const initiativesWithClients = await Promise.all(
+        allInitiatives.map(async (init) => {
+          const client = await storage.getClientById(init.clientId);
+          let agencyName = undefined;
+          if (client?.agencyId) {
+            const agencies = await storage.getAllAgenciesForSuperAdmin();
+            const agency = agencies.find(a => a.id === client.agencyId);
+            agencyName = agency?.name;
+          }
+          return { 
+            ...init, 
+            client,
+            agencyName
+          };
+        })
+      );
+      
+      res.json(initiativesWithClients);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching recommendations:', error);
+      res.status(500).json({ message: "Failed to fetch recommendations" });
+    }
+  });
+
+  // Generate recommendations for any client (Super Admin only)
+  app.post("/api/superadmin/clients/:clientId/generate-recommendations", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { clientId } = req.params;
+      
+      // Verify client exists
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Validate request body
+      const generateRecommendationsSchema = z.object({
+        preset: z.enum(["quick-wins", "strategic-growth", "full-audit"]),
+        includeCompetitors: z.boolean().default(false),
+        competitorDomains: z.array(z.string()).max(5).optional()
+      });
+      
+      const validatedData = generateRecommendationsSchema.parse(req.body);
+      const { generateAIRecommendations } = await import("./ai-analyzer");
+      
+      // Call AI analyzer with preset and competitor configuration
+      const result = await generateAIRecommendations(storage, clientId, {
+        preset: validatedData.preset,
+        includeCompetitors: validatedData.includeCompetitors,
+        competitorDomains: validatedData.competitorDomains
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({ message: result.error });
+      }
+
+      // Log audit event
+      await logAuditEvent(
+        req.user!.id,
+        'recommendations.generate',
+        'client',
+        clientId,
+        { 
+          preset: validatedData.preset, 
+          clientName: client.companyName,
+          recommendationsCreated: result.recommendationsCreated 
+        },
+        req.ip,
+        req.get('user-agent')
+      );
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully generated ${result.recommendationsCreated} AI-powered recommendations`,
+        count: result.recommendationsCreated 
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error('[SUPER ADMIN] Error generating recommendations:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get audit logs (Super Admin only)
   app.get("/api/superadmin/audit-logs", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
     try {
