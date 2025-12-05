@@ -13,6 +13,11 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { getAuthUser, clearAuthUser } from "@/lib/auth";
 
@@ -28,49 +33,56 @@ const menuItems = [
     url: "/client",
     icon: Home,
     notificationKey: null,
+    description: "Overview of your account status and key metrics",
   },
   {
     title: "Projects",
     url: "/client/projects",
     icon: FolderKanban,
     notificationKey: null,
+    description: "View active projects and track progress",
   },
   {
     title: "Recommendations",
     url: "/client/recommendations",
     icon: Lightbulb,
     notificationKey: "newRecommendations" as const,
+    description: "Review strategic initiatives proposed by your agency",
   },
   {
     title: "Billing",
     url: "/client/billing",
     icon: CreditCard,
     notificationKey: null,
+    description: "View invoices and manage payment details",
   },
   {
     title: "Reports",
     url: "/client/reports",
     icon: BarChart3,
     notificationKey: null,
+    description: "Access analytics and performance reports",
   },
   {
     title: "Profile",
     url: "/client/profile",
     icon: User,
     notificationKey: null,
+    description: "Update your account information and preferences",
   },
   {
     title: "Support",
     url: "/client/support",
     icon: HelpCircle,
     notificationKey: "unreadMessages" as const,
+    description: "Chat with your account manager for assistance",
   },
 ];
 
 export function ClientSidebar() {
   const [location, setLocation] = useLocation();
   const authUser = getAuthUser();
-  const { setOpenMobile, isMobile } = useSidebar();
+  const { setOpenMobile, isMobile, open } = useSidebar();
 
   const { data: notificationCounts } = useQuery<{ unreadMessages: number; newRecommendations: number }>({
     queryKey: ["/api/client/notifications/counts"],
@@ -129,26 +141,39 @@ export function ClientSidebar() {
                 
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={location === item.url}
-                      tooltip={item.title}
-                      data-testid={`nav-${item.title.toLowerCase()}`}
-                    >
-                      <Link href={item.url} onClick={handleNavClick}>
-                        <item.icon className="h-4 w-4" />
-                        <span className="flex-1">{item.title}</span>
-                        {count > 0 && (
-                          <Badge 
-                            variant="default" 
-                            className="ml-auto h-5 min-w-5 px-1 text-xs"
-                            data-testid={`notification-badge-${item.notificationKey}`}
-                          >
-                            {count}
-                          </Badge>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
+                    <Tooltip delayDuration={300}>
+                      <TooltipTrigger asChild>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={location === item.url}
+                          tooltip={!open ? item.title : undefined}
+                          data-testid={`nav-${item.title.toLowerCase()}`}
+                        >
+                          <Link href={item.url} onClick={handleNavClick}>
+                            <item.icon className="h-4 w-4" />
+                            <span className="flex-1">{item.title}</span>
+                            {count > 0 && (
+                              <Badge 
+                                variant="default" 
+                                className="ml-auto h-5 min-w-5 px-1 text-xs"
+                                data-testid={`notification-badge-${item.notificationKey}`}
+                              >
+                                {count}
+                              </Badge>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </TooltipTrigger>
+                      {open && item.description && (
+                        <TooltipContent 
+                          side="right" 
+                          align="center"
+                          className="max-w-[200px] text-xs"
+                        >
+                          {item.description}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
                   </SidebarMenuItem>
                 );
               })}
