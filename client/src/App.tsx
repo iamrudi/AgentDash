@@ -15,6 +15,7 @@ const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/home"));
 const Login = lazy(() => import("@/pages/login"));
 const Signup = lazy(() => import("@/pages/signup"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const ClientDetail = lazy(() => import("@/pages/client-detail"));
 const StaffDashboard = lazy(() => import("@/pages/staff-dashboard"));
 const StaffSettings = lazy(() => import("@/pages/staff-settings"));
@@ -68,6 +69,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/reset-password" component={ResetPassword} />
       
       {/* Public Form Embed (no auth required) */}
       <Route path="/forms/embed/:publicId" component={EmbedForm} />
