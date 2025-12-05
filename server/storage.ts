@@ -115,6 +115,7 @@ export interface IStorage {
   getStaffProfileById(id: string): Promise<Profile | undefined>;
   getAllStaff(): Promise<Profile[]>;
   createProfile(profile: InsertProfile): Promise<Profile>;
+  updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined>;
   
   // Clients
   getClientById(id: string): Promise<Client | undefined>;
@@ -436,6 +437,29 @@ export class DbStorage implements IStorage {
 
   async createProfile(profile: InsertProfile): Promise<Profile> {
     const result = await db.insert(profiles).values(profile).returning();
+    return result[0];
+  }
+
+  async updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined> {
+    // Only update provided fields
+    const updateFields: Record<string, unknown> = {};
+    if (data.fullName !== undefined) {
+      updateFields.fullName = data.fullName;
+    }
+    if (data.skills !== undefined) {
+      updateFields.skills = data.skills;
+    }
+    
+    // Return early if no fields to update
+    if (Object.keys(updateFields).length === 0) {
+      return this.getProfileByUserId(userId);
+    }
+    
+    const result = await db.update(profiles)
+      .set(updateFields)
+      .where(eq(profiles.id, userId))
+      .returning();
+    
     return result[0];
   }
 

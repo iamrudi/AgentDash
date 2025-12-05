@@ -178,6 +178,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user's own profile (Staff Settings page)
+  app.patch("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { updateUserProfileSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validation = updateUserProfileSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          message: "Invalid profile data",
+          errors: validation.error.errors,
+        });
+      }
+      
+      const { fullName, skills } = validation.data;
+      
+      // IDOR Protection: Users can ONLY update their own profile
+      const userId = req.user!.id;
+      
+      // Build update object with only provided fields
+      const updateData: { fullName?: string; skills?: string[] } = {};
+      if (fullName !== undefined) {
+        updateData.fullName = fullName;
+      }
+      if (skills !== undefined) {
+        updateData.skills = skills;
+      }
+      
+      // Update profile in database
+      const updatedProfile = await storage.updateUserProfile(userId, updateData);
+      
+      if (!updatedProfile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      
+      res.json({
+        message: "Profile updated successfully",
+        profile: updatedProfile,
+      });
+    } catch (error: any) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: error.message || "Failed to update profile" });
+    }
+  });
+
+  // Get current user's profile (for settings page)
+  app.get("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.getProfileByUserId(req.user!.id);
+      
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      
+      res.json(profile);
+    } catch (error: any) {
+      console.error("Profile fetch error:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch profile" });
+    }
+  });
+
   // Public Form Routes (no authentication required)
   
   // Get form metadata for embedding (publicId lookup)
