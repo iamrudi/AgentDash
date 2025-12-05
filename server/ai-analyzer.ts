@@ -185,17 +185,19 @@ Include competitive analysis and opportunities to outperform these competitors.`
       console.log("[AI Recommendation Debug]:", JSON.stringify(rec, null, 2));
       
       // Handle both field name variations from different AI providers
-      // OpenAI returns summaryObservation, Gemini may return observation
+      // OpenAI returns summaryObservation/summaryAction/impactLevel
+      // Gemini may return observation/proposedAction/impact
       // Use type assertion to handle the flexible response format
       const recAny = rec as any;
       const observationText = recAny.observation || recAny.summaryObservation || rec.title;
+      const proposedActionText = recAny.proposedAction || recAny.summaryAction || recAny.action || rec.title;
       const impactLevel = recAny.impact || recAny.impactLevel || "Medium";
       
       const initiative: InsertInitiative = {
         title: rec.title,
         observation: observationText,
         observationInsights: rec.observationInsights,
-        proposedAction: rec.proposedAction,
+        proposedAction: proposedActionText,
         actionTasks: rec.actionTasks,
         status: "Needs Review",
         cost: rec.estimatedCost?.toString() || "0",
