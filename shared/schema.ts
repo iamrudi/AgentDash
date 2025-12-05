@@ -52,6 +52,7 @@ export const profiles = pgTable("profiles", {
   role: text("role").notNull(), // 'Admin', 'Client', 'Staff', 'SuperAdmin'
   isSuperAdmin: boolean("is_super_admin").default(false).notNull(), // Platform-wide super admin flag
   agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // For Admin/Staff only, null for Client/SuperAdmin users
+  skills: text("skills").array(), // Array of skills for Staff (e.g., ['React', 'SEO', 'Copywriting'])
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   agencyIdIdx: index("profiles_agency_id_idx").on(table.agencyId),
@@ -561,6 +562,12 @@ export const updateAgencySettingSchema = z.object({
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({
   createdAt: true, // id is required (Supabase Auth user ID)
+});
+
+// Schema for updating user's own profile (Staff Settings page)
+export const updateUserProfileSchema = z.object({
+  fullName: z.string().min(1, "Name is required").max(100).optional(),
+  skills: z.array(z.string().max(50)).max(20).optional(), // Max 20 skills, each max 50 chars
 });
 
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
