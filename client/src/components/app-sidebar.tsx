@@ -232,7 +232,7 @@ export function AppSidebar() {
             </div>
           )}
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm">{role === "Staff" ? "Staff Portal" : "Agency Portal"}</span>
+            <span className="font-semibold text-sm">{role === "Staff" ? "Delivery Team" : "Agency Portal"}</span>
             <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
         </div>
