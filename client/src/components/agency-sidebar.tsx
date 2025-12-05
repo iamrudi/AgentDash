@@ -200,7 +200,8 @@ export function AgencySidebar() {
             <Shield className="h-5 w-5 text-primary group-data-[collapsible=icon]:h-4 group-data-[collapsible=icon]:w-4" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="font-semibold text-sm">Agency Portal</span>
+            <span className="font-semibold text-sm">Team manager
+</span>
             <span className="text-xs text-muted-foreground">{authUser?.profile.fullName}</span>
           </div>
         </div>
@@ -244,7 +245,6 @@ export function AgencySidebar() {
           </div>
         ))}
       </SidebarContent>
-
       <div className="p-2 mt-auto border-t">
         <SidebarMenu>
           <SidebarMenuItem>
