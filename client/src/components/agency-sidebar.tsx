@@ -219,9 +219,9 @@ export function AgencySidebar() {
       onMouseLeave={() => sidebarMode === 'hover' && setOpen(false)}
     >
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3">
           {branding?.agencyLogo ? (
-            <div className="h-10 w-auto max-w-[120px] flex items-center justify-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px]">
+            <div className="h-10 w-auto max-w-[120px] flex items-center group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:max-w-[32px] group-data-[collapsible=icon]:justify-center">
               <img 
                 src={branding.agencyLogo} 
                 alt="Agency Logo" 
