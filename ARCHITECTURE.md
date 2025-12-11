@@ -747,6 +747,212 @@ A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-d
 
 ---
 
+## Intelligence Core
+
+The Intelligence Core provides AI-augmented decision-making across the platform. It consists of three major subsystems that work together to learn from outcomes and improve recommendation quality.
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          INTELLIGENCE CORE                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐    │
+│  │ DURATION           │  │ CLOSED FEEDBACK    │  │ BRAND KNOWLEDGE    │    │
+│  │ INTELLIGENCE       │  │ LOOP               │  │ LAYER              │    │
+│  │ ─────────────────  │  │ ─────────────────  │  │ ─────────────────  │    │
+│  │ • Duration Model   │  │ • Outcome Tracking │  │ • Knowledge Cats   │    │
+│  │ • Resource Optim   │  │ • Quality Metrics  │  │ • Client Knowledge │    │
+│  │ • Commercial Score │  │ • AI Calibration   │  │ • Ingestion Logs   │    │
+│  └─────────┬──────────┘  └─────────┬──────────┘  └─────────┬──────────┘    │
+│            │                       │                       │                 │
+│            └───────────────────────┼───────────────────────┘                 │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                        Storage Layer                                  │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────┐  │   │
+│  │  │ Execution    │ │ Outcomes     │ │ Knowledge    │ │ Calibration │  │   │
+│  │  │ History      │ │ & Metrics    │ │ Documents    │ │ Parameters  │  │   │
+│  │  └──────────────┘ └──────────────┘ └──────────────┘ └─────────────┘  │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Duration Intelligence
+
+Predicts task duration and optimizes resource allocation.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     DURATION PREDICTION PIPELINE                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Task Created                                                                │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                   │
+│  │ Heuristic   │────▶│ Assignee    │────▶│ Client      │                   │
+│  │ Baseline    │     │ Offset      │     │ Adjustment  │                   │
+│  │ (task type) │     │ (skill fit) │     │ (complexity)│                   │
+│  └─────────────┘     └─────────────┘     └─────────────┘                   │
+│       │                                         │                           │
+│       └───────────┬─────────────────────────────┘                           │
+│                   ▼                                                          │
+│           ┌─────────────┐                                                   │
+│           │ Predicted   │  + Confidence Score (0-1)                        │
+│           │ Duration    │  + Sample Count                                  │
+│           └─────────────┘  + Variance Factor                               │
+│                   │                                                          │
+│                   ▼                                                          │
+│           ┌─────────────┐                                                   │
+│           │ Resource    │ → Greedy allocation by skill + capacity          │
+│           │ Optimizer   │ → Minimize overload + SLA breach risk            │
+│           └─────────────┘                                                   │
+│                   │                                                          │
+│                   ▼                                                          │
+│           ┌─────────────┐                                                   │
+│           │ Commercial  │ → Priority scoring by revenue + risk             │
+│           │ Impact      │ → SLA breach alerts                              │
+│           └─────────────┘                                                   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Services:**
+- `DurationModelService` — Layered prediction with confidence scoring
+- `ResourceOptimizerService` — Greedy allocation algorithm
+- `CommercialImpactService` — Priority queue generation
+
+**Tables:**
+- `task_execution_history` — Completed task duration records
+- `task_duration_predictions` — Prediction logs with variance
+- `resource_capacity_profiles` — Staff capacity per period
+- `resource_allocation_plans` — Recommended assignments
+- `commercial_impact_factors` — Scoring weights
+
+### Closed Feedback Loop
+
+Tracks recommendation outcomes to improve AI accuracy over time.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FEEDBACK LOOP FLOW                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  AI Recommendation Generated                                                 │
+│            │                                                                 │
+│            ▼                                                                 │
+│  ┌──────────────────┐                                                       │
+│  │ Initiative       │ ← Strategic Initiative created with prediction       │
+│  │ Created          │                                                       │
+│  └────────┬─────────┘                                                       │
+│           │                                                                  │
+│           ▼                                                                  │
+│  ┌──────────────────┐     ┌──────────────────┐                             │
+│  │ Client Reviews   │────▶│ Accepted /       │ ← Fire-and-forget capture   │
+│  │                  │     │ Rejected         │                              │
+│  └──────────────────┘     └────────┬─────────┘                             │
+│                                    │                                         │
+│                                    ▼                                         │
+│                    ┌───────────────────────────────┐                        │
+│                    │     OUTCOME FEEDBACK SERVICE   │                        │
+│                    │  ────────────────────────────  │                        │
+│                    │  • captureOutcome()           │                        │
+│                    │  • recordActualOutcome()      │                        │
+│                    │  • calculateImpactVariance()  │                        │
+│                    └───────────────┬───────────────┘                        │
+│                                    │                                         │
+│           ┌────────────────────────┼────────────────────────┐               │
+│           ▼                        ▼                        ▼               │
+│  ┌────────────────┐    ┌────────────────┐    ┌────────────────┐            │
+│  │ Outcomes Table │    │ Quality Metrics │    │ Calibration    │            │
+│  │ (acceptance %) │    │ (per rec type)  │    │ Parameters     │            │
+│  └────────────────┘    └────────────────┘    └────────────────┘            │
+│                                    │                                         │
+│                                    ▼                                         │
+│                          ┌─────────────────┐                                │
+│                          │ Signal Emitter  │ → Quality threshold breaches  │
+│                          └─────────────────┘                                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Pattern:** Fire-and-forget integration — outcome capture never blocks client response.
+
+**Services:**
+- `OutcomeFeedbackService` — Outcome capture and variance calculation
+
+**Tables:**
+- `recommendation_outcomes` — Acceptance/rejection records
+- `recommendation_quality_metrics` — Rolling quality scores
+- `ai_calibration_parameters` — Confidence adjustments
+
+### Brand Knowledge Layer
+
+Structured knowledge ingestion for AI context assembly.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      KNOWLEDGE MANAGEMENT FLOW                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                     KNOWLEDGE CATEGORIES                              │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │   │
+│  │  │ Brand    │ │ Business │ │ Competitor│ │ Historical│ │ Ops      │   │   │
+│  │  │ Voice    │ │ Rules    │ │ Info     │ │ Decisions │ │ Notes    │   │   │
+│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘   │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│                    ┌───────────────────────────────┐                        │
+│                    │   KNOWLEDGE INGESTION SERVICE  │                        │
+│                    │  ────────────────────────────  │                        │
+│                    │  • ingestKnowledge()          │                        │
+│                    │  • validateAgainstSchema()    │                        │
+│                    │  • detectConflicts()          │                        │
+│                    │  • createVersion()            │                        │
+│                    └───────────────┬───────────────┘                        │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                      CLIENT KNOWLEDGE TABLE                           │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐    │   │
+│  │  │ id │ clientId │ categoryId │ title │ content │ status │ v  │    │   │
+│  │  ├──────────────────────────────────────────────────────────────┤    │   │
+│  │  │ 1  │ c001     │ brand_voice│ Tone  │ Formal..│ active │ 2  │    │   │
+│  │  │ 2  │ c001     │ competitor │ Comp A│ Website.│ active │ 1  │    │   │
+│  │  └──────────────────────────────────────────────────────────────┘    │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│                    ┌───────────────────────────────┐                        │
+│                    │   KNOWLEDGE RETRIEVAL SERVICE  │                        │
+│                    │  ────────────────────────────  │                        │
+│                    │  • getContextForClient()      │ → Freshness weighting  │
+│                    │  • getKnowledgeByCategory()   │ → Category filtering   │
+│                    │  • assembleAIContext()        │ → AI prompt enrichment │
+│                    └───────────────────────────────┘                        │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Services:**
+- `KnowledgeIngestionService` — Validation, versioning, conflict detection
+- `KnowledgeRetrievalService` — Freshness-weighted retrieval
+
+**Tables:**
+- `knowledge_categories` — Category definitions with schemas
+- `client_knowledge` — Versioned knowledge documents
+- `knowledge_ingestion_log` — Audit trail for changes
+
+**UI:** `/agency/knowledge` — Full CRUD with filtering, search, history
+
+---
+
 ## Completed Enhancements (December 2024)
 
 - [x] WebSocket/SSE real-time updates
@@ -756,6 +962,9 @@ A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-d
 - [x] SLA & escalation engine
 - [x] Tenant-isolated vector stores
 - [x] SuperAdmin governance dashboard
+- [x] Duration Intelligence (prediction, optimization, commercial scoring)
+- [x] Closed Feedback Loop (outcome tracking, quality metrics, calibration)
+- [x] Brand Knowledge Layer (structured ingestion, versioning, retrieval)
 
 ## Future Enhancements
 
@@ -765,7 +974,21 @@ A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-d
 - [ ] Advanced AI model selection per task type
 - [ ] Workflow version comparison UI
 - [ ] Test execution mode with mock signals
+- [ ] Knowledge graph visualization
+- [ ] Cross-client pattern learning (with governance)
 
 ---
 
-*Last Updated: December 11, 2024*
+## Related Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns, API contracts |
+| [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt |
+| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores, cleanup queue |
+| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration mapping |
+| [replit.md](./replit.md) | Quick reference for development |
+
+---
+
+*Last Updated: December 2024*

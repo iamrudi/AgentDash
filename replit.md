@@ -392,9 +392,10 @@ The platform runs on Replit using:
 - Vector memory isolation  
 - Multi-agent system  
 - SuperAdmin governance  
-- **Duration Intelligence** - Predictive duration modeling, resource optimization, commercial impact scoring
-- **Closed Feedback Loop** (In Progress) - Outcome tracking, quality metrics, AI calibration
-- **Brand Knowledge Layer** (In Progress) - Structured knowledge ingestion pipeline
+- **Duration Intelligence** ✅ - Predictive duration modeling, resource optimization, commercial impact scoring
+- **Closed Feedback Loop** ✅ - Outcome tracking, quality metrics, AI calibration
+- **Brand Knowledge Layer** ✅ - Structured knowledge ingestion pipeline with UI
+- **Platform Audit** ✅ - Maintenance scoring, technical debt register, documentation updates
 
 ---
 
@@ -407,11 +408,38 @@ The platform runs on Replit using:
 - i18n support  
 - AI task-type model selection
 - Knowledge graph visualization
-- Cross-client pattern learning (with governance)  
+- Cross-client pattern learning (with governance)
+- Routes.ts/storage.ts refactoring (see Technical Debt Register)
 
 ---
 
-# 15. Getting Started
+# 15. Documentation Cross-References
+
+| Document | Purpose | Location |
+|----------|---------|----------|
+| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | Root |
+| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | Root |
+| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | Root |
+| **docs/maintenance-matrix.md** | Module health scores, cleanup queue | docs/ |
+| **docs/frontend-backend-map.md** | React → API → Storage mapping | docs/ |
+
+### Maintenance Scoring Quick Reference
+
+```
+MaintenanceScore = 100 - (5×Complexity + 10×TechDebt + 15×Incidents + 5×TestGap)
+
+🟢 ≥80: Healthy    🟡 60-79: Needs attention    🔴 <60: Critical
+```
+
+Current Status (December 2024):
+- Intelligence Layer: 82 🟢
+- AI Providers: 84 🟢
+- Workflow Engine: 79 🟡
+- Core Backend (routes.ts, storage.ts): 57 🔴 ← Needs refactoring
+
+---
+
+# 16. Getting Started
 
 1. Clone repository  
 2. Configure Replit secrets  

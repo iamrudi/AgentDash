@@ -1174,26 +1174,249 @@ const workflowValidationSchema = z.object({
 
 ---
 
+## Intelligence Layer Implementation
+
+### Duration Intelligence
+
+```typescript
+// server/intelligence/duration-model-service.ts
+interface DurationPrediction {
+  predictedMinutes: number;
+  confidence: number;        // 0-1 based on sample count, variance
+  sampleCount: number;
+  varianceFactor: number;
+  method: 'heuristic' | 'historical' | 'ml';
+}
+
+class DurationModelService {
+  // Layered prediction: baseline → assignee offset → client adjustment
+  async predictDuration(taskType: string, assigneeId?: string, clientId?: string): Promise<DurationPrediction>;
+  
+  // Cold start with global defaults, fast adaptation
+  async getTaskTypeBaseline(taskType: string): Promise<number>;
+  
+  // Assignee-specific performance factor
+  async getAssigneeOffset(assigneeId: string, taskType: string): Promise<number>;
+}
+
+// server/intelligence/resource-optimizer-service.ts
+interface AllocationPlan {
+  taskId: string;
+  recommendedAssigneeId: string;
+  score: number;             // Objective function result
+  reasons: string[];
+}
+
+class ResourceOptimizerService {
+  // Greedy allocation: skill fit + capacity + SLA risk
+  async optimize(tasks: Task[], staff: Profile[]): Promise<AllocationPlan[]>;
+  
+  // Objective: minimize overload + SLA breach + context switching
+  private calculateObjective(assignment: Assignment): number;
+}
+
+// server/intelligence/commercial-impact-service.ts
+interface PriorityScore {
+  taskId: string;
+  score: number;
+  components: {
+    revenue: number;
+    clientTier: number;
+    deadlineRisk: number;
+    strategicValue: number;
+  };
+}
+
+class CommercialImpactService {
+  // Configurable: revenue×w1 + tier×w2 + risk×w3 + strategic×w4
+  async calculatePriority(task: Task): Promise<PriorityScore>;
+  
+  // SLA breach detection
+  async detectBreachRisk(tasks: Task[]): Promise<Task[]>;
+}
+```
+
+### Closed Feedback Loop
+
+```typescript
+// server/intelligence/outcome-feedback-service.ts
+interface OutcomeRecord {
+  initiativeId: string;
+  accepted: boolean;
+  actualImpact?: string;
+  predictedImpact?: string;
+  varianceScore?: number;
+  capturedAt: Date;
+}
+
+class OutcomeFeedbackService {
+  // Fire-and-forget: never blocks client response
+  async captureOutcome(initiativeId: string, accepted: boolean): Promise<void>;
+  
+  // Called when initiative completes
+  async recordActualOutcome(initiativeId: string, impact: string): Promise<void>;
+  
+  // Variance = |actual - predicted| / predicted
+  async calculateImpactVariance(initiativeId: string): Promise<number>;
+  
+  // Rolling quality scores per recommendation type
+  async updateQualityMetrics(type: string, accepted: boolean): Promise<void>;
+}
+
+// Pattern: Fire-and-forget integration
+app.patch('/api/initiatives/:id/status', async (req, res) => {
+  const initiative = await storage.updateInitiativeStatus(id, status);
+  
+  // Non-blocking outcome capture
+  outcomeFeedbackService.captureOutcome(id, status === 'approved')
+    .catch(err => logger.warn('Outcome capture failed', { err }));
+  
+  res.json(initiative);
+});
+```
+
+### Knowledge Layer
+
+```typescript
+// server/intelligence/knowledge-ingestion-service.ts
+interface KnowledgeValidation {
+  valid: boolean;
+  errors: string[];
+  conflicts: { existingId: string; reason: string }[];
+}
+
+class KnowledgeIngestionService {
+  // Validates against category schema
+  async validateKnowledge(data: InsertClientKnowledge): Promise<KnowledgeValidation>;
+  
+  // Creates versioned entry with conflict detection
+  async ingestKnowledge(data: InsertClientKnowledge): Promise<ClientKnowledge>;
+  
+  // Increments version, maintains audit trail
+  async updateKnowledge(id: string, updates: Partial<ClientKnowledge>): Promise<ClientKnowledge>;
+  
+  // Soft delete with archival
+  async archiveKnowledge(id: string): Promise<void>;
+  
+  // Initialize default category set
+  async initializeDefaultCategories(agencyId: string): Promise<KnowledgeCategory[]>;
+}
+
+// server/intelligence/knowledge-retrieval-service.ts
+interface RetrievalContext {
+  documents: ClientKnowledge[];
+  categories: KnowledgeCategory[];
+  freshnessFactor: number;   // 0-1 recency weighting
+}
+
+class KnowledgeRetrievalService {
+  // Freshness-weighted, tenant-isolated
+  async getContextForClient(clientId: string): Promise<RetrievalContext>;
+  
+  // Category-filtered for specific AI tasks
+  async getKnowledgeByCategory(clientId: string, categoryId: string): Promise<ClientKnowledge[]>;
+  
+  // Assembles context for AI prompt enrichment
+  async assembleAIContext(clientId: string, taskType: string): Promise<string>;
+}
+```
+
+### API Endpoints
+
+| Endpoint | Method | Service | Purpose |
+|----------|--------|---------|---------|
+| `/api/intelligence/duration/predict` | POST | DurationModelService | Get duration prediction |
+| `/api/intelligence/duration/history` | GET | Storage | Task execution history |
+| `/api/intelligence/outcomes` | GET | Storage | Recommendation outcomes |
+| `/api/intelligence/outcomes/:id` | PATCH | OutcomeFeedbackService | Record actual outcome |
+| `/api/intelligence/quality-metrics` | GET | Storage | Quality metrics by type |
+| `/api/intelligence/calibration` | GET | Storage | AI calibration parameters |
+| `/api/knowledge` | GET/POST | KnowledgeIngestionService | CRUD knowledge |
+| `/api/knowledge/:id` | PATCH | KnowledgeIngestionService | Update knowledge |
+| `/api/knowledge/:id/archive` | POST | KnowledgeIngestionService | Archive knowledge |
+| `/api/knowledge/:id/history` | GET | Storage | Ingestion audit trail |
+| `/api/knowledge/categories` | GET | Storage | List categories |
+| `/api/knowledge/context/:clientId` | GET | KnowledgeRetrievalService | AI context assembly |
+
+---
+
 ## Important Files Reference (Updated)
 
+### Core System
+| File | Purpose |
+|------|---------|
+| `shared/schema.ts` | All database schemas (3,235 lines) |
+| `server/storage.ts` | Database operations (3,713 lines) |
+| `server/routes.ts` | All API endpoints (9,638 lines) |
+
+### Workflow Engine
 | File | Purpose |
 |------|---------|
 | `server/workflow/engine.ts` | WorkflowEngine class with step execution |
 | `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
+| `server/workflow/signal-router.ts` | Signal routing and matching |
+| `server/workflow/signal-adapters.ts` | External signal adapters |
+
+### Agent System
+| File | Purpose |
+|------|---------|
 | `server/agents/base-agent.ts` | BaseAgent abstract class |
 | `server/agents/domain-agents.ts` | SEO, PPC, CRM, Reporting agents |
 | `server/agents/orchestrator.ts` | AgentOrchestrator for routing |
 | `server/agents/agent-routes.ts` | Agent REST API endpoints |
+
+### SLA & Scheduling
+| File | Purpose |
+|------|---------|
 | `server/sla/sla-service.ts` | SLA breach detection and escalation |
 | `server/sla/sla-cron.ts` | Automated SLA monitoring (every 5 min) |
 | `server/sla/sla-routes.ts` | SLA REST API endpoints |
+
+### Intelligence Layer
+| File | Purpose |
+|------|---------|
+| `server/intelligence/duration-model-service.ts` | Task duration prediction |
+| `server/intelligence/resource-optimizer-service.ts` | Greedy resource allocation |
+| `server/intelligence/commercial-impact-service.ts` | Priority scoring |
+| `server/intelligence/outcome-feedback-service.ts` | Recommendation outcome tracking |
+| `server/intelligence/knowledge-ingestion-service.ts` | Knowledge validation and versioning |
+| `server/intelligence/knowledge-retrieval-service.ts` | Freshness-weighted retrieval |
+| `server/intelligence/signal-emitter.ts` | Quality threshold signals |
+| `server/intelligence/priority-engine.ts` | Task prioritization |
+
+### AI Providers
+| File | Purpose |
+|------|---------|
+| `server/ai/hardened-executor.ts` | Retry, caching, validation |
+| `server/ai/gemini-provider.ts` | Gemini API integration |
+| `server/ai/openai-provider.ts` | OpenAI API integration |
+| `server/ai/provider.ts` | Provider interface |
+
+### Vector & Embeddings
+| File | Purpose |
+|------|---------|
 | `server/vector/embedding-service.ts` | Tenant-isolated vector stores |
+
+### Frontend
+| File | Purpose |
+|------|---------|
+| `client/src/App.tsx` | Main router and layout |
+| `client/src/lib/queryClient.ts` | TanStack Query configuration |
 | `client/src/pages/agency/workflows.tsx` | Workflow list page |
 | `client/src/pages/agency/workflow-builder.tsx` | Visual workflow canvas editor |
-| `shared/schema.ts` | All database schemas |
-| `server/storage.ts` | Database operations |
-| `server/routes.ts` | All API endpoints |
+| `client/src/pages/agency/knowledge.tsx` | Knowledge management UI |
 
 ---
 
-*Last Updated: December 11, 2024*
+## Related Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
+| [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, technical debt |
+| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
+| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+
+---
+
+*Last Updated: December 2024*

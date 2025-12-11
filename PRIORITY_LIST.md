@@ -2,9 +2,17 @@
 
 ## Executive Summary
 
-This document outlines the 15-phase roadmap for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
+This document outlines the **18-phase roadmap** for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
 
 Each priority is ordered by dependency—completing earlier phases unlocks capabilities required by later phases.
+
+### Phase Summary (December 2024)
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1-14 | Core Engine, Rules, Signals, AI, Lineage, Vectors, SLA, Agents, CRM, Analytics, Tasks, Templates, WebSocket, SuperAdmin | ✅ Complete |
+| 15 | Visual Workflow Builder UI | 🟡 In Progress |
+| 16-18 | Duration Intelligence, Closed Feedback Loop, Brand Knowledge Layer | ✅ Complete |
 
 ---
 
@@ -1015,6 +1023,9 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 | Priority 13: Real-Time WebSocket/SSE Layer | ✅ Complete | December 2024 |
 | Priority 14: SuperAdmin Governance | ✅ Complete | December 2024 |
 | Priority 15: Visual Workflow Builder UI | 🟡 In Progress | December 2024 |
+| Priority 16: Duration Intelligence | ✅ Complete | December 2024 |
+| Priority 17: Closed Feedback Loop | ✅ Complete | December 2024 |
+| Priority 18: Brand Knowledge Layer | ✅ Complete | December 2024 |
 
 ### Priority 15 Progress Details
 - ✅ React Flow library installed and integrated
@@ -1032,4 +1043,112 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 
 ---
 
-*Last Updated: December 11, 2024*
+## Technical Debt Register
+
+### Critical (🔴 Must Address)
+
+| Item | File | Lines | Issue | Effort |
+|------|------|-------|-------|--------|
+| Monolithic routes.ts | `server/routes.ts` | 9,638 | Single file with all API handlers | 16 hrs |
+| Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern | 12 hrs |
+
+### High Priority (🟠 Should Address Soon)
+
+| Item | File | Issue | Effort |
+|------|------|-------|--------|
+| Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | 1 hr |
+| Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | 2 hrs |
+| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | 4 hrs |
+| Duplicate migrations | `migrations/` | Multiple versions of same migration | 2 hrs |
+| Console.log statements | Various | Should use structured logging | 3 hrs |
+
+### Medium Priority (🟡 Schedule for Cleanup)
+
+| Item | File | Issue | Effort |
+|------|------|-------|--------|
+| Agent system evaluation | `server/agents/` | Limited active usage | 4 hrs |
+| Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | 2 hrs |
+| Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | 1 hr |
+| WebSocket URL bug | Vite HMR | `wss://localhost:undefined` error | 2 hrs |
+
+### Low Priority (📝 Document for Later)
+
+| Item | File | Issue | Effort |
+|------|------|-------|--------|
+| Split schema.ts | `shared/schema.ts` | 3,235 lines - consider domain splits | 8 hrs |
+| Test coverage gaps | Various | Intelligence services need tests | 20 hrs |
+| Forms page cleanup | `pages/forms/` | Only embed.tsx used | 1 hr |
+
+---
+
+## Cleanup Actions
+
+### Migration Files to Clean
+
+| Action | File | Reason |
+|--------|------|--------|
+| Delete | `0001_enable_rls_policies_fixed.sql` | Duplicate of original |
+| Delete | `add_task_lists_rls.sql` | Duplicate of 0009 (no number) |
+| Delete | `apply_admin_delete_permissions.sql` | Duplicate of 0004 |
+| Move to scripts/ | `simple_rls_check.sql` | Utility, not migration |
+| Move to scripts/ | `all_in_one_rls_check_and_fix.sql` | Utility, not migration |
+| Move to scripts/ | `verify_rls_complete.sql` | Utility, not migration |
+
+### Code to Remove
+
+| Action | Location | Reason |
+|--------|----------|--------|
+| Remove | `checkRateLimit()` in googleApiRateLimiter.ts | Deprecated, use `reserveRequest()` |
+| Remove | `recordRequest()` in googleApiRateLimiter.ts | Deprecated, use `reserveRequest()` |
+| Consolidate | `server/routes/crm.ts` | Merge into `server/crm/crm-routes.ts` |
+| Evaluate | `server/agents/` | Determine if actively used |
+
+### Refactoring Roadmap
+
+**Phase 1: Quick Wins (Q1 2025)**
+- Remove deprecated methods
+- Consolidate CRM routes
+- Clean migration files
+- Replace console.log with logger
+
+**Phase 2: Major Refactors (Q2 2025)**
+- Split routes.ts into domain modules
+- Extract storage into domain services
+- Add comprehensive test coverage
+
+**Phase 3: Architecture (Q3 2025)**
+- Evaluate agent system retention
+- Consider schema.ts domain splits
+- Performance optimization audit
+
+---
+
+## Maintenance Scoring
+
+See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-module health scores.
+
+### Summary (December 2024)
+
+| Category | Modules | Avg Score | Status |
+|----------|---------|-----------|--------|
+| Workflow Engine | 4 | 79 | 🟡 Good |
+| Intelligence Layer | 6 | 82 | 🟢 Healthy |
+| AI Providers | 4 | 84 | 🟢 Healthy |
+| Core Backend | 3 | 57 | 🔴 Needs Attention |
+| Integration Libraries | 5 | 75 | 🟡 Good |
+| Real-time | 2 | 76 | 🟡 Good |
+
+---
+
+## Related Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
+| [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns |
+| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
+| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+
+---
+
+*Last Updated: December 2024*
