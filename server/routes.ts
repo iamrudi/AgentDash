@@ -8723,6 +8723,338 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // ===========================================
+  // DURATION INTELLIGENCE API ENDPOINTS
+  // ===========================================
+
+  // Duration Model - Get prediction for a task
+  app.post("/api/intelligence/duration/predict", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationModelService } = await import("./intelligence/duration-model-service");
+      const prediction = await durationModelService.predictDuration(agencyId, req.body);
+      res.json(prediction);
+    } catch (error: any) {
+      console.error("Error generating duration prediction:", error);
+      res.status(500).json({ message: "Failed to generate duration prediction" });
+    }
+  });
+
+  // Duration Model - Get model stats
+  app.get("/api/intelligence/duration/stats", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationModelService } = await import("./intelligence/duration-model-service");
+      const stats = await durationModelService.getModelStats(agencyId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching duration model stats:", error);
+      res.status(500).json({ message: "Failed to fetch duration model stats" });
+    }
+  });
+
+  // Duration Model - Get execution history
+  app.get("/api/intelligence/duration/history", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const taskType = req.query.taskType as string;
+      const clientId = req.query.clientId as string;
+
+      const history = await storage.getTaskExecutionHistoryByAgencyId(agencyId, { limit, taskType, clientId });
+      res.json(history);
+    } catch (error: any) {
+      console.error("Error fetching execution history:", error);
+      res.status(500).json({ message: "Failed to fetch execution history" });
+    }
+  });
+
+  // Duration Model - Record task completion
+  app.post("/api/intelligence/duration/record-completion", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationModelService } = await import("./intelligence/duration-model-service");
+      await durationModelService.recordTaskCompletion(agencyId, req.body);
+      res.json({ success: true, message: "Completion recorded successfully" });
+    } catch (error: any) {
+      console.error("Error recording task completion:", error);
+      res.status(500).json({ message: "Failed to record task completion" });
+    }
+  });
+
+  // Resource Optimization - Generate allocation plan
+  app.post("/api/intelligence/resource-optimization/generate-plan", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { resourceOptimizerService } = await import("./intelligence/resource-optimizer-service");
+      const { tasks, startDate, endDate } = req.body;
+      
+      const result = await resourceOptimizerService.generateAllocationPlan(
+        agencyId,
+        tasks,
+        new Date(startDate),
+        new Date(endDate)
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error generating allocation plan:", error);
+      res.status(500).json({ message: "Failed to generate allocation plan" });
+    }
+  });
+
+  // Resource Optimization - Save allocation plan
+  app.post("/api/intelligence/resource-optimization/save-plan", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { resourceOptimizerService } = await import("./intelligence/resource-optimizer-service");
+      const { name, startDate, endDate, assignments, objective } = req.body;
+      
+      const plan = await resourceOptimizerService.saveAllocationPlan(
+        agencyId,
+        name,
+        new Date(startDate),
+        new Date(endDate),
+        assignments,
+        objective,
+        req.user?.id || null
+      );
+      res.json(plan);
+    } catch (error: any) {
+      console.error("Error saving allocation plan:", error);
+      res.status(500).json({ message: "Failed to save allocation plan" });
+    }
+  });
+
+  // Resource Optimization - Get allocation plans
+  app.get("/api/intelligence/resource-optimization/plans", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const status = req.query.status as string;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const plans = await storage.getResourceAllocationPlansByAgencyId(agencyId, { status, limit });
+      res.json(plans);
+    } catch (error: any) {
+      console.error("Error fetching allocation plans:", error);
+      res.status(500).json({ message: "Failed to fetch allocation plans" });
+    }
+  });
+
+  // Resource Optimization - Get single plan
+  app.get("/api/intelligence/resource-optimization/plans/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const plan = await storage.getResourceAllocationPlanById(req.params.id);
+      if (!plan) {
+        return res.status(404).json({ message: "Allocation plan not found" });
+      }
+      res.json(plan);
+    } catch (error: any) {
+      console.error("Error fetching allocation plan:", error);
+      res.status(500).json({ message: "Failed to fetch allocation plan" });
+    }
+  });
+
+  // Resource Optimization - Update plan status
+  app.patch("/api/intelligence/resource-optimization/plans/:id/status", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['draft', 'approved', 'active', 'completed', 'archived'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const plan = await storage.updateResourceAllocationPlan(req.params.id, { 
+        status
+      });
+      res.json(plan);
+    } catch (error: any) {
+      console.error("Error updating plan status:", error);
+      res.status(500).json({ message: "Failed to update plan status" });
+    }
+  });
+
+  // Resource Optimization - Get capacity heatmap
+  app.get("/api/intelligence/resource-optimization/capacity-heatmap", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { resourceOptimizerService } = await import("./intelligence/resource-optimizer-service");
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date();
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      
+      const heatmap = await resourceOptimizerService.getCapacityHeatmap(agencyId, startDate, endDate);
+      res.json(heatmap);
+    } catch (error: any) {
+      console.error("Error fetching capacity heatmap:", error);
+      res.status(500).json({ message: "Failed to fetch capacity heatmap" });
+    }
+  });
+
+  // Resource Optimization - Get/Create capacity profiles
+  app.get("/api/intelligence/resource-optimization/capacity-profiles", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const activeOnly = req.query.activeOnly === 'true';
+      const profiles = await storage.getResourceCapacityProfilesByAgencyId(agencyId, { activeOnly });
+      res.json(profiles);
+    } catch (error: any) {
+      console.error("Error fetching capacity profiles:", error);
+      res.status(500).json({ message: "Failed to fetch capacity profiles" });
+    }
+  });
+
+  app.post("/api/intelligence/resource-optimization/capacity-profiles", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const profile = await storage.createResourceCapacityProfile({ ...req.body, agencyId });
+      res.json(profile);
+    } catch (error: any) {
+      console.error("Error creating capacity profile:", error);
+      res.status(500).json({ message: "Failed to create capacity profile" });
+    }
+  });
+
+  app.patch("/api/intelligence/resource-optimization/capacity-profiles/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.updateResourceCapacityProfile(req.params.id, req.body);
+      res.json(profile);
+    } catch (error: any) {
+      console.error("Error updating capacity profile:", error);
+      res.status(500).json({ message: "Failed to update capacity profile" });
+    }
+  });
+
+  // Commercial Impact - Calculate score
+  app.post("/api/intelligence/commercial-impact/calculate", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { commercialImpactService } = await import("./intelligence/commercial-impact-service");
+      const result = await commercialImpactService.calculateImpactScore(agencyId, req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error calculating commercial impact:", error);
+      res.status(500).json({ message: "Failed to calculate commercial impact" });
+    }
+  });
+
+  // Commercial Impact - Get top prioritized tasks
+  app.get("/api/intelligence/commercial-impact/top-priorities", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { commercialImpactService } = await import("./intelligence/commercial-impact-service");
+      const limit = parseInt(req.query.limit as string) || 20;
+      const priorities = await commercialImpactService.getTopPrioritizedTasks(agencyId, limit);
+      res.json(priorities);
+    } catch (error: any) {
+      console.error("Error fetching commercial impact priorities:", error);
+      res.status(500).json({ message: "Failed to fetch commercial impact priorities" });
+    }
+  });
+
+  // Commercial Impact - Get/Update factors
+  app.get("/api/intelligence/commercial-impact/factors", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { commercialImpactService } = await import("./intelligence/commercial-impact-service");
+      const factors = await commercialImpactService.getAgencyFactors(agencyId);
+      res.json(factors);
+    } catch (error: any) {
+      console.error("Error fetching commercial impact factors:", error);
+      res.status(500).json({ message: "Failed to fetch commercial impact factors" });
+    }
+  });
+
+  app.put("/api/intelligence/commercial-impact/factors", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { commercialImpactService } = await import("./intelligence/commercial-impact-service");
+      const factors = await commercialImpactService.updateAgencyFactors(agencyId, req.body);
+      res.json(factors);
+    } catch (error: any) {
+      console.error("Error updating commercial impact factors:", error);
+      res.status(500).json({ message: "Failed to update commercial impact factors" });
+    }
+  });
+
+  // Commercial Impact - Batch calculate
+  app.post("/api/intelligence/commercial-impact/batch-calculate", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { commercialImpactService } = await import("./intelligence/commercial-impact-service");
+      const { tasks } = req.body;
+      const results = await commercialImpactService.batchCalculateImpactScores(agencyId, tasks);
+      
+      // Convert Map to object for JSON response
+      const resultObj: Record<string, any> = {};
+      results.forEach((value, key) => {
+        resultObj[key] = value;
+      });
+      
+      res.json(resultObj);
+    } catch (error: any) {
+      console.error("Error batch calculating commercial impact:", error);
+      res.status(500).json({ message: "Failed to batch calculate commercial impact" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
