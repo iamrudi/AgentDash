@@ -1029,6 +1029,73 @@ export const workflowRuleEvaluations = pgTable("workflow_rule_evaluations", {
   createdAtIdx: index("workflow_rule_evaluations_created_at_idx").on(table.createdAt),
 }));
 
+// AI EXECUTION LOGGING (Track AI calls with lineage, caching, and validation)
+export const aiExecutions = pgTable("ai_executions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  workflowExecutionId: uuid("workflow_execution_id").references(() => workflowExecutions.id, { onDelete: "set null" }),
+  stepId: text("step_id"), // Workflow step that triggered the AI call
+  provider: text("provider").notNull(), // 'gemini', 'openai', etc.
+  model: text("model").notNull(), // 'gemini-1.5-flash', 'gpt-4', etc.
+  operation: text("operation").notNull(), // 'generateText', 'analyzeMetrics', etc.
+  inputHash: text("input_hash").notNull(), // SHA-256 of normalized input for caching
+  outputHash: text("output_hash"), // SHA-256 of output for verification
+  prompt: text("prompt").notNull(),
+  input: jsonb("input"), // Full input payload
+  output: jsonb("output"), // Full output payload
+  outputValidated: boolean("output_validated").default(false), // Did output pass schema validation?
+  validationErrors: jsonb("validation_errors"), // Schema validation errors if any
+  cached: boolean("cached").default(false), // Was result served from cache?
+  cacheKey: text("cache_key"), // Cache key used
+  status: text("status").notNull().default("pending"), // pending, success, failed, cached
+  error: text("error"), // Error message if failed
+  promptTokens: integer("prompt_tokens"), // Input tokens used
+  completionTokens: integer("completion_tokens"), // Output tokens used
+  totalTokens: integer("total_tokens"), // Total tokens used
+  durationMs: integer("duration_ms"), // Execution time in milliseconds
+  retryCount: integer("retry_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  agencyIdIdx: index("ai_executions_agency_id_idx").on(table.agencyId),
+  workflowExecutionIdIdx: index("ai_executions_workflow_execution_id_idx").on(table.workflowExecutionId),
+  inputHashIdx: index("ai_executions_input_hash_idx").on(table.inputHash),
+  statusIdx: index("ai_executions_status_idx").on(table.status),
+  createdAtIdx: index("ai_executions_created_at_idx").on(table.createdAt),
+  providerIdx: index("ai_executions_provider_idx").on(table.provider),
+}));
+
+// AI USAGE TRACKING (Aggregate token usage per agency for billing/quotas)
+export const aiUsageTracking = pgTable("ai_usage_tracking", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  periodStart: timestamp("period_start").notNull(), // Start of tracking period (daily/monthly)
+  periodEnd: timestamp("period_end").notNull(), // End of tracking period
+  provider: text("provider").notNull(), // 'gemini', 'openai', etc.
+  model: text("model"), // Optional: track per model
+  totalRequests: integer("total_requests").notNull().default(0),
+  successfulRequests: integer("successful_requests").notNull().default(0),
+  failedRequests: integer("failed_requests").notNull().default(0),
+  cachedRequests: integer("cached_requests").notNull().default(0),
+  totalPromptTokens: integer("total_prompt_tokens").notNull().default(0),
+  totalCompletionTokens: integer("total_completion_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  estimatedCostUsd: text("estimated_cost_usd"), // String to avoid floating point issues
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyPeriodIdx: index("ai_usage_tracking_agency_period_idx").on(table.agencyId, table.periodStart),
+  providerIdx: index("ai_usage_tracking_provider_idx").on(table.provider),
+  periodStartIdx: index("ai_usage_tracking_period_start_idx").on(table.periodStart),
+  uniqueAgencyPeriodProvider: index("ai_usage_tracking_unique_idx").on(table.agencyId, table.periodStart, table.provider, table.model),
+}));
+
+// AI execution types
+export type AIExecution = typeof aiExecutions.$inferSelect;
+export type InsertAIExecution = typeof aiExecutions.$inferInsert;
+export type AIUsageTracking = typeof aiUsageTracking.$inferSelect;
+export type InsertAIUsageTracking = typeof aiUsageTracking.$inferInsert;
+
 // Workflow schemas
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   id: true,
@@ -1110,6 +1177,19 @@ export const updateWorkflowSignalRouteSchema = createInsertSchema(workflowSignal
 export const insertWorkflowRuleEvaluationSchema = createInsertSchema(workflowRuleEvaluations).omit({
   id: true,
   createdAt: true,
+});
+
+// AI execution schemas
+export const insertAIExecutionSchema = createInsertSchema(aiExecutions).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const insertAIUsageTrackingSchema = createInsertSchema(aiUsageTracking).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 // Admin user creation schemas
