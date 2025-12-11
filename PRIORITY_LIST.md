@@ -606,7 +606,7 @@ type AnomalyType =
 
 ## Priority 11: Optimized Task System for Workflow Output
 
-**Status:** 🟡 Partial (task CRUD exists)  
+**Status:** ✅ COMPLETED (December 2024)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1  
 **Estimated Duration:** 1-2 weeks
@@ -614,37 +614,43 @@ type AnomalyType =
 ### Description
 Make task/project creation idempotent so workflows can safely retry without creating duplicates.
 
-### Deliverables
-- Idempotency key on task creation
-- Upsert semantics for workflow-created tasks
-- Batch task creation API
-- Task deduplication by content hash
-- Workflow-to-task lineage
+### Deliverables ✅
+- ✅ `idempotencyKey` field on tasks table for workflow-safe upsert
+- ✅ `contentHash` field on tasks table for deduplication
+- ✅ Upsert semantics via `IdempotentTaskService.upsertTask()`
+- ✅ Batch task creation API (`POST /api/tasks/workflow/batch`)
+- ✅ Task deduplication by content hash via `findDuplicateTasks()`
+- ✅ Workflow-to-task lineage via `workflowExecutionId` and `getTaskLineage()`
 
-### Technical Approach
+### Implementation Files
 ```typescript
-// Idempotent task creation
-async function createTaskIdempotent(
-  task: InsertTask,
-  idempotencyKey: string
-): Promise<Task> {
-  const existing = await db.query.tasks.findFirst({
-    where: eq(tasks.idempotencyKey, idempotencyKey)
-  });
-  
-  if (existing) return existing;
-  
-  return db.insert(tasks).values({
-    ...task,
-    idempotencyKey
-  }).returning();
-}
+// Idempotent task service
+server/tasks/idempotent-task-service.ts
+  - createTaskIdempotent(input, idempotencyKey, agencyId)
+  - createTaskByContentHash(input, agencyId)
+  - createTasksIdempotent(batchInput, agencyId) // Transaction-wrapped
+  - upsertTask(input, idempotencyKey, agencyId)
+  - findDuplicateTasks(input, agencyId)
+  - getTaskLineage(taskId)
+
+// REST API endpoints
+server/tasks/task-routes.ts
+  - POST /api/tasks/workflow/idempotent
+  - POST /api/tasks/workflow/batch
+  - PUT /api/tasks/workflow/upsert
+  - POST /api/tasks/workflow/deduplicate
+  - GET /api/tasks/workflow/:taskId/lineage
 ```
 
-### Success Criteria
-- Workflow retry creates no duplicates
-- Batch creation completes in single transaction
-- All workflow-created tasks traceable to source
+### Security ✅
+- All endpoints verify project/list belongs to authenticated agency
+- Admin/SuperAdmin role required for all operations
+- Content hash prevents accidental duplicates across retries
+
+### Success Criteria ✅
+- ✅ Workflow retry creates no duplicates (idempotencyKey lookup)
+- ✅ Batch creation completes in single transaction
+- ✅ All workflow-created tasks traceable via lineage endpoint
 
 ---
 

@@ -6318,6 +6318,15 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, taskRouter);
 
+  // Register Template routes (reusable templates for projects, workflows, prompts)
+  const { templateRouter } = await import("./templates/template-routes");
+  app.use("/api/templates", requireAuth, requireRole("Admin", "SuperAdmin"), (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    next();
+  }, templateRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

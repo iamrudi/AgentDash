@@ -2022,3 +2022,124 @@ export interface WorkflowTriggerConfig {
 // Extended workflow types
 export type WorkflowWithExecutions = Workflow & { executions?: WorkflowExecution[] };
 export type WorkflowExecutionWithEvents = WorkflowExecution & { events?: WorkflowEvent[] };
+
+// ===========================================
+// TEMPLATE SYSTEM TABLES (Priority 12)
+// ===========================================
+
+// TEMPLATES - Reusable templates for projects, task lists, workflows, and prompts
+export const templates = pgTable("templates", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }), // Null for system templates
+  type: text("type").notNull(), // 'project' | 'task_list' | 'workflow' | 'prompt'
+  name: text("name").notNull(),
+  description: text("description"),
+  isSystem: boolean("is_system").default(false).notNull(), // System templates available to all agencies
+  isPublic: boolean("is_public").default(false).notNull(), // Public templates can be cloned by other agencies
+  category: text("category"), // Optional categorization
+  tags: text("tags").array(), // Searchable tags
+  content: jsonb("content").notNull(), // Template structure
+  variables: jsonb("variables").default('[]').notNull(), // TemplateVariable[]
+  currentVersionId: uuid("current_version_id"),
+  usageCount: integer("usage_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("templates_agency_id_idx").on(table.agencyId),
+  typeIdx: index("templates_type_idx").on(table.type),
+  isSystemIdx: index("templates_is_system_idx").on(table.isSystem),
+}));
+
+// TEMPLATE VERSIONS - Version history for templates
+export const templateVersions = pgTable("template_versions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid("template_id").notNull().references(() => templates.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  content: jsonb("content").notNull(),
+  variables: jsonb("variables").default('[]').notNull(),
+  changelog: text("changelog"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  templateIdIdx: index("template_versions_template_id_idx").on(table.templateId),
+  versionIdx: index("template_versions_version_idx").on(table.version),
+}));
+
+// TEMPLATE INSTANTIATIONS - Track when templates are used
+export const templateInstantiations = pgTable("template_instantiations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: uuid("template_id").notNull().references(() => templates.id, { onDelete: "cascade" }),
+  templateVersionId: uuid("template_version_id").references(() => templateVersions.id, { onDelete: "set null" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  variableValues: jsonb("variable_values").default('{}').notNull(), // Substituted values
+  outputType: text("output_type").notNull(), // What was created: 'project' | 'task_list' | 'workflow'
+  outputId: uuid("output_id"), // ID of created entity
+  workflowExecutionId: uuid("workflow_execution_id"), // If created via workflow
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  templateIdIdx: index("template_instantiations_template_id_idx").on(table.templateId),
+  agencyIdIdx: index("template_instantiations_agency_id_idx").on(table.agencyId),
+  outputIdIdx: index("template_instantiations_output_id_idx").on(table.outputId),
+}));
+
+// Template types
+export type Template = typeof templates.$inferSelect;
+export type InsertTemplate = typeof templates.$inferInsert;
+export type TemplateVersion = typeof templateVersions.$inferSelect;
+export type InsertTemplateVersion = typeof templateVersions.$inferInsert;
+export type TemplateInstantiation = typeof templateInstantiations.$inferSelect;
+export type InsertTemplateInstantiation = typeof templateInstantiations.$inferInsert;
+
+// Template variable interface
+export interface TemplateVariable {
+  name: string;
+  type: 'string' | 'number' | 'date' | 'boolean' | 'select' | 'array';
+  required: boolean;
+  description?: string;
+  default?: unknown;
+  options?: string[]; // For select type
+  validation?: {
+    min?: number;
+    max?: number;
+    pattern?: string;
+    minLength?: number;
+    maxLength?: number;
+  };
+}
+
+// Template content structures
+export interface ProjectTemplateContent {
+  name: string; // Can include {{variables}}
+  description?: string;
+  taskLists: TaskListTemplateContent[];
+}
+
+export interface TaskListTemplateContent {
+  name: string;
+  tasks: TaskTemplateContent[];
+}
+
+export interface TaskTemplateContent {
+  description: string;
+  status?: string;
+  priority?: string;
+  dueDaysFromStart?: number; // Days offset from project start
+  timeEstimate?: string;
+  subtasks?: TaskTemplateContent[];
+}
+
+export interface WorkflowTemplateContent {
+  name: string;
+  description?: string;
+  triggerConfig?: WorkflowTriggerConfig;
+  steps: WorkflowStep[];
+}
+
+export interface PromptTemplateContent {
+  prompt: string; // Template with {{variables}}
+  systemPrompt?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+}
