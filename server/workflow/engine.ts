@@ -805,6 +805,47 @@ export class WorkflowEngine {
       ...event,
     });
   }
+
+  public async executeFromSignal(
+    signalId: string,
+    workflowId: string,
+    signalPayload: Record<string, unknown>
+  ): Promise<WorkflowExecution | null> {
+    const workflow = await this.storage.getWorkflowById(workflowId);
+    if (!workflow) {
+      console.error(`Workflow ${workflowId} not found for signal ${signalId}`);
+      return null;
+    }
+
+    if (!workflow.enabled) {
+      console.log(`Workflow ${workflowId} is disabled, skipping execution for signal ${signalId}`);
+      return null;
+    }
+
+    const execution = await this.execute(workflow, signalPayload, {
+      triggerId: signalId,
+      triggerType: "signal",
+    });
+
+    return execution;
+  }
+
+  public async processSignal(
+    signalId: string,
+    signalPayload: Record<string, unknown>,
+    workflowIds: string[]
+  ): Promise<{ signalId: string; executions: WorkflowExecution[] }> {
+    const executions: WorkflowExecution[] = [];
+
+    for (const workflowId of workflowIds) {
+      const execution = await this.executeFromSignal(signalId, workflowId, signalPayload);
+      if (execution) {
+        executions.push(execution);
+      }
+    }
+
+    return { signalId, executions };
+  }
 }
 
 export function createWorkflowEngine(storage: IStorage): WorkflowEngine {
