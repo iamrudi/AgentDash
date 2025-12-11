@@ -6327,6 +6327,22 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, templateRouter);
 
+  // Register Governance routes (SuperAdmin quota management, integration health, audit)
+  const governanceRouter = (await import("./governance/governance-routes")).default;
+  app.use("/api/governance", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    (req as any).user = {
+      id: authReq.user?.id,
+      agencyId: authReq.user?.agencyId,
+      email: authReq.user?.email,
+      role: authReq.user?.role,
+      isSuperAdmin: authReq.user?.isSuperAdmin,
+    };
+    next();
+  }, governanceRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

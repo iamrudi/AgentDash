@@ -5,6 +5,7 @@ import { aiExecutions, aiUsageTracking, type InsertAIExecution } from "@shared/s
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { getAIProvider } from "./provider";
 import type { AIProvider, GenerateTextOptions, TokenUsage } from "./types";
+import { quotaService } from "../governance/quota-service";
 
 export interface AIExecutionContext {
   agencyId: string;
@@ -157,6 +158,31 @@ export class HardenedAIExecutor {
         }
       }
 
+      // Check AI request quota before execution
+      const requestQuotaCheck = await quotaService.checkAIRequestQuota(context.agencyId);
+      if (!requestQuotaCheck.allowed) {
+        return {
+          success: false,
+          error: requestQuotaCheck.message || "AI request quota exceeded",
+          cached: false,
+          executionId: "",
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      // Estimate tokens and check token quota
+      const estimatedTokens = this.estimateTokens(options.prompt) * 2; // Rough estimate of prompt + response
+      const tokenQuotaCheck = await quotaService.checkAITokenQuota(context.agencyId, estimatedTokens);
+      if (!tokenQuotaCheck.allowed) {
+        return {
+          success: false,
+          error: tokenQuotaCheck.message || "AI token quota exceeded",
+          cached: false,
+          executionId: "",
+          durationMs: Date.now() - startTime,
+        };
+      }
+
       executionId = await this.logExecution({
         agencyId: context.agencyId,
         workflowExecutionId: context.workflowExecutionId,
@@ -244,6 +270,9 @@ export class HardenedAIExecutor {
       });
 
       await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, tokenUsage);
+
+      // Update quota usage after successful execution
+      await quotaService.incrementAIUsage(context.agencyId, tokenUsage.totalTokens);
 
       return {
         success: true,
