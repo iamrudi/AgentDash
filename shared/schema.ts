@@ -108,9 +108,11 @@ export const projects = pgTable("projects", {
   status: text("status").notNull(), // 'Active', 'Pending', 'Completed'
   description: text("description"),
   clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  workflowExecutionId: uuid("workflow_execution_id"), // Lineage: workflow that created this project
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   clientIdIdx: index("projects_client_id_idx").on(table.clientId),
+  workflowExecutionIdIdx: index("projects_workflow_execution_id_idx").on(table.workflowExecutionId),
 }));
 
 // TASK LISTS (Projects > Task Lists > Tasks hierarchy)
@@ -119,10 +121,12 @@ export const taskLists = pgTable("task_lists", {
   name: text("name").notNull(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }), // For RLS tenant isolation
+  workflowExecutionId: uuid("workflow_execution_id"), // Lineage: workflow that created this list
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   projectIdIdx: index("task_lists_project_id_idx").on(table.projectId),
   agencyIdIdx: index("task_lists_agency_id_idx").on(table.agencyId),
+  workflowExecutionIdIdx: index("task_lists_workflow_execution_id_idx").on(table.workflowExecutionId),
 }));
 
 // TASKS (Now supports: Lists, Subtasks, Start Dates, Time Tracking)
@@ -139,11 +143,13 @@ export const tasks = pgTable("tasks", {
   parentId: uuid("parent_id").references((): any => tasks.id, { onDelete: "cascade" }), // Self-reference for subtasks
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
   initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
+  workflowExecutionId: uuid("workflow_execution_id"), // Lineage: workflow that created this task
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   listIdIdx: index("tasks_list_id_idx").on(table.listId),
   parentIdIdx: index("tasks_parent_id_idx").on(table.parentId),
   projectIdIdx: index("tasks_project_id_idx").on(table.projectId),
+  workflowExecutionIdIdx: index("tasks_workflow_execution_id_idx").on(table.workflowExecutionId),
 }));
 
 // STAFF ASSIGNMENTS (Links staff to tasks)
@@ -1095,6 +1101,44 @@ export type AIExecution = typeof aiExecutions.$inferSelect;
 export type InsertAIExecution = typeof aiExecutions.$inferInsert;
 export type AIUsageTracking = typeof aiUsageTracking.$inferSelect;
 export type InsertAIUsageTracking = typeof aiUsageTracking.$inferInsert;
+
+// WORKFLOW RETENTION POLICIES (Configure data retention per agency)
+export const workflowRetentionPolicies = pgTable("workflow_retention_policies", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  resourceType: text("resource_type").notNull(), // 'workflow_executions', 'workflow_events', 'signals', 'ai_executions', 'rule_evaluations'
+  retentionDays: integer("retention_days").notNull().default(90), // Days to retain data
+  archiveBeforeDelete: boolean("archive_before_delete").default(false), // Archive to cold storage before deleting
+  enabled: boolean("enabled").notNull().default(true),
+  lastCleanupAt: timestamp("last_cleanup_at"), // When cleanup last ran
+  recordsDeleted: integer("records_deleted").default(0), // Total records deleted by this policy
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("workflow_retention_policies_agency_id_idx").on(table.agencyId),
+  resourceTypeIdx: index("workflow_retention_policies_resource_type_idx").on(table.resourceType),
+  uniqueAgencyResource: uniqueIndex("workflow_retention_policies_unique_idx").on(table.agencyId, table.resourceType),
+}));
+
+export type WorkflowRetentionPolicy = typeof workflowRetentionPolicies.$inferSelect;
+export type InsertWorkflowRetentionPolicy = typeof workflowRetentionPolicies.$inferInsert;
+
+export const insertWorkflowRetentionPolicySchema = createInsertSchema(workflowRetentionPolicies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCleanupAt: true,
+  recordsDeleted: true,
+});
+
+export const updateWorkflowRetentionPolicySchema = createInsertSchema(workflowRetentionPolicies).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCleanupAt: true,
+  recordsDeleted: true,
+}).partial();
 
 // Workflow schemas
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({

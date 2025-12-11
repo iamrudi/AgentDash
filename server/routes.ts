@@ -17,7 +17,7 @@ import { resolveAgencyContext } from "./middleware/agency-context";
 import { generateToken } from "./lib/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema, projects, taskLists, tasks, taskRelationships, type Task, insertWorkflowRuleSchema, updateWorkflowRuleSchema, insertWorkflowRuleVersionSchema, insertWorkflowRuleConditionSchema, insertWorkflowRuleActionSchema, insertWorkflowSignalSchema, insertWorkflowSignalRouteSchema, updateWorkflowSignalRouteSchema } from "@shared/schema";
+import { insertUserSchema, insertProfileSchema, insertClientSchema, createClientUserSchema, createStaffAdminUserSchema, insertInvoiceSchema, insertInvoiceLineItemSchema, insertProjectSchema, insertTaskSchema, updateTaskSchema, agencySettings, updateAgencySettingSchema, projects, taskLists, tasks, taskRelationships, clients, aiExecutions as aiExecutionsTable, workflowRetentionPolicies, workflowExecutions, workflowEvents, workflowSignals, workflowRuleEvaluations, workflowRules, type Task, insertWorkflowRuleSchema, updateWorkflowRuleSchema, insertWorkflowRuleVersionSchema, insertWorkflowRuleConditionSchema, insertWorkflowRuleActionSchema, insertWorkflowSignalSchema, insertWorkflowSignalRouteSchema, updateWorkflowSignalRouteSchema } from "@shared/schema";
 import { signalRouter } from "./workflow/signal-router";
 import { SignalAdapterFactory } from "./workflow/signal-adapters";
 import { getAuthUrl, exchangeCodeForTokens, refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGA4AvailableKeyEvents, fetchGSCData, fetchGSCTopQueries } from "./lib/googleOAuth";
@@ -35,7 +35,7 @@ import fs from "fs";
 import multer from "multer";
 import { EventEmitter } from "events";
 import { db } from "./db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, lt } from "drizzle-orm";
 
 // Configure multer for logo uploads
 const logoStorage = multer.diskStorage({
@@ -6490,6 +6490,295 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // ==================== LINEAGE QUERY API ====================
+
+  // Get lineage for a task (trace back to originating workflow/signal)
+  app.get("/api/lineage/task/:taskId", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { taskId } = req.params;
+      const task = await storage.getTaskById(taskId);
+      
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      // Verify agency access
+      const userAgencyId = req.user?.agencyId;
+      const taskWithProject = await db.select({
+        task: tasks,
+        project: projects,
+        client: clients,
+      })
+        .from(tasks)
+        .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .leftJoin(clients, eq(projects.clientId, clients.id))
+        .where(eq(tasks.id, taskId))
+        .limit(1);
+      
+      if (taskWithProject.length === 0) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      const clientAgencyId = taskWithProject[0].client?.agencyId;
+      if (clientAgencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Build lineage chain
+      const lineage: any = {
+        task: taskWithProject[0].task,
+        project: taskWithProject[0].project,
+        client: taskWithProject[0].client,
+        workflowExecution: null,
+        workflow: null,
+        signal: null,
+        events: [],
+      };
+      
+      // If task has workflow execution lineage
+      const taskData = taskWithProject[0].task as any;
+      if (taskData.workflowExecutionId) {
+        const execution = await storage.getWorkflowExecutionById(taskData.workflowExecutionId);
+        if (execution) {
+          lineage.workflowExecution = execution;
+          
+          // Get workflow definition
+          const workflow = await storage.getWorkflowById(execution.workflowId);
+          lineage.workflow = workflow;
+          
+          // Get triggering signal if exists
+          if (execution.triggerId) {
+            const signal = await storage.getSignalById(execution.triggerId);
+            lineage.signal = signal;
+          }
+          
+          // Get execution events
+          const events = await storage.getWorkflowEventsByExecutionId(execution.id);
+          lineage.events = events;
+        }
+      }
+      
+      res.json(lineage);
+    } catch (error: any) {
+      console.error('Error fetching task lineage:', error);
+      res.status(500).json({ message: "Failed to fetch task lineage" });
+    }
+  });
+
+  // Get lineage for a project
+  app.get("/api/lineage/project/:projectId", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { projectId } = req.params;
+      
+      const projectWithClient = await db.select({
+        project: projects,
+        client: clients,
+      })
+        .from(projects)
+        .leftJoin(clients, eq(projects.clientId, clients.id))
+        .where(eq(projects.id, projectId))
+        .limit(1);
+      
+      if (projectWithClient.length === 0) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      // Verify agency access
+      const userAgencyId = req.user?.agencyId;
+      const clientAgencyId = projectWithClient[0].client?.agencyId;
+      if (clientAgencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const lineage: any = {
+        project: projectWithClient[0].project,
+        client: projectWithClient[0].client,
+        workflowExecution: null,
+        workflow: null,
+        signal: null,
+        events: [],
+        createdTasks: [],
+        createdLists: [],
+      };
+      
+      // If project has workflow execution lineage
+      const projectData = projectWithClient[0].project as any;
+      if (projectData.workflowExecutionId) {
+        const execution = await storage.getWorkflowExecutionById(projectData.workflowExecutionId);
+        if (execution) {
+          lineage.workflowExecution = execution;
+          
+          const workflow = await storage.getWorkflowById(execution.workflowId);
+          lineage.workflow = workflow;
+          
+          if (execution.triggerId) {
+            const signal = await storage.getSignalById(execution.triggerId);
+            lineage.signal = signal;
+          }
+          
+          const events = await storage.getWorkflowEventsByExecutionId(execution.id);
+          lineage.events = events;
+        }
+      }
+      
+      // Get all tasks/lists created by same workflow execution
+      if (projectData.workflowExecutionId) {
+        const createdTasks = await db.select()
+          .from(tasks)
+          .where(eq((tasks as any).workflowExecutionId, projectData.workflowExecutionId));
+        lineage.createdTasks = createdTasks;
+        
+        const createdLists = await db.select()
+          .from(taskLists)
+          .where(eq((taskLists as any).workflowExecutionId, projectData.workflowExecutionId));
+        lineage.createdLists = createdLists;
+      }
+      
+      res.json(lineage);
+    } catch (error: any) {
+      console.error('Error fetching project lineage:', error);
+      res.status(500).json({ message: "Failed to fetch project lineage" });
+    }
+  });
+
+  // Get all entities created by a workflow execution
+  app.get("/api/workflow-executions/:id/lineage", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const userAgencyId = req.user?.agencyId;
+      const execution = await storage.getWorkflowExecutionById(id);
+      
+      if (!execution) {
+        return res.status(404).json({ message: "Execution not found" });
+      }
+      
+      // Verify agency access on execution first
+      if (execution.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied - execution belongs to different agency" });
+      }
+      
+      // Verify workflow access
+      const workflow = await storage.getWorkflowById(execution.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied - workflow belongs to different agency" });
+      }
+      
+      // Get all entities created by this execution - filter by agency
+      const createdProjects = await db.select()
+        .from(projects)
+        .leftJoin(clients, eq(projects.clientId, clients.id))
+        .where(and(
+          eq((projects as any).workflowExecutionId, id),
+          eq(clients.agencyId, userAgencyId!)
+        ));
+      
+      const createdLists = await db.select()
+        .from(taskLists)
+        .where(and(
+          eq((taskLists as any).workflowExecutionId, id),
+          eq(taskLists.agencyId, userAgencyId!)
+        ));
+      
+      const createdTasks = await db.select()
+        .from(tasks)
+        .leftJoin(projects, eq(tasks.projectId, projects.id))
+        .leftJoin(clients, eq(projects.clientId, clients.id))
+        .where(and(
+          eq((tasks as any).workflowExecutionId, id),
+          eq(clients.agencyId, userAgencyId!)
+        ));
+      
+      // Get AI executions - filter by agency
+      const aiExecs = await db.select()
+        .from(aiExecutionsTable)
+        .where(and(
+          eq(aiExecutionsTable.workflowExecutionId, id),
+          eq(aiExecutionsTable.agencyId, userAgencyId!)
+        ));
+      
+      // Get triggering signal - verify agency ownership
+      let signal = null;
+      if (execution.triggerId) {
+        const fetchedSignal = await storage.getSignalById(execution.triggerId);
+        if (fetchedSignal && (fetchedSignal.agencyId === userAgencyId || req.user?.isSuperAdmin)) {
+          signal = fetchedSignal;
+        }
+      }
+      
+      // Get execution events - verify agency ownership
+      const allEvents = await storage.getWorkflowEventsByExecutionId(id);
+      const events = allEvents.filter(e => e.agencyId === userAgencyId || req.user?.isSuperAdmin);
+      
+      res.json({
+        execution,
+        workflow,
+        signal,
+        events,
+        created: {
+          projects: createdProjects.map(p => p.projects),
+          taskLists: createdLists,
+          tasks: createdTasks.map(t => t.tasks),
+        },
+        aiExecutions: aiExecs,
+      });
+    } catch (error: any) {
+      console.error('Error fetching execution lineage:', error);
+      res.status(500).json({ message: "Failed to fetch execution lineage" });
+    }
+  });
+
+  // Replay a workflow execution (re-execute with same inputs)
+  app.post("/api/workflow-executions/:id/replay", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const originalExecution = await storage.getWorkflowExecutionById(id);
+      
+      if (!originalExecution) {
+        return res.status(404).json({ message: "Execution not found" });
+      }
+      
+      // Verify agency access through BOTH execution AND workflow
+      const userAgencyId = req.user?.agencyId;
+      
+      // Check execution's agencyId first
+      if (originalExecution.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied - execution belongs to different agency" });
+      }
+      
+      // Also verify workflow access
+      const workflow = await storage.getWorkflowById(originalExecution.workflowId);
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied - workflow belongs to different agency" });
+      }
+      
+      // Re-execute with same inputs but skip idempotency check
+      const newExecution = await workflowEngine.executeWorkflow(
+        originalExecution.workflowId,
+        {
+          input: originalExecution.triggerPayload || {},
+          triggerId: `replay:${id}`,
+          triggerType: 'replay',
+          skipIdempotencyCheck: true,
+        }
+      );
+      
+      res.json({
+        originalExecution,
+        replayedExecution: newExecution,
+      });
+    } catch (error: any) {
+      console.error('Error replaying workflow execution:', error);
+      res.status(500).json({ message: "Failed to replay workflow execution", error: error.message });
+    }
+  });
+
   // ==================== RULE ENGINE API ====================
 
   // Get all rules for agency
@@ -7207,6 +7496,223 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     } catch (error: any) {
       console.error("Error clearing AI cache:", error);
       res.status(500).json({ message: "Failed to clear AI cache" });
+    }
+  });
+
+  // ==================== RETENTION POLICY API ====================
+
+  // Get retention policies for agency
+  app.get("/api/retention-policies", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const policies = await db.select()
+        .from(workflowRetentionPolicies)
+        .where(eq(workflowRetentionPolicies.agencyId, agencyId));
+      
+      res.json(policies);
+    } catch (error: any) {
+      console.error("Error fetching retention policies:", error);
+      res.status(500).json({ message: "Failed to fetch retention policies" });
+    }
+  });
+
+  // Create or update retention policy
+  app.post("/api/retention-policies", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { resourceType, retentionDays, archiveBeforeDelete, enabled } = req.body;
+      
+      if (!resourceType || !retentionDays) {
+        return res.status(400).json({ message: "resourceType and retentionDays are required" });
+      }
+      
+      // Upsert policy
+      const existing = await db.select()
+        .from(workflowRetentionPolicies)
+        .where(and(
+          eq(workflowRetentionPolicies.agencyId, agencyId),
+          eq(workflowRetentionPolicies.resourceType, resourceType)
+        ))
+        .limit(1);
+      
+      let policy;
+      if (existing.length > 0) {
+        [policy] = await db.update(workflowRetentionPolicies)
+          .set({
+            retentionDays,
+            archiveBeforeDelete: archiveBeforeDelete ?? false,
+            enabled: enabled ?? true,
+            updatedAt: new Date(),
+          })
+          .where(eq(workflowRetentionPolicies.id, existing[0].id))
+          .returning();
+      } else {
+        [policy] = await db.insert(workflowRetentionPolicies)
+          .values({
+            agencyId,
+            resourceType,
+            retentionDays,
+            archiveBeforeDelete: archiveBeforeDelete ?? false,
+            enabled: enabled ?? true,
+          })
+          .returning();
+      }
+      
+      res.json(policy);
+    } catch (error: any) {
+      console.error("Error creating/updating retention policy:", error);
+      res.status(500).json({ message: "Failed to save retention policy" });
+    }
+  });
+
+  // Delete retention policy
+  app.delete("/api/retention-policies/:id", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const [policy] = await db.select()
+        .from(workflowRetentionPolicies)
+        .where(eq(workflowRetentionPolicies.id, id))
+        .limit(1);
+      
+      if (!policy) {
+        return res.status(404).json({ message: "Retention policy not found" });
+      }
+      
+      if (policy.agencyId !== agencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await db.delete(workflowRetentionPolicies)
+        .where(eq(workflowRetentionPolicies.id, id));
+      
+      res.json({ message: "Retention policy deleted" });
+    } catch (error: any) {
+      console.error("Error deleting retention policy:", error);
+      res.status(500).json({ message: "Failed to delete retention policy" });
+    }
+  });
+
+  // Run retention cleanup (admin only, typically called by cron)
+  app.post("/api/retention-policies/cleanup", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const policies = await db.select()
+        .from(workflowRetentionPolicies)
+        .where(and(
+          eq(workflowRetentionPolicies.agencyId, agencyId),
+          eq(workflowRetentionPolicies.enabled, true)
+        ));
+      
+      const results: any[] = [];
+      
+      for (const policy of policies) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - policy.retentionDays);
+        
+        let deletedCount = 0;
+        
+        switch (policy.resourceType) {
+          case 'workflow_executions':
+            const execResult = await db.delete(workflowExecutions)
+              .where(and(
+                eq(workflowExecutions.agencyId, agencyId),
+                lt(workflowExecutions.createdAt, cutoffDate)
+              ));
+            deletedCount = (execResult as any).rowCount || 0;
+            break;
+            
+          case 'workflow_events':
+            const eventsResult = await db.delete(workflowEvents)
+              .where(and(
+                eq(workflowEvents.agencyId, agencyId),
+                lt(workflowEvents.timestamp, cutoffDate)
+              ));
+            deletedCount = (eventsResult as any).rowCount || 0;
+            break;
+            
+          case 'signals':
+            const signalsResult = await db.delete(workflowSignals)
+              .where(and(
+                eq(workflowSignals.agencyId, agencyId),
+                lt(workflowSignals.ingestedAt, cutoffDate)
+              ));
+            deletedCount = (signalsResult as any).rowCount || 0;
+            break;
+            
+          case 'ai_executions':
+            const aiResult = await db.delete(aiExecutionsTable)
+              .where(and(
+                eq(aiExecutionsTable.agencyId, agencyId),
+                lt(aiExecutionsTable.createdAt, cutoffDate)
+              ));
+            deletedCount = (aiResult as any).rowCount || 0;
+            break;
+            
+          case 'rule_evaluations':
+            // Rule evaluations don't have agencyId directly, so we need to join through workflowRules
+            // First get rule IDs for this agency, then delete evaluations for those rules
+            const agencyRules = await db.select({ id: workflowRules.id })
+              .from(workflowRules)
+              .where(eq(workflowRules.agencyId, agencyId));
+            const agencyRuleIds = agencyRules.map(r => r.id);
+            
+            if (agencyRuleIds.length > 0) {
+              let evalDeletedCount = 0;
+              for (const ruleId of agencyRuleIds) {
+                const evalResult = await db.delete(workflowRuleEvaluations)
+                  .where(and(
+                    eq(workflowRuleEvaluations.ruleId, ruleId),
+                    lt(workflowRuleEvaluations.createdAt, cutoffDate)
+                  ));
+                evalDeletedCount += (evalResult as any).rowCount || 0;
+              }
+              deletedCount = evalDeletedCount;
+            }
+            break;
+        }
+        
+        // Update policy with cleanup stats
+        await db.update(workflowRetentionPolicies)
+          .set({
+            lastCleanupAt: new Date(),
+            recordsDeleted: sql`${workflowRetentionPolicies.recordsDeleted} + ${deletedCount}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(workflowRetentionPolicies.id, policy.id));
+        
+        results.push({
+          resourceType: policy.resourceType,
+          retentionDays: policy.retentionDays,
+          deletedCount,
+          cutoffDate,
+        });
+      }
+      
+      res.json({ 
+        message: "Retention cleanup completed",
+        results 
+      });
+    } catch (error: any) {
+      console.error("Error running retention cleanup:", error);
+      res.status(500).json({ message: "Failed to run retention cleanup" });
     }
   });
 
