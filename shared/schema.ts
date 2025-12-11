@@ -1128,6 +1128,141 @@ export type InsertAIExecution = typeof aiExecutions.$inferInsert;
 export type AIUsageTracking = typeof aiUsageTracking.$inferSelect;
 export type InsertAIUsageTracking = typeof aiUsageTracking.$inferInsert;
 
+// ==================== SUPERADMIN GOVERNANCE (Priority 14) ====================
+
+// AGENCY QUOTAS (Per-agency resource limits and usage tracking)
+export const agencyQuotas = pgTable("agency_quotas", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
+  aiTokenLimit: integer("ai_token_limit").notNull().default(1000000),
+  aiTokenUsed: integer("ai_token_used").notNull().default(0),
+  aiRequestLimit: integer("ai_request_limit").notNull().default(10000),
+  aiRequestUsed: integer("ai_request_used").notNull().default(0),
+  storageLimit: integer("storage_limit").notNull().default(5368709120),
+  storageUsed: integer("storage_used").notNull().default(0),
+  seatLimit: integer("seat_limit").notNull().default(10),
+  seatsUsed: integer("seats_used").notNull().default(0),
+  clientLimit: integer("client_limit").notNull().default(50),
+  clientsUsed: integer("clients_used").notNull().default(0),
+  projectLimit: integer("project_limit").notNull().default(200),
+  projectsUsed: integer("projects_used").notNull().default(0),
+  billingPlan: text("billing_plan").notNull().default("starter"),
+  monthlyPriceUsd: text("monthly_price_usd").default("0"),
+  resetDay: integer("reset_day").notNull().default(1),
+  lastResetAt: timestamp("last_reset_at"),
+  quotaExceededAt: timestamp("quota_exceeded_at"),
+  quotaWarningAt: timestamp("quota_warning_at"),
+  warningThreshold: integer("warning_threshold").notNull().default(80),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("agency_quotas_agency_id_idx").on(table.agencyId),
+  billingPlanIdx: index("agency_quotas_billing_plan_idx").on(table.billingPlan),
+}));
+
+export type AgencyQuota = typeof agencyQuotas.$inferSelect;
+export type InsertAgencyQuota = typeof agencyQuotas.$inferInsert;
+
+export const insertAgencyQuotaSchema = createInsertSchema(agencyQuotas).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastResetAt: true,
+  quotaExceededAt: true,
+  quotaWarningAt: true,
+});
+
+export const updateAgencyQuotaSchema = createInsertSchema(agencyQuotas).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+// INTEGRATION HEALTH (Monitor integration status and token expiry)
+export const integrationHealthStatusEnum = ["healthy", "degraded", "failed", "unknown"] as const;
+
+export const integrationHealth = pgTable("integration_health", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  integration: text("integration").notNull(),
+  status: text("status").notNull().default("unknown"),
+  lastCheckAt: timestamp("last_check_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  lastErrorAt: timestamp("last_error_at"),
+  lastErrorMessage: text("last_error_message"),
+  errorCount: integer("error_count").notNull().default(0),
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  tokenRefreshedAt: timestamp("token_refreshed_at"),
+  responseTimeMs: integer("response_time_ms"),
+  healthScore: integer("health_score").notNull().default(100),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("integration_health_agency_id_idx").on(table.agencyId),
+  integrationIdx: index("integration_health_integration_idx").on(table.integration),
+  statusIdx: index("integration_health_status_idx").on(table.status),
+  uniqueAgencyIntegration: uniqueIndex("integration_health_unique_idx").on(table.agencyId, table.integration),
+}));
+
+export type IntegrationHealth = typeof integrationHealth.$inferSelect;
+export type InsertIntegrationHealth = typeof integrationHealth.$inferInsert;
+
+export const insertIntegrationHealthSchema = createInsertSchema(integrationHealth).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastCheckAt: true,
+  lastSuccessAt: true,
+  lastErrorAt: true,
+  errorCount: true,
+  consecutiveFailures: true,
+});
+
+// GOVERNANCE AUDIT LOG (SuperAdmin actions audit trail)
+export const governanceAuditLogs = pgTable("governance_audit_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: uuid("admin_id").notNull().references(() => profiles.id),
+  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  previousValue: jsonb("previous_value").$type<Record<string, unknown>>(),
+  newValue: jsonb("new_value").$type<Record<string, unknown>>(),
+  reason: text("reason"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  adminIdIdx: index("governance_audit_logs_admin_id_idx").on(table.adminId),
+  agencyIdIdx: index("governance_audit_logs_agency_id_idx").on(table.agencyId),
+  actionIdx: index("governance_audit_logs_action_idx").on(table.action),
+  createdAtIdx: index("governance_audit_logs_created_at_idx").on(table.createdAt),
+}));
+
+export type GovernanceAuditLog = typeof governanceAuditLogs.$inferSelect;
+export type InsertGovernanceAuditLog = typeof governanceAuditLogs.$inferInsert;
+
+// RATE LIMIT CONFIG (Per-agency rate limit settings)
+export const rateLimitConfigs = pgTable("rate_limit_configs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull(),
+  maxRequests: integer("max_requests").notNull().default(100),
+  windowSeconds: integer("window_seconds").notNull().default(60),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("rate_limit_configs_agency_id_idx").on(table.agencyId),
+  uniqueAgencyEndpoint: uniqueIndex("rate_limit_configs_unique_idx").on(table.agencyId, table.endpoint),
+}));
+
+export type RateLimitConfig = typeof rateLimitConfigs.$inferSelect;
+export type InsertRateLimitConfig = typeof rateLimitConfigs.$inferInsert;
+
 // WORKFLOW RETENTION POLICIES (Configure data retention per agency)
 export const workflowRetentionPolicies = pgTable("workflow_retention_policies", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
