@@ -1140,6 +1140,125 @@ export const updateWorkflowRetentionPolicySchema = createInsertSchema(workflowRe
   recordsDeleted: true,
 }).partial();
 
+// ==================== VECTOR STORAGE (Priority 6) ====================
+
+// Document type enum
+export const documentTypeEnum = ["sop", "brand_asset", "analytics", "knowledge_base", "template", "report"] as const;
+export const documentStatusEnum = ["pending", "processing", "indexed", "failed", "archived"] as const;
+export const embeddingProviderEnum = ["openai", "gemini"] as const;
+
+// KNOWLEDGE BASE DOCUMENTS (Source documents for embeddings)
+export const knowledgeDocuments = pgTable("knowledge_documents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }), // Optional client-specific doc
+  title: text("title").notNull(),
+  description: text("description"),
+  documentType: text("document_type").notNull(), // 'sop', 'brand_asset', 'analytics', 'knowledge_base', 'template', 'report'
+  sourceUrl: text("source_url"), // Original URL if applicable
+  filePath: text("file_path"), // Storage path for uploaded files
+  mimeType: text("mime_type"), // e.g., 'application/pdf', 'text/markdown'
+  fileSize: integer("file_size"), // File size in bytes
+  content: text("content"), // Extracted text content
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(), // Additional metadata (author, tags, etc.)
+  status: text("status").notNull().default("pending"), // 'pending', 'processing', 'indexed', 'failed', 'archived'
+  errorMessage: text("error_message"), // Error details if processing failed
+  chunkCount: integer("chunk_count").default(0), // Number of chunks created
+  lastIndexedAt: timestamp("last_indexed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+}, (table) => ({
+  agencyIdIdx: index("knowledge_documents_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("knowledge_documents_client_id_idx").on(table.clientId),
+  statusIdx: index("knowledge_documents_status_idx").on(table.status),
+  documentTypeIdx: index("knowledge_documents_type_idx").on(table.documentType),
+}));
+
+// DOCUMENT EMBEDDINGS (Vector chunks for semantic search)
+export const documentEmbeddings = pgTable("document_embeddings", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull().references(() => knowledgeDocuments.id, { onDelete: "cascade" }),
+  chunkIndex: integer("chunk_index").notNull(), // Position of chunk in document
+  content: text("content").notNull(), // Text content of this chunk
+  embedding: jsonb("embedding").$type<number[]>().notNull(), // Vector stored as JSON array (e.g., 1536 dimensions for OpenAI)
+  embeddingModel: text("embedding_model").notNull(), // e.g., 'text-embedding-3-small', 'text-embedding-004'
+  embeddingProvider: text("embedding_provider").notNull(), // 'openai' or 'gemini'
+  tokenCount: integer("token_count"), // Tokens in this chunk
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(), // Chunk-level metadata (headers, page number, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("document_embeddings_agency_id_idx").on(table.agencyId),
+  documentIdIdx: index("document_embeddings_document_id_idx").on(table.documentId),
+  chunkIdx: index("document_embeddings_chunk_idx").on(table.documentId, table.chunkIndex),
+}));
+
+// EMBEDDING INDEX STATS (Track index health and performance)
+export const embeddingIndexStats = pgTable("embedding_index_stats", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
+  totalDocuments: integer("total_documents").default(0),
+  totalChunks: integer("total_chunks").default(0),
+  totalTokens: integer("total_tokens").default(0),
+  lastRebuildAt: timestamp("last_rebuild_at"),
+  lastPruneAt: timestamp("last_prune_at"),
+  averageQueryTimeMs: numeric("average_query_time_ms"),
+  queryCount: integer("query_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// SEMANTIC SEARCH LOGS (Track search queries and results)
+export const semanticSearchLogs = pgTable("semantic_search_logs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => profiles.id),
+  query: text("query").notNull(),
+  queryEmbedding: jsonb("query_embedding").$type<number[]>(), // Store query vector for analysis
+  resultCount: integer("result_count").notNull(),
+  topResultIds: text("top_result_ids").array(), // IDs of top returned chunks
+  topScores: jsonb("top_scores").$type<number[]>(), // Similarity scores
+  durationMs: integer("duration_ms"),
+  filters: jsonb("filters").$type<Record<string, unknown>>(), // Applied filters (documentType, clientId, etc.)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("semantic_search_logs_agency_id_idx").on(table.agencyId),
+  createdAtIdx: index("semantic_search_logs_created_at_idx").on(table.createdAt),
+}));
+
+// Vector storage types
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
+export type InsertKnowledgeDocument = typeof knowledgeDocuments.$inferInsert;
+
+export type DocumentEmbedding = typeof documentEmbeddings.$inferSelect;
+export type InsertDocumentEmbedding = typeof documentEmbeddings.$inferInsert;
+
+export type EmbeddingIndexStats = typeof embeddingIndexStats.$inferSelect;
+export type SemanticSearchLog = typeof semanticSearchLogs.$inferSelect;
+
+export const insertKnowledgeDocumentSchema = createInsertSchema(knowledgeDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  chunkCount: true,
+  lastIndexedAt: true,
+  errorMessage: true,
+});
+
+export const updateKnowledgeDocumentSchema = createInsertSchema(knowledgeDocuments).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+}).partial();
+
+export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddings).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Workflow schemas
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   id: true,
