@@ -2823,6 +2823,280 @@ export const commercialImpactScores = pgTable("commercial_impact_scores", {
   totalImpactScoreIdx: index("commercial_impact_scores_total_impact_idx").on(table.totalImpactScore),
 }));
 
+// ============================================
+// CLOSED FEEDBACK LOOP TABLES
+// ============================================
+
+// Enum for outcome status
+export const outcomeStatusEnum = ["pending", "success", "partial_success", "failure", "cancelled"] as const;
+export const recommendationTypeEnum = ["strategic", "operational", "tactical", "analytical", "creative"] as const;
+export const knowledgeCategoryTypeEnum = ["brand_voice", "business_constraints", "industry_context", "competitor_info", "historical_decisions", "operational_notes", "preferences"] as const;
+
+// Recommendation outcomes - tracks initiative outcomes for feedback
+export const recommendationOutcomes = pgTable("recommendation_outcomes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Link to initiative
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  recommendationSourceId: text("recommendation_source_id"), // Reference to original recommendation signal if applicable
+  
+  // Context
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  recommendationType: text("recommendation_type").notNull(), // strategic, operational, tactical
+  
+  // Outcome tracking
+  outcomeStatus: text("outcome_status").notNull().default("pending"), // success, partial_success, failure
+  
+  // Impact comparison
+  predictedImpact: jsonb("predicted_impact"), // { metric: string, value: number, unit: string }
+  actualImpact: jsonb("actual_impact"), // { metric: string, value: number, unit: string, measuredAt: date }
+  varianceScore: numeric("variance_score"), // percentage difference
+  varianceDirection: text("variance_direction"), // overperformed, underperformed, on_target
+  
+  // Timing
+  acceptedAt: timestamp("accepted_at"),
+  rejectedAt: timestamp("rejected_at"),
+  completedAt: timestamp("completed_at"),
+  measuredAt: timestamp("measured_at"),
+  
+  // Feedback notes
+  outcomeNotes: text("outcome_notes"),
+  lessonsLearned: text("lessons_learned"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("recommendation_outcomes_agency_id_idx").on(table.agencyId),
+  initiativeIdIdx: index("recommendation_outcomes_initiative_id_idx").on(table.initiativeId),
+  clientIdIdx: index("recommendation_outcomes_client_id_idx").on(table.clientId),
+  outcomeStatusIdx: index("recommendation_outcomes_status_idx").on(table.outcomeStatus),
+  recommendationTypeIdx: index("recommendation_outcomes_type_idx").on(table.recommendationType),
+}));
+
+// Quality metrics - rolling aggregates for recommendation effectiveness
+export const recommendationQualityMetrics = pgTable("recommendation_quality_metrics", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Grouping dimensions
+  recommendationType: text("recommendation_type").notNull(),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  
+  // Counts
+  totalRecommendations: integer("total_recommendations").default(0),
+  acceptedCount: integer("accepted_count").default(0),
+  rejectedCount: integer("rejected_count").default(0),
+  completedCount: integer("completed_count").default(0),
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  
+  // Rates (0-1)
+  acceptanceRate: numeric("acceptance_rate").default("0"),
+  successRate: numeric("success_rate").default("0"),
+  completionRate: numeric("completion_rate").default("0"),
+  
+  // Variance tracking
+  avgVarianceScore: numeric("avg_variance_score").default("0"),
+  varianceStdDev: numeric("variance_std_dev").default("0"),
+  overperformCount: integer("overperform_count").default(0),
+  underperformCount: integer("underperform_count").default(0),
+  
+  // Quality score (computed)
+  qualityScore: numeric("quality_score").default("0.5"), // 0-1 composite score
+  confidenceLevel: text("confidence_level").default("low"), // low, medium, high based on sample size
+  
+  // Trend indicators
+  trendDirection: text("trend_direction"), // improving, stable, declining
+  trendMagnitude: numeric("trend_magnitude").default("0"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("recommendation_quality_metrics_agency_id_idx").on(table.agencyId),
+  recommendationTypeIdx: index("recommendation_quality_metrics_type_idx").on(table.recommendationType),
+  clientIdIdx: index("recommendation_quality_metrics_client_id_idx").on(table.clientId),
+  periodIdx: index("recommendation_quality_metrics_period_idx").on(table.periodStart, table.periodEnd),
+  qualityScoreIdx: index("recommendation_quality_metrics_quality_score_idx").on(table.qualityScore),
+}));
+
+// AI calibration parameters - adjustable settings based on feedback
+export const aiCalibrationParameters = pgTable("ai_calibration_parameters", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Parameter identification
+  parameterKey: text("parameter_key").notNull(), // e.g., "confidence_threshold_strategic", "client_weight_enterprise"
+  parameterCategory: text("parameter_category").notNull(), // confidence, weighting, threshold, prompt
+  
+  // Current value
+  currentValue: numeric("current_value").notNull(),
+  defaultValue: numeric("default_value").notNull(),
+  minValue: numeric("min_value"),
+  maxValue: numeric("max_value"),
+  
+  // Client-specific override
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  
+  // Adjustment history
+  adjustmentHistory: jsonb("adjustment_history").default("[]"), // Array of { value, reason, adjustedAt, triggeredBy }
+  lastAdjustedAt: timestamp("last_adjusted_at"),
+  lastAdjustmentReason: text("last_adjustment_reason"),
+  
+  // Calibration source
+  autoCalibrated: boolean("auto_calibrated").default(false),
+  manualOverride: boolean("manual_override").default(false),
+  
+  // Effectiveness tracking
+  effectivenessScore: numeric("effectiveness_score").default("0.5"),
+  sampleCount: integer("sample_count").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("ai_calibration_parameters_agency_id_idx").on(table.agencyId),
+  parameterKeyIdx: index("ai_calibration_parameters_key_idx").on(table.parameterKey),
+  clientIdIdx: index("ai_calibration_parameters_client_id_idx").on(table.clientId),
+  categoryIdx: index("ai_calibration_parameters_category_idx").on(table.parameterCategory),
+  agencyKeyUnique: index("ai_calibration_parameters_agency_key_unique").on(table.agencyId, table.parameterKey, table.clientId),
+}));
+
+// ============================================
+// BRAND KNOWLEDGE LAYER TABLES
+// ============================================
+
+// Knowledge categories - defines schema for each knowledge type
+export const knowledgeCategories = pgTable("knowledge_categories", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Category definition
+  name: text("name").notNull(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  categoryType: text("category_type").notNull(), // brand_voice, business_constraints, industry_context, etc.
+  
+  // Schema definition (JSON Schema format)
+  schemaDefinition: jsonb("schema_definition").notNull(), // { fields: [{ name, type, required, options }] }
+  requiredFields: text("required_fields").array().default([]),
+  
+  // Validation rules
+  validationRules: jsonb("validation_rules"), // Custom validation beyond schema
+  
+  // Display settings
+  displayOrder: integer("display_order").default(0),
+  icon: text("icon"),
+  color: text("color"),
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  isSystemCategory: boolean("is_system_category").default(false), // Built-in vs custom
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("knowledge_categories_agency_id_idx").on(table.agencyId),
+  categoryTypeIdx: index("knowledge_categories_type_idx").on(table.categoryType),
+  nameIdx: index("knowledge_categories_name_idx").on(table.name),
+}));
+
+// Client knowledge entries - structured brand/business knowledge
+export const clientKnowledge = pgTable("client_knowledge", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Ownership
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  
+  // Category reference
+  categoryId: uuid("category_id").notNull().references(() => knowledgeCategories.id, { onDelete: "cascade" }),
+  
+  // Content
+  title: text("title").notNull(),
+  content: text("content"), // Main text content
+  structuredData: jsonb("structured_data"), // Category-specific structured fields
+  
+  // Metadata
+  source: text("source"), // manual, imported, extracted, ai_generated
+  sourceUrl: text("source_url"),
+  sourceDocumentId: text("source_document_id"),
+  
+  // Validity
+  validFrom: timestamp("valid_from").defaultNow(),
+  validUntil: timestamp("valid_until"),
+  isCurrentlyValid: boolean("is_currently_valid").default(true),
+  
+  // Confidence and quality
+  confidenceScore: numeric("confidence_score").default("1"), // 0-1, how reliable is this knowledge
+  verifiedBy: uuid("verified_by").references(() => users.id, { onDelete: "set null" }),
+  verifiedAt: timestamp("verified_at"),
+  
+  // Versioning
+  version: integer("version").default(1),
+  previousVersionId: uuid("previous_version_id"),
+  
+  // Usage tracking
+  usageCount: integer("usage_count").default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  lastUsedInContext: text("last_used_in_context"), // recommendation, analysis, chat, etc.
+  
+  // Status
+  status: text("status").default("active"), // active, archived, superseded, draft
+  
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("client_knowledge_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("client_knowledge_client_id_idx").on(table.clientId),
+  categoryIdIdx: index("client_knowledge_category_id_idx").on(table.categoryId),
+  statusIdx: index("client_knowledge_status_idx").on(table.status),
+  validityIdx: index("client_knowledge_validity_idx").on(table.isCurrentlyValid, table.validFrom, table.validUntil),
+  textSearchIdx: index("client_knowledge_title_idx").on(table.title),
+}));
+
+// Knowledge ingestion log - audit trail for knowledge changes
+export const knowledgeIngestionLog = pgTable("knowledge_ingestion_log", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Reference to client knowledge entry
+  knowledgeId: uuid("knowledge_id").references(() => clientKnowledge.id, { onDelete: "set null" }),
+  
+  // Ingestion details
+  action: text("action").notNull(), // created, updated, validated, archived, superseded, conflict_detected
+  sourceType: text("source_type").notNull(), // manual, api, import, ai_extraction
+  
+  // Before/after for updates
+  previousData: jsonb("previous_data"),
+  newData: jsonb("new_data"),
+  changeDescription: text("change_description"),
+  
+  // Validation
+  validationStatus: text("validation_status").notNull().default("pending"), // pending, passed, failed, skipped
+  validationErrors: jsonb("validation_errors"), // Array of validation error messages
+  
+  // Conflict detection
+  conflictDetected: boolean("conflict_detected").default(false),
+  conflictDetails: jsonb("conflict_details"), // { conflictingDocumentId, field, reason }
+  conflictResolution: text("conflict_resolution"), // kept_new, kept_existing, merged, manual
+  
+  // Actor
+  performedBy: uuid("performed_by").references(() => users.id, { onDelete: "set null" }),
+  performedAt: timestamp("performed_at").defaultNow().notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("knowledge_ingestion_log_agency_id_idx").on(table.agencyId),
+  knowledgeIdIdx: index("knowledge_ingestion_log_knowledge_id_idx").on(table.knowledgeId),
+  actionIdx: index("knowledge_ingestion_log_action_idx").on(table.action),
+  validationStatusIdx: index("knowledge_ingestion_log_validation_status_idx").on(table.validationStatus),
+  performedAtIdx: index("knowledge_ingestion_log_performed_at_idx").on(table.performedAt),
+}));
+
 // Insert schemas for Duration Intelligence
 export const insertTaskExecutionHistorySchema = createInsertSchema(taskExecutionHistory).omit({
   id: true,
@@ -2885,3 +3159,77 @@ export type TaskChannel = typeof taskChannelEnum[number];
 export type TaskComplexity = typeof taskComplexityEnum[number];
 export type PredictionConfidence = typeof predictionConfidenceEnum[number];
 export type AllocationStatus = typeof allocationStatusEnum[number];
+
+// ============================================
+// INSERT SCHEMAS FOR CLOSED FEEDBACK LOOP
+// ============================================
+
+export const insertRecommendationOutcomeSchema = createInsertSchema(recommendationOutcomes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRecommendationQualityMetricSchema = createInsertSchema(recommendationQualityMetrics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAiCalibrationParameterSchema = createInsertSchema(aiCalibrationParameters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// ============================================
+// INSERT SCHEMAS FOR BRAND KNOWLEDGE LAYER
+// ============================================
+
+export const insertKnowledgeCategorySchema = createInsertSchema(knowledgeCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientKnowledgeSchema = createInsertSchema(clientKnowledge).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertKnowledgeIngestionLogSchema = createInsertSchema(knowledgeIngestionLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ============================================
+// TYPE EXPORTS FOR CLOSED FEEDBACK LOOP
+// ============================================
+
+export type RecommendationOutcome = typeof recommendationOutcomes.$inferSelect;
+export type InsertRecommendationOutcome = z.infer<typeof insertRecommendationOutcomeSchema>;
+
+export type RecommendationQualityMetric = typeof recommendationQualityMetrics.$inferSelect;
+export type InsertRecommendationQualityMetric = z.infer<typeof insertRecommendationQualityMetricSchema>;
+
+export type AiCalibrationParameter = typeof aiCalibrationParameters.$inferSelect;
+export type InsertAiCalibrationParameter = z.infer<typeof insertAiCalibrationParameterSchema>;
+
+// ============================================
+// TYPE EXPORTS FOR BRAND KNOWLEDGE LAYER
+// ============================================
+
+export type KnowledgeCategory = typeof knowledgeCategories.$inferSelect;
+export type InsertKnowledgeCategory = z.infer<typeof insertKnowledgeCategorySchema>;
+
+export type ClientKnowledge = typeof clientKnowledge.$inferSelect;
+export type InsertClientKnowledge = z.infer<typeof insertClientKnowledgeSchema>;
+
+export type KnowledgeIngestionLog = typeof knowledgeIngestionLog.$inferSelect;
+export type InsertKnowledgeIngestionLog = z.infer<typeof insertKnowledgeIngestionLogSchema>;
+
+// Enum type exports for Feedback and Knowledge
+export type OutcomeStatus = typeof outcomeStatusEnum[number];
+export type RecommendationType = typeof recommendationTypeEnum[number];
+export type KnowledgeCategoryType = typeof knowledgeCategoryTypeEnum[number];
