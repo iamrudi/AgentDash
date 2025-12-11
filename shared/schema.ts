@@ -955,6 +955,11 @@ export const workflowRuleAudits = pgTable("workflow_rule_audits", {
   createdAtIdx: index("workflow_rule_audits_created_at_idx").on(table.createdAt),
 }));
 
+// Signal enums
+export const signalStatusEnum = ["pending", "processing", "completed", "failed", "duplicate"] as const;
+export const signalSourceEnum = ["ga4", "gsc", "hubspot", "linkedin", "internal", "webhook"] as const;
+export const signalUrgencyEnum = ["low", "normal", "high", "critical"] as const;
+
 // WORKFLOW SIGNALS (Persisted signals for rule evaluation and audit trail)
 export const workflowSignals = pgTable("workflow_signals", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -964,15 +969,44 @@ export const workflowSignals = pgTable("workflow_signals", {
   payload: jsonb("payload").notNull(), // The full signal data
   clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
   urgency: text("urgency").default("normal"), // low, normal, high, critical
+  dedupHash: text("dedup_hash"), // SHA256 hash for deduplication
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed, duplicate
   processed: boolean("processed").notNull().default(false),
   processedAt: timestamp("processed_at"),
+  lastError: text("last_error"), // Error message if processing failed
+  retryCount: integer("retry_count").notNull().default(0),
+  executionId: uuid("execution_id").references(() => workflowExecutions.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   agencyIdIdx: index("workflow_signals_agency_id_idx").on(table.agencyId),
   sourceIdx: index("workflow_signals_source_idx").on(table.source),
   typeIdx: index("workflow_signals_type_idx").on(table.type),
+  statusIdx: index("workflow_signals_status_idx").on(table.status),
   processedIdx: index("workflow_signals_processed_idx").on(table.processed),
   createdAtIdx: index("workflow_signals_created_at_idx").on(table.createdAt),
+  dedupHashIdx: index("workflow_signals_dedup_hash_idx").on(table.agencyId, table.dedupHash),
+}));
+
+// SIGNAL ROUTES - Maps signal types/sources to workflows
+export const workflowSignalRoutes = pgTable("workflow_signal_routes", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  workflowId: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  source: text("source"), // null = match all sources
+  type: text("type"), // null = match all types
+  urgencyFilter: text("urgency_filter").array(), // optional: only route specific urgencies
+  payloadFilter: jsonb("payload_filter"), // optional: JSON path conditions
+  enabled: boolean("enabled").notNull().default(true),
+  priority: integer("priority").notNull().default(0), // higher = evaluated first
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("workflow_signal_routes_agency_id_idx").on(table.agencyId),
+  workflowIdIdx: index("workflow_signal_routes_workflow_id_idx").on(table.workflowId),
+  sourceTypeIdx: index("workflow_signal_routes_source_type_idx").on(table.source, table.type),
+  enabledIdx: index("workflow_signal_routes_enabled_idx").on(table.enabled),
 }));
 
 // WORKFLOW RULE EVALUATIONS (Log of rule evaluations for debugging and audit)
@@ -1058,7 +1092,20 @@ export const insertWorkflowSignalSchema = createInsertSchema(workflowSignals).om
   id: true,
   createdAt: true,
   processedAt: true,
+  executionId: true,
 });
+
+export const insertWorkflowSignalRouteSchema = createInsertSchema(workflowSignalRoutes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateWorkflowSignalRouteSchema = createInsertSchema(workflowSignalRoutes).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+}).partial();
 
 export const insertWorkflowRuleEvaluationSchema = createInsertSchema(workflowRuleEvaluations).omit({
   id: true,
@@ -1276,6 +1323,13 @@ export type InsertWorkflowRuleAudit = z.infer<typeof insertWorkflowRuleAuditSche
 
 export type WorkflowSignal = typeof workflowSignals.$inferSelect;
 export type InsertWorkflowSignal = z.infer<typeof insertWorkflowSignalSchema>;
+export type SignalStatus = typeof signalStatusEnum[number];
+export type SignalSource = typeof signalSourceEnum[number];
+export type SignalUrgency = typeof signalUrgencyEnum[number];
+
+export type WorkflowSignalRoute = typeof workflowSignalRoutes.$inferSelect;
+export type InsertWorkflowSignalRoute = z.infer<typeof insertWorkflowSignalRouteSchema>;
+export type UpdateWorkflowSignalRoute = z.infer<typeof updateWorkflowSignalRouteSchema>;
 
 export type WorkflowRuleEvaluation = typeof workflowRuleEvaluations.$inferSelect;
 export type InsertWorkflowRuleEvaluation = z.infer<typeof insertWorkflowRuleEvaluationSchema>;

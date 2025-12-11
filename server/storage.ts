@@ -79,6 +79,9 @@ import {
   type InsertWorkflowRuleAudit,
   type WorkflowSignal,
   type InsertWorkflowSignal,
+  type WorkflowSignalRoute,
+  type InsertWorkflowSignalRoute,
+  type UpdateWorkflowSignalRoute,
   type WorkflowRuleEvaluation,
   type InsertWorkflowRuleEvaluation,
   users,
@@ -121,6 +124,7 @@ import {
   workflowRuleActions,
   workflowRuleAudits,
   workflowSignals,
+  workflowSignalRoutes,
   workflowRuleEvaluations,
 } from "@shared/schema";
 import { db } from "./db";
@@ -399,8 +403,22 @@ export interface IStorage {
   
   // Workflow Signals
   createWorkflowSignal(signal: InsertWorkflowSignal): Promise<WorkflowSignal>;
+  createWorkflowSignalWithDedup(signal: InsertWorkflowSignal): Promise<{ signal: WorkflowSignal; isDuplicate: boolean }>;
+  getWorkflowSignalById(id: string): Promise<WorkflowSignal | undefined>;
+  getWorkflowSignalByDedupHash(agencyId: string, dedupHash: string): Promise<WorkflowSignal | undefined>;
   getUnprocessedSignals(agencyId: string, limit?: number): Promise<WorkflowSignal[]>;
-  markSignalProcessed(id: string): Promise<void>;
+  getSignalsByStatus(agencyId: string, status: string, limit?: number): Promise<WorkflowSignal[]>;
+  updateSignalStatus(id: string, status: string, error?: string): Promise<WorkflowSignal>;
+  markSignalProcessed(id: string, executionId?: string): Promise<void>;
+  incrementSignalRetry(id: string): Promise<WorkflowSignal>;
+  
+  // Workflow Signal Routes
+  getSignalRoutesByAgencyId(agencyId: string): Promise<WorkflowSignalRoute[]>;
+  getSignalRouteById(id: string): Promise<WorkflowSignalRoute | undefined>;
+  getMatchingSignalRoutes(agencyId: string, source: string, type: string): Promise<WorkflowSignalRoute[]>;
+  createSignalRoute(route: InsertWorkflowSignalRoute): Promise<WorkflowSignalRoute>;
+  updateSignalRoute(id: string, data: UpdateWorkflowSignalRoute): Promise<WorkflowSignalRoute>;
+  deleteSignalRoute(id: string): Promise<void>;
   
   // Workflow Rule Evaluations
   createRuleEvaluation(evaluation: InsertWorkflowRuleEvaluation): Promise<WorkflowRuleEvaluation>;
@@ -2530,6 +2548,39 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async createWorkflowSignalWithDedup(signal: InsertWorkflowSignal): Promise<{ signal: WorkflowSignal; isDuplicate: boolean }> {
+    // Check for duplicate by dedup hash
+    if (signal.dedupHash) {
+      const existing = await this.getWorkflowSignalByDedupHash(signal.agencyId, signal.dedupHash);
+      if (existing) {
+        return { signal: existing, isDuplicate: true };
+      }
+    }
+    const result = await db.insert(workflowSignals).values(signal).returning();
+    return { signal: result[0], isDuplicate: false };
+  }
+
+  async getWorkflowSignalById(id: string): Promise<WorkflowSignal | undefined> {
+    const result = await db
+      .select()
+      .from(workflowSignals)
+      .where(eq(workflowSignals.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getWorkflowSignalByDedupHash(agencyId: string, dedupHash: string): Promise<WorkflowSignal | undefined> {
+    const result = await db
+      .select()
+      .from(workflowSignals)
+      .where(and(
+        eq(workflowSignals.agencyId, agencyId),
+        eq(workflowSignals.dedupHash, dedupHash)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
   async getUnprocessedSignals(agencyId: string, limit: number = 100): Promise<WorkflowSignal[]> {
     return await db
       .select()
@@ -2539,11 +2590,107 @@ export class DbStorage implements IStorage {
       .limit(limit);
   }
 
-  async markSignalProcessed(id: string): Promise<void> {
+  async getSignalsByStatus(agencyId: string, status: string, limit: number = 100): Promise<WorkflowSignal[]> {
+    return await db
+      .select()
+      .from(workflowSignals)
+      .where(and(
+        eq(workflowSignals.agencyId, agencyId),
+        eq(workflowSignals.status, status)
+      ))
+      .orderBy(workflowSignals.createdAt)
+      .limit(limit);
+  }
+
+  async updateSignalStatus(id: string, status: string, error?: string): Promise<WorkflowSignal> {
+    const result = await db
+      .update(workflowSignals)
+      .set({ 
+        status, 
+        lastError: error || null,
+        ...(status === 'completed' || status === 'failed' ? { processedAt: new Date(), processed: true } : {})
+      })
+      .where(eq(workflowSignals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markSignalProcessed(id: string, executionId?: string): Promise<void> {
     await db
       .update(workflowSignals)
-      .set({ processed: true, processedAt: new Date() })
+      .set({ 
+        processed: true, 
+        processedAt: new Date(),
+        status: 'completed',
+        executionId: executionId || null
+      })
       .where(eq(workflowSignals.id, id));
+  }
+
+  async incrementSignalRetry(id: string): Promise<WorkflowSignal> {
+    const result = await db
+      .update(workflowSignals)
+      .set({ 
+        retryCount: sql`${workflowSignals.retryCount} + 1`
+      })
+      .where(eq(workflowSignals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Workflow Signal Routes
+  async getSignalRoutesByAgencyId(agencyId: string): Promise<WorkflowSignalRoute[]> {
+    return await db
+      .select()
+      .from(workflowSignalRoutes)
+      .where(eq(workflowSignalRoutes.agencyId, agencyId))
+      .orderBy(desc(workflowSignalRoutes.priority));
+  }
+
+  async getSignalRouteById(id: string): Promise<WorkflowSignalRoute | undefined> {
+    const result = await db
+      .select()
+      .from(workflowSignalRoutes)
+      .where(eq(workflowSignalRoutes.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getMatchingSignalRoutes(agencyId: string, source: string, type: string): Promise<WorkflowSignalRoute[]> {
+    // Get all enabled routes for the agency and filter in memory for flexible matching
+    const routes = await db
+      .select()
+      .from(workflowSignalRoutes)
+      .where(and(
+        eq(workflowSignalRoutes.agencyId, agencyId),
+        eq(workflowSignalRoutes.enabled, true)
+      ))
+      .orderBy(desc(workflowSignalRoutes.priority));
+    
+    // Filter routes that match the source and type (null means match all)
+    return routes.filter(route => {
+      const sourceMatch = route.source === null || route.source === source;
+      const typeMatch = route.type === null || route.type === type;
+      return sourceMatch && typeMatch;
+    });
+  }
+
+  async createSignalRoute(route: InsertWorkflowSignalRoute): Promise<WorkflowSignalRoute> {
+    const result = await db.insert(workflowSignalRoutes).values(route).returning();
+    return result[0];
+  }
+
+  async updateSignalRoute(id: string, data: UpdateWorkflowSignalRoute): Promise<WorkflowSignalRoute> {
+    const result = await db
+      .update(workflowSignalRoutes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workflowSignalRoutes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSignalRoute(id: string): Promise<void> {
+    await db.delete(workflowSignalRoutes).where(eq(workflowSignalRoutes.id, id));
   }
 
   // Workflow Rule Evaluations
