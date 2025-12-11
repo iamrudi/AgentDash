@@ -67,6 +67,20 @@ import {
   type InsertWorkflow,
   type WorkflowExecution,
   type WorkflowEvent,
+  type WorkflowRule,
+  type InsertWorkflowRule,
+  type WorkflowRuleVersion,
+  type InsertWorkflowRuleVersion,
+  type WorkflowRuleCondition,
+  type InsertWorkflowRuleCondition,
+  type WorkflowRuleAction,
+  type InsertWorkflowRuleAction,
+  type WorkflowRuleAudit,
+  type InsertWorkflowRuleAudit,
+  type WorkflowSignal,
+  type InsertWorkflowSignal,
+  type WorkflowRuleEvaluation,
+  type InsertWorkflowRuleEvaluation,
   users,
   profiles,
   clients,
@@ -101,6 +115,13 @@ import {
   workflows,
   workflowExecutions,
   workflowEvents,
+  workflowRules,
+  workflowRuleVersions,
+  workflowRuleConditions,
+  workflowRuleActions,
+  workflowRuleAudits,
+  workflowSignals,
+  workflowRuleEvaluations,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -343,6 +364,47 @@ export interface IStorage {
   
   // Workflow Events
   getWorkflowEventsByExecutionId(executionId: string): Promise<WorkflowEvent[]>;
+  
+  // Workflow Rules
+  getWorkflowRulesByAgencyId(agencyId: string): Promise<WorkflowRule[]>;
+  getWorkflowRuleById(id: string): Promise<WorkflowRule | undefined>;
+  getEnabledRulesByAgencyId(agencyId: string): Promise<WorkflowRule[]>;
+  createWorkflowRule(rule: InsertWorkflowRule): Promise<WorkflowRule>;
+  updateWorkflowRule(id: string, data: Partial<WorkflowRule>): Promise<WorkflowRule>;
+  deleteWorkflowRule(id: string): Promise<void>;
+  
+  // Workflow Rule Versions
+  getRuleVersionsByRuleId(ruleId: string): Promise<WorkflowRuleVersion[]>;
+  getRuleVersionById(id: string): Promise<WorkflowRuleVersion | undefined>;
+  getPublishedRuleVersion(ruleId: string): Promise<WorkflowRuleVersion | undefined>;
+  createRuleVersion(version: InsertWorkflowRuleVersion): Promise<WorkflowRuleVersion>;
+  updateRuleVersion(id: string, data: Partial<WorkflowRuleVersion>): Promise<WorkflowRuleVersion>;
+  publishRuleVersion(id: string): Promise<WorkflowRuleVersion>;
+  
+  // Workflow Rule Conditions
+  getRuleConditionsByVersionId(versionId: string): Promise<WorkflowRuleCondition[]>;
+  createRuleCondition(condition: InsertWorkflowRuleCondition): Promise<WorkflowRuleCondition>;
+  createRuleConditions(conditions: InsertWorkflowRuleCondition[]): Promise<WorkflowRuleCondition[]>;
+  deleteRuleConditionsByVersionId(versionId: string): Promise<void>;
+  
+  // Workflow Rule Actions
+  getRuleActionsByVersionId(versionId: string): Promise<WorkflowRuleAction[]>;
+  createRuleAction(action: InsertWorkflowRuleAction): Promise<WorkflowRuleAction>;
+  createRuleActions(actions: InsertWorkflowRuleAction[]): Promise<WorkflowRuleAction[]>;
+  deleteRuleActionsByVersionId(versionId: string): Promise<void>;
+  
+  // Workflow Rule Audits
+  createRuleAudit(audit: InsertWorkflowRuleAudit): Promise<WorkflowRuleAudit>;
+  getRuleAuditsByRuleId(ruleId: string): Promise<WorkflowRuleAudit[]>;
+  
+  // Workflow Signals
+  createWorkflowSignal(signal: InsertWorkflowSignal): Promise<WorkflowSignal>;
+  getUnprocessedSignals(agencyId: string, limit?: number): Promise<WorkflowSignal[]>;
+  markSignalProcessed(id: string): Promise<void>;
+  
+  // Workflow Rule Evaluations
+  createRuleEvaluation(evaluation: InsertWorkflowRuleEvaluation): Promise<WorkflowRuleEvaluation>;
+  getRuleEvaluationsByRuleId(ruleId: string, limit?: number): Promise<WorkflowRuleEvaluation[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -2305,6 +2367,198 @@ export class DbStorage implements IStorage {
       .from(workflowEvents)
       .where(eq(workflowEvents.executionId, executionId))
       .orderBy(workflowEvents.timestamp);
+  }
+
+  // ==================== RULE ENGINE ====================
+
+  // Workflow Rules
+  async getWorkflowRulesByAgencyId(agencyId: string): Promise<WorkflowRule[]> {
+    return await db
+      .select()
+      .from(workflowRules)
+      .where(eq(workflowRules.agencyId, agencyId))
+      .orderBy(desc(workflowRules.createdAt));
+  }
+
+  async getWorkflowRuleById(id: string): Promise<WorkflowRule | undefined> {
+    const result = await db.select().from(workflowRules).where(eq(workflowRules.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getEnabledRulesByAgencyId(agencyId: string): Promise<WorkflowRule[]> {
+    return await db
+      .select()
+      .from(workflowRules)
+      .where(and(eq(workflowRules.agencyId, agencyId), eq(workflowRules.enabled, true)))
+      .orderBy(workflowRules.name);
+  }
+
+  async createWorkflowRule(rule: InsertWorkflowRule): Promise<WorkflowRule> {
+    const result = await db.insert(workflowRules).values(rule).returning();
+    return result[0];
+  }
+
+  async updateWorkflowRule(id: string, data: Partial<WorkflowRule>): Promise<WorkflowRule> {
+    const result = await db
+      .update(workflowRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workflowRules.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWorkflowRule(id: string): Promise<void> {
+    await db.delete(workflowRules).where(eq(workflowRules.id, id));
+  }
+
+  // Workflow Rule Versions
+  async getRuleVersionsByRuleId(ruleId: string): Promise<WorkflowRuleVersion[]> {
+    return await db
+      .select()
+      .from(workflowRuleVersions)
+      .where(eq(workflowRuleVersions.ruleId, ruleId))
+      .orderBy(desc(workflowRuleVersions.version));
+  }
+
+  async getRuleVersionById(id: string): Promise<WorkflowRuleVersion | undefined> {
+    const result = await db
+      .select()
+      .from(workflowRuleVersions)
+      .where(eq(workflowRuleVersions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getPublishedRuleVersion(ruleId: string): Promise<WorkflowRuleVersion | undefined> {
+    const result = await db
+      .select()
+      .from(workflowRuleVersions)
+      .where(and(eq(workflowRuleVersions.ruleId, ruleId), eq(workflowRuleVersions.status, "published")))
+      .orderBy(desc(workflowRuleVersions.version))
+      .limit(1);
+    return result[0];
+  }
+
+  async createRuleVersion(version: InsertWorkflowRuleVersion): Promise<WorkflowRuleVersion> {
+    const result = await db.insert(workflowRuleVersions).values(version).returning();
+    return result[0];
+  }
+
+  async updateRuleVersion(id: string, data: Partial<WorkflowRuleVersion>): Promise<WorkflowRuleVersion> {
+    const result = await db
+      .update(workflowRuleVersions)
+      .set(data)
+      .where(eq(workflowRuleVersions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async publishRuleVersion(id: string): Promise<WorkflowRuleVersion> {
+    const result = await db
+      .update(workflowRuleVersions)
+      .set({ status: "published", publishedAt: new Date() })
+      .where(eq(workflowRuleVersions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Workflow Rule Conditions
+  async getRuleConditionsByVersionId(versionId: string): Promise<WorkflowRuleCondition[]> {
+    return await db
+      .select()
+      .from(workflowRuleConditions)
+      .where(eq(workflowRuleConditions.ruleVersionId, versionId))
+      .orderBy(workflowRuleConditions.order);
+  }
+
+  async createRuleCondition(condition: InsertWorkflowRuleCondition): Promise<WorkflowRuleCondition> {
+    const result = await db.insert(workflowRuleConditions).values(condition).returning();
+    return result[0];
+  }
+
+  async createRuleConditions(conditions: InsertWorkflowRuleCondition[]): Promise<WorkflowRuleCondition[]> {
+    if (conditions.length === 0) return [];
+    const result = await db.insert(workflowRuleConditions).values(conditions).returning();
+    return result;
+  }
+
+  async deleteRuleConditionsByVersionId(versionId: string): Promise<void> {
+    await db.delete(workflowRuleConditions).where(eq(workflowRuleConditions.ruleVersionId, versionId));
+  }
+
+  // Workflow Rule Actions
+  async getRuleActionsByVersionId(versionId: string): Promise<WorkflowRuleAction[]> {
+    return await db
+      .select()
+      .from(workflowRuleActions)
+      .where(eq(workflowRuleActions.ruleVersionId, versionId))
+      .orderBy(workflowRuleActions.order);
+  }
+
+  async createRuleAction(action: InsertWorkflowRuleAction): Promise<WorkflowRuleAction> {
+    const result = await db.insert(workflowRuleActions).values(action).returning();
+    return result[0];
+  }
+
+  async createRuleActions(actions: InsertWorkflowRuleAction[]): Promise<WorkflowRuleAction[]> {
+    if (actions.length === 0) return [];
+    const result = await db.insert(workflowRuleActions).values(actions).returning();
+    return result;
+  }
+
+  async deleteRuleActionsByVersionId(versionId: string): Promise<void> {
+    await db.delete(workflowRuleActions).where(eq(workflowRuleActions.ruleVersionId, versionId));
+  }
+
+  // Workflow Rule Audits
+  async createRuleAudit(audit: InsertWorkflowRuleAudit): Promise<WorkflowRuleAudit> {
+    const result = await db.insert(workflowRuleAudits).values(audit).returning();
+    return result[0];
+  }
+
+  async getRuleAuditsByRuleId(ruleId: string): Promise<WorkflowRuleAudit[]> {
+    return await db
+      .select()
+      .from(workflowRuleAudits)
+      .where(eq(workflowRuleAudits.ruleId, ruleId))
+      .orderBy(desc(workflowRuleAudits.createdAt));
+  }
+
+  // Workflow Signals
+  async createWorkflowSignal(signal: InsertWorkflowSignal): Promise<WorkflowSignal> {
+    const result = await db.insert(workflowSignals).values(signal).returning();
+    return result[0];
+  }
+
+  async getUnprocessedSignals(agencyId: string, limit: number = 100): Promise<WorkflowSignal[]> {
+    return await db
+      .select()
+      .from(workflowSignals)
+      .where(and(eq(workflowSignals.agencyId, agencyId), eq(workflowSignals.processed, false)))
+      .orderBy(workflowSignals.createdAt)
+      .limit(limit);
+  }
+
+  async markSignalProcessed(id: string): Promise<void> {
+    await db
+      .update(workflowSignals)
+      .set({ processed: true, processedAt: new Date() })
+      .where(eq(workflowSignals.id, id));
+  }
+
+  // Workflow Rule Evaluations
+  async createRuleEvaluation(evaluation: InsertWorkflowRuleEvaluation): Promise<WorkflowRuleEvaluation> {
+    const result = await db.insert(workflowRuleEvaluations).values(evaluation).returning();
+    return result[0];
+  }
+
+  async getRuleEvaluationsByRuleId(ruleId: string, limit: number = 100): Promise<WorkflowRuleEvaluation[]> {
+    return await db
+      .select()
+      .from(workflowRuleEvaluations)
+      .where(eq(workflowRuleEvaluations.ruleId, ruleId))
+      .orderBy(desc(workflowRuleEvaluations.createdAt))
+      .limit(limit);
   }
 }
 

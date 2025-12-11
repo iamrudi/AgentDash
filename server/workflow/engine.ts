@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { db } from "../db";
 import { IStorage } from "../storage";
 import { getAIProvider } from "../ai/provider";
+import { createRuleEngine, RuleEngine, RuleEvaluationContext } from "./rule-engine";
 import {
   Workflow,
   WorkflowExecution,
@@ -47,12 +48,14 @@ interface TransactionContext {
 
 export class WorkflowEngine {
   private storage: IStorage;
+  private ruleEngine: RuleEngine;
   private stepHandlers: Map<string, StepHandler>;
   private currentAgencyId: string | null = null;
   private txContext: TransactionContext | null = null;
 
   constructor(storage: IStorage) {
     this.storage = storage;
+    this.ruleEngine = createRuleEngine(storage);
     this.stepHandlers = new Map();
     this.registerBuiltInHandlers();
   }
@@ -271,6 +274,13 @@ export class WorkflowEngine {
       return { success: false, error: "Missing rule configuration" };
     }
 
+    // Check if using a versioned rule (ruleId provided)
+    const ruleId = (config as any).ruleId;
+    if (ruleId) {
+      return await this.handleVersionedRule(ruleId, context);
+    }
+
+    // Fallback to inline conditions
     const results = config.conditions.map((cond) =>
       this.evaluateCondition(cond, context.data)
     );
@@ -284,6 +294,45 @@ export class WorkflowEngine {
       success: true,
       output: { passed, results },
       nextStep: passed ? undefined : null,
+    };
+  }
+
+  private async handleVersionedRule(
+    ruleId: string,
+    context: WorkflowContext
+  ): Promise<StepResult> {
+    const rule = await this.storage.getWorkflowRuleById(ruleId);
+    if (!rule) {
+      return { success: false, error: `Rule not found: ${ruleId}` };
+    }
+
+    if (!rule.enabled) {
+      return {
+        success: true,
+        output: { passed: false, skipped: true, reason: "Rule is disabled" },
+        nextStep: null,
+      };
+    }
+
+    const evalContext: RuleEvaluationContext = {
+      signal: context.data,
+      client: context.data.client as Record<string, unknown> | undefined,
+      project: context.data.project as Record<string, unknown> | undefined,
+      history: context.data.history as Array<Record<string, unknown>> | undefined,
+    };
+
+    const result = await this.ruleEngine.evaluateRule(rule, evalContext);
+
+    return {
+      success: true,
+      output: {
+        passed: result.matched,
+        ruleId: result.ruleId,
+        ruleVersionId: result.ruleVersionId,
+        conditionResults: result.conditionResults,
+        durationMs: result.durationMs,
+      },
+      nextStep: result.matched ? undefined : null,
     };
   }
 
