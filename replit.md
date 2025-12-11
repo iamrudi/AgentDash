@@ -108,7 +108,7 @@ Polling fallback at 1s interval where required.
 
 # 5. Workflow Engine (Core) ✅ IMPLEMENTED
 
-**Status**: Priority 1 & 2 Complete (December 2024)
+**Status**: Priorities 1-5 Complete (December 2024)
 
 ## Implementation Files
 - `server/workflow/engine.ts` - WorkflowEngine class with step execution

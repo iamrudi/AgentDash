@@ -244,7 +244,7 @@ server/workflow/engine.ts (AI step handler uses HardenedAIExecutor)
 
 ## Priority 5: Workflow Lineage & Event Logging
 
-**Status:** 🔴 Not Started  
+**Status:** ✅ COMPLETED (December 2024)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 4  
 **Estimated Duration:** 2 weeks
@@ -252,45 +252,44 @@ server/workflow/engine.ts (AI step handler uses HardenedAIExecutor)
 ### Description
 Implement comprehensive event logging that captures every workflow execution, enabling full replay and debugging.
 
-### Deliverables
-- `workflow_executions` table
-- `workflow_events` table (step-by-step log)
-- Execution replay capability
-- Lineage query API
-- Retention policies
+### Deliverables ✅
+- ✅ `workflow_executions` table with execution tracking
+- ✅ `workflow_events` table (step-by-step log)
+- ✅ Execution replay capability (`POST /api/workflow-executions/:id/replay`)
+- ✅ Lineage query APIs:
+  - `GET /api/lineage/task/:taskId` - Trace task to originating workflow/signal
+  - `GET /api/lineage/project/:projectId` - Trace project with all created entities
+  - `GET /api/workflow-executions/:id/lineage` - Get all entities created by execution
+- ✅ Retention policy system (`workflow_retention_policies` table)
+- ✅ `workflowExecutionId` fields on projects, taskLists, tasks for lineage tracking
+- ✅ Cross-tenant security: All lineage/replay endpoints enforce strict agency-level authorization
 
-### Schema
+### Implementation Files
 ```typescript
-// workflow_executions
-{
-  id: string;
-  workflowId: string;
-  triggerId: string;       // Signal that triggered
-  status: 'running' | 'completed' | 'failed';
-  startedAt: timestamp;
-  completedAt: timestamp;
-  error: text;
-  inputHash: string;
-  outputHash: string;
-}
+// Schema additions
+shared/schema.ts (workflowRetentionPolicies, workflowExecutionId fields)
 
-// workflow_events
-{
-  id: string;
-  executionId: string;
-  stepId: string;
-  type: 'started' | 'completed' | 'failed' | 'skipped';
-  input: jsonb;
-  output: jsonb;
-  durationMs: number;
-  timestamp: timestamp;
-}
+// Lineage and replay API endpoints
+server/routes.ts (lineage query, replay, retention policy APIs)
 ```
 
-### Success Criteria
-- Any workflow execution fully reconstructable from events
-- Lineage query: "What created this task?" → full chain
-- 90-day retention with archival
+### Retention Policy Features
+- Configurable retention days per resource type
+- Resource types: workflow_executions, workflow_events, signals, ai_executions, rule_evaluations
+- Archive before delete option (for future cold storage)
+- Tracks cleanup stats (lastCleanupAt, recordsDeleted)
+- Agency-scoped cleanup (no cross-tenant data deletion)
+
+### Security Hardening
+- Replay endpoint validates BOTH execution.agencyId AND workflow.agencyId
+- Lineage endpoints filter all nested entities by caller's agencyId
+- Retention cleanup scopes deletions by agency (rule_evaluations via rule ownership)
+
+### Success Criteria ✅
+- ✅ Any workflow execution fully reconstructable from events
+- ✅ Lineage query: "What created this task?" → full chain
+- ✅ Configurable retention with per-agency policies
+- ✅ No cross-tenant data exposure in lineage or replay operations
 
 ---
 
