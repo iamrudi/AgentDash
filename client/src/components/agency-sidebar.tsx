@@ -22,6 +22,7 @@ import {
   Building,
   Clock,
   GitBranch,
+  Brain,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -102,6 +103,13 @@ const menuGroups = [
         icon: GitBranch,
         notificationKey: null,
         description: "Build and manage automated workflows",
+      },
+      {
+        title: "Intelligence",
+        url: "/agency/intelligence",
+        icon: Brain,
+        notificationKey: null,
+        description: "Operational intelligence signals, insights, and priorities",
       },
     ],
   },

@@ -56,6 +56,9 @@ const GovernanceDashboard = lazy(() => import("@/pages/governance-dashboard"));
 const WorkflowBuilder = lazy(() => import("@/pages/agency/workflow-builder"));
 const Workflows = lazy(() => import("@/pages/agency/workflows"));
 
+// Intelligence Center (lazy-loaded)
+const AgencyIntelligence = lazy(() => import("@/pages/agency/intelligence"));
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -269,6 +272,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <WorkflowBuilder />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/intelligence">
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
+          <AgencyLayout>
+            <AgencyIntelligence />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

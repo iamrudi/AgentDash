@@ -8257,6 +8257,472 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // ===========================================
+  // INTELLIGENCE LAYER ENDPOINTS (Priority 16)
+  // ===========================================
+
+  // Intelligence Signals - List signals for agency
+  app.get("/api/intelligence/signals", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { limit, sourceSystem, category, processed } = req.query;
+      const signals = await storage.getIntelligenceSignalsByAgencyId(agencyId, {
+        limit: limit ? parseInt(limit as string) : undefined,
+        sourceSystem: sourceSystem as string | undefined,
+        category: category as string | undefined,
+        processed: processed ? processed === "true" : undefined,
+      });
+      
+      res.json(signals);
+    } catch (error: any) {
+      console.error("Error fetching intelligence signals:", error);
+      res.status(500).json({ message: "Failed to fetch signals" });
+    }
+  });
+
+  // Intelligence Signals - Get single signal
+  app.get("/api/intelligence/signals/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const signal = await storage.getIntelligenceSignalById(req.params.id);
+      if (!signal) {
+        return res.status(404).json({ message: "Signal not found" });
+      }
+      
+      // Check agency access
+      const agencyId = req.user?.agencyId;
+      if (agencyId && signal.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(signal);
+    } catch (error: any) {
+      console.error("Error fetching signal:", error);
+      res.status(500).json({ message: "Failed to fetch signal" });
+    }
+  });
+
+  // Intelligence Signals - Create new signal (for internal/integration use)
+  app.post("/api/intelligence/signals", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const signalData = {
+        ...req.body,
+        agencyId,
+        occurredAt: new Date(req.body.occurredAt || Date.now()),
+      };
+      
+      const signal = await storage.createIntelligenceSignal(signalData);
+      res.status(201).json(signal);
+    } catch (error: any) {
+      console.error("Error creating signal:", error);
+      res.status(500).json({ message: "Failed to create signal" });
+    }
+  });
+
+  // Intelligence Signals - Discard a signal
+  app.post("/api/intelligence/signals/:id/discard", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ message: "Discard reason is required" });
+      }
+      
+      const signal = await storage.discardSignal(req.params.id, reason);
+      res.json(signal);
+    } catch (error: any) {
+      console.error("Error discarding signal:", error);
+      res.status(500).json({ message: "Failed to discard signal" });
+    }
+  });
+
+  // Intelligence Insights - List insights for agency
+  app.get("/api/intelligence/insights", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { limit, status, severity, clientId } = req.query;
+      const insights = await storage.getIntelligenceInsightsByAgencyId(agencyId, {
+        limit: limit ? parseInt(limit as string) : undefined,
+        status: status as string | undefined,
+        severity: severity as string | undefined,
+        clientId: clientId as string | undefined,
+      });
+      
+      res.json(insights);
+    } catch (error: any) {
+      console.error("Error fetching insights:", error);
+      res.status(500).json({ message: "Failed to fetch insights" });
+    }
+  });
+
+  // Intelligence Insights - Get single insight
+  app.get("/api/intelligence/insights/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const insight = await storage.getIntelligenceInsightById(req.params.id);
+      if (!insight) {
+        return res.status(404).json({ message: "Insight not found" });
+      }
+      
+      const agencyId = req.user?.agencyId;
+      if (agencyId && insight.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(insight);
+    } catch (error: any) {
+      console.error("Error fetching insight:", error);
+      res.status(500).json({ message: "Failed to fetch insight" });
+    }
+  });
+
+  // Intelligence Insights - Create insight (for internal/aggregator use)
+  app.post("/api/intelligence/insights", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const insightData = {
+        ...req.body,
+        agencyId,
+      };
+      
+      const insight = await storage.createIntelligenceInsight(insightData);
+      res.status(201).json(insight);
+    } catch (error: any) {
+      console.error("Error creating insight:", error);
+      res.status(500).json({ message: "Failed to create insight" });
+    }
+  });
+
+  // Intelligence Insights - Update status
+  app.patch("/api/intelligence/insights/:id/status", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+      
+      const validStatuses = ["open", "prioritised", "actioned", "ignored", "invalid"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const insight = await storage.updateIntelligenceInsightStatus(req.params.id, status);
+      res.json(insight);
+    } catch (error: any) {
+      console.error("Error updating insight status:", error);
+      res.status(500).json({ message: "Failed to update insight status" });
+    }
+  });
+
+  // Intelligence Priority Config - Get config for agency
+  app.get("/api/intelligence/priority-config", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const config = await storage.getIntelligencePriorityConfig(agencyId);
+      if (!config) {
+        // Return defaults if no config exists
+        return res.json({
+          agencyId,
+          wImpact: "0.4",
+          wUrgency: "0.3",
+          wConfidence: "0.2",
+          wResource: "0.1",
+        });
+      }
+      
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error fetching priority config:", error);
+      res.status(500).json({ message: "Failed to fetch priority config" });
+    }
+  });
+
+  // Intelligence Priority Config - Update config
+  app.put("/api/intelligence/priority-config", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { wImpact, wUrgency, wConfidence, wResource } = req.body;
+      
+      const config = await storage.upsertIntelligencePriorityConfig({
+        agencyId,
+        wImpact: wImpact || "0.4",
+        wUrgency: wUrgency || "0.3",
+        wConfidence: wConfidence || "0.2",
+        wResource: wResource || "0.1",
+      });
+      
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error updating priority config:", error);
+      res.status(500).json({ message: "Failed to update priority config" });
+    }
+  });
+
+  // Intelligence Priorities - List priorities for agency
+  app.get("/api/intelligence/priorities", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { limit, status, bucket } = req.query;
+      const priorities = await storage.getIntelligencePrioritiesByAgencyId(agencyId, {
+        limit: limit ? parseInt(limit as string) : undefined,
+        status: status as string | undefined,
+        bucket: bucket as string | undefined,
+      });
+      
+      res.json(priorities);
+    } catch (error: any) {
+      console.error("Error fetching priorities:", error);
+      res.status(500).json({ message: "Failed to fetch priorities" });
+    }
+  });
+
+  // Intelligence Priorities - Get single priority
+  app.get("/api/intelligence/priorities/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const priority = await storage.getIntelligencePriorityById(req.params.id);
+      if (!priority) {
+        return res.status(404).json({ message: "Priority not found" });
+      }
+      
+      const agencyId = req.user?.agencyId;
+      if (agencyId && priority.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(priority);
+    } catch (error: any) {
+      console.error("Error fetching priority:", error);
+      res.status(500).json({ message: "Failed to fetch priority" });
+    }
+  });
+
+  // Intelligence Priorities - Create priority (for priority engine use)
+  app.post("/api/intelligence/priorities", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const priorityData = {
+        ...req.body,
+        agencyId,
+      };
+      
+      const priority = await storage.createIntelligencePriority(priorityData);
+      res.status(201).json(priority);
+    } catch (error: any) {
+      console.error("Error creating priority:", error);
+      res.status(500).json({ message: "Failed to create priority" });
+    }
+  });
+
+  // Intelligence Priorities - Update status
+  app.patch("/api/intelligence/priorities/:id/status", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+      
+      const validStatuses = ["pending", "in_progress", "done", "dismissed"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      
+      const priority = await storage.updateIntelligencePriorityStatus(req.params.id, status);
+      res.json(priority);
+    } catch (error: any) {
+      console.error("Error updating priority status:", error);
+      res.status(500).json({ message: "Failed to update priority status" });
+    }
+  });
+
+  // Intelligence Feedback - List feedback for agency
+  app.get("/api/intelligence/feedback", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { limit, insightId } = req.query;
+      const feedback = await storage.getIntelligenceFeedbackByAgencyId(agencyId, {
+        limit: limit ? parseInt(limit as string) : undefined,
+        insightId: insightId as string | undefined,
+      });
+      
+      res.json(feedback);
+    } catch (error: any) {
+      console.error("Error fetching feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Intelligence Feedback - Get single feedback
+  app.get("/api/intelligence/feedback/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const feedback = await storage.getIntelligenceFeedbackById(req.params.id);
+      if (!feedback) {
+        return res.status(404).json({ message: "Feedback not found" });
+      }
+      
+      const agencyId = req.user?.agencyId;
+      if (agencyId && feedback.agencyId !== agencyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(feedback);
+    } catch (error: any) {
+      console.error("Error fetching feedback:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Intelligence Feedback - Submit feedback
+  app.post("/api/intelligence/feedback", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const feedbackData = {
+        ...req.body,
+        agencyId,
+        createdByUserId: req.user?.id,
+      };
+      
+      const feedback = await storage.createIntelligenceFeedback(feedbackData);
+      res.status(201).json(feedback);
+    } catch (error: any) {
+      console.error("Error creating feedback:", error);
+      res.status(500).json({ message: "Failed to create feedback" });
+    }
+  });
+
+  // Intelligence Overview - Dashboard summary
+  app.get("/api/intelligence/overview", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const [signals, insights, priorities] = await Promise.all([
+        storage.getIntelligenceSignalsByAgencyId(agencyId, { limit: 100, processed: false }),
+        storage.getOpenIntelligenceInsights(agencyId),
+        storage.getPendingIntelligencePriorities(agencyId),
+      ]);
+      
+      res.json({
+        unprocessedSignalsCount: signals.length,
+        openInsightsCount: insights.length,
+        pendingPrioritiesCount: priorities.length,
+        recentSignals: signals.slice(0, 10),
+        topInsights: insights.slice(0, 5),
+        topPriorities: priorities.slice(0, 5),
+      });
+    } catch (error: any) {
+      console.error("Error fetching intelligence overview:", error);
+      res.status(500).json({ message: "Failed to fetch intelligence overview" });
+    }
+  });
+
+  // Intelligence Processing - Process signals into insights (Admin only)
+  app.post("/api/intelligence/process-signals", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { insightAggregator } = await import("./intelligence/insight-aggregator");
+      const result = await insightAggregator.processSignals(agencyId);
+      
+      res.json({
+        message: "Signal processing completed",
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("Error processing signals:", error);
+      res.status(500).json({ message: "Failed to process signals" });
+    }
+  });
+
+  // Intelligence Processing - Compute priorities from insights (Admin only)
+  app.post("/api/intelligence/compute-priorities", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { priorityEngine } = await import("./intelligence/priority-engine");
+      const result = await priorityEngine.processInsights(agencyId);
+      
+      res.json({
+        message: "Priority computation completed",
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("Error computing priorities:", error);
+      res.status(500).json({ message: "Failed to compute priorities" });
+    }
+  });
+
+  // Intelligence Processing - Run full pipeline (Admin only)
+  app.post("/api/intelligence/run-pipeline", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { insightAggregator } = await import("./intelligence/insight-aggregator");
+      const { priorityEngine } = await import("./intelligence/priority-engine");
+      
+      const signalResult = await insightAggregator.processSignals(agencyId);
+      const priorityResult = await priorityEngine.processInsights(agencyId);
+      
+      res.json({
+        message: "Intelligence pipeline completed",
+        signalsProcessed: signalResult.processed,
+        insightsCreated: signalResult.insightsCreated,
+        prioritiesCreated: priorityResult.prioritiesCreated,
+      });
+    } catch (error: any) {
+      console.error("Error running intelligence pipeline:", error);
+      res.status(500).json({ message: "Failed to run intelligence pipeline" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

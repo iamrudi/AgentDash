@@ -84,6 +84,16 @@ import {
   type UpdateWorkflowSignalRoute,
   type WorkflowRuleEvaluation,
   type InsertWorkflowRuleEvaluation,
+  type IntelligenceSignal,
+  type InsertIntelligenceSignal,
+  type IntelligenceInsight,
+  type InsertIntelligenceInsight,
+  type IntelligencePriorityConfig,
+  type InsertIntelligencePriorityConfig,
+  type IntelligencePriority,
+  type InsertIntelligencePriority,
+  type IntelligenceFeedback,
+  type InsertIntelligenceFeedback,
   users,
   profiles,
   clients,
@@ -126,6 +136,11 @@ import {
   workflowSignals,
   workflowSignalRoutes,
   workflowRuleEvaluations,
+  intelligenceSignals,
+  intelligenceInsights,
+  intelligencePriorityConfig,
+  intelligencePriorities,
+  intelligenceFeedback,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -423,6 +438,37 @@ export interface IStorage {
   // Workflow Rule Evaluations
   createRuleEvaluation(evaluation: InsertWorkflowRuleEvaluation): Promise<WorkflowRuleEvaluation>;
   getRuleEvaluationsByRuleId(ruleId: string, limit?: number): Promise<WorkflowRuleEvaluation[]>;
+  
+  // Intelligence Signals
+  createIntelligenceSignal(signal: InsertIntelligenceSignal): Promise<IntelligenceSignal>;
+  getIntelligenceSignalById(id: string): Promise<IntelligenceSignal | undefined>;
+  getIntelligenceSignalsByAgencyId(agencyId: string, options?: { limit?: number; sourceSystem?: string; category?: string; processed?: boolean }): Promise<IntelligenceSignal[]>;
+  getUnprocessedIntelligenceSignals(agencyId: string, limit?: number): Promise<IntelligenceSignal[]>;
+  markSignalProcessedToInsight(id: string): Promise<IntelligenceSignal>;
+  discardSignal(id: string, reason: string): Promise<IntelligenceSignal>;
+  
+  // Intelligence Insights
+  createIntelligenceInsight(insight: InsertIntelligenceInsight): Promise<IntelligenceInsight>;
+  getIntelligenceInsightById(id: string): Promise<IntelligenceInsight | undefined>;
+  getIntelligenceInsightsByAgencyId(agencyId: string, options?: { limit?: number; status?: string; severity?: string; clientId?: string }): Promise<IntelligenceInsight[]>;
+  getOpenIntelligenceInsights(agencyId: string): Promise<IntelligenceInsight[]>;
+  updateIntelligenceInsightStatus(id: string, status: string): Promise<IntelligenceInsight>;
+  
+  // Intelligence Priority Config
+  getIntelligencePriorityConfig(agencyId: string): Promise<IntelligencePriorityConfig | undefined>;
+  upsertIntelligencePriorityConfig(config: InsertIntelligencePriorityConfig): Promise<IntelligencePriorityConfig>;
+  
+  // Intelligence Priorities
+  createIntelligencePriority(priority: InsertIntelligencePriority): Promise<IntelligencePriority>;
+  getIntelligencePriorityById(id: string): Promise<IntelligencePriority | undefined>;
+  getIntelligencePrioritiesByAgencyId(agencyId: string, options?: { limit?: number; status?: string; bucket?: string }): Promise<IntelligencePriority[]>;
+  getPendingIntelligencePriorities(agencyId: string): Promise<IntelligencePriority[]>;
+  updateIntelligencePriorityStatus(id: string, status: string): Promise<IntelligencePriority>;
+  
+  // Intelligence Feedback
+  createIntelligenceFeedback(feedback: InsertIntelligenceFeedback): Promise<IntelligenceFeedback>;
+  getIntelligenceFeedbackById(id: string): Promise<IntelligenceFeedback | undefined>;
+  getIntelligenceFeedbackByAgencyId(agencyId: string, options?: { limit?: number; insightId?: string }): Promise<IntelligenceFeedback[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -2706,6 +2752,264 @@ export class DbStorage implements IStorage {
       .where(eq(workflowRuleEvaluations.ruleId, ruleId))
       .orderBy(desc(workflowRuleEvaluations.createdAt))
       .limit(limit);
+  }
+
+  // Intelligence Signals
+  async createIntelligenceSignal(signal: InsertIntelligenceSignal): Promise<IntelligenceSignal> {
+    const result = await db.insert(intelligenceSignals).values(signal).returning();
+    return result[0];
+  }
+
+  async getIntelligenceSignalById(id: string): Promise<IntelligenceSignal | undefined> {
+    const result = await db
+      .select()
+      .from(intelligenceSignals)
+      .where(eq(intelligenceSignals.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getIntelligenceSignalsByAgencyId(
+    agencyId: string, 
+    options?: { limit?: number; sourceSystem?: string; category?: string; processed?: boolean }
+  ): Promise<IntelligenceSignal[]> {
+    let conditions = [eq(intelligenceSignals.agencyId, agencyId)];
+    
+    if (options?.sourceSystem) {
+      conditions.push(eq(intelligenceSignals.sourceSystem, options.sourceSystem));
+    }
+    if (options?.category) {
+      conditions.push(eq(intelligenceSignals.category, options.category));
+    }
+    if (options?.processed !== undefined) {
+      conditions.push(eq(intelligenceSignals.processedToInsight, options.processed));
+    }
+    
+    const query = db
+      .select()
+      .from(intelligenceSignals)
+      .where(and(...conditions))
+      .orderBy(desc(intelligenceSignals.occurredAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  async getUnprocessedIntelligenceSignals(agencyId: string, limit: number = 100): Promise<IntelligenceSignal[]> {
+    return await db
+      .select()
+      .from(intelligenceSignals)
+      .where(and(
+        eq(intelligenceSignals.agencyId, agencyId),
+        eq(intelligenceSignals.processedToInsight, false),
+        eq(intelligenceSignals.discarded, false)
+      ))
+      .orderBy(desc(intelligenceSignals.occurredAt))
+      .limit(limit);
+  }
+
+  async markSignalProcessedToInsight(id: string): Promise<IntelligenceSignal> {
+    const result = await db
+      .update(intelligenceSignals)
+      .set({ processedToInsight: true, updatedAt: new Date() })
+      .where(eq(intelligenceSignals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async discardSignal(id: string, reason: string): Promise<IntelligenceSignal> {
+    const result = await db
+      .update(intelligenceSignals)
+      .set({ discarded: true, discardReason: reason, updatedAt: new Date() })
+      .where(eq(intelligenceSignals.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Intelligence Insights
+  async createIntelligenceInsight(insight: InsertIntelligenceInsight): Promise<IntelligenceInsight> {
+    const result = await db.insert(intelligenceInsights).values(insight).returning();
+    return result[0];
+  }
+
+  async getIntelligenceInsightById(id: string): Promise<IntelligenceInsight | undefined> {
+    const result = await db
+      .select()
+      .from(intelligenceInsights)
+      .where(eq(intelligenceInsights.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getIntelligenceInsightsByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; status?: string; severity?: string; clientId?: string }
+  ): Promise<IntelligenceInsight[]> {
+    let conditions = [eq(intelligenceInsights.agencyId, agencyId)];
+    
+    if (options?.status) {
+      conditions.push(eq(intelligenceInsights.status, options.status));
+    }
+    if (options?.severity) {
+      conditions.push(eq(intelligenceInsights.severity, options.severity));
+    }
+    if (options?.clientId) {
+      conditions.push(eq(intelligenceInsights.clientId, options.clientId));
+    }
+    
+    const query = db
+      .select()
+      .from(intelligenceInsights)
+      .where(and(...conditions))
+      .orderBy(desc(intelligenceInsights.createdAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  async getOpenIntelligenceInsights(agencyId: string): Promise<IntelligenceInsight[]> {
+    return await db
+      .select()
+      .from(intelligenceInsights)
+      .where(and(
+        eq(intelligenceInsights.agencyId, agencyId),
+        eq(intelligenceInsights.status, "open")
+      ))
+      .orderBy(desc(intelligenceInsights.createdAt));
+  }
+
+  async updateIntelligenceInsightStatus(id: string, status: string): Promise<IntelligenceInsight> {
+    const result = await db
+      .update(intelligenceInsights)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(intelligenceInsights.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Intelligence Priority Config
+  async getIntelligencePriorityConfig(agencyId: string): Promise<IntelligencePriorityConfig | undefined> {
+    const result = await db
+      .select()
+      .from(intelligencePriorityConfig)
+      .where(eq(intelligencePriorityConfig.agencyId, agencyId))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertIntelligencePriorityConfig(config: InsertIntelligencePriorityConfig): Promise<IntelligencePriorityConfig> {
+    const existing = await this.getIntelligencePriorityConfig(config.agencyId);
+    if (existing) {
+      const result = await db
+        .update(intelligencePriorityConfig)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(intelligencePriorityConfig.agencyId, config.agencyId))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(intelligencePriorityConfig).values(config).returning();
+    return result[0];
+  }
+
+  // Intelligence Priorities
+  async createIntelligencePriority(priority: InsertIntelligencePriority): Promise<IntelligencePriority> {
+    const result = await db.insert(intelligencePriorities).values(priority).returning();
+    return result[0];
+  }
+
+  async getIntelligencePriorityById(id: string): Promise<IntelligencePriority | undefined> {
+    const result = await db
+      .select()
+      .from(intelligencePriorities)
+      .where(eq(intelligencePriorities.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getIntelligencePrioritiesByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; status?: string; bucket?: string }
+  ): Promise<IntelligencePriority[]> {
+    let conditions = [eq(intelligencePriorities.agencyId, agencyId)];
+    
+    if (options?.status) {
+      conditions.push(eq(intelligencePriorities.status, options.status));
+    }
+    if (options?.bucket) {
+      conditions.push(eq(intelligencePriorities.rankingBucket, options.bucket));
+    }
+    
+    const query = db
+      .select()
+      .from(intelligencePriorities)
+      .where(and(...conditions))
+      .orderBy(desc(intelligencePriorities.priorityScore));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  async getPendingIntelligencePriorities(agencyId: string): Promise<IntelligencePriority[]> {
+    return await db
+      .select()
+      .from(intelligencePriorities)
+      .where(and(
+        eq(intelligencePriorities.agencyId, agencyId),
+        eq(intelligencePriorities.status, "pending")
+      ))
+      .orderBy(desc(intelligencePriorities.priorityScore));
+  }
+
+  async updateIntelligencePriorityStatus(id: string, status: string): Promise<IntelligencePriority> {
+    const result = await db
+      .update(intelligencePriorities)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(intelligencePriorities.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Intelligence Feedback
+  async createIntelligenceFeedback(feedback: InsertIntelligenceFeedback): Promise<IntelligenceFeedback> {
+    const result = await db.insert(intelligenceFeedback).values(feedback).returning();
+    return result[0];
+  }
+
+  async getIntelligenceFeedbackById(id: string): Promise<IntelligenceFeedback | undefined> {
+    const result = await db
+      .select()
+      .from(intelligenceFeedback)
+      .where(eq(intelligenceFeedback.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getIntelligenceFeedbackByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; insightId?: string }
+  ): Promise<IntelligenceFeedback[]> {
+    let conditions = [eq(intelligenceFeedback.agencyId, agencyId)];
+    
+    if (options?.insightId) {
+      conditions.push(eq(intelligenceFeedback.insightId, options.insightId));
+    }
+    
+    const query = db
+      .select()
+      .from(intelligenceFeedback)
+      .where(and(...conditions))
+      .orderBy(desc(intelligenceFeedback.createdAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
   }
 }
 

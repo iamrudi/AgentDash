@@ -2278,3 +2278,259 @@ export interface PromptTemplateContent {
   temperature?: number;
   maxTokens?: number;
 }
+
+// ===========================================
+// CANONICAL INTELLIGENCE LAYER (Priority 16)
+// ===========================================
+
+// Enums for intelligence layer
+export const intelligenceSignalCategoryEnum = ["anomaly", "threshold", "event"] as const;
+export const intelligenceSignalSeverityEnum = ["info", "low", "medium", "high", "critical"] as const;
+export const intelligenceInsightStatusEnum = ["open", "prioritised", "actioned", "ignored", "invalid"] as const;
+export const intelligencePriorityStatusEnum = ["pending", "in_progress", "done", "dismissed"] as const;
+export const intelligenceRankingBucketEnum = ["now", "next", "later", "backlog"] as const;
+
+// INTELLIGENCE SIGNALS - Raw, typed events from analytics, CRM, workflows, humans
+export const intelligenceSignals = pgTable("intelligence_signals", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  sourceSystem: text("source_system").notNull(), // 'GA4', 'GSC', 'HUBSPOT', 'CRM', 'WORKFLOW', 'MANUAL'
+  signalType: text("signal_type").notNull(), // 'pageview_drop', 'pipeline_spike', 'deal_stage_changed', 'sla_breach'
+  category: text("category").notNull(), // 'anomaly', 'threshold', 'event'
+  severity: text("severity"), // 'info', 'low', 'medium', 'high', 'critical'
+  occurredAt: timestamp("occurred_at").notNull(),
+  ingestedAt: timestamp("ingested_at").defaultNow().notNull(),
+  
+  // Linkage
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }),
+  
+  // Payload
+  payload: jsonb("payload").notNull(), // Raw event data in normalized shape
+  metricsSnapshot: jsonb("metrics_snapshot"), // { "sessions": 120, "goal_completions": 5 }
+  dimensions: jsonb("dimensions"), // { "channel": "organic", "page_path": "/pricing" }
+  
+  // Classification & metadata
+  detector: text("detector"), // Which job/workflow produced this signal
+  version: text("version"), // Version of detector/prompt
+  correlationKey: text("correlation_key"), // "client:123|site:main"
+  parentSignalId: uuid("parent_signal_id"), // If derived from another signal
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  
+  // Status flags
+  processedToInsight: boolean("processed_to_insight").default(false),
+  discarded: boolean("discarded").default(false),
+  discardReason: text("discard_reason"),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("intelligence_signals_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("intelligence_signals_client_id_idx").on(table.clientId),
+  sourceSystemIdx: index("intelligence_signals_source_system_idx").on(table.sourceSystem),
+  signalTypeIdx: index("intelligence_signals_signal_type_idx").on(table.signalType),
+  categoryIdx: index("intelligence_signals_category_idx").on(table.category),
+  occurredAtIdx: index("intelligence_signals_occurred_at_idx").on(table.occurredAt),
+  correlationKeyIdx: index("intelligence_signals_correlation_key_idx").on(table.correlationKey),
+  processedIdx: index("intelligence_signals_processed_idx").on(table.processedToInsight),
+}));
+
+// INTELLIGENCE INSIGHTS - Aggregated, interpreted metrics & findings
+export const intelligenceInsights = pgTable("intelligence_insights", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  insightType: text("insight_type").notNull(), // 'traffic_drop', 'conversion_rate_issue', 'pipeline_shortfall'
+  title: text("title").notNull(), // Short human-readable title
+  description: text("description"), // Explanation (can be AI-generated)
+  
+  // Scope
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }),
+  metricKey: text("metric_key"), // 'sessions', 'mql_to_sql_conversion_rate', 'pipeline_value'
+  timeRangeStart: timestamp("time_range_start"),
+  timeRangeEnd: timestamp("time_range_end"),
+  
+  // Values
+  currentValue: numeric("current_value"),
+  baselineValue: numeric("baseline_value"),
+  deltaAbsolute: numeric("delta_absolute"),
+  deltaPercent: numeric("delta_percent"),
+  
+  // Quality & lineage
+  confidenceScore: numeric("confidence_score"), // 0–1
+  severity: text("severity"), // 'low', 'medium', 'high', 'critical'
+  sourceSignalIds: uuid("source_signal_ids").array(), // Array of contributing signals
+  sourceSystems: text("source_systems").array(), // ['GA4', 'HUBSPOT']
+  
+  // Suggested next step (optional, AI-generated)
+  suggestedAction: text("suggested_action"),
+  suggestedActionType: text("suggested_action_type"), // 'campaign_adjustment', 'new_initiative', 'task_update'
+  
+  // Lifecycle
+  status: text("status").notNull().default("open"), // 'open', 'prioritised', 'actioned', 'ignored', 'invalid'
+  createdByAgent: text("created_by_agent"), // 'anomaly_detector_v1', 'insight_aggregator_v2'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("intelligence_insights_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("intelligence_insights_client_id_idx").on(table.clientId),
+  insightTypeIdx: index("intelligence_insights_insight_type_idx").on(table.insightType),
+  statusIdx: index("intelligence_insights_status_idx").on(table.status),
+  severityIdx: index("intelligence_insights_severity_idx").on(table.severity),
+  createdAtIdx: index("intelligence_insights_created_at_idx").on(table.createdAt),
+}));
+
+// INTELLIGENCE PRIORITY CONFIG - Per-agency weight tuning
+export const intelligencePriorityConfig = pgTable("intelligence_priority_config", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
+  wImpact: numeric("w_impact").default("0.4").notNull(), // Weight for commercial impact
+  wUrgency: numeric("w_urgency").default("0.3").notNull(), // Weight for urgency
+  wConfidence: numeric("w_confidence").default("0.2").notNull(), // Weight for confidence
+  wResource: numeric("w_resource").default("0.1").notNull(), // Weight for resource feasibility
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("intelligence_priority_config_agency_id_idx").on(table.agencyId),
+}));
+
+// INTELLIGENCE PRIORITIES - Ranked queue of work the system believes should happen
+export const intelligencePriorities = pgTable("intelligence_priorities", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  insightId: uuid("insight_id").notNull().references(() => intelligenceInsights.id, { onDelete: "cascade" }),
+  
+  // Scoring dimensions (0–1)
+  commercialImpactScore: numeric("commercial_impact_score").notNull(),
+  urgencyScore: numeric("urgency_score").notNull(),
+  confidenceScore: numeric("confidence_score").notNull(), // Mirrored from insight
+  resourceFeasibilityScore: numeric("resource_feasibility_score").notNull(),
+  
+  // Final outcome
+  priorityScore: numeric("priority_score").notNull(), // Weighted composite score
+  
+  // Derived metadata
+  rankingBucket: text("ranking_bucket"), // 'now', 'next', 'later', 'backlog'
+  recommendedDueDate: timestamp("recommended_due_date"),
+  
+  // Resource context snapshot
+  computedAt: timestamp("computed_at").defaultNow().notNull(),
+  resourceContext: jsonb("resource_context"), // Snapshot of capacity/skills considered
+  
+  // Workflow linkage
+  createdWorkflowRunId: uuid("created_workflow_run_id"),
+  status: text("status").default("pending").notNull(), // 'pending', 'in_progress', 'done', 'dismissed'
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("intelligence_priorities_agency_id_idx").on(table.agencyId),
+  insightIdIdx: index("intelligence_priorities_insight_id_idx").on(table.insightId),
+  priorityScoreIdx: index("intelligence_priorities_priority_score_idx").on(table.priorityScore),
+  rankingBucketIdx: index("intelligence_priorities_ranking_bucket_idx").on(table.rankingBucket),
+  statusIdx: index("intelligence_priorities_status_idx").on(table.status),
+}));
+
+// INTELLIGENCE FEEDBACK - Tracks outcomes and connects back to original signals/insights
+export const intelligenceFeedback = pgTable("intelligence_feedback", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Linkage
+  insightId: uuid("insight_id").references(() => intelligenceInsights.id, { onDelete: "set null" }),
+  priorityId: uuid("priority_id").references(() => intelligencePriorities.id, { onDelete: "set null" }),
+  initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  
+  // What happened?
+  recommendationFollowed: boolean("recommendation_followed").notNull(),
+  followReason: text("follow_reason"), // Why they followed
+  notFollowedReason: text("not_followed_reason"), // Why they ignored/changed
+  
+  // Outcomes (quantitative)
+  outcomeType: text("outcome_type"), // 'metric_change', 'client_feedback', 'qa_evaluation'
+  outcomeWindowStart: timestamp("outcome_window_start"),
+  outcomeWindowEnd: timestamp("outcome_window_end"),
+  outcomeMetricKey: text("outcome_metric_key"), // 'sessions', 'pipeline_value'
+  outcomeBeforeValue: numeric("outcome_before_value"),
+  outcomeAfterValue: numeric("outcome_after_value"),
+  outcomeDeltaAbsolute: numeric("outcome_delta_absolute"),
+  outcomeDeltaPercent: numeric("outcome_delta_percent"),
+  
+  // Evaluation
+  outcomeScore: numeric("outcome_score"), // 0–1; how "good" was this outcome?
+  humanRating: integer("human_rating"), // 1–5 rating from strategist/AM
+  notes: text("notes"),
+  
+  // Lineage
+  sourceSignals: uuid("source_signals").array(), // Signals used in evaluation
+  createdByUserId: uuid("created_by_user_id").references(() => profiles.id, { onDelete: "set null" }),
+  createdByAgent: text("created_by_agent"), // Which agent/workflow produced it
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("intelligence_feedback_agency_id_idx").on(table.agencyId),
+  insightIdIdx: index("intelligence_feedback_insight_id_idx").on(table.insightId),
+  priorityIdIdx: index("intelligence_feedback_priority_id_idx").on(table.priorityId),
+  outcomeScoreIdx: index("intelligence_feedback_outcome_score_idx").on(table.outcomeScore),
+  createdAtIdx: index("intelligence_feedback_created_at_idx").on(table.createdAt),
+}));
+
+// Insert schemas for intelligence layer
+export const insertIntelligenceSignalSchema = createInsertSchema(intelligenceSignals).omit({
+  id: true,
+  ingestedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertIntelligenceInsightSchema = createInsertSchema(intelligenceInsights).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertIntelligencePriorityConfigSchema = createInsertSchema(intelligencePriorityConfig).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertIntelligencePrioritySchema = createInsertSchema(intelligencePriorities).omit({
+  id: true,
+  computedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertIntelligenceFeedbackSchema = createInsertSchema(intelligenceFeedback).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for intelligence layer
+export type IntelligenceSignal = typeof intelligenceSignals.$inferSelect;
+export type InsertIntelligenceSignal = z.infer<typeof insertIntelligenceSignalSchema>;
+
+export type IntelligenceInsight = typeof intelligenceInsights.$inferSelect;
+export type InsertIntelligenceInsight = z.infer<typeof insertIntelligenceInsightSchema>;
+
+export type IntelligencePriorityConfig = typeof intelligencePriorityConfig.$inferSelect;
+export type InsertIntelligencePriorityConfig = z.infer<typeof insertIntelligencePriorityConfigSchema>;
+
+export type IntelligencePriority = typeof intelligencePriorities.$inferSelect;
+export type InsertIntelligencePriority = z.infer<typeof insertIntelligencePrioritySchema>;
+
+export type IntelligenceFeedback = typeof intelligenceFeedback.$inferSelect;
+export type InsertIntelligenceFeedback = z.infer<typeof insertIntelligenceFeedbackSchema>;
+
+// Enum type exports
+export type IntelligenceSignalCategory = typeof intelligenceSignalCategoryEnum[number];
+export type IntelligenceSignalSeverity = typeof intelligenceSignalSeverityEnum[number];
+export type IntelligenceInsightStatus = typeof intelligenceInsightStatusEnum[number];
+export type IntelligencePriorityStatus = typeof intelligencePriorityStatusEnum[number];
+export type IntelligenceRankingBucket = typeof intelligenceRankingBucketEnum[number];
