@@ -122,6 +122,65 @@ async function runWorkflowTest() {
   console.log(`Same as execution 1? ${execution3.id === execution1.id}`);
   console.log("");
 
+  // Test 4: Regression test for step failure
+  console.log("Testing step failure handling...");
+  const failingWorkflow = await storage.createWorkflow({
+    agencyId,
+    name: "Test Failing Workflow",
+    description: "A workflow designed to fail to test error handling",
+    status: "active",
+    triggerType: "manual",
+    triggerConfig: null,
+    steps: [
+      {
+        id: "step-1",
+        type: "signal",
+        name: "Capture Signal",
+        config: {
+          signal: { type: "test", filter: null }
+        },
+        next: "step-2"
+      },
+      {
+        id: "step-2",
+        type: "action",
+        name: "Trigger Error",
+        config: {
+          action: {
+            type: "unknown_action_type",  // This will cause an error
+            config: {}
+          }
+        },
+        next: null
+      }
+    ] as any,
+    timeout: 60,
+    retryPolicy: null,
+    createdBy: null,
+  });
+
+  const failingExecution = await engine.execute(failingWorkflow, {
+    type: "test",
+    value: 999,
+    source: "failure-test"
+  }, {
+    triggerId: "failure-test-1",
+    triggerType: "manual"
+  });
+
+  console.log(`Failing Execution ID: ${failingExecution.id}`);
+  console.log(`Status: ${failingExecution.status}`);
+  console.log(`Error: ${failingExecution.error}`);
+  
+  if (failingExecution.status === "failed") {
+    console.log("✅ Step failure correctly marked execution as failed\n");
+  } else {
+    console.log("❌ ERROR: Execution should be marked as failed!\n");
+  }
+
+  // Cleanup failing workflow
+  await db.delete(workflows).where(eq(workflows.id, failingWorkflow.id));
+
   console.log("Cleaning up test data...");
   await db.delete(workflows).where(eq(workflows.id, testWorkflow.id));
   console.log("Test workflow deleted.\n");

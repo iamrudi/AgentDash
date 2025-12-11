@@ -855,6 +855,146 @@ export const workflowEvents = pgTable("workflow_events", {
   timestampIdx: index("workflow_events_timestamp_idx").on(table.timestamp),
 }));
 
+// ==================== RULE ENGINE ====================
+
+// Rule categories for organization
+export const ruleCategoryEnum = ["threshold", "anomaly", "lifecycle", "integration", "custom"] as const;
+
+// Rule operator types for conditions
+export const ruleOperatorEnum = [
+  "gt", "gte", "lt", "lte", "eq", "neq",  // Basic comparison
+  "contains", "not_contains", "matches",   // String operations
+  "in", "not_in",                          // Array membership
+  "percent_change_gt", "percent_change_lt", // Threshold detection
+  "anomaly_zscore_gt",                     // Anomaly detection (z-score)
+  "inactivity_days_gt",                    // Lifecycle triggers
+  "changed_to", "changed_from"             // State transitions
+] as const;
+
+// Rule version status
+export const ruleVersionStatusEnum = ["draft", "published", "deprecated"] as const;
+
+// WORKFLOW RULES (Rule definitions with tenant isolation)
+export const workflowRules = pgTable("workflow_rules", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("custom"), // threshold, anomaly, lifecycle, integration, custom
+  enabled: boolean("enabled").notNull().default(true),
+  defaultVersionId: uuid("default_version_id"), // Reference to active version (set after version created)
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("workflow_rules_agency_id_idx").on(table.agencyId),
+  categoryIdx: index("workflow_rules_category_idx").on(table.category),
+  enabledIdx: index("workflow_rules_enabled_idx").on(table.enabled),
+}));
+
+// WORKFLOW RULE VERSIONS (Versioned rule configurations for auditability)
+export const workflowRuleVersions = pgTable("workflow_rule_versions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: uuid("rule_id").notNull().references(() => workflowRules.id, { onDelete: "cascade" }),
+  version: integer("version").notNull().default(1),
+  status: text("status").notNull().default("draft"), // draft, published, deprecated
+  conditionLogic: text("condition_logic").notNull().default("all"), // all (AND), any (OR)
+  thresholdConfig: jsonb("threshold_config"), // { windowDays: number, baselineType: 'average' | 'previous' }
+  lifecycleConfig: jsonb("lifecycle_config"), // { inactivityField: string, triggerDays: number }
+  anomalyConfig: jsonb("anomaly_config"), // { zScoreThreshold: number, windowDays: number }
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  publishedAt: timestamp("published_at"),
+}, (table) => ({
+  ruleIdIdx: index("workflow_rule_versions_rule_id_idx").on(table.ruleId),
+  statusIdx: index("workflow_rule_versions_status_idx").on(table.status),
+  versionIdx: uniqueIndex("workflow_rule_versions_unique_idx").on(table.ruleId, table.version),
+}));
+
+// WORKFLOW RULE CONDITIONS (Individual conditions within a rule version)
+export const workflowRuleConditions = pgTable("workflow_rule_conditions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleVersionId: uuid("rule_version_id").notNull().references(() => workflowRuleVersions.id, { onDelete: "cascade" }),
+  order: integer("order").notNull().default(0), // Evaluation order
+  fieldPath: text("field_path").notNull(), // JSONPath or dot notation (e.g., "metrics.sessions", "lead.status")
+  operator: text("operator").notNull(), // gt, gte, lt, lte, eq, neq, contains, matches, in, percent_change_gt, anomaly_zscore_gt, etc.
+  comparisonValue: jsonb("comparison_value").notNull(), // The value to compare against (can be number, string, array)
+  windowConfig: jsonb("window_config"), // { days: number, aggregation: 'sum' | 'avg' | 'min' | 'max' }
+  scope: text("scope").default("signal"), // signal, context, client, project
+}, (table) => ({
+  ruleVersionIdIdx: index("workflow_rule_conditions_rule_version_id_idx").on(table.ruleVersionId),
+  orderIdx: index("workflow_rule_conditions_order_idx").on(table.order),
+}));
+
+// WORKFLOW RULE ACTIONS (Actions to take when rule matches)
+export const workflowRuleActions = pgTable("workflow_rule_actions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleVersionId: uuid("rule_version_id").notNull().references(() => workflowRuleVersions.id, { onDelete: "cascade" }),
+  order: integer("order").notNull().default(0), // Execution order
+  actionType: text("action_type").notNull(), // Same as workflow action types
+  actionConfig: jsonb("action_config").notNull(), // Configuration for the action
+}, (table) => ({
+  ruleVersionIdIdx: index("workflow_rule_actions_rule_version_id_idx").on(table.ruleVersionId),
+  orderIdx: index("workflow_rule_actions_order_idx").on(table.order),
+}));
+
+// WORKFLOW RULE AUDITS (Change history for compliance)
+export const workflowRuleAudits = pgTable("workflow_rule_audits", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: uuid("rule_id").notNull().references(() => workflowRules.id, { onDelete: "cascade" }),
+  ruleVersionId: uuid("rule_version_id").references(() => workflowRuleVersions.id, { onDelete: "set null" }),
+  actorId: uuid("actor_id").references(() => profiles.id),
+  changeType: text("change_type").notNull(), // created, updated, published, deprecated, deleted
+  changeSummary: text("change_summary"),
+  previousState: jsonb("previous_state"),
+  newState: jsonb("new_state"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ruleIdIdx: index("workflow_rule_audits_rule_id_idx").on(table.ruleId),
+  actorIdIdx: index("workflow_rule_audits_actor_id_idx").on(table.actorId),
+  createdAtIdx: index("workflow_rule_audits_created_at_idx").on(table.createdAt),
+}));
+
+// WORKFLOW SIGNALS (Persisted signals for rule evaluation and audit trail)
+export const workflowSignals = pgTable("workflow_signals", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  source: text("source").notNull(), // ga4, gsc, hubspot, linkedin, internal, webhook
+  type: text("type").notNull(), // metrics, lead_update, ranking_change, engagement, etc.
+  payload: jsonb("payload").notNull(), // The full signal data
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  urgency: text("urgency").default("normal"), // low, normal, high, critical
+  processed: boolean("processed").notNull().default(false),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("workflow_signals_agency_id_idx").on(table.agencyId),
+  sourceIdx: index("workflow_signals_source_idx").on(table.source),
+  typeIdx: index("workflow_signals_type_idx").on(table.type),
+  processedIdx: index("workflow_signals_processed_idx").on(table.processed),
+  createdAtIdx: index("workflow_signals_created_at_idx").on(table.createdAt),
+}));
+
+// WORKFLOW RULE EVALUATIONS (Log of rule evaluations for debugging and audit)
+export const workflowRuleEvaluations = pgTable("workflow_rule_evaluations", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  ruleId: uuid("rule_id").notNull().references(() => workflowRules.id, { onDelete: "cascade" }),
+  ruleVersionId: uuid("rule_version_id").notNull().references(() => workflowRuleVersions.id, { onDelete: "cascade" }),
+  signalId: uuid("signal_id").references(() => workflowSignals.id, { onDelete: "set null" }),
+  executionId: uuid("execution_id").references(() => workflowExecutions.id, { onDelete: "set null" }),
+  matched: boolean("matched").notNull(),
+  conditionResults: jsonb("condition_results").notNull(), // Array of { conditionId, passed, actualValue, expectedValue }
+  evaluationContext: jsonb("evaluation_context"), // Context data used in evaluation
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ruleIdIdx: index("workflow_rule_evaluations_rule_id_idx").on(table.ruleId),
+  signalIdIdx: index("workflow_rule_evaluations_signal_id_idx").on(table.signalId),
+  executionIdIdx: index("workflow_rule_evaluations_execution_id_idx").on(table.executionId),
+  matchedIdx: index("workflow_rule_evaluations_matched_idx").on(table.matched),
+  createdAtIdx: index("workflow_rule_evaluations_created_at_idx").on(table.createdAt),
+}));
+
 // Workflow schemas
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   id: true,
@@ -878,6 +1018,51 @@ export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutio
 export const insertWorkflowEventSchema = createInsertSchema(workflowEvents).omit({
   id: true,
   timestamp: true,
+});
+
+// Rule engine schemas
+export const insertWorkflowRuleSchema = createInsertSchema(workflowRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  defaultVersionId: true,
+});
+
+export const updateWorkflowRuleSchema = createInsertSchema(workflowRules).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  createdBy: true,
+}).partial();
+
+export const insertWorkflowRuleVersionSchema = createInsertSchema(workflowRuleVersions).omit({
+  id: true,
+  createdAt: true,
+  publishedAt: true,
+});
+
+export const insertWorkflowRuleConditionSchema = createInsertSchema(workflowRuleConditions).omit({
+  id: true,
+});
+
+export const insertWorkflowRuleActionSchema = createInsertSchema(workflowRuleActions).omit({
+  id: true,
+});
+
+export const insertWorkflowRuleAuditSchema = createInsertSchema(workflowRuleAudits).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkflowSignalSchema = createInsertSchema(workflowSignals).omit({
+  id: true,
+  createdAt: true,
+  processedAt: true,
+});
+
+export const insertWorkflowRuleEvaluationSchema = createInsertSchema(workflowRuleEvaluations).omit({
+  id: true,
+  createdAt: true,
 });
 
 // Admin user creation schemas
@@ -1068,6 +1253,39 @@ export type WorkflowExecutionStatus = typeof workflowExecutionStatusEnum[number]
 export type WorkflowEvent = typeof workflowEvents.$inferSelect;
 export type InsertWorkflowEvent = z.infer<typeof insertWorkflowEventSchema>;
 export type WorkflowEventType = typeof workflowEventTypeEnum[number];
+
+// Rule Engine Types
+export type WorkflowRule = typeof workflowRules.$inferSelect;
+export type InsertWorkflowRule = z.infer<typeof insertWorkflowRuleSchema>;
+export type UpdateWorkflowRule = z.infer<typeof updateWorkflowRuleSchema>;
+export type RuleCategory = typeof ruleCategoryEnum[number];
+
+export type WorkflowRuleVersion = typeof workflowRuleVersions.$inferSelect;
+export type InsertWorkflowRuleVersion = z.infer<typeof insertWorkflowRuleVersionSchema>;
+export type RuleVersionStatus = typeof ruleVersionStatusEnum[number];
+
+export type WorkflowRuleCondition = typeof workflowRuleConditions.$inferSelect;
+export type InsertWorkflowRuleCondition = z.infer<typeof insertWorkflowRuleConditionSchema>;
+export type RuleOperator = typeof ruleOperatorEnum[number];
+
+export type WorkflowRuleAction = typeof workflowRuleActions.$inferSelect;
+export type InsertWorkflowRuleAction = z.infer<typeof insertWorkflowRuleActionSchema>;
+
+export type WorkflowRuleAudit = typeof workflowRuleAudits.$inferSelect;
+export type InsertWorkflowRuleAudit = z.infer<typeof insertWorkflowRuleAuditSchema>;
+
+export type WorkflowSignal = typeof workflowSignals.$inferSelect;
+export type InsertWorkflowSignal = z.infer<typeof insertWorkflowSignalSchema>;
+
+export type WorkflowRuleEvaluation = typeof workflowRuleEvaluations.$inferSelect;
+export type InsertWorkflowRuleEvaluation = z.infer<typeof insertWorkflowRuleEvaluationSchema>;
+
+// Extended rule types
+export type WorkflowRuleWithVersion = WorkflowRule & { activeVersion?: WorkflowRuleVersion };
+export type WorkflowRuleVersionWithConditions = WorkflowRuleVersion & { 
+  conditions?: WorkflowRuleCondition[];
+  actions?: WorkflowRuleAction[];
+};
 
 // Workflow step definition types (used in workflow.steps JSON field)
 export interface WorkflowStepConfig {

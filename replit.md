@@ -311,4 +311,35 @@ Encryption:
 - Native mobile shell  
 - Model routing per workflow type  
 
+# 16. Maintainability & Extensibility Standard
+
+A component is only accepted into the system if **new features can be added without modifying its internal implementation**.  
+This rule guarantees long-term stability, predictable behaviour, and rapid feature development.
+
+## 16.1 Architectural Constraints
+
+### 1. Components must be open for extension, closed for modification
+Every module (services, workflows, integrations, AI providers, UI panels) must:
+- expose explicit interfaces
+- handle external inputs through adapters
+- never require internal rewrites to support new behaviours
+
+If a new feature requires editing core logic, the component is rejected.
+
+### 2. Workflow Engine as the primary extension point
+All automation, rules, triggers, tasks, CRM events, and AI flows extend the Workflow Engine — not the underlying codebase.
+
+New features are implemented by:
+- adding new signal types  
+- adding new rules  
+- adding new DAG workflows  
+- adding new AI prompt templates  
+- adding new output handlers  
+
+The core engine remains untouched.
+
+### 3. Provider Architecture Everywhere
+AI providers, CRM providers, integration adapters, and PDF generators must follow the same contract pattern:
+
+
 ---
