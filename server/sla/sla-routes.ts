@@ -3,8 +3,37 @@ import { z } from "zod";
 import { slaService } from "./sla-service";
 import { runManualScan } from "./sla-cron";
 import { db } from "../db";
-import { slaDefinitions, slaBreaches, slaBreachEvents, escalationChains } from "@shared/schema";
+import { slaDefinitions, slaBreaches, slaBreachEvents, escalationChains, clients, projects } from "@shared/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
+
+async function validateResourceOwnership(
+  agencyId: string,
+  clientId?: string | null,
+  projectId?: string | null
+): Promise<{ valid: boolean; error?: string }> {
+  if (clientId) {
+    const [client] = await db.select({ id: clients.id })
+      .from(clients)
+      .where(and(eq(clients.id, clientId), eq(clients.agencyId, agencyId)))
+      .limit(1);
+    if (!client) {
+      return { valid: false, error: "Client not found or does not belong to this agency" };
+    }
+  }
+
+  if (projectId) {
+    const [project] = await db.select({ id: projects.id })
+      .from(projects)
+      .innerJoin(clients, eq(projects.clientId, clients.id))
+      .where(and(eq(projects.id, projectId), eq(clients.agencyId, agencyId)))
+      .limit(1);
+    if (!project) {
+      return { valid: false, error: "Project not found or does not belong to this agency" };
+    }
+  }
+
+  return { valid: true };
+}
 
 export const slaRouter = Router();
 
@@ -59,6 +88,15 @@ slaRouter.post("/definitions", async (req, res) => {
     }
 
     const validatedData = createSlaSchema.parse(req.body);
+
+    const ownership = await validateResourceOwnership(
+      agencyId,
+      validatedData.clientId,
+      validatedData.projectId
+    );
+    if (!ownership.valid) {
+      return res.status(400).json({ error: ownership.error });
+    }
 
     const [newSla] = await db.insert(slaDefinitions)
       .values({
@@ -115,12 +153,28 @@ slaRouter.get("/definitions/:id", async (req, res) => {
   }
 });
 
+const updateSlaSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  responseTimeHours: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid numeric string").optional(),
+  resolutionTimeHours: z.string().regex(/^\d+(\.\d+)?$/, "Must be a valid numeric string").optional(),
+  appliesTo: z.array(z.enum(["task", "project", "initiative"])).optional(),
+  priority: z.enum(["low", "medium", "high", "critical"]).optional(),
+  status: z.enum(["active", "paused", "archived"]).optional(),
+  businessHoursOnly: z.boolean().optional(),
+  businessHoursStart: z.number().int().min(0).max(23).optional(),
+  businessHoursEnd: z.number().int().min(0).max(23).optional(),
+  timezone: z.string().optional(),
+});
+
 slaRouter.patch("/definitions/:id", async (req, res) => {
   try {
     const agencyId = (req as any).agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
+
+    const validatedData = updateSlaSchema.parse(req.body);
 
     const existingSla = await db.select()
       .from(slaDefinitions)
@@ -136,14 +190,20 @@ slaRouter.patch("/definitions/:id", async (req, res) => {
 
     const [updated] = await db.update(slaDefinitions)
       .set({
-        ...req.body,
+        ...validatedData,
         updatedAt: new Date(),
       })
-      .where(eq(slaDefinitions.id, req.params.id))
+      .where(and(
+        eq(slaDefinitions.id, req.params.id),
+        eq(slaDefinitions.agencyId, agencyId)
+      ))
       .returning();
 
     res.json(updated);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid request body", details: error.errors });
+    }
     console.error("Error updating SLA definition:", error);
     res.status(500).json({ error: "Failed to update SLA definition" });
   }
@@ -252,6 +312,19 @@ slaRouter.post("/breaches/:id/acknowledge", async (req, res) => {
       return res.status(403).json({ error: "Agency access required" });
     }
 
+    const [breach] = await db.select()
+      .from(slaBreaches)
+      .innerJoin(slaDefinitions, eq(slaBreaches.slaId, slaDefinitions.id))
+      .where(and(
+        eq(slaBreaches.id, req.params.id),
+        eq(slaDefinitions.agencyId, agencyId)
+      ))
+      .limit(1);
+
+    if (!breach) {
+      return res.status(404).json({ error: "Breach not found" });
+    }
+
     await slaService.acknowledgeBreach(req.params.id, userId, req.body.notes);
     
     res.json({ success: true });
@@ -267,6 +340,19 @@ slaRouter.post("/breaches/:id/resolve", async (req, res) => {
     const userId = (req as any).userId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
+    }
+
+    const [breach] = await db.select()
+      .from(slaBreaches)
+      .innerJoin(slaDefinitions, eq(slaBreaches.slaId, slaDefinitions.id))
+      .where(and(
+        eq(slaBreaches.id, req.params.id),
+        eq(slaDefinitions.agencyId, agencyId)
+      ))
+      .limit(1);
+
+    if (!breach) {
+      return res.status(404).json({ error: "Breach not found" });
     }
 
     await slaService.resolveBreach(req.params.id, userId, req.body.resolution);

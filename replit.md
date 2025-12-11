@@ -270,7 +270,49 @@ SuperAdmin mutations are fully logged.
 
 ---
 
-# 12. Security Model
+# 12. SLA & Escalation Engine ✅ IMPLEMENTED (December 2024)
+
+## Implementation Files
+- `server/sla/sla-service.ts` - SlaService class with breach detection and escalation
+- `server/sla/sla-cron.ts` - Automated monitoring every 5 minutes
+- `server/sla/sla-routes.ts` - API endpoints for SLA CRUD and management
+- `shared/schema.ts` - SLA tables (sla_definitions, sla_breaches, escalation_chains)
+
+## Schema
+- **sla_definitions**: Agency-scoped SLA policies with response/resolution times
+- **sla_breaches**: Tracked breach records with lifecycle (detected → acknowledged → escalated → resolved)
+- **sla_breach_events**: Full audit trail of breach state changes
+- **escalation_chains**: Multi-level escalation with profile assignment and actions
+
+## Features
+- Response time and resolution time tracking
+- Business hours support with configurable start/end times
+- Multi-level escalation chains with automatic reassignment
+- Breach actions: notify (in-app/email), reassign, escalate, pause_billing
+- Full breach lifecycle management with audit trail
+- Manual scan trigger for immediate breach detection
+- Per-client and per-project SLA policies
+
+## Security
+- All endpoints enforce strict agency-scoped queries
+- Update endpoints use validated schemas to prevent field tampering
+- No query parameter overrides allowed for agencyId
+- Parameterized queries prevent SQL injection
+
+## API Endpoints
+- `GET/POST /api/sla/definitions` - List/create SLA definitions
+- `GET/PATCH/DELETE /api/sla/definitions/:id` - Single SLA operations
+- `GET/POST /api/sla/definitions/:id/escalations` - Escalation chain management
+- `GET /api/sla/breaches` - List breaches with filtering
+- `GET /api/sla/breaches/:id` - Breach details with events
+- `POST /api/sla/breaches/:id/acknowledge` - Acknowledge breach
+- `POST /api/sla/breaches/:id/resolve` - Resolve breach
+- `POST /api/sla/scan` - Trigger manual breach scan
+- `GET /api/sla/check/:resourceType/:resourceId` - Check SLA compliance
+
+---
+
+# 13. Security Model
 
 Layers:
 1. HTTPS, CORS, rate limits  
