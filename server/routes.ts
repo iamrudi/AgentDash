@@ -2807,6 +2807,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const initiative = await storage.updateInitiativeClientResponse(id, response, feedback);
       
+      // Track recommendation outcome in feedback loop (fire-and-forget, non-blocking)
+      // Import at module level would be better but using dynamic import for isolation
+      import("./intelligence/outcome-feedback-service").then(({ outcomeFeedbackService }) => {
+        storage.getClientById(existingInitiative.clientId).then((client) => {
+          if (client) {
+            outcomeFeedbackService.captureOutcome({
+              agencyId: client.agencyId,
+              clientId: existingInitiative.clientId,
+              recommendationId: id,
+              recommendationType: existingInitiative.recommendationType || "strategic",
+              wasAccepted: response === "approved",
+              predictedImpact: existingInitiative.impact ? Number(existingInitiative.impact) : undefined,
+              notes: feedback || undefined,
+            }).then(() => {
+              console.log(`[FEEDBACK_LOOP] Captured outcome for initiative ${id}: ${response}`);
+            }).catch((err: Error) => {
+              console.error("[FEEDBACK_LOOP] Failed to capture outcome:", err);
+            });
+          }
+        }).catch((err: Error) => {
+          console.error("[FEEDBACK_LOOP] Failed to get client:", err);
+        });
+      }).catch((err: Error) => {
+        console.error("[FEEDBACK_LOOP] Failed to import feedback service:", err);
+      });
+      
       // If approved, automatically create project and invoice (if not already created)
       let projectId: string | undefined = existingInitiative.projectId || undefined;
       let invoiceId: string | undefined = existingInitiative.invoiceId || undefined;
