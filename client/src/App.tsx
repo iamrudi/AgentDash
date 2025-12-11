@@ -50,6 +50,7 @@ const AgencyHoursReport = lazy(() => import("@/pages/agency/hours-report"));
 
 // Super Admin Portal Pages (lazy-loaded)
 const SuperAdminPortal = lazy(() => import("@/pages/superadmin/index"));
+const GovernanceDashboard = lazy(() => import("@/pages/governance-dashboard"));
 
 // Loading fallback component
 function PageLoader() {
@@ -265,6 +266,14 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]} requireSuperAdmin={true}>
           <AgencyLayout>
             <SuperAdminPortal />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/superadmin/governance">
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]} requireSuperAdmin={true}>
+          <AgencyLayout>
+            <GovernanceDashboard />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

@@ -116,7 +116,7 @@ export class HardenedAIExecutor {
     useCache: boolean = true
   ): Promise<HardenedExecutionResult<T>> {
     const startTime = Date.now();
-    const inputHash = this.computeInputHash({ prompt: options.prompt, ...options });
+    const inputHash = this.computeInputHash({ ...options });
     const cacheKey = this.getCacheKey(context.agencyId, context.operation, inputHash);
     
     let executionId: string = "";
