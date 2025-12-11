@@ -442,17 +442,82 @@ The rule engine supports 16 operators:
 
 ---
 
-## Future Enhancements
+## Visual Workflow Builder
 
-- [ ] WebSocket-based real-time updates (replacing polling)
-- [ ] Advanced reporting with export capabilities
-- [ ] White-label mobile app support
-- [ ] Webhook integrations for external systems
-- [ ] Multi-language support (i18n)
-- [ ] Advanced AI model selection per task type
-- [ ] Visual workflow builder UI
-- [ ] Signal processing pipeline for external integrations
+### Overview
+
+A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-drop workflow creation.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  Visual Workflow Builder                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐  ┌─────────────────────┐  ┌───────────────┐  │
+│  │ Step Palette │  │   React Flow Canvas  │  │  Properties   │  │
+│  │              │  │                      │  │    Panel      │  │
+│  │  Signal      │  │   ┌─────┐            │  │               │  │
+│  │  Rule        │  │   │Node │──────┐     │  │  Name:        │  │
+│  │  AI          │  │   └─────┘      │     │  │  Config:      │  │
+│  │  Action      │  │        │       ▼     │  │  Variables:   │  │
+│  │  Transform   │  │        ▼    ┌─────┐  │  │               │  │
+│  │  Notification│  │   ┌─────┐   │Node │  │  │               │  │
+│  │  Branch      │  │   │Node │   └─────┘  │  │               │  │
+│  │              │  │   └─────┘            │  │               │  │
+│  └──────────────┘  └─────────────────────┘  └───────────────┘  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Step Types
+
+| Step Type | Color | Description |
+|-----------|-------|-------------|
+| Signal | Yellow | Entry point triggers (workflow start) |
+| Rule | Blue | Conditional logic evaluation |
+| AI | Purple | AI-powered processing steps |
+| Action | Green | Business logic operations |
+| Transform | Orange | Data transformation steps |
+| Notification | Pink | Alert and notification steps |
+| Branch | Cyan | Conditional flow branching |
+
+### Routes
+
+| Route | Description |
+|-------|-------------|
+| `/agency/workflows` | Workflow list with CRUD operations |
+| `/agency/workflow-builder/:id?` | Visual canvas editor |
+
+### Backend API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/workflows/validate` | POST | Zod schema validation for workflow structure |
+| `/api/workflows/:id/duplicate` | POST | Clone workflow with tenant isolation |
 
 ---
 
-*Last Updated: December 2024*
+## Completed Enhancements (December 2024)
+
+- [x] WebSocket/SSE real-time updates
+- [x] Visual workflow builder UI (in progress)
+- [x] Signal processing pipeline for external integrations
+- [x] Multi-agent architecture
+- [x] SLA & escalation engine
+- [x] Tenant-isolated vector stores
+- [x] SuperAdmin governance dashboard
+
+## Future Enhancements
+
+- [ ] Advanced reporting with export capabilities
+- [ ] White-label mobile app support
+- [ ] Multi-language support (i18n)
+- [ ] Advanced AI model selection per task type
+- [ ] Workflow version comparison UI
+- [ ] Test execution mode with mock signals
+
+---
+
+*Last Updated: December 11, 2024*

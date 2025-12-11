@@ -20,6 +20,14 @@ A production-ready, multi-tenant SaaS platform for agency-client relationship ma
 - **SEO Audit Tools** - Lighthouse-powered website audits with AI summaries
 - **Content Co-pilot** - AI content generation using Data for SEO API
 
+### Workflow Automation
+- **Visual Workflow Builder** - No-code drag-and-drop workflow creation with React Flow
+- **Deterministic Workflow Engine** - Atomic transactions with idempotency guarantees
+- **Rule Engine** - 16 operators for threshold, anomaly, and lifecycle triggers
+- **Signal Processing** - Ingest events from GA4, GSC, HubSpot, LinkedIn
+- **Multi-Agent Architecture** - Specialized AI agents for SEO, PPC, CRM, and Reporting
+- **SLA & Escalation Engine** - Deadline monitoring with automatic escalation chains
+
 ### Security & Performance
 - **Supabase Auth** - Secure authentication with session management
 - **AES-256-GCM Encryption** - Sensitive data protection

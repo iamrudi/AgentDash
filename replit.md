@@ -46,11 +46,54 @@ The project is deployed on Replit, using Express for the backend, Vite for the f
 
 ## Recent Changes (December 2024)
 
-### Visual Workflow Builder UI
-- Added `/agency/workflows` page for listing and managing workflows
-- Added `/agency/workflow-builder/:id?` page with React Flow canvas for visual workflow creation
-- Sidebar navigation includes "Workflows" link under Strategy section
-- Three-panel layout: step palette (left), canvas (center), properties panel (right)
-- Seven step types: Signal, Rule, AI, Action, Transform, Notification, Branch
-- Backend endpoints: POST /api/workflows/validate, POST /api/workflows/:id/duplicate
-- Files: `client/src/pages/agency/workflows.tsx`, `client/src/pages/agency/workflow-builder.tsx`
+### Priority 15: Visual Workflow Builder UI (In Progress)
+A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-drop workflow creation.
+
+**Completed Features:**
+- `/agency/workflows` - Workflow list page with status badges, step counts, and CRUD operations
+- `/agency/workflow-builder/:id?` - Visual canvas editor with three-panel layout
+- **Step Palette:** 7 draggable step types with distinct visual styling:
+  - Signal (yellow) - Entry point triggers
+  - Rule (blue) - Conditional logic evaluation
+  - AI (purple) - AI execution steps
+  - Action (green) - Business logic operations
+  - Transform (orange) - Data transformation
+  - Notification (pink) - Alert/notification steps
+  - Branch (cyan) - Conditional flow branching
+- **React Flow Nodes:** Custom StepNode component with Handle components for edge connections (top/bottom, plus left/right for branch nodes)
+- **Backend Endpoints:**
+  - `POST /api/workflows/validate` - Zod schema validation for workflow structure
+  - `POST /api/workflows/:id/duplicate` - Clone existing workflow with tenant isolation
+- **Navigation:** "Workflows" link in agency sidebar under Strategy section
+- **Data Alignment:** Frontend uses `steps` array and `updatedAt` fields matching database schema
+
+**Pending Features:**
+- Properties panel for configuring selected nodes
+- Edge/connection validation
+- Variable binding system
+- Toolbar with save/validate/test controls
+- Workflow version comparison
+- Test execution mode
+
+**Key Files:**
+- `client/src/pages/agency/workflows.tsx` - Workflow list page
+- `client/src/pages/agency/workflow-builder.tsx` - Visual canvas editor
+- `client/src/App.tsx` - Route registration
+- `client/src/components/agency-sidebar.tsx` - Navigation link
+
+### Previous Completions (Priorities 1-14)
+All foundational workflow engine priorities (1-14) have been completed including:
+- Workflow Engine with deterministic execution
+- Rule Engine with 16 operators
+- Signal Processing & Ingestion
+- Hardened AI Execution Layer
+- Workflow Lineage & Event Logging
+- Tenant-Isolated Vector Stores
+- SLA & Escalation Engine
+- Multi-Agent Architecture
+- CRM Integration Triggers
+- Enhanced Analytics Ingestion
+- Task System Optimization
+- Template System
+- Real-Time WebSocket/SSE Layer
+- SuperAdmin Governance

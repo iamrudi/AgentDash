@@ -1089,6 +1089,91 @@ escalation_chains: {
 
 ---
 
+## Visual Workflow Builder UI
+
+### Overview
+
+A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-drop workflow creation.
+
+### Routes
+
+- `/agency/workflows` - Workflow list page with CRUD operations
+- `/agency/workflow-builder/:id?` - Visual canvas editor
+
+### Frontend Components
+
+```typescript
+// client/src/pages/agency/workflow-builder.tsx
+// Three-panel layout: Step Palette (left), Canvas (center), Properties (right)
+
+// Step Types with visual styling
+const STEP_TYPES = [
+  { type: 'signal', label: 'Signal', color: 'yellow', icon: Zap },
+  { type: 'rule', label: 'Rule', color: 'blue', icon: Filter },
+  { type: 'ai', label: 'AI', color: 'purple', icon: Brain },
+  { type: 'action', label: 'Action', color: 'green', icon: Play },
+  { type: 'transform', label: 'Transform', color: 'orange', icon: ArrowRightLeft },
+  { type: 'notification', label: 'Notification', color: 'pink', icon: Bell },
+  { type: 'branch', label: 'Branch', color: 'cyan', icon: GitBranch }
+];
+
+// Custom React Flow node with Handle components
+function StepNode({ data, selected }) {
+  return (
+    <div className={`step-node ${data.type}`}>
+      <Handle type="target" position={Position.Top} />
+      <div className="node-content">
+        <StepIcon type={data.type} />
+        <span>{data.label}</span>
+      </div>
+      <Handle type="source" position={Position.Bottom} />
+      {/* Branch nodes have additional left/right handles */}
+      {data.type === 'branch' && (
+        <>
+          <Handle type="source" id="true" position={Position.Right} />
+          <Handle type="source" id="false" position={Position.Left} />
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+### Backend API
+
+```typescript
+// POST /api/workflows/validate
+// Validates workflow structure using Zod schema
+const workflowValidationSchema = z.object({
+  steps: z.array(z.object({
+    id: z.string().min(1),
+    type: z.enum(["signal", "rule", "ai", "action", "transform", "notification", "branch"]),
+    name: z.string().optional(),
+    config: z.record(z.unknown()).optional(),
+    position: z.object({ x: z.number(), y: z.number() }).optional(),
+  })),
+  connections: z.array(z.object({
+    source: z.string().min(1),
+    target: z.string().min(1),
+    sourceHandle: z.string().optional(),
+    targetHandle: z.string().optional(),
+  })).optional().default([]),
+});
+
+// POST /api/workflows/:id/duplicate
+// Clones workflow with tenant isolation
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `client/src/pages/agency/workflows.tsx` | Workflow list page |
+| `client/src/pages/agency/workflow-builder.tsx` | Visual canvas editor |
+| `server/routes.ts` | Validate/duplicate endpoints |
+
+---
+
 ## Important Files Reference (Updated)
 
 | File | Purpose |
@@ -1102,10 +1187,13 @@ escalation_chains: {
 | `server/sla/sla-service.ts` | SLA breach detection and escalation |
 | `server/sla/sla-cron.ts` | Automated SLA monitoring (every 5 min) |
 | `server/sla/sla-routes.ts` | SLA REST API endpoints |
+| `server/vector/embedding-service.ts` | Tenant-isolated vector stores |
+| `client/src/pages/agency/workflows.tsx` | Workflow list page |
+| `client/src/pages/agency/workflow-builder.tsx` | Visual workflow canvas editor |
 | `shared/schema.ts` | All database schemas |
 | `server/storage.ts` | Database operations |
 | `server/routes.ts` | All API endpoints |
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 11, 2024*
