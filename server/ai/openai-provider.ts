@@ -6,6 +6,7 @@ import type {
   Preset,
   LighthouseSummary,
   ChatAnalysis,
+  GenerateTextOptions,
 } from "./types";
 
 const openai = new OpenAI({
@@ -338,6 +339,28 @@ If the conversation contains only greetings/small talk with no substantive conte
     } catch (error) {
       console.error("OpenAI chat analysis error:", error);
       throw new Error(`Failed to analyze chat history: ${error}`);
+    }
+  }
+
+  async generateText(options: GenerateTextOptions): Promise<string> {
+    try {
+      const response = await openai.chat.completions.create({
+        model: options.model || "gpt-4o",
+        messages: [
+          { role: "user", content: options.prompt },
+        ],
+        max_tokens: options.maxTokens ?? 2048,
+        temperature: options.temperature ?? 0.7,
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("Empty response from OpenAI");
+      }
+      return content;
+    } catch (error) {
+      console.error("OpenAI generateText error:", error);
+      throw new Error(`Failed to generate text: ${error}`);
     }
   }
 }

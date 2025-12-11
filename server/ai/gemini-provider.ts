@@ -7,6 +7,7 @@ import type {
   Preset,
   LighthouseSummary,
   ChatAnalysis,
+  GenerateTextOptions,
 } from "./types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -432,6 +433,31 @@ Focus on messages from the "Client" role - these are the most important for unde
     } catch (error) {
       console.error("Gemini AI chat analysis error:", error);
       throw new Error(`Failed to analyze chat history: ${error}`);
+    }
+  }
+
+  async generateText(options: GenerateTextOptions): Promise<string> {
+    try {
+      const response = await callGeminiWithRetry(
+        () => ai.models.generateContent({
+          model: options.model || "gemini-2.0-flash",
+          config: {
+            temperature: options.temperature ?? 0.7,
+            maxOutputTokens: options.maxTokens ?? 2048,
+          },
+          contents: options.prompt,
+        }),
+        "generateText"
+      );
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("Empty response from Gemini AI");
+      }
+      return text;
+    } catch (error) {
+      console.error("Gemini AI generateText error:", error);
+      throw new Error(`Failed to generate text: ${error}`);
     }
   }
 }

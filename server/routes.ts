@@ -6265,6 +6265,228 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   // Register Settings routes
   app.use("/api/settings", settingsRouter);
 
+  // ===========================================
+  // WORKFLOW ENGINE ROUTES
+  // ===========================================
+  
+  // Get all workflows for agency
+  app.get("/api/workflows", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const workflows = await storage.getWorkflowsByAgencyId(agencyId);
+      res.json(workflows);
+    } catch (error: any) {
+      console.error('Error fetching workflows:', error);
+      res.status(500).json({ message: "Failed to fetch workflows" });
+    }
+  });
+  
+  // Get single workflow
+  app.get("/api/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      // Check agency access
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      res.json(workflow);
+    } catch (error: any) {
+      console.error('Error fetching workflow:', error);
+      res.status(500).json({ message: "Failed to fetch workflow" });
+    }
+  });
+  
+  // Create workflow
+  app.post("/api/workflows", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
+      const resolvedAgencyId = agencyId || req.user?.agencyId;
+      
+      if (!resolvedAgencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+      
+      const { name, description, triggerType, triggerConfig, steps, timeout, retryPolicy } = req.body;
+      
+      if (!name || !triggerType || !steps) {
+        return res.status(400).json({ message: "name, triggerType, and steps are required" });
+      }
+      
+      const workflow = await storage.createWorkflow({
+        agencyId: resolvedAgencyId,
+        name,
+        description,
+        triggerType,
+        triggerConfig,
+        steps,
+        timeout,
+        retryPolicy,
+        createdBy: req.user?.id,
+        status: "draft",
+      });
+      
+      res.status(201).json(workflow);
+    } catch (error: any) {
+      console.error('Error creating workflow:', error);
+      res.status(500).json({ message: "Failed to create workflow" });
+    }
+  });
+  
+  // Update workflow
+  app.patch("/api/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const { name, description, status, triggerType, triggerConfig, steps, timeout, retryPolicy } = req.body;
+      
+      const updated = await storage.updateWorkflow(id, {
+        name,
+        description,
+        status,
+        triggerType,
+        triggerConfig,
+        steps,
+        timeout,
+        retryPolicy,
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating workflow:', error);
+      res.status(500).json({ message: "Failed to update workflow" });
+    }
+  });
+  
+  // Delete workflow
+  app.delete("/api/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteWorkflow(id);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error('Error deleting workflow:', error);
+      res.status(500).json({ message: "Failed to delete workflow" });
+    }
+  });
+  
+  // Execute workflow manually
+  app.post("/api/workflows/:id/execute", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (workflow.status !== "active") {
+        return res.status(400).json({ message: "Workflow must be active to execute" });
+      }
+      
+      const { createWorkflowEngine } = await import("./workflow/engine");
+      const engine = createWorkflowEngine(storage);
+      
+      const triggerPayload = req.body.payload || {};
+      
+      const execution = await engine.execute(workflow, triggerPayload, {
+        triggerId: `manual-${Date.now()}`,
+        triggerType: "manual",
+        skipIdempotencyCheck: req.body.skipIdempotencyCheck,
+      });
+      
+      res.json(execution);
+    } catch (error: any) {
+      console.error('Error executing workflow:', error);
+      res.status(500).json({ message: "Failed to execute workflow", error: error.message });
+    }
+  });
+  
+  // Get workflow executions
+  app.get("/api/workflows/:id/executions", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const executions = await storage.getWorkflowExecutionsByWorkflowId(id);
+      res.json(executions);
+    } catch (error: any) {
+      console.error('Error fetching workflow executions:', error);
+      res.status(500).json({ message: "Failed to fetch workflow executions" });
+    }
+  });
+  
+  // Get execution events (step logs)
+  app.get("/api/workflow-executions/:id/events", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const execution = await storage.getWorkflowExecutionById(id);
+      
+      if (!execution) {
+        return res.status(404).json({ message: "Execution not found" });
+      }
+      
+      // Verify agency access through workflow
+      const workflow = await storage.getWorkflowById(execution.workflowId);
+      const userAgencyId = req.user?.agencyId;
+      if (!workflow || (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const events = await storage.getWorkflowEventsByExecutionId(id);
+      res.json(events);
+    } catch (error: any) {
+      console.error('Error fetching execution events:', error);
+      res.status(500).json({ message: "Failed to fetch execution events" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

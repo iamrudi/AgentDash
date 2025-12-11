@@ -42,6 +42,13 @@ export interface ChatAnalysis {
   activeQuestions: string[];
 }
 
+export interface GenerateTextOptions {
+  prompt: string;
+  model?: string;
+  maxTokens?: number;
+  temperature?: number;
+}
+
 export interface AIProvider {
   analyzeClientMetrics(
     clientName: string,
@@ -68,4 +75,6 @@ export interface AIProvider {
   analyzeChatHistory(
     chatHistory: string
   ): Promise<ChatAnalysis>;
+
+  generateText(options: GenerateTextOptions): Promise<string>;
 }

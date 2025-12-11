@@ -63,6 +63,10 @@ import {
   type InsertProposalSection,
   type AuditLog,
   type InsertAuditLog,
+  type Workflow,
+  type InsertWorkflow,
+  type WorkflowExecution,
+  type WorkflowEvent,
   users,
   profiles,
   clients,
@@ -94,6 +98,9 @@ import {
   proposals,
   proposalSections,
   auditLogs,
+  workflows,
+  workflowExecutions,
+  workflowEvents,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -322,6 +329,20 @@ export interface IStorage {
   // Super Admin - Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(limit: number, offset: number): Promise<AuditLog[]>;
+  
+  // Workflows
+  getWorkflowsByAgencyId(agencyId: string): Promise<Workflow[]>;
+  getWorkflowById(id: string): Promise<Workflow | undefined>;
+  createWorkflow(workflow: InsertWorkflow): Promise<Workflow>;
+  updateWorkflow(id: string, data: Partial<Workflow>): Promise<Workflow>;
+  deleteWorkflow(id: string): Promise<void>;
+  
+  // Workflow Executions
+  getWorkflowExecutionsByWorkflowId(workflowId: string): Promise<WorkflowExecution[]>;
+  getWorkflowExecutionById(id: string): Promise<WorkflowExecution | undefined>;
+  
+  // Workflow Events
+  getWorkflowEventsByExecutionId(executionId: string): Promise<WorkflowEvent[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -2225,6 +2246,65 @@ export class DbStorage implements IStorage {
       .orderBy(desc(auditLogs.createdAt))
       .limit(limit)
       .offset(offset);
+  }
+
+  // Workflows
+  async getWorkflowsByAgencyId(agencyId: string): Promise<Workflow[]> {
+    return await db
+      .select()
+      .from(workflows)
+      .where(eq(workflows.agencyId, agencyId))
+      .orderBy(desc(workflows.createdAt));
+  }
+
+  async getWorkflowById(id: string): Promise<Workflow | undefined> {
+    const result = await db.select().from(workflows).where(eq(workflows.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createWorkflow(workflow: InsertWorkflow): Promise<Workflow> {
+    const result = await db.insert(workflows).values(workflow).returning();
+    return result[0];
+  }
+
+  async updateWorkflow(id: string, data: Partial<Workflow>): Promise<Workflow> {
+    const result = await db
+      .update(workflows)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workflows.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteWorkflow(id: string): Promise<void> {
+    await db.delete(workflows).where(eq(workflows.id, id));
+  }
+
+  // Workflow Executions
+  async getWorkflowExecutionsByWorkflowId(workflowId: string): Promise<WorkflowExecution[]> {
+    return await db
+      .select()
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.workflowId, workflowId))
+      .orderBy(desc(workflowExecutions.createdAt));
+  }
+
+  async getWorkflowExecutionById(id: string): Promise<WorkflowExecution | undefined> {
+    const result = await db
+      .select()
+      .from(workflowExecutions)
+      .where(eq(workflowExecutions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  // Workflow Events
+  async getWorkflowEventsByExecutionId(executionId: string): Promise<WorkflowEvent[]> {
+    return await db
+      .select()
+      .from(workflowEvents)
+      .where(eq(workflowEvents.executionId, executionId))
+      .orderBy(workflowEvents.timestamp);
   }
 }
 

@@ -831,12 +831,14 @@ export const workflowExecutions = pgTable("workflow_executions", {
   agencyIdIdx: index("workflow_executions_agency_id_idx").on(table.agencyId),
   statusIdx: index("workflow_executions_status_idx").on(table.status),
   inputHashIdx: index("workflow_executions_input_hash_idx").on(table.inputHash),
+  idempotencyIdx: uniqueIndex("workflow_executions_idempotency_idx").on(table.workflowId, table.inputHash),
 }));
 
 // WORKFLOW EVENTS (Step-by-step execution log)
 export const workflowEvents = pgTable("workflow_events", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   executionId: uuid("execution_id").notNull().references(() => workflowExecutions.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
   stepId: text("step_id").notNull(), // Reference to step in workflow definition
   stepType: text("step_type").notNull(), // signal, rule, ai, action, branch, parallel
   eventType: text("event_type").notNull(), // started, completed, failed, skipped, retrying
@@ -848,6 +850,7 @@ export const workflowEvents = pgTable("workflow_events", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
 }, (table) => ({
   executionIdIdx: index("workflow_events_execution_id_idx").on(table.executionId),
+  agencyIdIdx: index("workflow_events_agency_id_idx").on(table.agencyId),
   stepIdIdx: index("workflow_events_step_id_idx").on(table.stepId),
   timestampIdx: index("workflow_events_timestamp_idx").on(table.timestamp),
 }));
