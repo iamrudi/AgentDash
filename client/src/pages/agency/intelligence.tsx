@@ -91,8 +91,11 @@ export default function IntelligencePage() {
   });
 
   const runPipelineMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/intelligence/run-pipeline"),
-    onSuccess: (data: any) => {
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/intelligence/run-pipeline");
+      return response.json();
+    },
+    onSuccess: (data: { signalsProcessed: number; insightsCreated: number; prioritiesCreated: number }) => {
       toast({
         title: "Pipeline completed",
         description: `Processed ${data.signalsProcessed} signals, created ${data.insightsCreated} insights and ${data.prioritiesCreated} priorities.`,
