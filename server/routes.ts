@@ -9055,6 +9055,111 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // ===========================================
+  // DURATION INTELLIGENCE INTEGRATION ENDPOINTS
+  // ===========================================
+
+  // Integration - Check SLA risks for tasks
+  app.post("/api/intelligence/integration/sla-risks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationIntelligenceIntegration } = await import("./intelligence/duration-intelligence-integration");
+      const { tasksWithPredictions } = req.body;
+      const risks = await durationIntelligenceIntegration.checkSLARisks(agencyId, tasksWithPredictions);
+      res.json(risks);
+    } catch (error: any) {
+      console.error("Error checking SLA risks:", error);
+      res.status(500).json({ message: "Failed to check SLA risks" });
+    }
+  });
+
+  // Integration - Enrich tasks with intelligence
+  app.post("/api/intelligence/integration/enrich-tasks", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationIntelligenceIntegration } = await import("./intelligence/duration-intelligence-integration");
+      const { taskIds } = req.body;
+      
+      const tasks = [];
+      for (const taskId of taskIds) {
+        const task = await storage.getTaskById(taskId);
+        if (task) tasks.push(task);
+      }
+      
+      const enrichedTasks = await durationIntelligenceIntegration.enrichTasksWithIntelligence(agencyId, tasks);
+      res.json(enrichedTasks);
+    } catch (error: any) {
+      console.error("Error enriching tasks:", error);
+      res.status(500).json({ message: "Failed to enrich tasks" });
+    }
+  });
+
+  // Integration - Generate resource plan with intelligence
+  app.post("/api/intelligence/integration/generate-intelligent-plan", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationIntelligenceIntegration } = await import("./intelligence/duration-intelligence-integration");
+      const { taskIds, startDate, endDate } = req.body;
+      
+      const tasks = [];
+      for (const taskId of taskIds) {
+        const task = await storage.getTaskById(taskId);
+        if (task) tasks.push(task);
+      }
+      
+      const result = await durationIntelligenceIntegration.generateResourcePlanWithIntelligence(
+        agencyId,
+        tasks,
+        new Date(startDate),
+        new Date(endDate)
+      );
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error generating intelligent resource plan:", error);
+      res.status(500).json({ message: "Failed to generate intelligent resource plan" });
+    }
+  });
+
+  // Integration - Predict and signal for a task
+  app.post("/api/intelligence/integration/predict-and-signal", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { durationIntelligenceIntegration } = await import("./intelligence/duration-intelligence-integration");
+      const { taskId, taskType, complexity, channel } = req.body;
+      
+      const task = await storage.getTaskById(taskId);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      const result = await durationIntelligenceIntegration.predictAndSignal(agencyId, task, {
+        taskType: taskType || 'general',
+        complexity: complexity || 'medium',
+        channel
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error predicting and signaling:", error);
+      res.status(500).json({ message: "Failed to predict and signal" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
