@@ -2,6 +2,7 @@ import { createHash, createHmac } from "crypto";
 import { db } from "../db";
 import { agencySettings, workflowSignals } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { SignalRouter } from "../workflow/signal-router";
 
 export type CRMEventType = 
   | 'deal.created'
@@ -238,10 +239,12 @@ export class CRMWebhookHandler {
 
   async processWebhookBatch(
     payloads: CRMWebhookPayload[]
-  ): Promise<{ processed: number; duplicates: number; errors: string[] }> {
+  ): Promise<{ processed: number; duplicates: number; errors: string[]; workflowsTriggered: number }> {
     let processed = 0;
     let duplicates = 0;
+    let workflowsTriggered = 0;
     const errors: string[] = [];
+    const signalRouter = new SignalRouter();
 
     for (const payload of payloads) {
       try {
@@ -251,20 +254,43 @@ export class CRMWebhookHandler {
           continue;
         }
 
-        const event = this.normalizeHubSpotEvent(payload);
-        const result = await this.createSignalFromCRMEvent(agencyId, event);
+        const result = await signalRouter.ingestSignal(
+          agencyId,
+          'hubspot',
+          payload as unknown as Record<string, unknown>
+        );
 
         if (result.isDuplicate) {
           duplicates++;
         } else {
           processed++;
+          workflowsTriggered += result.workflowsTriggered.length;
         }
       } catch (error: any) {
         errors.push(`Error processing event: ${error.message}`);
       }
     }
 
-    return { processed, duplicates, errors };
+    return { processed, duplicates, errors, workflowsTriggered };
+  }
+
+  async processAndRouteCRMEvent(
+    agencyId: string,
+    event: NormalizedCRMEvent
+  ): Promise<{ signalId: string; isDuplicate: boolean; workflowsTriggered: string[] }> {
+    const signalRouter = new SignalRouter();
+    
+    const result = await signalRouter.ingestSignal(
+      agencyId,
+      'hubspot',
+      event.rawPayload
+    );
+
+    return {
+      signalId: result.signal.id,
+      isDuplicate: result.isDuplicate,
+      workflowsTriggered: result.workflowsTriggered,
+    };
   }
 }
 

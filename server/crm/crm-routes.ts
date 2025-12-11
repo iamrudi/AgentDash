@@ -53,6 +53,7 @@ crmRouter.post("/webhooks/hubspot", async (req: Request, res: Response) => {
       received: payloads.length,
       processed: result.processed,
       duplicates: result.duplicates,
+      workflowsTriggered: result.workflowsTriggered,
     });
   } catch (error: any) {
     console.error("[CRM_WEBHOOK] Error processing webhook:", error);
