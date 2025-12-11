@@ -236,7 +236,11 @@ export class HardenedAIExecutor {
           totalTokens: tokenUsage.totalTokens,
         });
 
-        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, tokenUsage);
+        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, {
+          prompt: tokenUsage.promptTokens,
+          completion: tokenUsage.completionTokens,
+          total: tokenUsage.totalTokens
+        });
 
         return {
           success: false,
@@ -269,7 +273,11 @@ export class HardenedAIExecutor {
         totalTokens: tokenUsage.totalTokens,
       });
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, tokenUsage);
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, {
+        prompt: tokenUsage.promptTokens,
+        completion: tokenUsage.completionTokens,
+        total: tokenUsage.totalTokens
+      });
 
       // Update quota usage after successful execution
       await quotaService.incrementAIUsage(context.agencyId, tokenUsage.totalTokens);
@@ -427,16 +435,19 @@ export class HardenedAIExecutor {
   }
 
   async getUsageByAgency(agencyId: string, periodStart?: Date, periodEnd?: Date) {
-    let query = db.select().from(aiUsageTracking).where(eq(aiUsageTracking.agencyId, agencyId));
+    const conditions = [eq(aiUsageTracking.agencyId, agencyId)];
     
     if (periodStart) {
-      query = query.where(gte(aiUsageTracking.periodStart, periodStart)) as typeof query;
+      conditions.push(gte(aiUsageTracking.periodStart, periodStart));
     }
     if (periodEnd) {
-      query = query.where(lte(aiUsageTracking.periodEnd, periodEnd)) as typeof query;
+      conditions.push(lte(aiUsageTracking.periodEnd, periodEnd));
     }
     
-    return query.orderBy(aiUsageTracking.periodStart);
+    return db.select()
+      .from(aiUsageTracking)
+      .where(and(...conditions))
+      .orderBy(aiUsageTracking.periodStart);
   }
 
   clearCache(): void {
