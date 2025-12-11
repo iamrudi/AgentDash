@@ -6269,6 +6269,15 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   // Register Settings routes
   app.use("/api/settings", settingsRouter);
 
+  // Register SLA routes
+  const { slaRouter } = await import("./sla/sla-routes");
+  app.use("/api/sla", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    next();
+  }, slaRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

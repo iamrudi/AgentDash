@@ -154,6 +154,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   scheduleOrphanCleanup();
   log('✅ Orphan user cleanup scheduler started (runs nightly at 2:00 AM)');
 
+  // Start SLA monitoring for breach detection and escalation
+  const { startSlaMonitoring } = await import("./sla/sla-cron");
+  await startSlaMonitoring();
+  log('✅ SLA monitoring scheduler started (runs every 5 minutes)');
+
   // Serve frontend (must be after API routes but before 404 handler)
   // This catch-all serves index.html for all non-API GET requests
   if (app.get("env") === "development") {
