@@ -1,7 +1,9 @@
 import { createHash } from "crypto";
+import { z } from "zod";
 import { db } from "../db";
 import { IStorage } from "../storage";
 import { getAIProvider } from "../ai/provider";
+import { hardenedAIExecutor, type AIExecutionContext } from "../ai/hardened-executor";
 import { createRuleEngine, RuleEngine, RuleEvaluationContext } from "./rule-engine";
 import {
   Workflow,
@@ -24,6 +26,7 @@ export interface WorkflowContext {
   agencyId: string;
   clientId?: string;
   userId?: string;
+  executionId?: string;
   data: Record<string, unknown>;
   stepResults: Record<string, unknown>;
 }
@@ -128,6 +131,7 @@ export class WorkflowEngine {
 
         const context: WorkflowContext = {
           agencyId: workflow.agencyId,
+          executionId: execution.id,
           data: { ...triggerPayload },
           stepResults: {},
         };
@@ -387,30 +391,87 @@ export class WorkflowEngine {
 
     try {
       const prompt = this.interpolateTemplate(config.prompt, context.data);
+      const providerName = config.provider || "gemini";
+      const modelName = providerName === "openai" ? "gpt-4o" : "gemini-2.0-flash";
       
-      const aiProvider = await getAIProvider(context.agencyId);
-      const response = await aiProvider.generateText({
-        prompt,
-        model: config.provider === "openai" ? "gpt-4o" : "gemini-2.0-flash",
-      });
+      const executionContext: AIExecutionContext = {
+        agencyId: context.agencyId,
+        workflowExecutionId: context.executionId,
+        stepId: step.id,
+        operation: "workflow_ai_step",
+        provider: providerName,
+        model: modelName,
+      };
 
-      let output: unknown = response;
-      
       if (config.schema) {
-        try {
-          output = JSON.parse(response);
-        } catch {
-          return { success: false, error: "AI response is not valid JSON" };
-        }
-      }
+        const dynamicSchema = this.buildZodSchemaFromConfig(config.schema);
+        const result = await hardenedAIExecutor.executeWithSchema(
+          executionContext,
+          { prompt, model: modelName },
+          dynamicSchema,
+          config.useCache !== false
+        );
 
-      return { success: true, output };
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
+
+        return { success: true, output: result.data };
+      } else {
+        const result = await hardenedAIExecutor.execute(
+          executionContext,
+          { prompt, model: modelName },
+          config.useCache !== false
+        );
+
+        if (!result.success) {
+          return { success: false, error: result.error };
+        }
+
+        return { success: true, output: result.data };
+      }
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : "AI step failed",
       };
     }
+  }
+
+  private buildZodSchemaFromConfig(schemaConfig: Record<string, unknown>): z.ZodSchema {
+    if (schemaConfig.type === "object" && schemaConfig.properties) {
+      const properties = schemaConfig.properties as Record<string, { type: string; items?: { type: string } }>;
+      const shape: Record<string, z.ZodTypeAny> = {};
+      
+      for (const [key, prop] of Object.entries(properties)) {
+        switch (prop.type) {
+          case "string":
+            shape[key] = z.string();
+            break;
+          case "number":
+            shape[key] = z.number();
+            break;
+          case "boolean":
+            shape[key] = z.boolean();
+            break;
+          case "array":
+            if (prop.items?.type === "string") {
+              shape[key] = z.array(z.string());
+            } else if (prop.items?.type === "number") {
+              shape[key] = z.array(z.number());
+            } else {
+              shape[key] = z.array(z.unknown());
+            }
+            break;
+          default:
+            shape[key] = z.unknown();
+        }
+      }
+      
+      return z.object(shape);
+    }
+    
+    return z.unknown();
   }
 
   private interpolateTemplate(

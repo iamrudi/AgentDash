@@ -49,7 +49,19 @@ export interface GenerateTextOptions {
   temperature?: number;
 }
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+export interface GenerateTextResult {
+  text: string;
+  usage?: TokenUsage;
+}
+
 export interface AIProvider {
+  generateTextWithUsage?(options: GenerateTextOptions): Promise<GenerateTextResult>;
   analyzeClientMetrics(
     clientName: string,
     ga4Metrics: MetricData[],

@@ -4,7 +4,7 @@ import { db } from "../db";
 import { aiExecutions, aiUsageTracking, type InsertAIExecution } from "@shared/schema";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { getAIProvider } from "./provider";
-import type { AIProvider, GenerateTextOptions } from "./types";
+import type { AIProvider, GenerateTextOptions, TokenUsage } from "./types";
 
 export interface AIExecutionContext {
   agencyId: string;
@@ -94,6 +94,20 @@ export class HardenedAIExecutor {
     });
   }
 
+  private estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  private estimateTokenUsage(prompt: string, response: string): TokenUsage {
+    const promptTokens = this.estimateTokens(prompt);
+    const completionTokens = this.estimateTokens(response);
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+    };
+  }
+
   async executeWithSchema<T>(
     context: AIExecutionContext,
     options: GenerateTextOptions,
@@ -131,6 +145,8 @@ export class HardenedAIExecutor {
             durationMs: Date.now() - startTime,
           });
 
+          await this.updateUsageTracking(context.agencyId, providerName, modelName, true, true);
+
           return {
             success: true,
             data: cached.output as T,
@@ -155,7 +171,21 @@ export class HardenedAIExecutor {
       });
 
       const provider = await getAIProvider(context.agencyId);
-      const rawResponse = await provider.generateText(options);
+      
+      let rawResponse: string;
+      let tokenUsage: TokenUsage | undefined;
+
+      if (provider.generateTextWithUsage) {
+        const result = await provider.generateTextWithUsage(options);
+        rawResponse = result.text;
+        tokenUsage = result.usage;
+      } else {
+        rawResponse = await provider.generateText(options);
+      }
+
+      if (!tokenUsage) {
+        tokenUsage = this.estimateTokenUsage(options.prompt, rawResponse);
+      }
 
       let parsed: unknown;
       try {
@@ -175,13 +205,23 @@ export class HardenedAIExecutor {
           validationErrors,
           error: `Schema validation failed: ${validationErrors.map(e => e.message).join(", ")}`,
           durationMs: Date.now() - startTime,
+          promptTokens: tokenUsage.promptTokens,
+          completionTokens: tokenUsage.completionTokens,
+          totalTokens: tokenUsage.totalTokens,
         });
+
+        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, tokenUsage);
 
         return {
           success: false,
           error: `Schema validation failed: ${validationErrors.map(e => e.message).join(", ")}`,
           cached: false,
           executionId,
+          tokens: {
+            prompt: tokenUsage.promptTokens,
+            completion: tokenUsage.completionTokens,
+            total: tokenUsage.totalTokens,
+          },
           durationMs: Date.now() - startTime,
         };
       }
@@ -198,15 +238,23 @@ export class HardenedAIExecutor {
         outputHash,
         outputValidated: true,
         durationMs: Date.now() - startTime,
+        promptTokens: tokenUsage.promptTokens,
+        completionTokens: tokenUsage.completionTokens,
+        totalTokens: tokenUsage.totalTokens,
       });
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false);
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, tokenUsage);
 
       return {
         success: true,
         data: validationResult.data,
         cached: false,
         executionId,
+        tokens: {
+          prompt: tokenUsage.promptTokens,
+          completion: tokenUsage.completionTokens,
+          total: tokenUsage.totalTokens,
+        },
         durationMs: Date.now() - startTime,
       };
     } catch (error: any) {

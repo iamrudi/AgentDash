@@ -27,6 +27,7 @@ import { InvoiceGeneratorService } from "./services/invoiceGenerator";
 import { PDFGeneratorService } from "./services/pdfGenerator";
 import { PDFStorageService } from "./services/pdfStorage";
 import { getAIProvider, invalidateAIProviderCache } from "./ai/provider";
+import { hardenedAIExecutor } from "./ai/hardened-executor";
 import { cache, CACHE_TTL } from "./lib/cache";
 import express from "express";
 import path from "path";
@@ -7114,6 +7115,99 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     res.json({
       sources: SignalAdapterFactory.getSupportedSources(),
     });
+  });
+
+  // ============================================
+  // AI EXECUTION AND USAGE TRACKING ENDPOINTS
+  // ============================================
+
+  // Get AI execution by ID
+  app.get("/api/ai-executions/:id", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const execution = await hardenedAIExecutor.getExecutionById(id);
+      
+      if (!execution) {
+        return res.status(404).json({ message: "AI execution not found" });
+      }
+
+      const agencyId = req.user?.agencyId;
+      if (execution.agencyId !== agencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(execution);
+    } catch (error: any) {
+      console.error("Error fetching AI execution:", error);
+      res.status(500).json({ message: "Failed to fetch AI execution" });
+    }
+  });
+
+  // Get AI executions by workflow execution ID
+  app.get("/api/workflow-executions/:id/ai-executions", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const agencyId = req.user?.agencyId;
+
+      const executions = await hardenedAIExecutor.getExecutionsByWorkflow(id);
+      
+      const filteredExecutions = executions.filter(
+        exec => exec.agencyId === agencyId || req.user?.isSuperAdmin
+      );
+
+      if (executions.length > 0 && filteredExecutions.length === 0 && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(filteredExecutions);
+    } catch (error: any) {
+      console.error("Error fetching AI executions:", error);
+      res.status(500).json({ message: "Failed to fetch AI executions" });
+    }
+  });
+
+  // Get AI usage tracking for agency
+  app.get("/api/ai-usage", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(403).json({ message: "Agency ID required" });
+      }
+
+      const { periodStart, periodEnd } = req.query;
+      const usage = await hardenedAIExecutor.getUsageByAgency(
+        agencyId,
+        periodStart ? new Date(periodStart as string) : undefined,
+        periodEnd ? new Date(periodEnd as string) : undefined
+      );
+
+      res.json(usage);
+    } catch (error: any) {
+      console.error("Error fetching AI usage:", error);
+      res.status(500).json({ message: "Failed to fetch AI usage" });
+    }
+  });
+
+  // Get AI cache stats (admin only)
+  app.get("/api/ai-cache/stats", requireAuth, requireRole(["Admin"]), async (_req: AuthRequest, res) => {
+    try {
+      const stats = hardenedAIExecutor.getCacheStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching AI cache stats:", error);
+      res.status(500).json({ message: "Failed to fetch AI cache stats" });
+    }
+  });
+
+  // Clear AI cache (admin only)
+  app.delete("/api/ai-cache", requireAuth, requireRole(["Admin"]), async (_req: AuthRequest, res) => {
+    try {
+      hardenedAIExecutor.clearCache();
+      res.json({ message: "AI cache cleared" });
+    } catch (error: any) {
+      console.error("Error clearing AI cache:", error);
+      res.status(500).json({ message: "Failed to clear AI cache" });
+    }
   });
 
   const httpServer = createServer(app);
