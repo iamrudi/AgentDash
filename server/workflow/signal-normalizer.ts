@@ -81,15 +81,16 @@ export class SignalNormalizer {
       throw new Error(`Invalid urgency: ${raw.urgency}. Valid urgencies: ${VALID_URGENCIES.join(", ")}`);
     }
 
+    const dedupHash = this.computeDedupHash(agencyId, source, raw.type, raw.data);
+
     const payload: Record<string, unknown> = {
       ...raw.data,
       _metadata: {
-        originalTimestamp: raw.timestamp || new Date().toISOString(),
+        ...(raw.timestamp ? { originalTimestamp: raw.timestamp } : {}),
+        ingestedAt: new Date().toISOString(),
         ...(raw.metadata || {}),
       },
     };
-
-    const dedupHash = this.computeDedupHash(agencyId, source, raw.type, payload);
 
     return {
       agencyId,
