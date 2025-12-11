@@ -6309,6 +6309,15 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, analyticsRouter);
 
+  // Register Idempotent Task routes (workflow-safe task creation)
+  const { taskRouter } = await import("./tasks/task-routes");
+  app.use("/api/tasks/workflow", requireAuth, requireRole("Admin", "SuperAdmin"), (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    next();
+  }, taskRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

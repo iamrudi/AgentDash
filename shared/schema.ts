@@ -148,12 +148,16 @@ export const tasks = pgTable("tasks", {
   projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Derived from listId -> project (kept for query performance)
   initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "set null" }), // Link to strategic initiative
   workflowExecutionId: uuid("workflow_execution_id"), // Lineage: workflow that created this task
+  idempotencyKey: text("idempotency_key"), // Unique key for workflow-safe upsert (prevents duplicates on retry)
+  contentHash: text("content_hash"), // SHA-256 hash of task content for deduplication
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   listIdIdx: index("tasks_list_id_idx").on(table.listId),
   parentIdIdx: index("tasks_parent_id_idx").on(table.parentId),
   projectIdIdx: index("tasks_project_id_idx").on(table.projectId),
   workflowExecutionIdIdx: index("tasks_workflow_execution_id_idx").on(table.workflowExecutionId),
+  idempotencyKeyIdx: index("tasks_idempotency_key_idx").on(table.idempotencyKey),
+  contentHashIdx: index("tasks_content_hash_idx").on(table.contentHash),
 }));
 
 // STAFF ASSIGNMENTS (Links staff to tasks)
