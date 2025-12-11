@@ -1259,6 +1259,205 @@ export const insertDocumentEmbeddingSchema = createInsertSchema(documentEmbeddin
   createdAt: true,
 });
 
+// ==================== SLA & ESCALATION ENGINE (Priority 7) ====================
+
+// SLA breach action types
+export const slaBreachActionTypeEnum = ["notify", "reassign", "escalate", "pause_billing", "create_task"] as const;
+export const slaPriorityEnum = ["low", "medium", "high", "critical"] as const;
+export const slaStatusEnum = ["active", "paused", "archived"] as const;
+export const breachStatusEnum = ["detected", "acknowledged", "escalated", "resolved", "auto_resolved"] as const;
+
+// SLA DEFINITIONS (Service Level Agreements per client/project)
+export const slaDefinitions = pgTable("sla_definitions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }), // Optional: client-specific SLA
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }), // Optional: project-specific SLA
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: text("priority").notNull().default("medium"), // 'low', 'medium', 'high', 'critical'
+  status: text("status").notNull().default("active"), // 'active', 'paused', 'archived'
+  responseTimeHours: numeric("response_time_hours").notNull(), // Time to first response
+  resolutionTimeHours: numeric("resolution_time_hours").notNull(), // Time to resolution
+  businessHoursOnly: boolean("business_hours_only").default(true), // Only count business hours
+  businessHoursStart: integer("business_hours_start").default(9), // Start hour (0-23)
+  businessHoursEnd: integer("business_hours_end").default(17), // End hour (0-23)
+  businessDays: text("business_days").array().default(["Mon", "Tue", "Wed", "Thu", "Fri"]), // Working days
+  timezone: text("timezone").default("UTC"),
+  appliesTo: text("applies_to").array().default(["task"]), // 'task', 'message', 'project', 'initiative'
+  taskPriorities: text("task_priorities").array(), // Apply only to specific task priorities
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("sla_definitions_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("sla_definitions_client_id_idx").on(table.clientId),
+  projectIdIdx: index("sla_definitions_project_id_idx").on(table.projectId),
+  statusIdx: index("sla_definitions_status_idx").on(table.status),
+}));
+
+// ESCALATION CHAINS (Ordered list of escalation recipients)
+export const escalationChains = pgTable("escalation_chains", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  slaId: uuid("sla_id").notNull().references(() => slaDefinitions.id, { onDelete: "cascade" }),
+  level: integer("level").notNull(), // Escalation level (1 = first, 2 = second, etc.)
+  escalateAfterMinutes: integer("escalate_after_minutes").notNull(), // Minutes after breach before escalating to this level
+  profileId: uuid("profile_id").references(() => profiles.id, { onDelete: "set null" }), // Who to escalate to
+  notifyEmail: text("notify_email"), // Alternative email if no profile
+  notifyInApp: boolean("notify_in_app").default(true),
+  notifyEmail2: boolean("notify_email_flag").default(true), // Send email notification
+  reassignTask: boolean("reassign_task").default(false), // Reassign the task to this person
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("escalation_chains_agency_id_idx").on(table.agencyId),
+  slaIdIdx: index("escalation_chains_sla_id_idx").on(table.slaId),
+  levelIdx: index("escalation_chains_level_idx").on(table.slaId, table.level),
+}));
+
+// SLA BREACH ACTIONS (Configurable actions when SLA is breached)
+export const slaBreachActions = pgTable("sla_breach_actions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  slaId: uuid("sla_id").notNull().references(() => slaDefinitions.id, { onDelete: "cascade" }),
+  actionType: text("action_type").notNull(), // 'notify', 'reassign', 'escalate', 'pause_billing', 'create_task'
+  triggerAt: text("trigger_at").notNull().default("breach"), // 'warning' (50%), 'breach', 'escalation_1', 'escalation_2', etc.
+  config: jsonb("config").$type<Record<string, unknown>>(), // Action-specific configuration
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  slaIdIdx: index("sla_breach_actions_sla_id_idx").on(table.slaId),
+}));
+
+// SLA BREACHES (Track actual breaches)
+export const slaBreaches = pgTable("sla_breaches", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  slaId: uuid("sla_id").notNull().references(() => slaDefinitions.id, { onDelete: "cascade" }),
+  resourceType: text("resource_type").notNull(), // 'task', 'message', 'project', 'initiative'
+  resourceId: uuid("resource_id").notNull(), // ID of the breached resource
+  breachType: text("breach_type").notNull(), // 'response_time', 'resolution_time'
+  status: text("status").notNull().default("detected"), // 'detected', 'acknowledged', 'escalated', 'resolved', 'auto_resolved'
+  detectedAt: timestamp("detected_at").defaultNow().notNull(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  acknowledgedBy: uuid("acknowledged_by").references(() => profiles.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: uuid("resolved_by").references(() => profiles.id),
+  deadlineAt: timestamp("deadline_at").notNull(), // When the SLA was supposed to be met
+  actualResponseAt: timestamp("actual_response_at"), // When first response happened
+  actualResolutionAt: timestamp("actual_resolution_at"), // When resolved
+  breachDurationMinutes: integer("breach_duration_minutes"), // How long past deadline
+  currentEscalationLevel: integer("current_escalation_level").default(0),
+  notes: text("notes"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+}, (table) => ({
+  agencyIdIdx: index("sla_breaches_agency_id_idx").on(table.agencyId),
+  slaIdIdx: index("sla_breaches_sla_id_idx").on(table.slaId),
+  resourceIdx: index("sla_breaches_resource_idx").on(table.resourceType, table.resourceId),
+  statusIdx: index("sla_breaches_status_idx").on(table.status),
+  detectedAtIdx: index("sla_breaches_detected_at_idx").on(table.detectedAt),
+}));
+
+// SLA BREACH EVENTS (Audit trail for breach lifecycle)
+export const slaBreachEvents = pgTable("sla_breach_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  breachId: uuid("breach_id").notNull().references(() => slaBreaches.id, { onDelete: "cascade" }),
+  eventType: text("event_type").notNull(), // 'detected', 'warning_sent', 'escalated', 'acknowledged', 'resolved', 'notification_sent', 'task_reassigned'
+  eventData: jsonb("event_data").$type<Record<string, unknown>>(),
+  triggeredBy: text("triggered_by").notNull().default("system"), // 'system', 'user', 'automation'
+  userId: uuid("user_id").references(() => profiles.id), // If triggered by user
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  breachIdIdx: index("sla_breach_events_breach_id_idx").on(table.breachId),
+  eventTypeIdx: index("sla_breach_events_event_type_idx").on(table.eventType),
+  createdAtIdx: index("sla_breach_events_created_at_idx").on(table.createdAt),
+}));
+
+// SLA METRICS (Aggregated metrics for reporting)
+export const slaMetrics = pgTable("sla_metrics", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  slaId: uuid("sla_id").references(() => slaDefinitions.id, { onDelete: "cascade" }), // Optional: per-SLA metrics
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }), // Optional: per-client metrics
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  periodType: text("period_type").notNull(), // 'daily', 'weekly', 'monthly'
+  totalItems: integer("total_items").default(0), // Total items tracked
+  itemsWithinSla: integer("items_within_sla").default(0),
+  itemsBreached: integer("items_breached").default(0),
+  slaComplianceRate: numeric("sla_compliance_rate"), // Percentage (0-100)
+  averageResponseTimeMinutes: numeric("average_response_time_minutes"),
+  averageResolutionTimeMinutes: numeric("average_resolution_time_minutes"),
+  breachesByPriority: jsonb("breaches_by_priority").$type<Record<string, number>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("sla_metrics_agency_id_idx").on(table.agencyId),
+  slaIdIdx: index("sla_metrics_sla_id_idx").on(table.slaId),
+  clientIdIdx: index("sla_metrics_client_id_idx").on(table.clientId),
+  periodIdx: index("sla_metrics_period_idx").on(table.periodStart, table.periodEnd),
+  periodTypeIdx: index("sla_metrics_period_type_idx").on(table.periodType),
+}));
+
+// SLA Types
+export type SlaDefinition = typeof slaDefinitions.$inferSelect;
+export type InsertSlaDefinition = typeof slaDefinitions.$inferInsert;
+
+export type EscalationChain = typeof escalationChains.$inferSelect;
+export type InsertEscalationChain = typeof escalationChains.$inferInsert;
+
+export type SlaBreachAction = typeof slaBreachActions.$inferSelect;
+export type InsertSlaBreachAction = typeof slaBreachActions.$inferInsert;
+
+export type SlaBreach = typeof slaBreaches.$inferSelect;
+export type InsertSlaBreach = typeof slaBreaches.$inferInsert;
+
+export type SlaBreachEvent = typeof slaBreachEvents.$inferSelect;
+export type InsertSlaBreachEvent = typeof slaBreachEvents.$inferInsert;
+
+export type SlaMetrics = typeof slaMetrics.$inferSelect;
+export type InsertSlaMetrics = typeof slaMetrics.$inferInsert;
+
+// SLA Insert Schemas
+export const insertSlaDefinitionSchema = createInsertSchema(slaDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateSlaDefinitionSchema = createInsertSchema(slaDefinitions).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+}).partial();
+
+export const insertEscalationChainSchema = createInsertSchema(escalationChains).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSlaBreachActionSchema = createInsertSchema(slaBreachActions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSlaBreachSchema = createInsertSchema(slaBreaches).omit({
+  id: true,
+  detectedAt: true,
+});
+
+export const insertSlaBreachEventSchema = createInsertSchema(slaBreachEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSlaMetricsSchema = createInsertSchema(slaMetrics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Workflow schemas
 export const insertWorkflowSchema = createInsertSchema(workflows).omit({
   id: true,
