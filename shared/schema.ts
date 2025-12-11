@@ -778,6 +778,105 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
   submittedAt: true,
 });
 
+// ==========================================
+// WORKFLOW ENGINE TABLES
+// ==========================================
+
+// Workflow step types
+export const workflowStepTypeEnum = ["signal", "rule", "ai", "action", "branch", "parallel"] as const;
+export const workflowStatusEnum = ["draft", "active", "paused", "archived"] as const;
+export const workflowExecutionStatusEnum = ["pending", "running", "completed", "failed", "cancelled"] as const;
+export const workflowEventTypeEnum = ["started", "completed", "failed", "skipped", "retrying"] as const;
+
+// WORKFLOWS (Workflow definitions)
+export const workflows = pgTable("workflows", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("draft"), // draft, active, paused, archived
+  triggerType: text("trigger_type").notNull(), // 'manual', 'signal', 'schedule', 'webhook'
+  triggerConfig: jsonb("trigger_config"), // Configuration for the trigger (e.g., cron expression, signal type)
+  steps: jsonb("steps").notNull(), // Array of WorkflowStep definitions
+  timeout: integer("timeout").default(300), // Timeout in seconds (default 5 minutes)
+  retryPolicy: jsonb("retry_policy"), // { maxRetries: number, backoffMs: number }
+  version: integer("version").default(1).notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("workflows_agency_id_idx").on(table.agencyId),
+  statusIdx: index("workflows_status_idx").on(table.status),
+}));
+
+// WORKFLOW EXECUTIONS (Individual workflow runs)
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  workflowId: uuid("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed, cancelled
+  triggerId: text("trigger_id"), // Signal ID or manual trigger reference
+  triggerType: text("trigger_type"), // What triggered this execution
+  triggerPayload: jsonb("trigger_payload"), // The input data that triggered execution
+  inputHash: text("input_hash"), // Hash of inputs for idempotency checking
+  outputHash: text("output_hash"), // Hash of outputs for verification
+  result: jsonb("result"), // Final output/result of the workflow
+  error: text("error"), // Error message if failed
+  currentStep: text("current_step"), // ID of currently executing step
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  workflowIdIdx: index("workflow_executions_workflow_id_idx").on(table.workflowId),
+  agencyIdIdx: index("workflow_executions_agency_id_idx").on(table.agencyId),
+  statusIdx: index("workflow_executions_status_idx").on(table.status),
+  inputHashIdx: index("workflow_executions_input_hash_idx").on(table.inputHash),
+}));
+
+// WORKFLOW EVENTS (Step-by-step execution log)
+export const workflowEvents = pgTable("workflow_events", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  executionId: uuid("execution_id").notNull().references(() => workflowExecutions.id, { onDelete: "cascade" }),
+  stepId: text("step_id").notNull(), // Reference to step in workflow definition
+  stepType: text("step_type").notNull(), // signal, rule, ai, action, branch, parallel
+  eventType: text("event_type").notNull(), // started, completed, failed, skipped, retrying
+  input: jsonb("input"), // Input data for this step
+  output: jsonb("output"), // Output data from this step
+  error: text("error"), // Error message if step failed
+  durationMs: integer("duration_ms"), // How long the step took
+  retryCount: integer("retry_count").default(0),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+}, (table) => ({
+  executionIdIdx: index("workflow_events_execution_id_idx").on(table.executionId),
+  stepIdIdx: index("workflow_events_step_id_idx").on(table.stepId),
+  timestampIdx: index("workflow_events_timestamp_idx").on(table.timestamp),
+}));
+
+// Workflow schemas
+export const insertWorkflowSchema = createInsertSchema(workflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  version: true,
+});
+
+export const updateWorkflowSchema = createInsertSchema(workflows).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  createdBy: true,
+}).partial();
+
+export const insertWorkflowExecutionSchema = createInsertSchema(workflowExecutions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkflowEventSchema = createInsertSchema(workflowEvents).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Admin user creation schemas
 export const createClientUserSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -951,3 +1050,66 @@ export type DealWithContact = Deal & { contact?: Contact };
 export type DealWithCompany = Deal & { company?: Company };
 export type ProposalWithSections = Proposal & { sections?: ProposalSection[] };
 export type TaskMessageWithSender = TaskMessage & { sender?: Profile };
+
+// Workflow Types
+export type Workflow = typeof workflows.$inferSelect;
+export type InsertWorkflow = z.infer<typeof insertWorkflowSchema>;
+export type UpdateWorkflow = z.infer<typeof updateWorkflowSchema>;
+export type WorkflowStatus = typeof workflowStatusEnum[number];
+export type WorkflowStepType = typeof workflowStepTypeEnum[number];
+
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+export type InsertWorkflowExecution = z.infer<typeof insertWorkflowExecutionSchema>;
+export type WorkflowExecutionStatus = typeof workflowExecutionStatusEnum[number];
+
+export type WorkflowEvent = typeof workflowEvents.$inferSelect;
+export type InsertWorkflowEvent = z.infer<typeof insertWorkflowEventSchema>;
+export type WorkflowEventType = typeof workflowEventTypeEnum[number];
+
+// Workflow step definition types (used in workflow.steps JSON field)
+export interface WorkflowStepConfig {
+  signal?: { type: string; filter?: Record<string, unknown> };
+  rule?: { conditions: RuleCondition[]; logic: 'all' | 'any' };
+  ai?: { provider?: string; prompt: string; schema?: Record<string, unknown> };
+  action?: { type: string; config: Record<string, unknown> };
+  branch?: { conditions: BranchCondition[]; default?: string };
+  parallel?: { steps: string[] };
+}
+
+export interface WorkflowStep {
+  id: string;
+  name: string;
+  type: WorkflowStepType;
+  config: WorkflowStepConfig;
+  next?: string | null;
+  onError?: 'fail' | 'skip' | 'retry';
+  retryConfig?: { maxRetries: number; backoffMs: number };
+}
+
+export interface RuleCondition {
+  field: string;
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'regex' | 'exists';
+  value: unknown;
+}
+
+export interface BranchCondition {
+  condition: RuleCondition[];
+  logic: 'all' | 'any';
+  next: string;
+}
+
+export interface WorkflowRetryPolicy {
+  maxRetries: number;
+  backoffMs: number;
+  backoffMultiplier?: number;
+}
+
+export interface WorkflowTriggerConfig {
+  signalType?: string;
+  schedule?: string; // cron expression
+  webhookPath?: string;
+}
+
+// Extended workflow types
+export type WorkflowWithExecutions = Workflow & { executions?: WorkflowExecution[] };
+export type WorkflowExecutionWithEvents = WorkflowExecution & { events?: WorkflowEvent[] };
