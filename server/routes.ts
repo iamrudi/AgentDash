@@ -9279,6 +9279,334 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // ============================================
+  // CLOSED FEEDBACK LOOP API ROUTES
+  // ============================================
+
+  // Capture recommendation outcome
+  app.post("/api/intelligence/feedback-loop/outcomes", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { outcomeFeedbackService } = await import("./intelligence/outcome-feedback-service");
+      const outcome = await outcomeFeedbackService.captureOutcome({
+        ...req.body,
+        agencyId,
+      });
+      res.json(outcome);
+    } catch (error: any) {
+      console.error("Error capturing outcome:", error);
+      res.status(500).json({ message: "Failed to capture outcome" });
+    }
+  });
+
+  // Update recommendation outcome
+  app.patch("/api/intelligence/feedback-loop/outcomes/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const { outcomeFeedbackService } = await import("./intelligence/outcome-feedback-service");
+      const outcome = await outcomeFeedbackService.updateOutcome(req.params.id, req.body);
+      if (!outcome) {
+        return res.status(404).json({ message: "Outcome not found" });
+      }
+      res.json(outcome);
+    } catch (error: any) {
+      console.error("Error updating outcome:", error);
+      res.status(500).json({ message: "Failed to update outcome" });
+    }
+  });
+
+  // Get recommendation quality dashboard
+  app.get("/api/intelligence/feedback-loop/quality-dashboard", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { outcomeFeedbackService } = await import("./intelligence/outcome-feedback-service");
+      const dashboard = await outcomeFeedbackService.getQualityDashboard(agencyId, {
+        clientId: req.query.clientId as string,
+        periods: req.query.periods ? parseInt(req.query.periods as string) : undefined,
+      });
+      res.json(dashboard);
+    } catch (error: any) {
+      console.error("Error getting quality dashboard:", error);
+      res.status(500).json({ message: "Failed to get quality dashboard" });
+    }
+  });
+
+  // Get AI calibration parameters
+  app.get("/api/intelligence/feedback-loop/calibration", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const params = await storage.getAiCalibrationParameters(agencyId, req.query.clientId as string);
+      res.json(params);
+    } catch (error: any) {
+      console.error("Error getting calibration parameters:", error);
+      res.status(500).json({ message: "Failed to get calibration parameters" });
+    }
+  });
+
+  // Update AI calibration parameter
+  app.put("/api/intelligence/feedback-loop/calibration", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const param = await storage.upsertAiCalibrationParameter({
+        ...req.body,
+        agencyId,
+      });
+      res.json(param);
+    } catch (error: any) {
+      console.error("Error updating calibration parameter:", error);
+      res.status(500).json({ message: "Failed to update calibration parameter" });
+    }
+  });
+
+  // ============================================
+  // BRAND KNOWLEDGE LAYER API ROUTES
+  // ============================================
+
+  // Get knowledge categories
+  app.get("/api/knowledge/categories", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const categories = await knowledgeIngestionService.getCategories(agencyId);
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Error getting knowledge categories:", error);
+      res.status(500).json({ message: "Failed to get knowledge categories" });
+    }
+  });
+
+  // Initialize default knowledge categories
+  app.post("/api/knowledge/categories/initialize", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const categories = await knowledgeIngestionService.initializeDefaultCategories(agencyId);
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Error initializing knowledge categories:", error);
+      res.status(500).json({ message: "Failed to initialize knowledge categories" });
+    }
+  });
+
+  // Ingest knowledge
+  app.post("/api/knowledge", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const result = await knowledgeIngestionService.ingest({
+        ...req.body,
+        agencyId,
+        createdBy: req.user?.id,
+      });
+      
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error ingesting knowledge:", error);
+      res.status(500).json({ message: "Failed to ingest knowledge" });
+    }
+  });
+
+  // Get knowledge entries
+  app.get("/api/knowledge", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const knowledge = await knowledgeIngestionService.getKnowledge(agencyId, {
+        clientId: req.query.clientId as string,
+        categoryId: req.query.categoryId as string,
+        status: req.query.status as string,
+        validOnly: req.query.validOnly === "true",
+      });
+      res.json(knowledge);
+    } catch (error: any) {
+      console.error("Error getting knowledge:", error);
+      res.status(500).json({ message: "Failed to get knowledge" });
+    }
+  });
+
+  // Get single knowledge entry
+  app.get("/api/knowledge/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const knowledge = await storage.getClientKnowledgeById(req.params.id);
+      if (!knowledge) {
+        return res.status(404).json({ message: "Knowledge entry not found" });
+      }
+      res.json(knowledge);
+    } catch (error: any) {
+      console.error("Error getting knowledge entry:", error);
+      res.status(500).json({ message: "Failed to get knowledge entry" });
+    }
+  });
+
+  // Update knowledge entry
+  app.patch("/api/knowledge/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const result = await knowledgeIngestionService.update(req.params.id, req.body, req.user?.id);
+      
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error updating knowledge:", error);
+      res.status(500).json({ message: "Failed to update knowledge" });
+    }
+  });
+
+  // Archive knowledge entry
+  app.post("/api/knowledge/:id/archive", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const result = await knowledgeIngestionService.archive(req.params.id, req.user?.id);
+      
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error archiving knowledge:", error);
+      res.status(500).json({ message: "Failed to archive knowledge" });
+    }
+  });
+
+  // Supersede knowledge entry
+  app.post("/api/knowledge/:id/supersede", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const result = await knowledgeIngestionService.supersede(req.params.id, {
+        ...req.body,
+        agencyId,
+        createdBy: req.user?.id,
+      });
+      
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error superseding knowledge:", error);
+      res.status(500).json({ message: "Failed to supersede knowledge" });
+    }
+  });
+
+  // Search knowledge
+  app.get("/api/knowledge/search", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeRetrievalService } = await import("./intelligence/knowledge-retrieval-service");
+      const results = await knowledgeRetrievalService.searchKnowledge(agencyId, req.query.q as string, {
+        clientId: req.query.clientId as string,
+        categoryId: req.query.categoryId as string,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+      });
+      res.json(results);
+    } catch (error: any) {
+      console.error("Error searching knowledge:", error);
+      res.status(500).json({ message: "Failed to search knowledge" });
+    }
+  });
+
+  // Get knowledge ingestion history
+  app.get("/api/knowledge/ingestion-history", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeIngestionService } = await import("./intelligence/knowledge-ingestion-service");
+      const history = await knowledgeIngestionService.getIngestionHistory(agencyId, req.query.knowledgeId as string);
+      res.json(history);
+    } catch (error: any) {
+      console.error("Error getting ingestion history:", error);
+      res.status(500).json({ message: "Failed to get ingestion history" });
+    }
+  });
+
+  // Assemble knowledge context for AI
+  app.post("/api/knowledge/assemble-context", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeRetrievalService } = await import("./intelligence/knowledge-retrieval-service");
+      const context = await knowledgeRetrievalService.assembleContext({
+        ...req.body,
+        agencyId,
+      });
+      res.json(context);
+    } catch (error: any) {
+      console.error("Error assembling knowledge context:", error);
+      res.status(500).json({ message: "Failed to assemble knowledge context" });
+    }
+  });
+
+  // Get prompt context (formatted string for AI)
+  app.post("/api/knowledge/prompt-context", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+    try {
+      const agencyId = req.user?.agencyId;
+      if (!agencyId) {
+        return res.status(400).json({ message: "Agency context required" });
+      }
+
+      const { knowledgeRetrievalService } = await import("./intelligence/knowledge-retrieval-service");
+      const context = await knowledgeRetrievalService.getContextForPrompt({
+        ...req.body,
+        agencyId,
+      });
+      res.json({ context });
+    } catch (error: any) {
+      console.error("Error getting prompt context:", error);
+      res.status(500).json({ message: "Failed to get prompt context" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -106,6 +106,18 @@ import {
   type InsertCommercialImpactFactors,
   type CommercialImpactScore,
   type InsertCommercialImpactScore,
+  type RecommendationOutcome,
+  type InsertRecommendationOutcome,
+  type RecommendationQualityMetric,
+  type InsertRecommendationQualityMetric,
+  type AiCalibrationParameter,
+  type InsertAiCalibrationParameter,
+  type KnowledgeCategory,
+  type InsertKnowledgeCategory,
+  type ClientKnowledge,
+  type InsertClientKnowledge,
+  type KnowledgeIngestionLog,
+  type InsertKnowledgeIngestionLog,
   users,
   profiles,
   clients,
@@ -159,6 +171,12 @@ import {
   resourceAllocationPlan,
   commercialImpactFactors,
   commercialImpactScores,
+  recommendationOutcomes,
+  recommendationQualityMetrics,
+  aiCalibrationParameters,
+  knowledgeCategories,
+  clientKnowledge,
+  knowledgeIngestionLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -487,6 +505,36 @@ export interface IStorage {
   createIntelligenceFeedback(feedback: InsertIntelligenceFeedback): Promise<IntelligenceFeedback>;
   getIntelligenceFeedbackById(id: string): Promise<IntelligenceFeedback | undefined>;
   getIntelligenceFeedbackByAgencyId(agencyId: string, options?: { limit?: number; insightId?: string }): Promise<IntelligenceFeedback[]>;
+  
+  // Recommendation Outcomes (Closed Feedback Loop)
+  createRecommendationOutcome(outcome: InsertRecommendationOutcome): Promise<RecommendationOutcome>;
+  getRecommendationOutcome(id: string): Promise<RecommendationOutcome | undefined>;
+  updateRecommendationOutcome(id: string, data: Partial<InsertRecommendationOutcome>): Promise<RecommendationOutcome | undefined>;
+  getRecommendationOutcomes(agencyId: string, options?: { clientId?: string; recommendationType?: string; periodStart?: Date; periodEnd?: Date }): Promise<RecommendationOutcome[]>;
+  
+  // Recommendation Quality Metrics
+  upsertRecommendationQualityMetric(metric: InsertRecommendationQualityMetric): Promise<RecommendationQualityMetric>;
+  getRecommendationQualityMetric(agencyId: string, recommendationType: string, periodStart: Date, periodEnd: Date, clientId?: string): Promise<RecommendationQualityMetric | undefined>;
+  getRecommendationQualityMetrics(agencyId: string, options?: { periodStart?: Date; periodEnd?: Date; clientId?: string }): Promise<RecommendationQualityMetric[]>;
+  
+  // AI Calibration Parameters
+  getAiCalibrationParameters(agencyId: string, clientId?: string): Promise<AiCalibrationParameter[]>;
+  upsertAiCalibrationParameter(param: InsertAiCalibrationParameter): Promise<AiCalibrationParameter>;
+  
+  // Knowledge Categories
+  createKnowledgeCategory(category: InsertKnowledgeCategory): Promise<KnowledgeCategory>;
+  getKnowledgeCategoriesByAgencyId(agencyId: string): Promise<KnowledgeCategory[]>;
+  getKnowledgeCategoryById(id: string): Promise<KnowledgeCategory | undefined>;
+  
+  // Client Knowledge
+  createClientKnowledge(knowledge: InsertClientKnowledge): Promise<ClientKnowledge>;
+  updateClientKnowledge(id: string, data: Partial<InsertClientKnowledge>): Promise<ClientKnowledge | undefined>;
+  getClientKnowledgeById(id: string): Promise<ClientKnowledge | undefined>;
+  getClientKnowledge(agencyId: string, options?: { clientId?: string; categoryId?: string; status?: string }): Promise<ClientKnowledge[]>;
+  
+  // Knowledge Ingestion Log
+  createKnowledgeIngestionLog(log: InsertKnowledgeIngestionLog): Promise<KnowledgeIngestionLog>;
+  getKnowledgeIngestionLogs(agencyId: string, knowledgeId?: string): Promise<KnowledgeIngestionLog[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -3389,6 +3437,276 @@ export class DbStorage implements IStorage {
       return await query.limit(options.limit);
     }
     return await query;
+  }
+
+  // ============================================
+  // RECOMMENDATION OUTCOMES (Closed Feedback Loop)
+  // ============================================
+
+  async createRecommendationOutcome(outcome: InsertRecommendationOutcome): Promise<RecommendationOutcome> {
+    const result = await db.insert(recommendationOutcomes).values(outcome).returning();
+    return result[0];
+  }
+
+  async getRecommendationOutcome(id: string): Promise<RecommendationOutcome | undefined> {
+    const result = await db.select().from(recommendationOutcomes).where(eq(recommendationOutcomes.id, id)).limit(1);
+    return result[0];
+  }
+
+  async updateRecommendationOutcome(id: string, data: Partial<InsertRecommendationOutcome>): Promise<RecommendationOutcome | undefined> {
+    const result = await db
+      .update(recommendationOutcomes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(recommendationOutcomes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getRecommendationOutcomes(
+    agencyId: string,
+    options?: { clientId?: string; recommendationType?: string; periodStart?: Date; periodEnd?: Date }
+  ): Promise<RecommendationOutcome[]> {
+    const conditions = [eq(recommendationOutcomes.agencyId, agencyId)];
+    
+    if (options?.clientId) {
+      conditions.push(eq(recommendationOutcomes.clientId, options.clientId));
+    }
+    if (options?.recommendationType) {
+      conditions.push(eq(recommendationOutcomes.recommendationType, options.recommendationType));
+    }
+    if (options?.periodStart) {
+      conditions.push(gte(recommendationOutcomes.createdAt, options.periodStart));
+    }
+    if (options?.periodEnd) {
+      conditions.push(lte(recommendationOutcomes.createdAt, options.periodEnd));
+    }
+
+    return await db
+      .select()
+      .from(recommendationOutcomes)
+      .where(and(...conditions))
+      .orderBy(desc(recommendationOutcomes.createdAt));
+  }
+
+  // ============================================
+  // RECOMMENDATION QUALITY METRICS
+  // ============================================
+
+  async upsertRecommendationQualityMetric(metric: InsertRecommendationQualityMetric): Promise<RecommendationQualityMetric> {
+    const conditions = [
+      eq(recommendationQualityMetrics.agencyId, metric.agencyId),
+      eq(recommendationQualityMetrics.recommendationType, metric.recommendationType),
+      eq(recommendationQualityMetrics.periodStart, metric.periodStart),
+      eq(recommendationQualityMetrics.periodEnd, metric.periodEnd),
+    ];
+    
+    if (metric.clientId) {
+      conditions.push(eq(recommendationQualityMetrics.clientId, metric.clientId));
+    }
+
+    const existing = await db
+      .select()
+      .from(recommendationQualityMetrics)
+      .where(and(...conditions))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const result = await db
+        .update(recommendationQualityMetrics)
+        .set({ ...metric, updatedAt: new Date() })
+        .where(eq(recommendationQualityMetrics.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(recommendationQualityMetrics).values(metric).returning();
+      return result[0];
+    }
+  }
+
+  async getRecommendationQualityMetric(
+    agencyId: string,
+    recommendationType: string,
+    periodStart: Date,
+    periodEnd: Date,
+    clientId?: string
+  ): Promise<RecommendationQualityMetric | undefined> {
+    const conditions = [
+      eq(recommendationQualityMetrics.agencyId, agencyId),
+      eq(recommendationQualityMetrics.recommendationType, recommendationType),
+      eq(recommendationQualityMetrics.periodStart, periodStart),
+      eq(recommendationQualityMetrics.periodEnd, periodEnd),
+    ];
+    
+    if (clientId) {
+      conditions.push(eq(recommendationQualityMetrics.clientId, clientId));
+    }
+
+    const result = await db
+      .select()
+      .from(recommendationQualityMetrics)
+      .where(and(...conditions))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRecommendationQualityMetrics(
+    agencyId: string,
+    options?: { periodStart?: Date; periodEnd?: Date; clientId?: string }
+  ): Promise<RecommendationQualityMetric[]> {
+    const conditions = [eq(recommendationQualityMetrics.agencyId, agencyId)];
+    
+    if (options?.periodStart) {
+      conditions.push(eq(recommendationQualityMetrics.periodStart, options.periodStart));
+    }
+    if (options?.periodEnd) {
+      conditions.push(eq(recommendationQualityMetrics.periodEnd, options.periodEnd));
+    }
+    if (options?.clientId) {
+      conditions.push(eq(recommendationQualityMetrics.clientId, options.clientId));
+    }
+
+    return await db
+      .select()
+      .from(recommendationQualityMetrics)
+      .where(and(...conditions))
+      .orderBy(desc(recommendationQualityMetrics.periodStart));
+  }
+
+  // ============================================
+  // AI CALIBRATION PARAMETERS
+  // ============================================
+
+  async getAiCalibrationParameters(agencyId: string, clientId?: string): Promise<AiCalibrationParameter[]> {
+    const conditions = [eq(aiCalibrationParameters.agencyId, agencyId)];
+    
+    if (clientId) {
+      conditions.push(eq(aiCalibrationParameters.clientId, clientId));
+    }
+
+    return await db
+      .select()
+      .from(aiCalibrationParameters)
+      .where(and(...conditions));
+  }
+
+  async upsertAiCalibrationParameter(param: InsertAiCalibrationParameter): Promise<AiCalibrationParameter> {
+    const conditions = [
+      eq(aiCalibrationParameters.agencyId, param.agencyId),
+      eq(aiCalibrationParameters.parameterKey, param.parameterKey),
+    ];
+    
+    if (param.clientId) {
+      conditions.push(eq(aiCalibrationParameters.clientId, param.clientId));
+    }
+
+    const existing = await db
+      .select()
+      .from(aiCalibrationParameters)
+      .where(and(...conditions))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const result = await db
+        .update(aiCalibrationParameters)
+        .set({ ...param, updatedAt: new Date(), lastAdjustedAt: new Date() })
+        .where(eq(aiCalibrationParameters.id, existing[0].id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(aiCalibrationParameters).values(param).returning();
+      return result[0];
+    }
+  }
+
+  // ============================================
+  // KNOWLEDGE CATEGORIES
+  // ============================================
+
+  async createKnowledgeCategory(category: InsertKnowledgeCategory): Promise<KnowledgeCategory> {
+    const result = await db.insert(knowledgeCategories).values(category).returning();
+    return result[0];
+  }
+
+  async getKnowledgeCategoriesByAgencyId(agencyId: string): Promise<KnowledgeCategory[]> {
+    return await db
+      .select()
+      .from(knowledgeCategories)
+      .where(eq(knowledgeCategories.agencyId, agencyId))
+      .orderBy(knowledgeCategories.name);
+  }
+
+  async getKnowledgeCategoryById(id: string): Promise<KnowledgeCategory | undefined> {
+    const result = await db.select().from(knowledgeCategories).where(eq(knowledgeCategories.id, id)).limit(1);
+    return result[0];
+  }
+
+  // ============================================
+  // CLIENT KNOWLEDGE
+  // ============================================
+
+  async createClientKnowledge(knowledge: InsertClientKnowledge): Promise<ClientKnowledge> {
+    const result = await db.insert(clientKnowledge).values(knowledge).returning();
+    return result[0];
+  }
+
+  async updateClientKnowledge(id: string, data: Partial<InsertClientKnowledge>): Promise<ClientKnowledge | undefined> {
+    const result = await db
+      .update(clientKnowledge)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientKnowledge.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getClientKnowledgeById(id: string): Promise<ClientKnowledge | undefined> {
+    const result = await db.select().from(clientKnowledge).where(eq(clientKnowledge.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getClientKnowledge(
+    agencyId: string,
+    options?: { clientId?: string; categoryId?: string; status?: string }
+  ): Promise<ClientKnowledge[]> {
+    const conditions = [eq(clientKnowledge.agencyId, agencyId)];
+    
+    if (options?.clientId) {
+      conditions.push(eq(clientKnowledge.clientId, options.clientId));
+    }
+    if (options?.categoryId) {
+      conditions.push(eq(clientKnowledge.categoryId, options.categoryId));
+    }
+    if (options?.status) {
+      conditions.push(eq(clientKnowledge.status, options.status));
+    }
+
+    return await db
+      .select()
+      .from(clientKnowledge)
+      .where(and(...conditions))
+      .orderBy(desc(clientKnowledge.updatedAt));
+  }
+
+  // ============================================
+  // KNOWLEDGE INGESTION LOG
+  // ============================================
+
+  async createKnowledgeIngestionLog(log: InsertKnowledgeIngestionLog): Promise<KnowledgeIngestionLog> {
+    const result = await db.insert(knowledgeIngestionLog).values(log).returning();
+    return result[0];
+  }
+
+  async getKnowledgeIngestionLogs(agencyId: string, knowledgeId?: string): Promise<KnowledgeIngestionLog[]> {
+    const conditions = [eq(knowledgeIngestionLog.agencyId, agencyId)];
+    
+    if (knowledgeId) {
+      conditions.push(eq(knowledgeIngestionLog.knowledgeId, knowledgeId));
+    }
+
+    return await db
+      .select()
+      .from(knowledgeIngestionLog)
+      .where(and(...conditions))
+      .orderBy(desc(knowledgeIngestionLog.performedAt));
   }
 }
 
