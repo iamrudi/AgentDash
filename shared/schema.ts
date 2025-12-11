@@ -789,7 +789,7 @@ export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).om
 // ==========================================
 
 // Workflow step types
-export const workflowStepTypeEnum = ["signal", "rule", "ai", "action", "branch", "parallel"] as const;
+export const workflowStepTypeEnum = ["signal", "rule", "ai", "action", "branch", "parallel", "agent"] as const;
 export const workflowStatusEnum = ["draft", "active", "paused", "archived"] as const;
 export const workflowExecutionStatusEnum = ["pending", "running", "completed", "failed", "cancelled"] as const;
 export const workflowEventTypeEnum = ["started", "completed", "failed", "skipped", "retrying"] as const;
@@ -1946,10 +1946,17 @@ export type WorkflowRuleVersionWithConditions = WorkflowRuleVersion & {
 export interface WorkflowStepConfig {
   signal?: { type: string; filter?: Record<string, unknown> };
   rule?: { conditions: RuleCondition[]; logic: 'all' | 'any' };
-  ai?: { provider?: string; prompt: string; schema?: Record<string, unknown> };
+  ai?: { provider?: string; prompt: string; schema?: Record<string, unknown>; useCache?: boolean };
   action?: { type: string; config: Record<string, unknown> };
   branch?: { conditions: BranchCondition[]; default?: string };
   parallel?: { steps: string[] };
+  agent?: {
+    domain?: string;
+    operation?: 'analyze' | 'recommend' | 'execute';
+    agentId?: string;
+    capability?: string;
+    input?: Record<string, unknown>;
+  };
 }
 
 export interface WorkflowStep {

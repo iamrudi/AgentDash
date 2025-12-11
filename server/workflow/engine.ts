@@ -74,6 +74,7 @@ export class WorkflowEngine {
     this.stepHandlers.set("action", this.handleActionStep.bind(this));
     this.stepHandlers.set("branch", this.handleBranchStep.bind(this));
     this.stepHandlers.set("parallel", this.handleParallelStep.bind(this));
+    this.stepHandlers.set("agent", this.handleAgentStep.bind(this));
   }
 
   public registerStepHandler(type: string, handler: StepHandler): void {
@@ -736,6 +737,72 @@ export class WorkflowEngine {
       success: true,
       output: { parallelSteps: config.steps },
     };
+  }
+
+  /**
+   * Agent step handler - routes to specialized domain agents via orchestrator
+   * Supports: analyze, recommend, execute operations
+   */
+  private async handleAgentStep(
+    step: WorkflowStep,
+    context: WorkflowContext
+  ): Promise<StepResult> {
+    const config = step.config.agent as {
+      domain?: string;
+      operation?: 'analyze' | 'recommend' | 'execute';
+      agentId?: string;
+      capability?: string;
+      input?: Record<string, unknown>;
+    } | undefined;
+    
+    if (!config) {
+      return { success: false, error: "Missing agent configuration" };
+    }
+
+    try {
+      // Dynamically import orchestrator to avoid circular dependencies
+      const { AgentOrchestrator } = await import("../agents/orchestrator");
+      const orchestrator = new AgentOrchestrator(this.storage);
+      
+      // Build agent input from context and config
+      const agentInput = {
+        ...context.data,
+        ...(config.input || {}),
+        stepResults: context.stepResults,
+      };
+
+      // Route to appropriate agent(s)
+      const result = await orchestrator.route({
+        agencyId: context.agencyId,
+        domain: config.domain,
+        capability: config.capability,
+        operation: config.operation || 'analyze',
+        input: agentInput,
+        context: {
+          workflowExecutionId: context.executionId,
+          stepId: step.id,
+          clientId: context.clientId,
+          userId: context.userId,
+        },
+      });
+
+      if (!result.success) {
+        return { success: false, error: result.error || "Agent execution failed" };
+      }
+
+      return {
+        success: true,
+        output: {
+          agentId: result.agentId,
+          domain: result.domain,
+          result: result.result,
+          metadata: result.metadata,
+        },
+      };
+    } catch (error: any) {
+      console.error("[WORKFLOW_AGENT_STEP] Error:", error);
+      return { success: false, error: error.message || "Agent step failed" };
+    }
   }
 
   private computeHash(data: unknown): string {
