@@ -6278,6 +6278,15 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, slaRouter);
 
+  // Register Agent routes (Multi-Agent Architecture)
+  const { agentRouter } = await import("./agents/agent-routes");
+  app.use("/api/agents", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    next();
+  }, agentRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================
