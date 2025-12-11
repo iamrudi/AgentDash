@@ -52,6 +52,10 @@ const AgencyHoursReport = lazy(() => import("@/pages/agency/hours-report"));
 const SuperAdminPortal = lazy(() => import("@/pages/superadmin/index"));
 const GovernanceDashboard = lazy(() => import("@/pages/governance-dashboard"));
 
+// Workflow Builder (lazy-loaded)
+const WorkflowBuilder = lazy(() => import("@/pages/agency/workflow-builder"));
+const Workflows = lazy(() => import("@/pages/agency/workflows"));
+
 // Loading fallback component
 function PageLoader() {
   return (
@@ -249,6 +253,22 @@ function Router() {
         <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
             <AgencySettings />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/workflows">
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
+          <AgencyLayout>
+            <Workflows />
+          </AgencyLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/agency/workflow-builder/:id?">
+        <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
+          <AgencyLayout>
+            <WorkflowBuilder />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

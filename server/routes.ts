@@ -6565,6 +6565,118 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  // Validate workflow configuration with Zod schema
+  const workflowValidationSchema = z.object({
+    steps: z.array(z.object({
+      id: z.string().min(1),
+      type: z.enum(["signal", "rule", "ai", "action", "transform", "notification", "branch"]),
+      name: z.string().optional(),
+      config: z.record(z.unknown()).optional(),
+      position: z.object({
+        x: z.number(),
+        y: z.number(),
+      }).optional(),
+    })),
+    connections: z.array(z.object({
+      source: z.string().min(1),
+      target: z.string().min(1),
+      sourceHandle: z.string().optional(),
+      targetHandle: z.string().optional(),
+    })).optional().default([]),
+  });
+
+  app.post("/api/workflows/validate", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const validationResult = workflowValidationSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        return res.status(400).json({
+          valid: false,
+          errors: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+          warnings: [],
+        });
+      }
+      
+      const { steps, connections } = validationResult.data;
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      
+      if (steps.length === 0) {
+        errors.push("Workflow must have at least one step");
+      }
+      
+      // Check for signal step (entry point)
+      const signalSteps = steps.filter((s) => s.type === "signal");
+      if (signalSteps.length === 0) {
+        errors.push("Workflow must have at least one signal step as entry point");
+      }
+      
+      // Check for orphaned steps (no incoming connections)
+      const connectedTargets = new Set(connections.map((c) => c.target));
+      const orphanedSteps = steps.filter((s) => 
+        s.type !== "signal" && !connectedTargets.has(s.id)
+      );
+      if (orphanedSteps.length > 0) {
+        warnings.push(`${orphanedSteps.length} step(s) have no incoming connections`);
+      }
+      
+      // Check for required configurations
+      steps.forEach((step) => {
+        if (step.type === "ai" && !step.config?.promptTemplate) {
+          warnings.push(`AI step "${step.name || step.id}" is missing a prompt template`);
+        }
+        if (step.type === "notification" && !step.config?.channel) {
+          warnings.push(`Notification step "${step.name || step.id}" is missing a channel`);
+        }
+      });
+      
+      res.json({
+        valid: errors.length === 0,
+        errors,
+        warnings,
+      });
+    } catch (error: any) {
+      console.error('Error validating workflow:', error);
+      res.status(500).json({ message: "Failed to validate workflow" });
+    }
+  });
+
+  // Duplicate workflow
+  app.post("/api/workflows/:id/duplicate", requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const workflow = await storage.getWorkflowById(id);
+      
+      if (!workflow) {
+        return res.status(404).json({ message: "Workflow not found" });
+      }
+      
+      const userAgencyId = req.user?.agencyId;
+      if (workflow.agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Create duplicate with new name
+      const duplicatedWorkflow = await storage.createWorkflow({
+        agencyId: workflow.agencyId,
+        name: `${workflow.name} (Copy)`,
+        description: workflow.description,
+        status: "draft",
+        triggerType: workflow.triggerType,
+        triggerConfig: workflow.triggerConfig,
+        steps: workflow.steps,
+        timeout: workflow.timeout,
+        retryPolicy: workflow.retryPolicy,
+        createdBy: req.user?.id || null,
+      });
+      
+      res.json(duplicatedWorkflow);
+    } catch (error: any) {
+      console.error('Error duplicating workflow:', error);
+      res.status(500).json({ message: "Failed to duplicate workflow" });
+    }
+  });
+
   // ==================== LINEAGE QUERY API ====================
 
   // Get lineage for a task (trace back to originating workflow/signal)

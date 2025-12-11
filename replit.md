@@ -42,3 +42,15 @@ The project is deployed on Replit, using Express for the backend, Vite for the f
 - **Scheduler:** node-cron
 - **Icons:** Lucide icons
 - **Integrations:** Google Analytics 4 (GA4), Google Search Console (GSC), HubSpot, LinkedIn
+- **Visual Workflow Builder:** @xyflow/react (React Flow) for drag-and-drop workflow creation
+
+## Recent Changes (December 2024)
+
+### Visual Workflow Builder UI
+- Added `/agency/workflows` page for listing and managing workflows
+- Added `/agency/workflow-builder/:id?` page with React Flow canvas for visual workflow creation
+- Sidebar navigation includes "Workflows" link under Strategy section
+- Three-panel layout: step palette (left), canvas (center), properties panel (right)
+- Seven step types: Signal, Rule, AI, Action, Transform, Notification, Branch
+- Backend endpoints: POST /api/workflows/validate, POST /api/workflows/:id/duplicate
+- Files: `client/src/pages/agency/workflows.tsx`, `client/src/pages/agency/workflow-builder.tsx`
