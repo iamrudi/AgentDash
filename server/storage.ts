@@ -94,6 +94,18 @@ import {
   type InsertIntelligencePriority,
   type IntelligenceFeedback,
   type InsertIntelligenceFeedback,
+  type TaskExecutionHistory,
+  type InsertTaskExecutionHistory,
+  type TaskDurationPrediction,
+  type InsertTaskDurationPrediction,
+  type ResourceCapacityProfile,
+  type InsertResourceCapacityProfile,
+  type ResourceAllocationPlan,
+  type InsertResourceAllocationPlan,
+  type CommercialImpactFactors,
+  type InsertCommercialImpactFactors,
+  type CommercialImpactScore,
+  type InsertCommercialImpactScore,
   users,
   profiles,
   clients,
@@ -141,6 +153,12 @@ import {
   intelligencePriorityConfig,
   intelligencePriorities,
   intelligenceFeedback,
+  taskExecutionHistory,
+  taskDurationPredictions,
+  resourceCapacityProfiles,
+  resourceAllocationPlan,
+  commercialImpactFactors,
+  commercialImpactScores,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -3005,6 +3023,367 @@ export class DbStorage implements IStorage {
       .from(intelligenceFeedback)
       .where(and(...conditions))
       .orderBy(desc(intelligenceFeedback.createdAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  // ===========================================
+  // DURATION INTELLIGENCE STORAGE METHODS
+  // ===========================================
+
+  // Task Execution History
+  async createTaskExecutionHistory(data: InsertTaskExecutionHistory): Promise<TaskExecutionHistory> {
+    const result = await db.insert(taskExecutionHistory).values(data).returning();
+    return result[0];
+  }
+
+  async getTaskExecutionHistoryForPrediction(
+    agencyId: string,
+    taskType: string,
+    complexity: string,
+    assigneeId: string | null,
+    clientId: string | null,
+    limit: number
+  ): Promise<TaskExecutionHistory[]> {
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    
+    let conditions = [
+      eq(taskExecutionHistory.agencyId, agencyId),
+      eq(taskExecutionHistory.taskType, taskType),
+      gte(taskExecutionHistory.completedAt, ninetyDaysAgo)
+    ];
+
+    const result = await db
+      .select()
+      .from(taskExecutionHistory)
+      .where(and(...conditions))
+      .orderBy(desc(taskExecutionHistory.completedAt))
+      .limit(limit);
+    
+    return result;
+  }
+
+  async getTaskExecutionHistoryByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; taskType?: string; clientId?: string }
+  ): Promise<TaskExecutionHistory[]> {
+    let conditions = [eq(taskExecutionHistory.agencyId, agencyId)];
+    
+    if (options?.taskType) {
+      conditions.push(eq(taskExecutionHistory.taskType, options.taskType));
+    }
+    if (options?.clientId) {
+      conditions.push(eq(taskExecutionHistory.clientId, options.clientId));
+    }
+    
+    const query = db
+      .select()
+      .from(taskExecutionHistory)
+      .where(and(...conditions))
+      .orderBy(desc(taskExecutionHistory.completedAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  async getDurationModelStats(agencyId: string): Promise<{
+    totalHistoricalRecords: number;
+    avgVariancePercent: number;
+    coldStartRate: number;
+    confidenceDistribution: Record<string, number>;
+    topTaskTypes: Array<{ taskType: string; count: number; avgHours: number }>;
+  }> {
+    const history = await db
+      .select()
+      .from(taskExecutionHistory)
+      .where(eq(taskExecutionHistory.agencyId, agencyId));
+
+    const predictions = await db
+      .select()
+      .from(taskDurationPredictions)
+      .where(eq(taskDurationPredictions.agencyId, agencyId));
+
+    const totalHistoricalRecords = history.length;
+    
+    const variances = history
+      .map(h => h.variancePercent ? parseFloat(h.variancePercent) : null)
+      .filter((v): v is number => v !== null);
+    const avgVariancePercent = variances.length > 0
+      ? variances.reduce((a, b) => a + b, 0) / variances.length
+      : 0;
+
+    const coldStartCount = predictions.filter(p => p.isColdStart).length;
+    const coldStartRate = predictions.length > 0 
+      ? coldStartCount / predictions.length 
+      : 0;
+
+    const confidenceDistribution: Record<string, number> = {
+      very_low: 0,
+      low: 0,
+      medium: 0,
+      high: 0,
+      very_high: 0
+    };
+    for (const p of predictions) {
+      const level = p.confidenceLevel || 'medium';
+      confidenceDistribution[level] = (confidenceDistribution[level] || 0) + 1;
+    }
+
+    const taskTypeGroups = new Map<string, { count: number; totalHours: number }>();
+    for (const h of history) {
+      const type = h.taskType;
+      const hours = parseFloat(h.actualHours);
+      if (!taskTypeGroups.has(type)) {
+        taskTypeGroups.set(type, { count: 0, totalHours: 0 });
+      }
+      const group = taskTypeGroups.get(type)!;
+      group.count++;
+      group.totalHours += hours;
+    }
+
+    const topTaskTypes = Array.from(taskTypeGroups.entries())
+      .map(([taskType, data]) => ({
+        taskType,
+        count: data.count,
+        avgHours: Math.round((data.totalHours / data.count) * 100) / 100
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return {
+      totalHistoricalRecords,
+      avgVariancePercent: Math.round(avgVariancePercent * 100) / 100,
+      coldStartRate: Math.round(coldStartRate * 100) / 100,
+      confidenceDistribution,
+      topTaskTypes
+    };
+  }
+
+  // Task Duration Predictions
+  async upsertTaskDurationPrediction(data: InsertTaskDurationPrediction): Promise<TaskDurationPrediction> {
+    const existing = await db
+      .select()
+      .from(taskDurationPredictions)
+      .where(eq(taskDurationPredictions.taskId, data.taskId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const result = await db
+        .update(taskDurationPredictions)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(taskDurationPredictions.taskId, data.taskId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(taskDurationPredictions).values(data).returning();
+      return result[0];
+    }
+  }
+
+  async getTaskDurationPrediction(taskId: string): Promise<TaskDurationPrediction | undefined> {
+    const result = await db
+      .select()
+      .from(taskDurationPredictions)
+      .where(eq(taskDurationPredictions.taskId, taskId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getTaskDurationPredictionsByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; coldStartOnly?: boolean }
+  ): Promise<TaskDurationPrediction[]> {
+    let conditions = [eq(taskDurationPredictions.agencyId, agencyId)];
+    
+    if (options?.coldStartOnly) {
+      conditions.push(eq(taskDurationPredictions.isColdStart, true));
+    }
+    
+    const query = db
+      .select()
+      .from(taskDurationPredictions)
+      .where(and(...conditions))
+      .orderBy(desc(taskDurationPredictions.computedAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  // Resource Capacity Profiles
+  async createResourceCapacityProfile(data: InsertResourceCapacityProfile): Promise<ResourceCapacityProfile> {
+    const result = await db.insert(resourceCapacityProfiles).values(data).returning();
+    return result[0];
+  }
+
+  async updateResourceCapacityProfile(id: string, data: Partial<InsertResourceCapacityProfile>): Promise<ResourceCapacityProfile> {
+    const result = await db
+      .update(resourceCapacityProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(resourceCapacityProfiles.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getResourceCapacityProfileByStaffId(staffId: string): Promise<ResourceCapacityProfile | undefined> {
+    const result = await db
+      .select()
+      .from(resourceCapacityProfiles)
+      .where(eq(resourceCapacityProfiles.staffId, staffId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getResourceCapacityProfilesByAgencyId(
+    agencyId: string,
+    options?: { activeOnly?: boolean }
+  ): Promise<ResourceCapacityProfile[]> {
+    let conditions = [eq(resourceCapacityProfiles.agencyId, agencyId)];
+    
+    if (options?.activeOnly) {
+      conditions.push(eq(resourceCapacityProfiles.isActive, true));
+    }
+    
+    return await db
+      .select()
+      .from(resourceCapacityProfiles)
+      .where(and(...conditions));
+  }
+
+  // Resource Allocation Plans
+  async createResourceAllocationPlan(data: InsertResourceAllocationPlan): Promise<ResourceAllocationPlan> {
+    const result = await db.insert(resourceAllocationPlan).values(data).returning();
+    return result[0];
+  }
+
+  async updateResourceAllocationPlan(id: string, data: Partial<InsertResourceAllocationPlan>): Promise<ResourceAllocationPlan> {
+    const result = await db
+      .update(resourceAllocationPlan)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(resourceAllocationPlan.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getResourceAllocationPlanById(id: string): Promise<ResourceAllocationPlan | undefined> {
+    const result = await db
+      .select()
+      .from(resourceAllocationPlan)
+      .where(eq(resourceAllocationPlan.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async getResourceAllocationPlansByAgencyId(
+    agencyId: string,
+    options?: { status?: string; limit?: number }
+  ): Promise<ResourceAllocationPlan[]> {
+    let conditions = [eq(resourceAllocationPlan.agencyId, agencyId)];
+    
+    if (options?.status) {
+      conditions.push(eq(resourceAllocationPlan.status, options.status));
+    }
+    
+    const query = db
+      .select()
+      .from(resourceAllocationPlan)
+      .where(and(...conditions))
+      .orderBy(desc(resourceAllocationPlan.createdAt));
+    
+    if (options?.limit) {
+      return await query.limit(options.limit);
+    }
+    return await query;
+  }
+
+  // Commercial Impact Factors
+  async upsertCommercialImpactFactors(data: InsertCommercialImpactFactors): Promise<CommercialImpactFactors> {
+    const existing = await db
+      .select()
+      .from(commercialImpactFactors)
+      .where(eq(commercialImpactFactors.agencyId, data.agencyId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const result = await db
+        .update(commercialImpactFactors)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(commercialImpactFactors.agencyId, data.agencyId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(commercialImpactFactors).values(data).returning();
+      return result[0];
+    }
+  }
+
+  async getCommercialImpactFactorsByAgencyId(agencyId: string): Promise<CommercialImpactFactors | undefined> {
+    const result = await db
+      .select()
+      .from(commercialImpactFactors)
+      .where(eq(commercialImpactFactors.agencyId, agencyId))
+      .limit(1);
+    return result[0];
+  }
+
+  // Commercial Impact Scores
+  async createCommercialImpactScore(data: InsertCommercialImpactScore): Promise<CommercialImpactScore> {
+    const result = await db.insert(commercialImpactScores).values(data).returning();
+    return result[0];
+  }
+
+  async upsertCommercialImpactScore(data: InsertCommercialImpactScore): Promise<CommercialImpactScore> {
+    const taskId = data.taskId;
+    if (!taskId) {
+      const result = await db.insert(commercialImpactScores).values(data).returning();
+      return result[0];
+    }
+    
+    const existing = await db
+      .select()
+      .from(commercialImpactScores)
+      .where(eq(commercialImpactScores.taskId, taskId))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const result = await db
+        .update(commercialImpactScores)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(commercialImpactScores.taskId, taskId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(commercialImpactScores).values(data).returning();
+      return result[0];
+    }
+  }
+
+  async getCommercialImpactScoreByTaskId(taskId: string): Promise<CommercialImpactScore | undefined> {
+    const result = await db
+      .select()
+      .from(commercialImpactScores)
+      .where(eq(commercialImpactScores.taskId, taskId))
+      .limit(1);
+    return result[0];
+  }
+
+  async getCommercialImpactScoresByAgencyId(
+    agencyId: string,
+    options?: { limit?: number; minScore?: number }
+  ): Promise<CommercialImpactScore[]> {
+    let conditions = [eq(commercialImpactScores.agencyId, agencyId)];
+    
+    const query = db
+      .select()
+      .from(commercialImpactScores)
+      .where(and(...conditions))
+      .orderBy(desc(commercialImpactScores.totalImpactScore));
     
     if (options?.limit) {
       return await query.limit(options.limit);
