@@ -64,9 +64,26 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point
 │   ├── vite.ts                 # Vite dev server integration
-│   └── ai/
-│       ├── openai-provider.ts  # OpenAI integration
-│       └── gemini-provider.ts  # Gemini integration
+│   ├── ai/
+│   │   ├── openai-provider.ts  # OpenAI integration
+│   │   ├── gemini-provider.ts  # Gemini integration
+│   │   └── hardened-executor.ts # Hardened AI execution layer
+│   ├── agents/
+│   │   ├── base-agent.ts       # BaseAgent abstract class
+│   │   ├── domain-agents.ts    # SEO, PPC, CRM, Reporting agents
+│   │   ├── orchestrator.ts     # AgentOrchestrator routing
+│   │   ├── agent-routes.ts     # Agent REST API
+│   │   └── ai-provider-adapter.ts # AI provider abstraction
+│   ├── sla/
+│   │   ├── sla-service.ts      # SLA breach detection
+│   │   ├── sla-cron.ts         # Automated monitoring
+│   │   └── sla-routes.ts       # SLA REST API
+│   └── workflow/
+│       ├── engine.ts           # WorkflowEngine class
+│       ├── rule-engine.ts      # RuleEngine with 16 operators
+│       ├── signal-adapters.ts  # Signal ingestion adapters
+│       ├── signal-normalizer.ts # Signal normalization
+│       └── signal-router.ts    # Signal routing
 ├── shared/
 │   └── schema.ts               # Drizzle schema + Zod types
 └── uploads/
@@ -724,6 +741,214 @@ npx tsc --noEmit
 | `server/storage.ts` | Database operations including workflow/rule CRUD |
 | `server/routes.ts` | All API endpoints including workflow/rule endpoints |
 | `scripts/test-workflow.ts` | Workflow regression test suite |
+
+---
+
+## Multi-Agent Architecture
+
+### Agent System Overview
+
+The multi-agent system enables specialized AI agents for different domains to be orchestrated by the workflow engine.
+
+```typescript
+// server/agents/base-agent.ts
+abstract class BaseAgent {
+  abstract readonly domain: AgentDomain;      // 'seo' | 'ppc' | 'crm' | 'reporting'
+  abstract readonly capabilities: string[];
+  
+  // Core lifecycle methods
+  async analyze(context: AgentContext): Promise<AgentResult>;
+  async recommend(context: AgentContext): Promise<AgentResult>;
+  async execute(action: AgentAction): Promise<AgentResult>;
+  
+  // Audit trail with input/output hashing
+  protected async logExecution(params: ExecutionLog): Promise<void>;
+}
+```
+
+### Domain Agents
+
+```typescript
+// server/agents/domain-agents.ts
+// SEOAgent - Keyword analysis, content optimization, technical SEO
+// PPCAgent - Campaign analysis, bid optimization, budget allocation
+// CRMAgent - Lead scoring, pipeline analysis, customer segmentation
+// ReportingAgent - Report generation, data visualization, trend analysis
+```
+
+### Agent Orchestrator
+
+```typescript
+// server/agents/orchestrator.ts
+class AgentOrchestrator {
+  // Route signals to correct agent(s)
+  async route(request: RouteRequest): Promise<AgentResult>;
+  
+  // Domain-based routing (SEO → SEOAgent)
+  // Capability matching for cross-domain requests
+  // Multi-agent collaboration with shared context
+  // Priority-based agent selection
+}
+```
+
+### Workflow Integration
+
+```typescript
+// Agent step type in workflow engine
+const agentStep: WorkflowStep = {
+  id: 'step-1',
+  type: 'agent',
+  config: {
+    agent: {
+      domain: 'seo',
+      operation: 'analyze',
+      capability: 'keyword_analysis',
+      input: { /* agent-specific input */ }
+    }
+  }
+};
+```
+
+### Agent Tables
+
+```typescript
+// Schema (shared/schema.ts)
+agents: {
+  id: uuid PRIMARY KEY,
+  agencyId: uuid REFERENCES agencies,
+  name: varchar,
+  domain: varchar,           // 'seo' | 'ppc' | 'crm' | 'reporting'
+  status: varchar,           // 'active' | 'inactive' | 'maintenance'
+  aiProvider: varchar,       // 'gemini' | 'openai'
+  aiModel: varchar,
+  systemPrompt: text
+}
+
+agent_capabilities: {
+  id: uuid PRIMARY KEY,
+  agentId: uuid REFERENCES agents,
+  name: varchar,
+  description: text,
+  enabled: boolean,
+  config: jsonb
+}
+
+agent_executions: {
+  id: uuid PRIMARY KEY,
+  agentId: uuid REFERENCES agents,
+  agencyId: uuid REFERENCES agencies,
+  operation: varchar,        // 'analyze' | 'recommend' | 'execute'
+  inputHash: varchar,        // SHA-256 for idempotency
+  outputHash: varchar,       // SHA-256 for reproducibility
+  status: varchar,
+  tokenCount: integer,
+  latencyMs: integer,
+  metadata: jsonb
+}
+
+agent_collaborations: {
+  id: uuid PRIMARY KEY,
+  primaryAgentId: uuid REFERENCES agents,
+  secondaryAgentId: uuid REFERENCES agents,
+  agencyId: uuid REFERENCES agencies,
+  sharedContext: jsonb,
+  status: varchar
+}
+```
+
+### API Endpoints
+
+```
+GET/POST    /api/agents                           - List/create agents
+GET/PATCH   /api/agents/:id                       - Agent operations
+DELETE      /api/agents/:id                       - Delete agent
+GET/POST    /api/agents/:id/capabilities          - Capability management
+DELETE      /api/agents/:id/capabilities/:capId   - Remove capability
+GET         /api/agents/executions                - List all executions
+GET         /api/agents/:id/executions            - List agent executions
+POST        /api/agents/orchestrate               - Execute via orchestrator
+```
+
+---
+
+## SLA & Escalation Engine
+
+### SLA System Overview
+
+The SLA engine monitors deadlines and escalates breaches automatically.
+
+```typescript
+// server/sla/sla-service.ts
+class SlaService {
+  // Detect breaches across all agencies
+  async detectBreaches(): Promise<SLABreach[]>;
+  
+  // Process escalations for a breach
+  async processEscalations(breachId: string): Promise<void>;
+  
+  // Check SLA compliance for a resource
+  async checkCompliance(resourceType: string, resourceId: string): Promise<SLAStatus>;
+}
+```
+
+### SLA Tables
+
+```typescript
+// Schema (shared/schema.ts)
+sla_definitions: {
+  id: uuid PRIMARY KEY,
+  agencyId: uuid REFERENCES agencies,
+  name: varchar,
+  responseTimeMinutes: integer,
+  resolutionTimeMinutes: integer,
+  businessHoursOnly: boolean,
+  businessHoursStart: time,
+  businessHoursEnd: time,
+  clientId: uuid REFERENCES clients,
+  projectId: uuid REFERENCES projects
+}
+
+sla_breaches: {
+  id: uuid PRIMARY KEY,
+  slaDefinitionId: uuid REFERENCES sla_definitions,
+  agencyId: uuid REFERENCES agencies,
+  resourceType: varchar,
+  resourceId: uuid,
+  breachType: varchar,      // 'response' | 'resolution'
+  status: varchar,          // 'detected' | 'acknowledged' | 'escalated' | 'resolved'
+  detectedAt: timestamp,
+  acknowledgedAt: timestamp,
+  resolvedAt: timestamp
+}
+
+escalation_chains: {
+  id: uuid PRIMARY KEY,
+  slaDefinitionId: uuid REFERENCES sla_definitions,
+  level: integer,
+  escalateAfterMinutes: integer,
+  assignToProfileId: uuid REFERENCES profiles,
+  action: varchar           // 'notify' | 'reassign' | 'escalate' | 'pause_billing'
+}
+```
+
+---
+
+## Important Files Reference (Updated)
+
+| File | Purpose |
+|------|---------|
+| `server/workflow/engine.ts` | WorkflowEngine class with step execution |
+| `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
+| `server/agents/base-agent.ts` | BaseAgent abstract class |
+| `server/agents/domain-agents.ts` | SEO, PPC, CRM, Reporting agents |
+| `server/agents/orchestrator.ts` | AgentOrchestrator for routing |
+| `server/agents/agent-routes.ts` | Agent REST API endpoints |
+| `server/sla/sla-service.ts` | SLA breach detection and escalation |
+| `server/sla/sla-cron.ts` | Automated SLA monitoring (every 5 min) |
+| `server/sla/sla-routes.ts` | SLA REST API endpoints |
+| `shared/schema.ts` | All database schemas |
+| `server/storage.ts` | Database operations |
+| `server/routes.ts` | All API endpoints |
 
 ---
 
