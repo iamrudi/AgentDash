@@ -30,6 +30,7 @@ import { PDFStorageService } from "./services/pdfStorage";
 import { getAIProvider, invalidateAIProviderCache } from "./ai/provider";
 import { hardenedAIExecutor } from "./ai/hardened-executor";
 import { cache, CACHE_TTL } from "./lib/cache";
+import { durationIntelligenceIntegration } from "./intelligence/duration-intelligence-integration";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -1210,6 +1211,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const newTask = await storage.createTask(taskData);
 
+      // Trigger async duration prediction (non-blocking)
+      if (req.user?.agencyId) {
+        const agencyId = req.user.agencyId;
+        // Fire and forget - don't block the response
+        setImmediate(async () => {
+          try {
+            // Get task details for prediction
+            const taskType = (newTask.description?.toLowerCase().includes('design') ? 'design' :
+                            newTask.description?.toLowerCase().includes('content') ? 'content' :
+                            newTask.description?.toLowerCase().includes('dev') ? 'development' :
+                            newTask.description?.toLowerCase().includes('seo') ? 'seo' : 'general');
+            const complexity = newTask.priority === 'High' ? 'high' : 
+                              newTask.priority === 'Low' ? 'low' : 'medium';
+            
+            // Get assignee if available
+            const assignments = await storage.getAssignmentsByTaskId(newTask.id);
+            const assigneeId = assignments.length > 0 ? assignments[0].staffProfileId : undefined;
+            
+            // Get client from project if available
+            let clientId: string | undefined;
+            if (newTask.projectId) {
+              const project = await storage.getProjectById(newTask.projectId);
+              clientId = project?.clientId ?? undefined;
+            }
+            
+            // Generate prediction
+            const prediction = await durationIntelligenceIntegration.orchestratePrediction(
+              agencyId, newTask.id, taskType, complexity, assigneeId, clientId
+            );
+            
+            console.log(`[Duration Intelligence] Generated prediction for task ${newTask.id}: ${prediction.predictedHours}h (${prediction.confidenceLevel})`);
+          } catch (predictionError) {
+            console.error('[Duration Intelligence] Failed to generate prediction:', predictionError);
+          }
+        });
+      }
+
       res.status(201).json(newTask);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -1265,6 +1303,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update task
   app.patch("/api/agency/tasks/:id", requireAuth, requireRole("Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
+      // Get old task state before update for completion tracking
+      const oldTask = await storage.getTaskById(req.params.id);
+      
       // Validate time tracking increments (must be 0.5 hour increments)
       if (req.body.timeTracked !== undefined && req.body.timeTracked !== null) {
         const tracked = Number(req.body.timeTracked);
@@ -1298,6 +1339,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const updatedTask = await storage.updateTask(req.params.id, storageData);
+
+      // Track task completion for Duration Intelligence (non-blocking)
+      if (oldTask && oldTask.status !== 'Completed' && updatedTask.status === 'Completed' && req.user?.agencyId) {
+        const agencyId = req.user.agencyId;
+        setImmediate(async () => {
+          try {
+            // Determine task type from description
+            const taskType = (updatedTask.description?.toLowerCase().includes('design') ? 'design' :
+                            updatedTask.description?.toLowerCase().includes('content') ? 'content' :
+                            updatedTask.description?.toLowerCase().includes('dev') ? 'development' :
+                            updatedTask.description?.toLowerCase().includes('seo') ? 'seo' : 'general');
+            const complexity = updatedTask.priority === 'High' ? 'high' : 
+                              updatedTask.priority === 'Low' ? 'low' : 'medium';
+            
+            // Get actual duration from time tracked
+            const actualHours = updatedTask.timeTracked ? parseFloat(updatedTask.timeTracked) : 0;
+            
+            // Get assignee if available
+            const assignments = await storage.getAssignmentsByTaskId(updatedTask.id);
+            const assigneeId = assignments.length > 0 ? assignments[0].staffProfileId : undefined;
+            
+            // Get client from project if available
+            let clientId: string | undefined;
+            if (updatedTask.projectId) {
+              const project = await storage.getProjectById(updatedTask.projectId);
+              clientId = project?.clientId ?? undefined;
+            }
+            
+            // Record completion in history
+            await durationIntelligenceIntegration.recordTaskCompletion(
+              agencyId, updatedTask.id, taskType, complexity, actualHours, assigneeId, clientId
+            );
+            
+            console.log(`[Duration Intelligence] Recorded task completion ${updatedTask.id}: ${actualHours}h actual`);
+            
+            // Trigger outcome feedback comparison
+            const feedback = await durationIntelligenceIntegration.generateOutcomeFeedback(agencyId, updatedTask.id);
+            if (feedback) {
+              console.log(`[Duration Intelligence] Outcome feedback for ${updatedTask.id}: predicted ${feedback.predictedHours}h vs actual ${feedback.actualHours}h (variance: ${feedback.variancePercent.toFixed(1)}%)`);
+            }
+          } catch (completionError) {
+            console.error('[Duration Intelligence] Failed to record completion:', completionError);
+          }
+        });
+      }
 
       res.json(updatedTask);
     } catch (error: any) {
@@ -2284,6 +2370,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Log activity for the changes
       await logTaskActivity(id, req.user!.id, oldTask, updatedTask);
+      
+      // Track task completion for Duration Intelligence (non-blocking)
+      if (oldTask && oldTask.status !== 'Completed' && updatedTask.status === 'Completed' && req.user?.agencyId) {
+        const agencyId = req.user.agencyId;
+        setImmediate(async () => {
+          try {
+            const taskType = (updatedTask.description?.toLowerCase().includes('design') ? 'design' :
+                            updatedTask.description?.toLowerCase().includes('content') ? 'content' :
+                            updatedTask.description?.toLowerCase().includes('dev') ? 'development' :
+                            updatedTask.description?.toLowerCase().includes('seo') ? 'seo' : 'general');
+            const complexity = updatedTask.priority === 'High' ? 'high' : 
+                              updatedTask.priority === 'Low' ? 'low' : 'medium';
+            const actualHours = updatedTask.timeTracked ? parseFloat(updatedTask.timeTracked) : 0;
+            
+            const assignments = await storage.getAssignmentsByTaskId(updatedTask.id);
+            const assigneeId = assignments.length > 0 ? assignments[0].staffProfileId : undefined;
+            
+            let clientId: string | undefined;
+            if (updatedTask.projectId) {
+              const project = await storage.getProjectById(updatedTask.projectId);
+              clientId = project?.clientId ?? undefined;
+            }
+            
+            await durationIntelligenceIntegration.recordTaskCompletion(
+              agencyId, updatedTask.id, taskType, complexity, actualHours, assigneeId, clientId
+            );
+            
+            console.log(`[Duration Intelligence] Staff recorded task completion ${updatedTask.id}: ${actualHours}h actual`);
+          } catch (completionError) {
+            console.error('[Duration Intelligence] Failed to record staff completion:', completionError);
+          }
+        });
+      }
       
       res.json(updatedTask);
     } catch (error: any) {

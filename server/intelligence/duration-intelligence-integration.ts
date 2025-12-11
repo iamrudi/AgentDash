@@ -346,6 +346,69 @@ export class DurationIntelligenceIntegration {
     const project = await storage.getProjectById(projectId);
     return project?.clientId || null;
   }
+
+  /**
+   * Wrapper method for recording task completion from routes
+   */
+  async recordTaskCompletion(
+    agencyId: string,
+    taskId: string,
+    taskType: string,
+    complexity: string,
+    actualHours: number,
+    assigneeId?: string,
+    clientId?: string
+  ): Promise<void> {
+    // Get task details
+    const task = await storage.getTaskById(taskId);
+    if (!task) {
+      console.warn(`[Duration Intelligence] Task not found for completion recording: ${taskId}`);
+      return;
+    }
+
+    // Use the existing onTaskCompleted logic
+    await this.onTaskCompleted(agencyId, task, actualHours, {
+      taskType,
+      complexity,
+      channel: undefined
+    });
+  }
+
+  /**
+   * Generate outcome feedback comparing predicted vs actual duration
+   */
+  async generateOutcomeFeedback(
+    agencyId: string,
+    taskId: string
+  ): Promise<{ predictedHours: number; actualHours: number; variancePercent: number } | null> {
+    try {
+      // Get prediction for task
+      const prediction = await storage.getTaskDurationPrediction(taskId);
+      if (!prediction) {
+        return null;
+      }
+
+      // Get task to get actual hours tracked
+      const task = await storage.getTaskById(taskId);
+      if (!task || !task.timeTracked) {
+        return null;
+      }
+
+      const predictedHours = parseFloat(prediction.predictedHours);
+      const actualHours = parseFloat(task.timeTracked);
+      const variancePercent = predictedHours > 0 ? 
+        ((actualHours - predictedHours) / predictedHours) * 100 : 0;
+
+      return {
+        predictedHours,
+        actualHours,
+        variancePercent
+      };
+    } catch (error) {
+      console.error('[Duration Intelligence] Error generating outcome feedback:', error);
+      return null;
+    }
+  }
 }
 
 export const durationIntelligenceIntegration = new DurationIntelligenceIntegration();
