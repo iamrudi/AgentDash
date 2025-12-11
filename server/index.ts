@@ -135,6 +135,12 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Initialize WebSocket server for real-time features
+  const { realtimeServer, realtimeRoutes } = await import("./realtime");
+  realtimeServer.initialize(server);
+  app.use("/api/realtime", realtimeRoutes);
+  log('✅ WebSocket real-time server initialized at /ws');
+
   // Start invoice scheduler for automated monthly invoicing
   if (features.autoInvoicing) {
     const invoiceScheduler = new InvoiceScheduler(storage);
