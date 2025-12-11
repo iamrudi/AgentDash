@@ -7665,7 +7665,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Get AI cache stats (admin only)
-  app.get("/api/ai-cache/stats", requireAuth, requireRole(["Admin"]), async (_req: AuthRequest, res) => {
+  app.get("/api/ai-cache/stats", requireAuth, requireRole("Admin"), async (_req: AuthRequest, res) => {
     try {
       const stats = hardenedAIExecutor.getCacheStats();
       res.json(stats);
@@ -7676,7 +7676,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Clear AI cache (admin only)
-  app.delete("/api/ai-cache", requireAuth, requireRole(["Admin"]), async (_req: AuthRequest, res) => {
+  app.delete("/api/ai-cache", requireAuth, requireRole("Admin"), async (_req: AuthRequest, res) => {
     try {
       hardenedAIExecutor.clearCache();
       res.json({ message: "AI cache cleared" });
@@ -7708,7 +7708,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Create or update retention policy
-  app.post("/api/retention-policies", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/retention-policies", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
       if (!agencyId) {
@@ -7761,7 +7761,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Delete retention policy
-  app.delete("/api/retention-policies/:id", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.delete("/api/retention-policies/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
       const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
@@ -7794,7 +7794,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Run retention cleanup (admin only, typically called by cron)
-  app.post("/api/retention-policies/cleanup", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/retention-policies/cleanup", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
       if (!agencyId) {
@@ -8218,7 +8218,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Rebuild entire index (Admin only)
-  app.post("/api/embedding-index/rebuild", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/embedding-index/rebuild", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8238,7 +8238,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Prune orphaned embeddings (Admin only)
-  app.post("/api/embedding-index/prune", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/embedding-index/prune", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8262,7 +8262,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   // ===========================================
 
   // Intelligence Signals - List signals for agency
-  app.get("/api/intelligence/signals", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/signals", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8285,7 +8285,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Signals - Get single signal
-  app.get("/api/intelligence/signals/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/signals/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const signal = await storage.getIntelligenceSignalById(req.params.id);
       if (!signal) {
@@ -8306,7 +8306,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Signals - Create new signal (for internal/integration use)
-  app.post("/api/intelligence/signals", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/signals", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8328,7 +8328,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Signals - Discard a signal
-  app.post("/api/intelligence/signals/:id/discard", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/signals/:id/discard", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const { reason } = req.body;
       if (!reason) {
@@ -8344,7 +8344,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Insights - List insights for agency
-  app.get("/api/intelligence/insights", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/insights", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8367,7 +8367,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Insights - Get single insight
-  app.get("/api/intelligence/insights/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/insights/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const insight = await storage.getIntelligenceInsightById(req.params.id);
       if (!insight) {
@@ -8387,7 +8387,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Insights - Create insight (for internal/aggregator use)
-  app.post("/api/intelligence/insights", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/insights", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8408,7 +8408,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Insights - Update status
-  app.patch("/api/intelligence/insights/:id/status", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.patch("/api/intelligence/insights/:id/status", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const { status } = req.body;
       if (!status) {
@@ -8429,7 +8429,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priority Config - Get config for agency
-  app.get("/api/intelligence/priority-config", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/priority-config", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8456,7 +8456,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priority Config - Update config
-  app.put("/api/intelligence/priority-config", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.put("/api/intelligence/priority-config", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8481,7 +8481,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priorities - List priorities for agency
-  app.get("/api/intelligence/priorities", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/priorities", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8503,7 +8503,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priorities - Get single priority
-  app.get("/api/intelligence/priorities/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/priorities/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const priority = await storage.getIntelligencePriorityById(req.params.id);
       if (!priority) {
@@ -8523,7 +8523,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priorities - Create priority (for priority engine use)
-  app.post("/api/intelligence/priorities", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/priorities", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8544,7 +8544,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Priorities - Update status
-  app.patch("/api/intelligence/priorities/:id/status", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.patch("/api/intelligence/priorities/:id/status", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const { status } = req.body;
       if (!status) {
@@ -8565,7 +8565,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Feedback - List feedback for agency
-  app.get("/api/intelligence/feedback", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/feedback", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8586,7 +8586,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Feedback - Get single feedback
-  app.get("/api/intelligence/feedback/:id", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/feedback/:id", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const feedback = await storage.getIntelligenceFeedbackById(req.params.id);
       if (!feedback) {
@@ -8606,7 +8606,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Feedback - Submit feedback
-  app.post("/api/intelligence/feedback", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/feedback", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8628,7 +8628,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Overview - Dashboard summary
-  app.get("/api/intelligence/overview", requireAuth, requireRole(["Admin", "SuperAdmin"]), async (req: AuthRequest, res) => {
+  app.get("/api/intelligence/overview", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8656,7 +8656,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Processing - Process signals into insights (Admin only)
-  app.post("/api/intelligence/process-signals", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/process-signals", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8677,7 +8677,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Processing - Compute priorities from insights (Admin only)
-  app.post("/api/intelligence/compute-priorities", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/compute-priorities", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
@@ -8698,7 +8698,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
   });
 
   // Intelligence Processing - Run full pipeline (Admin only)
-  app.post("/api/intelligence/run-pipeline", requireAuth, requireRole(["Admin"]), async (req: AuthRequest, res) => {
+  app.post("/api/intelligence/run-pipeline", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const agencyId = req.user?.agencyId;
       if (!agencyId) {
