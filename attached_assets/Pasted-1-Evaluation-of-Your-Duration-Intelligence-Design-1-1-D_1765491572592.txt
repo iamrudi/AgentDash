@@ -1,0 +1,227 @@
+1. Evaluation of Your Duration Intelligence Design
+1.1 Duration Prediction Models
+
+Track historical task execution data… build feature-based predictions… generate confidence scores and emit prediction signals.
+
+Strengths
+
+You’re explicitly modelling:
+
+type
+
+complexity
+
+assignee
+
+actual duration
+
+variance
+
+Using similar past tasks and confidence scores is exactly what you want for:
+
+plan vs. actual analysis
+
+SLA risk
+
+capacity planning
+
+Suggested refinements
+
+Feature set
+Add features that will massively help:
+
+Client/account ID (some clients introduce consistent drag)
+
+Channel/domain (SEO, PPC, Email, Dev, Design)
+
+“AI-involved” flag (AI-assisted vs purely human)
+
+Context size (e.g. number of assets/pages)
+
+Urgency / SLA tier
+
+Model layering
+
+Start with heuristic baselines per (task_type, complexity, role).
+
+Then refine with:
+
+per-assignee offsets (some people are consistently faster/slower)
+
+client-specific adjustments
+
+This keeps things interpretable and avoids premature overfitting.
+
+Confidence score design
+
+Derive from:
+
+Number of similar past samples
+
+Variance in those samples
+
+Recency (last 90 days weighted more)
+
+Use confidence to:
+
+drive UI: “Estimated 3h (low confidence)”
+
+decide when to ask humans for manual adjustments
+
+Cold start strategy
+
+For new clients/task types, fall back to:
+
+global defaults per task type
+
+then adapt quickly as data comes in
+
+Make that visible: “Using global baseline (no client history yet).”
+
+1.2 Resource Optimization
+
+Define staff capacity… balance workload… consider skills, load, predicted durations.
+
+Strengths
+
+Exactly what’s needed to move from “task assignment” → true scheduling engine.
+
+You’re correctly tying capacity, skills, and durations together.
+
+Suggested refinements
+
+Capacity model granularity
+
+Represent capacity in time buckets:
+
+e.g. daily granularity with available_hours[day] per user.
+
+Include:
+
+focus constraints (e.g. max context switches per day)
+
+soft vs hard constraints (preferences vs rules)
+
+Assignment objective function
+Think like a solver even if you implement greedily at first:
+
+Minimise: overload (hours beyond capacity)
+
+Minimise: SLA breach risk
+
+Minimise: context switching
+
+Maximise: skill fit + seniority fit
+
+Maximise: commercial impact completed per unit time
+
+Algorithm roadmap
+
+v1: greedy:
+
+sort tasks by priority
+
+assign to best-fit available staff using predicted duration
+
+v2: add “look ahead” to avoid overloading the same person
+
+v3: if needed, move to a CP-SAT / linear optimisation style approach
+
+Human override loop
+
+Every assignment plan should be:
+
+previewable
+
+editable
+
+re-runnable
+
+Changes by humans should feed back as learning signals about realistic capacity/constraints.
+
+1.3 Commercial Impact Prioritization
+
+Score tasks/projects by revenue impact, client tier, deadline, strategic weight… feed into Priority Engine.
+
+Strengths
+
+This is the missing “why” behind prioritisation: commercial and strategic impact.
+
+Integrating with the Priority Engine means you’re not building another parallel scoring system.
+
+Suggested refinements
+
+Explicit scoring formula
+
+Example:
+
+impact_score =
+  f(revenue_impact) * w1 +
+  f(client_tier) * w2 +
+  f(deadline_risk) * w3 +
+  strategic_weight * w4 +
+  lifecycle_weight * w5
+
+
+Make the weights configurable per agency.
+
+Non-revenue work
+
+Don’t forget:
+
+internal initiatives
+
+technical debt
+
+relationship / retention work
+
+These need a “strategic value” dimension so they don’t get starved.
+
+Feedback from outcomes
+
+After completion, compare:
+
+predicted impact vs actual impact
+
+Use that to:
+
+bias future scores
+
+update “strategic weight” of similar task types.
+
+1.4 Integration Points (Really Strong)
+
+You wrote:
+
+Predictions → intelligence_signals
+
+Priority Engine uses impact scoring
+
+SLA Engine uses predictions for proactive breach alerts
+
+Task creation triggers async prediction refresh
+
+Workflow engine injects predictions when scheduling
+
+From an architecture viewpoint, this is 👌:
+
+Prediction as signal
+Keeps your core engine clean: predictions just become one more signal type that workflows listen to.
+
+SLA risk alerts
+Beautiful: SLA engine uses predicted_duration + current_queue to forecast breaches.
+
+Async refresh
+Task creation / update triggers re-evaluation. Good for scalability and user experience.
+
+Workflow integration
+Scheduling workflows read from:
+
+predictions
+
+capacity profiles
+
+commercial priority
+…and produce assignment decisions.
+
+The main ask now is: make Duration Intelligence a first-class domain in your docs.
