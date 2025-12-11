@@ -21,8 +21,16 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Settings
+  Settings,
+  Timer,
+  Users,
+  BarChart3,
+  DollarSign,
+  Gauge,
+  Target,
+  Zap
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface IntelligenceOverview {
   unprocessedSignalsCount: number;
@@ -68,6 +76,49 @@ interface IntelligencePriority {
   rankingBucket: string | null;
   status: string;
   recommendedDueDate: string | null;
+}
+
+interface DurationPrediction {
+  id: string;
+  taskId: string;
+  predictedHours: string;
+  confidenceScore: string;
+  confidenceLevel: string;
+  isColdStart: boolean;
+  coldStartReason: string | null;
+  createdAt: string;
+}
+
+interface CapacityProfile {
+  id: string;
+  staffId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  maxHours: string;
+  focusTimeStart: string | null;
+  focusTimeEnd: string | null;
+}
+
+interface CommercialPriority {
+  taskId: string;
+  taskDescription: string;
+  clientName: string;
+  totalImpactScore: number;
+  revenueImpact: number;
+  clientTierWeight: number;
+  deadlineRiskWeight: number;
+  strategicWeight: number;
+  slaAtRisk: boolean;
+  daysUntilDeadline: number | null;
+}
+
+interface ModelStats {
+  totalHistoricalRecords: number;
+  avgVariancePercent: number;
+  coldStartRate: number;
+  confidenceDistribution: Record<string, number>;
+  topTaskTypes: Array<{ taskType: string; count: number; avgHours: number }>;
 }
 
 export default function IntelligencePage() {
@@ -199,7 +250,7 @@ export default function IntelligencePage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" className="flex items-center gap-2" data-testid="tab-overview">
             <TrendingUp className="w-4 h-4" />
             Overview
@@ -215,6 +266,10 @@ export default function IntelligencePage() {
           <TabsTrigger value="priorities" className="flex items-center gap-2" data-testid="tab-priorities">
             <ListOrdered className="w-4 h-4" />
             Priorities
+          </TabsTrigger>
+          <TabsTrigger value="duration" className="flex items-center gap-2" data-testid="tab-duration">
+            <Timer className="w-4 h-4" />
+            Duration
           </TabsTrigger>
           <TabsTrigger value="config" className="flex items-center gap-2" data-testid="tab-config">
             <Settings className="w-4 h-4" />
@@ -514,6 +569,10 @@ export default function IntelligencePage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="duration" className="mt-6">
+          <DurationIntelligenceTab />
+        </TabsContent>
+
         <TabsContent value="config" className="mt-6">
           <PriorityConfigTab />
         </TabsContent>
@@ -638,5 +697,384 @@ function PriorityConfigTab() {
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function DurationIntelligenceTab() {
+  const { toast } = useToast();
+  const [predictionForm, setPredictionForm] = useState({
+    taskType: "general",
+    complexity: "medium",
+  });
+
+  const { data: modelStats, isLoading: statsLoading } = useQuery<ModelStats>({
+    queryKey: ["/api/intelligence/duration/stats"],
+  });
+
+  const { data: recentPredictions, isLoading: predictionsLoading } = useQuery<DurationPrediction[]>({
+    queryKey: ["/api/intelligence/duration/predictions"],
+  });
+
+  const { data: commercialPriorities, isLoading: prioritiesLoading } = useQuery<CommercialPriority[]>({
+    queryKey: ["/api/intelligence/commercial-impact/priorities"],
+  });
+
+  const { data: capacityProfiles, isLoading: capacityLoading } = useQuery<CapacityProfile[]>({
+    queryKey: ["/api/intelligence/resource-optimization/capacity"],
+  });
+
+  const predictMutation = useMutation({
+    mutationFn: async (input: { taskType: string; complexity: string }) => {
+      const response = await apiRequest("POST", "/api/intelligence/duration/predict", input);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Prediction generated",
+        description: `Predicted duration: ${data.predictedHours.toFixed(1)} hours (${data.confidenceLevel} confidence)`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Prediction failed",
+        description: "Failed to generate duration prediction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getConfidenceBadge = (level: string) => {
+    const styles: Record<string, string> = {
+      high: "bg-green-500 text-white",
+      medium: "bg-yellow-500 text-black",
+      low: "bg-red-500 text-white",
+    };
+    return <Badge className={styles[level] || "bg-muted"}>{level}</Badge>;
+  };
+
+  const getImpactColor = (score: number) => {
+    if (score >= 80) return "bg-red-500";
+    if (score >= 60) return "bg-orange-500";
+    if (score >= 40) return "bg-yellow-500";
+    return "bg-green-500";
+  };
+
+  const getDayName = (day: number) => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return days[day] || "Unknown";
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Historical Records
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-3xl font-bold" data-testid="text-historical-records">
+                {modelStats?.totalHistoricalRecords || 0}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Avg Variance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-3xl font-bold" data-testid="text-avg-variance">
+                {modelStats?.avgVariancePercent?.toFixed(1) || 0}%
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Cold Start Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-3xl font-bold" data-testid="text-cold-start-rate">
+                {((modelStats?.coldStartRate || 0) * 100).toFixed(0)}%
+              </span>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Capacity Profiles
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {capacityLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <span className="text-3xl font-bold" data-testid="text-capacity-profiles">
+                {capacityProfiles?.length || 0}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Timer className="w-5 h-5" />
+              Quick Prediction
+            </CardTitle>
+            <CardDescription>Generate a duration estimate for a task type</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Task Type</label>
+                <select
+                  value={predictionForm.taskType}
+                  onChange={(e) => setPredictionForm({ ...predictionForm, taskType: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  data-testid="select-task-type"
+                >
+                  <option value="general">General</option>
+                  <option value="content">Content</option>
+                  <option value="design">Design</option>
+                  <option value="development">Development</option>
+                  <option value="review">Review</option>
+                  <option value="research">Research</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="reporting">Reporting</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Complexity</label>
+                <select
+                  value={predictionForm.complexity}
+                  onChange={(e) => setPredictionForm({ ...predictionForm, complexity: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md bg-background"
+                  data-testid="select-complexity"
+                >
+                  <option value="simple">Simple</option>
+                  <option value="medium">Medium</option>
+                  <option value="complex">Complex</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+            </div>
+            <Button
+              onClick={() => predictMutation.mutate(predictionForm)}
+              disabled={predictMutation.isPending}
+              data-testid="button-predict"
+            >
+              {predictMutation.isPending ? "Predicting..." : "Generate Prediction"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gauge className="w-5 h-5" />
+              Confidence Distribution
+            </CardTitle>
+            <CardDescription>How confident are our predictions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : modelStats?.confidenceDistribution ? (
+              <div className="space-y-4">
+                {Object.entries(modelStats.confidenceDistribution).map(([level, count]) => (
+                  <div key={level} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="capitalize">{level}</span>
+                      <span>{count}</span>
+                    </div>
+                    <Progress 
+                      value={(count / Math.max(...Object.values(modelStats.confidenceDistribution), 1)) * 100} 
+                      className="h-2"
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">No prediction data yet</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              Recent Predictions
+            </CardTitle>
+            <CardDescription>Latest duration predictions with confidence scores</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {predictionsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : recentPredictions?.length ? (
+                <div className="space-y-3">
+                  {recentPredictions.map((prediction) => (
+                    <div
+                      key={prediction.id}
+                      className="p-3 border rounded-lg space-y-2"
+                      data-testid={`card-prediction-${prediction.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">
+                          {parseFloat(prediction.predictedHours).toFixed(1)} hours
+                        </span>
+                        {getConfidenceBadge(prediction.confidenceLevel)}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>Confidence: {(parseFloat(prediction.confidenceScore) * 100).toFixed(0)}%</span>
+                        {prediction.isColdStart && (
+                          <Badge variant="outline" className="text-xs">
+                            Cold Start
+                          </Badge>
+                        )}
+                      </div>
+                      {prediction.coldStartReason && (
+                        <p className="text-xs text-muted-foreground">{prediction.coldStartReason}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No predictions yet. Generate one using the form above.
+                </p>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Commercial Priority Queue
+            </CardTitle>
+            <CardDescription>Tasks ranked by commercial impact</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px]">
+              {prioritiesLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : commercialPriorities?.length ? (
+                <div className="space-y-3">
+                  {commercialPriorities.map((priority, index) => (
+                    <div
+                      key={priority.taskId}
+                      className="p-3 border rounded-lg space-y-2"
+                      data-testid={`card-priority-${priority.taskId}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold text-muted-foreground">#{index + 1}</span>
+                          <span className="font-medium truncate max-w-[180px]">
+                            {priority.taskDescription || "Untitled Task"}
+                          </span>
+                        </div>
+                        <div className={`px-2 py-1 rounded text-white text-sm font-medium ${getImpactColor(priority.totalImpactScore)}`}>
+                          {priority.totalImpactScore.toFixed(0)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{priority.clientName || "No Client"}</span>
+                        {priority.slaAtRisk && (
+                          <Badge variant="destructive" className="text-xs">
+                            SLA Risk
+                          </Badge>
+                        )}
+                        {priority.daysUntilDeadline !== null && (
+                          <span className={priority.daysUntilDeadline <= 2 ? "text-red-500" : ""}>
+                            {priority.daysUntilDeadline}d left
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex gap-2 text-xs">
+                        <span>Rev: {(priority.revenueImpact * 100).toFixed(0)}%</span>
+                        <span>Tier: {(priority.clientTierWeight * 100).toFixed(0)}%</span>
+                        <span>Deadline: {(priority.deadlineRiskWeight * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No commercial priorities calculated yet.
+                </p>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="w-5 h-5" />
+            Top Task Types by Duration
+          </CardTitle>
+          <CardDescription>Task types with most historical data and average durations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {statsLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : modelStats?.topTaskTypes?.length ? (
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+              {modelStats.topTaskTypes.map((taskType) => (
+                <div key={taskType.taskType} className="p-4 border rounded-lg text-center">
+                  <p className="font-medium capitalize">{taskType.taskType}</p>
+                  <p className="text-2xl font-bold">{taskType.avgHours.toFixed(1)}h</p>
+                  <p className="text-xs text-muted-foreground">{taskType.count} samples</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm text-center py-8">
+              No task type data available yet. Complete more tasks to build the model.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
