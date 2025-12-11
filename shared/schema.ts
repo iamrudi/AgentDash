@@ -2534,3 +2534,354 @@ export type IntelligenceSignalSeverity = typeof intelligenceSignalSeverityEnum[n
 export type IntelligenceInsightStatus = typeof intelligenceInsightStatusEnum[number];
 export type IntelligencePriorityStatus = typeof intelligencePriorityStatusEnum[number];
 export type IntelligenceRankingBucket = typeof intelligenceRankingBucketEnum[number];
+
+// ===========================================
+// DURATION INTELLIGENCE (Task Estimation & Optimization)
+// ===========================================
+
+// Task channels/domains for categorization
+export const taskChannelEnum = ["seo", "ppc", "email", "social", "content", "design", "development", "strategy", "admin", "other"] as const;
+export const taskComplexityEnum = ["trivial", "simple", "moderate", "complex", "very_complex"] as const;
+export const predictionConfidenceEnum = ["very_low", "low", "medium", "high", "very_high"] as const;
+export const allocationStatusEnum = ["draft", "proposed", "approved", "rejected", "executed"] as const;
+
+// TASK EXECUTION HISTORY - Historical task data for training duration models
+export const taskExecutionHistory = pgTable("task_execution_history", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  
+  // Core task metadata at completion time
+  taskType: text("task_type").notNull(), // From task description categorization
+  channel: text("channel"), // 'seo', 'ppc', 'email', 'social', 'content', 'design', 'development', etc.
+  complexity: text("complexity").notNull().default("moderate"), // 'trivial', 'simple', 'moderate', 'complex', 'very_complex'
+  
+  // Extended features for prediction
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+  assigneeId: uuid("assignee_id").references(() => profiles.id, { onDelete: "set null" }),
+  aiInvolved: boolean("ai_involved").default(false), // Was AI used to assist?
+  contextSize: integer("context_size"), // Number of assets/pages/items involved
+  urgencyTier: text("urgency_tier"), // 'standard', 'high', 'critical'
+  
+  // Duration data
+  estimatedHours: numeric("estimated_hours"), // Original estimate
+  actualHours: numeric("actual_hours").notNull(), // Actual time tracked
+  varianceHours: numeric("variance_hours"), // actual - estimated
+  variancePercent: numeric("variance_percent"), // (actual - estimated) / estimated * 100
+  
+  // SLA context
+  hadSlaBreached: boolean("had_sla_breached").default(false),
+  slaResponseTimeHours: numeric("sla_response_time_hours"),
+  slaResolutionTimeHours: numeric("sla_resolution_time_hours"),
+  
+  // Timeline
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("task_execution_history_agency_id_idx").on(table.agencyId),
+  taskIdIdx: index("task_execution_history_task_id_idx").on(table.taskId),
+  clientIdIdx: index("task_execution_history_client_id_idx").on(table.clientId),
+  assigneeIdIdx: index("task_execution_history_assignee_id_idx").on(table.assigneeId),
+  taskTypeIdx: index("task_execution_history_task_type_idx").on(table.taskType),
+  channelIdx: index("task_execution_history_channel_idx").on(table.channel),
+  complexityIdx: index("task_execution_history_complexity_idx").on(table.complexity),
+  completedAtIdx: index("task_execution_history_completed_at_idx").on(table.completedAt),
+}));
+
+// TASK DURATION PREDICTIONS - Current predictions per task
+export const taskDurationPredictions = pgTable("task_duration_predictions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  taskId: uuid("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }).unique(),
+  
+  // Prediction outputs
+  predictedHours: numeric("predicted_hours").notNull(),
+  confidenceScore: numeric("confidence_score").notNull(), // 0-1
+  confidenceLevel: text("confidence_level").notNull().default("medium"), // 'very_low', 'low', 'medium', 'high', 'very_high'
+  predictionRange: jsonb("prediction_range"), // { min: number, max: number, p25: number, p75: number }
+  
+  // Model layering contributions
+  baselineHours: numeric("baseline_hours"), // From heuristic (task_type, complexity, role)
+  assigneeOffset: numeric("assignee_offset"), // +/- hours for assignee performance
+  clientOffset: numeric("client_offset"), // +/- hours for client-specific drag
+  contextSizeAdjustment: numeric("context_size_adjustment"), // Scaling for context size
+  
+  // Cold start handling
+  isColdStart: boolean("is_cold_start").default(false),
+  coldStartReason: text("cold_start_reason"), // 'new_client', 'new_task_type', 'new_assignee', 'insufficient_data'
+  fallbackLevel: text("fallback_level"), // 'global', 'agency', 'channel', 'type'
+  
+  // Training data context
+  sampleCount: integer("sample_count").default(0), // Similar tasks used for prediction
+  sampleVariance: numeric("sample_variance"), // Variance in similar task durations
+  sampleRecencyDays: integer("sample_recency_days"), // Average age of samples
+  
+  // Signals emitted
+  signalEmittedAt: timestamp("signal_emitted_at"),
+  signalId: uuid("signal_id"),
+  
+  computedAt: timestamp("computed_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"), // When to refresh prediction
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("task_duration_predictions_agency_id_idx").on(table.agencyId),
+  taskIdIdx: index("task_duration_predictions_task_id_idx").on(table.taskId),
+  confidenceScoreIdx: index("task_duration_predictions_confidence_score_idx").on(table.confidenceScore),
+  isColdStartIdx: index("task_duration_predictions_is_cold_start_idx").on(table.isColdStart),
+  computedAtIdx: index("task_duration_predictions_computed_at_idx").on(table.computedAt),
+}));
+
+// RESOURCE CAPACITY PROFILES - Staff capacity by time buckets
+export const resourceCapacityProfiles = pgTable("resource_capacity_profiles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  staffId: uuid("staff_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  
+  // Base capacity
+  weeklyCapacityHours: numeric("weekly_capacity_hours").default("40").notNull(),
+  dailyCapacityHours: numeric("daily_capacity_hours").default("8").notNull(),
+  
+  // Daily breakdown (hours available per day of week)
+  mondayHours: numeric("monday_hours").default("8"),
+  tuesdayHours: numeric("tuesday_hours").default("8"),
+  wednesdayHours: numeric("wednesday_hours").default("8"),
+  thursdayHours: numeric("thursday_hours").default("8"),
+  fridayHours: numeric("friday_hours").default("8"),
+  saturdayHours: numeric("saturday_hours").default("0"),
+  sundayHours: numeric("sunday_hours").default("0"),
+  
+  // Focus constraints
+  maxTasksPerDay: integer("max_tasks_per_day").default(8), // Context switch limit
+  maxProjectsPerDay: integer("max_projects_per_day").default(4),
+  preferredTaskDurationMin: numeric("preferred_task_duration_min").default("0.5"), // Hours
+  preferredTaskDurationMax: numeric("preferred_task_duration_max").default("4"), // Hours
+  
+  // Skills for matching
+  primarySkills: text("primary_skills").array(), // Core competencies
+  secondarySkills: text("secondary_skills").array(), // Can do but not preferred
+  channelSpecializations: text("channel_specializations").array(), // 'seo', 'ppc', etc.
+  
+  // Soft vs hard constraints
+  softConstraints: jsonb("soft_constraints"), // { prefer_morning: true, avoid_fridays: false }
+  hardConstraints: jsonb("hard_constraints"), // { max_hours_per_client: 20, no_urgent_after_4pm: true }
+  
+  // Performance modifiers (for prediction adjustments)
+  speedModifier: numeric("speed_modifier").default("1.0"), // 1.0 = average, 1.2 = 20% faster
+  qualityScore: numeric("quality_score").default("1.0"), // For skill matching weight
+  
+  // Time off / unavailability
+  plannedTimeOff: jsonb("planned_time_off"), // Array of { startDate, endDate, type }
+  
+  isActive: boolean("is_active").default(true),
+  effectiveFrom: date("effective_from"),
+  effectiveTo: date("effective_to"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("resource_capacity_profiles_agency_id_idx").on(table.agencyId),
+  staffIdIdx: index("resource_capacity_profiles_staff_id_idx").on(table.staffId),
+  isActiveIdx: index("resource_capacity_profiles_is_active_idx").on(table.isActive),
+  uniqueStaffProfile: uniqueIndex("resource_capacity_profiles_staff_unique").on(table.staffId, table.agencyId),
+}));
+
+// RESOURCE ALLOCATION PLAN - Assignment plans (previewable, editable, re-runnable)
+export const resourceAllocationPlan = pgTable("resource_allocation_plan", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Plan metadata
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("draft"), // 'draft', 'proposed', 'approved', 'rejected', 'executed'
+  
+  // Time window
+  planStartDate: date("plan_start_date").notNull(),
+  planEndDate: date("plan_end_date").notNull(),
+  
+  // Assignments (array of task->staff mappings)
+  assignments: jsonb("assignments").notNull(), // Array of { taskId, staffId, scheduledDate, predictedHours, priority }
+  
+  // Optimization metrics
+  totalPredictedHours: numeric("total_predicted_hours"),
+  totalStaffCapacityHours: numeric("total_staff_capacity_hours"),
+  utilizationRate: numeric("utilization_rate"), // totalPredicted / totalCapacity
+  
+  // Objective function scores
+  overloadScore: numeric("overload_score"), // Lower is better - hours beyond capacity
+  slaRiskScore: numeric("sla_risk_score"), // Lower is better - breach probability
+  contextSwitchScore: numeric("context_switch_score"), // Lower is better
+  skillFitScore: numeric("skill_fit_score"), // Higher is better
+  commercialImpactScore: numeric("commercial_impact_score"), // Higher is better
+  compositeScore: numeric("composite_score"), // Final optimization score
+  
+  // Human override tracking
+  humanEdited: boolean("human_edited").default(false),
+  editHistory: jsonb("edit_history"), // Array of { changedAt, changedBy, changes }
+  
+  // Execution
+  executedAt: timestamp("executed_at"),
+  executedBy: uuid("executed_by").references(() => profiles.id, { onDelete: "set null" }),
+  
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("resource_allocation_plan_agency_id_idx").on(table.agencyId),
+  statusIdx: index("resource_allocation_plan_status_idx").on(table.status),
+  planStartDateIdx: index("resource_allocation_plan_start_date_idx").on(table.planStartDate),
+}));
+
+// COMMERCIAL IMPACT FACTORS - Per-agency configurable scoring weights and factors
+export const commercialImpactFactors = pgTable("commercial_impact_factors", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
+  
+  // Scoring formula weights (sum to 1.0)
+  wRevenue: numeric("w_revenue").default("0.25").notNull(),
+  wClientTier: numeric("w_client_tier").default("0.25").notNull(),
+  wDeadlineRisk: numeric("w_deadline_risk").default("0.20").notNull(),
+  wStrategicWeight: numeric("w_strategic_weight").default("0.15").notNull(),
+  wLifecycleWeight: numeric("w_lifecycle_weight").default("0.15").notNull(),
+  
+  // Client tier definitions
+  clientTierMapping: jsonb("client_tier_mapping").default('{"platinum": 1.0, "gold": 0.8, "silver": 0.6, "bronze": 0.4, "standard": 0.2}'),
+  
+  // Revenue impact scaling (how to normalize revenue values)
+  revenueScaleMin: numeric("revenue_scale_min").default("0"), // Minimum revenue value
+  revenueScaleMax: numeric("revenue_scale_max").default("100000"), // Maximum revenue value for scaling
+  
+  // Deadline risk curve parameters
+  deadlineRiskDays: jsonb("deadline_risk_days").default('{"critical": 1, "high": 3, "medium": 7, "low": 14}'),
+  
+  // Strategic value for non-revenue work
+  strategicValueMapping: jsonb("strategic_value_mapping").default('{"internal_initiative": 0.5, "tech_debt": 0.4, "relationship": 0.6, "retention": 0.7, "expansion": 0.8}'),
+  
+  // Lifecycle weight (where in client journey)
+  lifecycleWeightMapping: jsonb("lifecycle_weight_mapping").default('{"onboarding": 0.9, "growth": 0.7, "mature": 0.5, "at_risk": 0.95, "churning": 0.3}'),
+  
+  // Decay settings for feedback loop
+  feedbackDecayDays: integer("feedback_decay_days").default(90), // How long feedback influences scoring
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("commercial_impact_factors_agency_id_idx").on(table.agencyId),
+}));
+
+// COMMERCIAL IMPACT SCORES - Per-task/project commercial impact scores
+export const commercialImpactScores = pgTable("commercial_impact_scores", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  
+  // Reference to scored entity
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  initiativeId: uuid("initiative_id").references(() => initiatives.id, { onDelete: "cascade" }),
+  
+  // Client context
+  clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
+  clientTier: text("client_tier"),
+  clientLifecycleStage: text("client_lifecycle_stage"),
+  
+  // Individual factor scores (0-1)
+  revenueScore: numeric("revenue_score").default("0"),
+  clientTierScore: numeric("client_tier_score").default("0"),
+  deadlineRiskScore: numeric("deadline_risk_score").default("0"),
+  strategicScore: numeric("strategic_score").default("0"),
+  lifecycleScore: numeric("lifecycle_score").default("0"),
+  
+  // Computed total
+  totalImpactScore: numeric("total_impact_score").notNull(),
+  
+  // Revenue context
+  estimatedRevenueImpact: numeric("estimated_revenue_impact"),
+  revenueImpactType: text("revenue_impact_type"), // 'direct', 'retention', 'expansion', 'referral'
+  
+  // Strategic context
+  isNonRevenueWork: boolean("is_non_revenue_work").default(false),
+  nonRevenueType: text("non_revenue_type"), // 'internal_initiative', 'tech_debt', 'relationship', 'retention'
+  
+  // Deadline context
+  daysUntilDeadline: integer("days_until_deadline"),
+  slaAtRisk: boolean("sla_at_risk").default(false),
+  
+  // Feedback loop
+  predictedVsActual: jsonb("predicted_vs_actual"), // { predicted: number, actual: number, variance: number }
+  feedbackApplied: boolean("feedback_applied").default(false),
+  
+  computedAt: timestamp("computed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("commercial_impact_scores_agency_id_idx").on(table.agencyId),
+  taskIdIdx: index("commercial_impact_scores_task_id_idx").on(table.taskId),
+  projectIdIdx: index("commercial_impact_scores_project_id_idx").on(table.projectId),
+  clientIdIdx: index("commercial_impact_scores_client_id_idx").on(table.clientId),
+  totalImpactScoreIdx: index("commercial_impact_scores_total_impact_idx").on(table.totalImpactScore),
+}));
+
+// Insert schemas for Duration Intelligence
+export const insertTaskExecutionHistorySchema = createInsertSchema(taskExecutionHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskDurationPredictionSchema = createInsertSchema(taskDurationPredictions).omit({
+  id: true,
+  computedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResourceCapacityProfileSchema = createInsertSchema(resourceCapacityProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResourceAllocationPlanSchema = createInsertSchema(resourceAllocationPlan).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCommercialImpactFactorsSchema = createInsertSchema(commercialImpactFactors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCommercialImpactScoreSchema = createInsertSchema(commercialImpactScores).omit({
+  id: true,
+  computedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for Duration Intelligence
+export type TaskExecutionHistory = typeof taskExecutionHistory.$inferSelect;
+export type InsertTaskExecutionHistory = z.infer<typeof insertTaskExecutionHistorySchema>;
+
+export type TaskDurationPrediction = typeof taskDurationPredictions.$inferSelect;
+export type InsertTaskDurationPrediction = z.infer<typeof insertTaskDurationPredictionSchema>;
+
+export type ResourceCapacityProfile = typeof resourceCapacityProfiles.$inferSelect;
+export type InsertResourceCapacityProfile = z.infer<typeof insertResourceCapacityProfileSchema>;
+
+export type ResourceAllocationPlan = typeof resourceAllocationPlan.$inferSelect;
+export type InsertResourceAllocationPlan = z.infer<typeof insertResourceAllocationPlanSchema>;
+
+export type CommercialImpactFactors = typeof commercialImpactFactors.$inferSelect;
+export type InsertCommercialImpactFactors = z.infer<typeof insertCommercialImpactFactorsSchema>;
+
+export type CommercialImpactScore = typeof commercialImpactScores.$inferSelect;
+export type InsertCommercialImpactScore = z.infer<typeof insertCommercialImpactScoreSchema>;
+
+// Enum type exports for Duration Intelligence
+export type TaskChannel = typeof taskChannelEnum[number];
+export type TaskComplexity = typeof taskComplexityEnum[number];
+export type PredictionConfidence = typeof predictionConfidenceEnum[number];
+export type AllocationStatus = typeof allocationStatusEnum[number];
