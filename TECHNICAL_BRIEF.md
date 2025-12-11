@@ -936,6 +936,97 @@ CRM webhooks are isolated by agency via `hubspotPortalId` mapping in `agency_set
 
 ---
 
+## Analytics Anomaly Detection
+
+### Overview
+
+The analytics anomaly detection service automatically identifies significant changes in GA4 and GSC metrics, converting detected anomalies into workflow signals for automated response.
+
+### Core Service
+
+```typescript
+// server/analytics/anomaly-detection.ts
+class AnomalyDetectionService {
+  // Statistical Methods
+  calculateZScore(value: number, dataset: number[]): number;
+  calculateIQRBounds(dataset: number[]): IQRBounds;
+  
+  // Detection
+  detectAnomaliesForClient(clientId: string, agencyId: string): Promise<DetectedAnomaly[]>;
+  runAnomalyDetectionForAgency(agencyId: string): Promise<AnomalyResults[]>;
+  
+  // Trend Analysis
+  analyzeTrends(clientId: string): Promise<TrendAnalysis[]>;
+  
+  // Signal Conversion
+  convertAnomalyToSignal(anomaly: DetectedAnomaly): Promise<string | null>;
+}
+```
+
+### Anomaly Types
+
+```typescript
+type AnomalyType = 
+  | 'traffic_drop' | 'traffic_spike'
+  | 'conversion_drop' | 'conversion_spike'
+  | 'ranking_loss' | 'ranking_gain'
+  | 'impression_drop' | 'click_drop'
+  | 'spend_anomaly' | 'bounce_rate_spike';
+```
+
+### Detection Methods
+
+| Method | Description | Use Case |
+|--------|-------------|----------|
+| Z-score | Standard deviation from mean | Traffic and conversion anomalies |
+| IQR | Interquartile range outliers | Robust outlier detection |
+| Percent Change | WoW/MoM comparison | Trend analysis |
+
+### Threshold Configuration
+
+```typescript
+interface AnomalyThreshold {
+  metricType: MetricType;
+  zScoreThreshold: number;       // Default: 2.5
+  percentChangeThreshold: number; // Default: 30%
+  minDataPoints: number;          // Default: 14 days
+  enabled: boolean;
+}
+```
+
+### False Positive Filtering
+
+The service filters false positives using:
+- **Weekend Pattern Detection:** Reduced traffic on weekends is expected
+- **Confidence Scoring:** Combines Z-score, data points, and IQR validation
+- **Historical Similarity:** Checks if similar values occurred recently
+
+### API Endpoints
+
+```
+GET  /api/analytics/anomalies/:clientId    - Detect anomalies for client
+GET  /api/analytics/trends/:clientId       - WoW/MoM trend analysis
+POST /api/analytics/anomalies/scan         - Scan all agency clients
+POST /api/analytics/anomalies/:clientId/convert - Convert to signals
+GET  /api/analytics/statistics/:clientId   - Statistical summary
+```
+
+### Signal Integration
+
+Detected anomalies are converted to workflow signals via `AnalyticsAdapter`:
+
+```typescript
+// Signal type mapping
+const signalTypeMap = {
+  traffic_drop: 'traffic_anomaly',
+  conversion_drop: 'conversion_anomaly',
+  ranking_loss: 'ranking_anomaly',
+  impression_drop: 'visibility_anomaly',
+};
+```
+
+---
+
 ## SLA & Escalation Engine
 
 ### SLA System Overview

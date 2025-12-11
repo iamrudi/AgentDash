@@ -437,6 +437,24 @@ export const dailyMetrics = pgTable("daily_metrics", {
   clientIdDateIdx: index("daily_metrics_client_id_date_idx").on(table.clientId, table.date),
 }));
 
+// CLIENT ANOMALY THRESHOLDS (per-client anomaly detection configuration)
+export const clientAnomalyThresholds = pgTable("client_anomaly_thresholds", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  metricType: text("metric_type").notNull(), // 'sessions', 'conversions', 'clicks', etc.
+  zScoreThreshold: numeric("z_score_threshold").default("2.5"),
+  percentChangeThreshold: numeric("percent_change_threshold").default("30"),
+  minDataPoints: integer("min_data_points").default(14),
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clientIdMetricIdx: index("client_anomaly_thresholds_client_metric_idx").on(table.clientId, table.metricType),
+}));
+
+export type ClientAnomalyThreshold = typeof clientAnomalyThresholds.$inferSelect;
+export type InsertClientAnomalyThreshold = typeof clientAnomalyThresholds.$inferInsert;
+
 // CLIENT INTEGRATIONS (OAuth tokens for external services)
 export const clientIntegrations = pgTable("client_integrations", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),

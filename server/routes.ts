@@ -6300,6 +6300,15 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, crmRouter);
 
+  // Register Analytics routes (anomaly detection and trend analysis)
+  const { analyticsRouter } = await import("./analytics/analytics-routes");
+  app.use("/api/analytics", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    next();
+  }, analyticsRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

@@ -248,6 +248,66 @@ export class WebhookAdapter implements SignalAdapter {
   }
 }
 
+export class AnalyticsAdapter implements SignalAdapter {
+  source = "analytics";
+
+  adapt(agencyId: string, rawData: Record<string, unknown>, clientId?: string): AdapterResult {
+    const anomalyType = rawData.anomalyType as string || "analytics_anomaly";
+    const severity = rawData.severity as string || "medium";
+    
+    // Map severity to urgency
+    const urgencyMap: Record<string, string> = {
+      critical: "critical",
+      high: "high",
+      medium: "normal",
+      low: "low",
+    };
+    const urgency = urgencyMap[severity] || "normal";
+    
+    // Determine signal type based on anomaly type
+    const type = this.mapAnomalyTypeToSignalType(anomalyType);
+    
+    const raw: RawSignalPayload = {
+      source: this.source,
+      type,
+      data: rawData,
+      clientId: clientId || rawData.clientId as string,
+      urgency,
+      timestamp: rawData.detectedAt as string || new Date().toISOString(),
+      metadata: {
+        adapter: "analytics",
+        anomalyId: rawData.anomalyId,
+        metricType: rawData.metricType,
+        zScore: rawData.zScore,
+        percentChange: rawData.percentChange,
+        confidence: rawData.confidence,
+      },
+    };
+
+    const normalized = SignalNormalizer.normalize(agencyId, raw);
+    return {
+      signal: SignalNormalizer.toInsertSignal(normalized),
+      rawPayload: rawData,
+    };
+  }
+
+  private mapAnomalyTypeToSignalType(anomalyType: string): string {
+    const typeMap: Record<string, string> = {
+      traffic_drop: "traffic_anomaly",
+      traffic_spike: "traffic_anomaly",
+      conversion_drop: "conversion_anomaly",
+      conversion_spike: "conversion_anomaly",
+      ranking_loss: "ranking_anomaly",
+      ranking_gain: "ranking_anomaly",
+      bounce_rate_spike: "engagement_anomaly",
+      impression_drop: "visibility_anomaly",
+      click_drop: "engagement_anomaly",
+      spend_anomaly: "budget_anomaly",
+    };
+    return typeMap[anomalyType] || "analytics_anomaly";
+  }
+}
+
 export class SignalAdapterFactory {
   private static adapters: Map<string, SignalAdapter> = new Map([
     ["ga4", new GA4Adapter()],
@@ -256,6 +316,7 @@ export class SignalAdapterFactory {
     ["linkedin", new LinkedInAdapter()],
     ["internal", new InternalAdapter()],
     ["webhook", new WebhookAdapter()],
+    ["analytics", new AnalyticsAdapter()],
   ]);
 
   static getAdapter(source: string): SignalAdapter {
