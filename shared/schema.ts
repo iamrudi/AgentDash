@@ -1417,6 +1417,126 @@ export type InsertSlaBreachEvent = typeof slaBreachEvents.$inferInsert;
 export type SlaMetrics = typeof slaMetrics.$inferSelect;
 export type InsertSlaMetrics = typeof slaMetrics.$inferInsert;
 
+// ============================================
+// MULTI-AGENT ARCHITECTURE (Priority 8)
+// ============================================
+
+// Agent domain types
+export const agentDomainEnum = ["seo", "ppc", "crm", "reporting", "general"] as const;
+export const agentStatusEnum = ["active", "inactive", "deprecated"] as const;
+export const agentExecutionStatusEnum = ["pending", "running", "completed", "failed"] as const;
+
+// AGENTS (Specialized AI agents per domain)
+export const agents = pgTable("agents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  domain: text("domain").notNull(), // 'seo', 'ppc', 'crm', 'reporting', 'general'
+  status: text("status").notNull().default("active"), // 'active', 'inactive', 'deprecated'
+  aiProvider: text("ai_provider").notNull().default("gemini"), // 'gemini', 'openai'
+  aiModel: text("ai_model"), // Specific model override
+  systemPrompt: text("system_prompt"), // Custom system prompt for the agent
+  temperature: numeric("temperature").default("0.7"),
+  maxTokens: integer("max_tokens").default(4096),
+  capabilities: text("capabilities").array().notNull().default(sql`ARRAY[]::text[]`),
+  config: jsonb("config").$type<Record<string, unknown>>(), // Domain-specific configuration
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+}, (table) => ({
+  agencyIdIdx: index("agents_agency_id_idx").on(table.agencyId),
+  domainIdx: index("agents_domain_idx").on(table.domain),
+  statusIdx: index("agents_status_idx").on(table.status),
+}));
+
+// AGENT CAPABILITIES (Fine-grained capability definitions)
+export const agentCapabilities = pgTable("agent_capabilities", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g., 'analyze_rankings', 'generate_content', 'score_leads'
+  description: text("description"),
+  inputSchema: jsonb("input_schema").$type<Record<string, unknown>>(), // Expected input format
+  outputSchema: jsonb("output_schema").$type<Record<string, unknown>>(), // Expected output format
+  promptTemplate: text("prompt_template"), // Template for this capability
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agentIdIdx: index("agent_capabilities_agent_id_idx").on(table.agentId),
+  nameIdx: index("agent_capabilities_name_idx").on(table.name),
+}));
+
+// AGENT EXECUTIONS (Track every agent invocation)
+export const agentExecutions = pgTable("agent_executions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  capabilityId: uuid("capability_id").references(() => agentCapabilities.id),
+  workflowExecutionId: uuid("workflow_execution_id").references(() => workflowExecutions.id),
+  signalId: uuid("signal_id").references(() => workflowSignals.id),
+  operation: text("operation").notNull(), // 'analyze', 'recommend', 'execute'
+  status: text("status").notNull().default("pending"), // 'pending', 'running', 'completed', 'failed'
+  input: jsonb("input").$type<Record<string, unknown>>(),
+  output: jsonb("output").$type<Record<string, unknown>>(),
+  inputHash: text("input_hash"), // For idempotency
+  outputHash: text("output_hash"), // For reproducibility verification
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  totalTokens: integer("total_tokens"),
+  latencyMs: integer("latency_ms"),
+  error: text("error"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("agent_executions_agency_id_idx").on(table.agencyId),
+  agentIdIdx: index("agent_executions_agent_id_idx").on(table.agentId),
+  statusIdx: index("agent_executions_status_idx").on(table.status),
+  workflowExecutionIdIdx: index("agent_executions_workflow_execution_id_idx").on(table.workflowExecutionId),
+  inputHashIdx: index("agent_executions_input_hash_idx").on(table.inputHash),
+  createdAtIdx: index("agent_executions_created_at_idx").on(table.createdAt),
+}));
+
+// AGENT ROUTING RULES (Route signals to appropriate agents)
+export const agentRoutingRules = pgTable("agent_routing_rules", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: integer("priority").default(100), // Lower = higher priority
+  signalSource: text("signal_source"), // Filter by source (null = any)
+  signalType: text("signal_type"), // Filter by type (null = any)
+  payloadFilter: jsonb("payload_filter").$type<Record<string, unknown>>(), // JSONPath-style filters
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("agent_routing_rules_agency_id_idx").on(table.agencyId),
+  agentIdIdx: index("agent_routing_rules_agent_id_idx").on(table.agentId),
+  priorityIdx: index("agent_routing_rules_priority_idx").on(table.priority),
+  signalSourceIdx: index("agent_routing_rules_signal_source_idx").on(table.signalSource),
+  signalTypeIdx: index("agent_routing_rules_signal_type_idx").on(table.signalType),
+}));
+
+// Agent Types
+export type Agent = typeof agents.$inferSelect;
+export type InsertAgent = typeof agents.$inferInsert;
+
+export type AgentCapability = typeof agentCapabilities.$inferSelect;
+export type InsertAgentCapability = typeof agentCapabilities.$inferInsert;
+
+export type AgentExecution = typeof agentExecutions.$inferSelect;
+export type InsertAgentExecution = typeof agentExecutions.$inferInsert;
+
+export type AgentRoutingRule = typeof agentRoutingRules.$inferSelect;
+export type InsertAgentRoutingRule = typeof agentRoutingRules.$inferInsert;
+
+export type AgentDomain = typeof agentDomainEnum[number];
+export type AgentStatus = typeof agentStatusEnum[number];
+export type AgentExecutionStatus = typeof agentExecutionStatusEnum[number];
+
 // SLA Insert Schemas
 export const insertSlaDefinitionSchema = createInsertSchema(slaDefinitions).omit({
   id: true,
@@ -1553,6 +1673,45 @@ export const insertAIUsageTrackingSchema = createInsertSchema(aiUsageTracking).o
   createdAt: true,
   updatedAt: true,
 });
+
+// Agent schemas
+export const insertAgentSchema = createInsertSchema(agents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAgentSchema = createInsertSchema(agents).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+  updatedAt: true,
+  createdBy: true,
+}).partial();
+
+export const insertAgentCapabilitySchema = createInsertSchema(agentCapabilities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAgentExecutionSchema = createInsertSchema(agentExecutions).omit({
+  id: true,
+  createdAt: true,
+  startedAt: true,
+  completedAt: true,
+});
+
+export const insertAgentRoutingRuleSchema = createInsertSchema(agentRoutingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateAgentRoutingRuleSchema = createInsertSchema(agentRoutingRules).omit({
+  id: true,
+  agencyId: true,
+  createdAt: true,
+}).partial();
 
 // Admin user creation schemas
 export const createClientUserSchema = z.object({
