@@ -113,7 +113,7 @@ interface WorkflowRuleVersion {
 
 ## Priority 3: Signal Processing & Ingestion
 
-**Status:** 🔴 Not Started  
+**Status:** ✅ COMPLETED (December 2024)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 2  
 **Estimated Duration:** 2 weeks
@@ -121,7 +121,43 @@ interface WorkflowRuleVersion {
 ### Description
 Create a normalized signal format that ingests events from GA4, GSC, HubSpot, LinkedIn, and internal application events into the workflow engine.
 
-### Deliverables
+### Deliverables ✅
+- ✅ Signal ingestion adapters per source (`server/workflow/signal-adapters.ts`)
+- ✅ SignalNormalizer for canonical payload transformation (`server/workflow/signal-normalizer.ts`)
+- ✅ SignalRouter for routing signals to matching workflows (`server/workflow/signal-router.ts`)
+- ✅ Extended workflow_signals schema with dedup, status, and retry fields
+- ✅ workflow_signal_routes table for routing configuration
+- ✅ 12 API endpoints for signal ingestion and route management
+- ✅ WorkflowEngine integration with executeFromSignal() method
+
+### Implementation Files
+```typescript
+// Signal adapters for each source
+server/workflow/signal-adapters.ts  // GA4, GSC, HubSpot, LinkedIn, Internal adapters
+
+// Normalization with deterministic dedup hash
+server/workflow/signal-normalizer.ts  // Canonical payload + SHA-256 hash
+
+// Routing logic with payload filters
+server/workflow/signal-router.ts  // Route matching + workflow triggering
+```
+
+### Signal Deduplication
+- Deterministic hash: SHA-256(agencyId + source + type + canonicalPayload)
+- Unique constraint on (agency_id, dedup_hash) prevents duplicates
+- Hash excludes ingestion-time metadata (ingestedAt)
+- Provider timestamps included only when explicitly provided
+
+### Success Criteria ✅
+- ✅ Signals normalized to canonical format before persistence
+- ✅ Duplicate signals deduplicated via hash (identical inputs → single record)
+- ✅ Signal routes filter by source/type/urgency/payload
+- ✅ WorkflowEngine triggered automatically for matching routes
+- ✅ Failed signals tracked with retry count for reprocessing
+
+---
+
+### Original Deliverables (reference)
 - Signal ingestion adapters per source
 - Signal queue (in-memory or Redis-backed)
 - Signal routing to appropriate workflows
