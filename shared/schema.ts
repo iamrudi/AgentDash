@@ -26,6 +26,10 @@ export const agencySettings = pgTable("agency_settings", {
   hubspotAccessToken: text("hubspot_access_token"), // Encrypted before storage
   hubspotAccessTokenIv: text("hubspot_access_token_iv"), // IV for encryption
   hubspotAccessTokenAuthTag: text("hubspot_access_token_auth_tag"), // Auth tag for encryption
+  hubspotPortalId: text("hubspot_portal_id"), // HubSpot portal/account ID for webhook routing
+  hubspotWebhookSecret: text("hubspot_webhook_secret"), // Encrypted webhook secret for signature validation
+  hubspotWebhookSecretIv: text("hubspot_webhook_secret_iv"),
+  hubspotWebhookSecretAuthTag: text("hubspot_webhook_secret_auth_tag"),
   hubspotConnectedAt: timestamp("hubspot_connected_at"),
   // LinkedIn Integration (agency-wide)
   linkedinAccessToken: text("linkedin_access_token"), // Encrypted before storage

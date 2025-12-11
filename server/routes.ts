@@ -6287,6 +6287,19 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, agentRouter);
 
+  // Register CRM routes (HubSpot webhooks and integration)
+  const { crmRouter } = await import("./crm/crm-routes");
+  // Public webhook endpoint (no auth required for HubSpot webhooks)
+  app.use("/api/crm/webhooks", crmRouter);
+  // Protected CRM endpoints
+  app.use("/api/crm", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).agencyId = authReq.user?.agencyId;
+    (req as any).userId = authReq.user?.id;
+    (req as any).user = authReq.user;
+    next();
+  }, crmRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================
