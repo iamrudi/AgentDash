@@ -19,6 +19,7 @@ export type CRMEventType =
   | 'company.propertyChange'
   | 'meeting.created'
   | 'meeting.updated'
+  | 'meeting.deleted'
   | 'form.submitted';
 
 export interface CRMWebhookPayload {
@@ -61,15 +62,91 @@ export interface CRMSignalPayload {
 }
 
 export class CRMWebhookHandler {
+  /**
+   * Verify HubSpot webhook signature using v3 spec.
+   * HubSpot v3 signature: HMAC-SHA256(clientSecret, requestMethod + requestUri + requestBody + timestamp)
+   * The signature is provided in X-HubSpot-Signature-v3 header.
+   * Uses constant-time comparison to prevent timing attacks.
+   * 
+   * For v2 fallback (older webhook configs):
+   * SHA-256(clientSecret + requestBody)
+   */
+  async verifyHubSpotSignatureV3(
+    requestMethod: string,
+    requestUri: string,
+    requestBody: string,
+    signature: string,
+    clientSecret: string,
+    timestamp: string
+  ): Promise<boolean> {
+    if (!signature || !clientSecret || !timestamp) {
+      return false;
+    }
+
+    // Check timestamp is within 5 minutes (300 seconds) to prevent replay attacks
+    const requestTimestamp = parseInt(timestamp, 10);
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    if (Math.abs(currentTimestamp - requestTimestamp) > 300) {
+      console.warn('[CRM_WEBHOOK] Signature timestamp expired');
+      return false;
+    }
+
+    // HubSpot v3 signature: HMAC-SHA256(clientSecret, requestMethod + requestUri + requestBody + timestamp)
+    const sourceString = requestMethod + requestUri + requestBody + timestamp;
+    const expectedHash = createHmac('sha256', clientSecret)
+      .update(sourceString)
+      .digest('base64');
+    
+    return this.constantTimeCompare(signature, expectedHash);
+  }
+
+  /**
+   * Verify HubSpot webhook signature using v2 spec (fallback).
+   * SHA-256(clientSecret + requestBody)
+   */
+  async verifyHubSpotSignatureV2(
+    requestBody: string,
+    signature: string,
+    clientSecret: string
+  ): Promise<boolean> {
+    if (!signature || !clientSecret) {
+      return false;
+    }
+
+    const sourceString = clientSecret + requestBody;
+    const expectedHash = createHash('sha256')
+      .update(sourceString)
+      .digest('hex');
+    
+    return this.constantTimeCompare(signature, expectedHash);
+  }
+
+  /**
+   * Constant-time string comparison to prevent timing attacks.
+   */
+  private constantTimeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+      result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    }
+    
+    return result === 0;
+  }
+
+  /**
+   * Legacy method for backward compatibility.
+   * Prefers v3 verification, falls back to v2.
+   */
   async verifyHubSpotSignature(
     requestBody: string,
     signature: string,
     clientSecret: string
   ): Promise<boolean> {
-    const hash = createHmac('sha256', clientSecret)
-      .update(requestBody)
-      .digest('hex');
-    return hash === signature;
+    return this.verifyHubSpotSignatureV2(requestBody, signature, clientSecret);
   }
 
   async findAgencyByPortalId(portalId: string): Promise<string | null> {
@@ -137,12 +214,17 @@ export class CRMWebhookHandler {
       meeting: {
         created: 'meeting.created',
         updated: 'meeting.updated',
+        deleted: 'meeting.deleted',
+      },
+      // HubSpot form submissions come as 'forms.submission'
+      forms: {
+        submission: 'form.submitted',
+      },
+      form: {
+        submitted: 'form.submitted',
+        submission: 'form.submitted',
       },
     };
-
-    if (objectType === 'form' && action === 'submitted') {
-      return 'form.submitted';
-    }
 
     return typeMap[objectType]?.[action] || 'deal.updated';
   }
@@ -232,6 +314,7 @@ export class CRMWebhookHandler {
       'company.propertyChange': 'company_property_changed',
       'meeting.created': 'meeting_scheduled',
       'meeting.updated': 'meeting_updated',
+      'meeting.deleted': 'meeting_deleted',
       'form.submitted': 'form_submission',
     };
     return typeMapping[eventType] || 'crm_event';

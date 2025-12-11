@@ -871,6 +871,71 @@ POST        /api/agents/orchestrate               - Execute via orchestrator
 
 ---
 
+## CRM Integration & Webhook Processing
+
+### CRM Webhook Handler
+
+The CRM system processes incoming webhook events from HubSpot and converts them into workflow signals.
+
+```typescript
+// server/crm/crm-webhook-handler.ts
+class CRMWebhookHandler {
+  // HubSpot signature verification for webhook security
+  verifyHubSpotSignature(requestBody: string, signature: string, clientSecret: string): Promise<boolean>;
+  
+  // Find agency by HubSpot portal ID (agency isolation)
+  findAgencyByPortalId(portalId: string): Promise<string | null>;
+  
+  // Normalize raw HubSpot events into standard format
+  normalizeHubSpotEvent(payload: CRMWebhookPayload): NormalizedCRMEvent;
+  
+  // Batch process webhook payloads with deduplication
+  processWebhookBatch(payloads: CRMWebhookPayload[]): Promise<ProcessResult>;
+  
+  // Route CRM events through SignalRouter for workflow triggering
+  processAndRouteCRMEvent(agencyId: string, event: NormalizedCRMEvent): Promise<RoutingResult>;
+}
+```
+
+### Supported CRM Event Types (16 total)
+
+```typescript
+type CRMEventType = 
+  | 'deal.created' | 'deal.updated' | 'deal.deleted' | 'deal.propertyChange'
+  | 'contact.created' | 'contact.updated' | 'contact.deleted' | 'contact.propertyChange'
+  | 'company.created' | 'company.updated' | 'company.deleted' | 'company.propertyChange'
+  | 'meeting.created' | 'meeting.updated'
+  | 'form.submitted';
+```
+
+### Signal Type Mapping
+
+| CRM Event | Signal Type | Urgency |
+|-----------|-------------|---------|
+| Deal stage change | `deal_stage_changed` | high |
+| Deal created | `deal_created` | normal |
+| Contact created | `contact_created` | normal |
+| Form submission | `form_submission` | high |
+| Meeting scheduled | `meeting_scheduled` | normal |
+
+### CRM API Endpoints
+
+```
+POST /api/crm/webhooks/hubspot  - Public webhook endpoint (no auth)
+GET  /api/crm/status/:agencyId  - Check HubSpot integration status
+GET  /api/crm/events            - List CRM signals for agency
+POST /api/crm/sync/:agencyId    - Trigger manual CRM data sync
+```
+
+### Agency Isolation
+
+CRM webhooks are isolated by agency via `hubspotPortalId` mapping in `agency_settings`:
+- Each agency configures their HubSpot portal ID
+- Incoming webhooks are matched to agencies by portal ID
+- Signals are created with agency-specific deduplication
+
+---
+
 ## SLA & Escalation Engine
 
 ### SLA System Overview
