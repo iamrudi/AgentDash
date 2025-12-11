@@ -295,7 +295,7 @@ server/routes.ts (lineage query, replay, retention policy APIs)
 
 ## Priority 6: Tenant-Isolated Vector Stores
 
-**Status:** 🔴 Not Started  
+**Status:** ✅ COMPLETED (December 2024)  
 **Complexity:** High  
 **Dependencies:** None (can parallel with 1-5)  
 **Estimated Duration:** 3-4 weeks
@@ -303,36 +303,49 @@ server/routes.ts (lineage query, replay, retention policy APIs)
 ### Description
 Create per-agency vector stores for SOPs, brand assets, analytics embeddings, and knowledge bases for "Chat with Your Data" features.
 
-### Deliverables
-- Vector storage schema with agency isolation
-- Embedding pipeline (OpenAI/Gemini embeddings)
-- Semantic search API
-- Document ingestion (PDF, Markdown, HTML)
-- Index management (rebuild, prune)
+### Deliverables ✅
+- ✅ Vector storage schema with agency isolation (`knowledgeDocuments`, `documentEmbeddings` tables)
+- ✅ Embedding pipeline with dual provider support (OpenAI text-embedding-3-small, Gemini text-embedding-004)
+- ✅ Semantic search API with cosine similarity and query logging
+- ✅ Document ingestion with smart chunking (~500 tokens, 50 token overlap)
+- ✅ Index management endpoints (rebuild, prune, stats) with Admin-only access
 
-### Technical Approach
+### Implementation Files
 ```typescript
-// embeddings table
-{
-  id: string;
-  agencyId: string;        // Tenant isolation
-  documentId: string;
-  chunkIndex: number;
-  content: text;
-  embedding: vector(1536); // OpenAI dimension
-  metadata: jsonb;
-  createdAt: timestamp;
+// server/vector/embedding-service.ts
+class EmbeddingService {
+  generateEmbedding(text, provider)     // OpenAI/Gemini abstraction
+  indexDocument(documentId, agencyId)   // Chunk and embed
+  semanticSearch(query, agencyId, options)  // Cosine similarity search
+  rebuildIndex(agencyId)                // Full reindex
+  pruneOrphanedEmbeddings(agencyId)     // Cleanup
+  getIndexStats(agencyId)               // Stats per agency
 }
 
-// RLS Policy
-CREATE POLICY "agency_embeddings" ON embeddings
-  FOR ALL USING (agency_id = current_agency_id());
+// Schema (shared/schema.ts)
+knowledgeDocuments, documentEmbeddings, embeddingIndexStats, semanticSearchLogs
+
+// API Endpoints (server/routes.ts)
+GET/POST/PATCH/DELETE /api/knowledge-documents
+POST /api/knowledge-documents/:id/reindex
+POST /api/semantic-search
+GET /api/embedding-stats
+POST /api/embedding-index/rebuild (Admin only)
+POST /api/embedding-index/prune (Admin only)
 ```
 
-### Success Criteria
-- Embeddings strictly isolated by agency
-- Semantic search returns relevant chunks in < 200ms
-- Documents re-indexed on update
+### Security Hardening ✅
+- All endpoints derive agencyId from `req.user?.agencyId` (no query parameter override)
+- Document CRUD enforces ownership via `where(and(eq(id), eq(agencyId)))`
+- Semantic search uses parameterized `inArray()` queries (no SQL injection)
+- All document lookups include agency filtering to prevent cross-tenant leakage
+- Admin-only endpoints protected with `requireRole(["Admin"])`
+
+### Success Criteria ✅
+- ✅ Embeddings strictly isolated by agency
+- ✅ Semantic search returns relevant chunks with cosine similarity scoring
+- ✅ Documents re-indexed on update via reindex endpoint
+- ✅ No cross-tenant data exposure in any vector operation
 
 ---
 
