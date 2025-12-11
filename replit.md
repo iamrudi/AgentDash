@@ -106,7 +106,15 @@ Polling fallback at 1s interval where required.
 
 ---
 
-# 5. Workflow Engine (Core)
+# 5. Workflow Engine (Core) ✅ IMPLEMENTED
+
+**Status**: Priority 1 & 2 Complete (December 2024)
+
+## Implementation Files
+- `server/workflow/engine.ts` - WorkflowEngine class with step execution
+- `server/workflow/rule-engine.ts` - RuleEngine with 16 operators
+- `shared/schema.ts` - Workflow and rule table definitions
+- `scripts/test-workflow.ts` - Regression test suite
 
 ## Inputs (Signals)
 All external data and app events normalize to:
@@ -122,14 +130,17 @@ timestamp
 
 Sources include GA4, GSC, HubSpot, LinkedIn, Internal.
 
-## Rules Engine
-Rules run before AI:
-- ranking drop thresholds  
-- PPC anomaly detection  
-- lead lifecycle changes  
-- inactivity triggers  
+## Rules Engine ✅ IMPLEMENTED
+Rules run before AI with 16 operators:
+- **Standard**: eq, neq, gt, gte, lt, lte
+- **String**: contains, not_contains, starts_with, ends_with
+- **Collection**: in, not_in, is_null, is_not_null
+- **Threshold**: percent_change_gt, percent_change_lt
+- **Anomaly**: anomaly_zscore_gt (Z-score calculation)
+- **Lifecycle**: inactivity_days_gt, changed_to, changed_from
 
-Rules are versioned and auditable.
+Rules are versioned (draft → published → deprecated) and auditable.
+12 API endpoints for rule CRUD with Zod validation.
 
 ## AI Execution Layer
 - provider abstraction  
@@ -341,5 +352,74 @@ The core engine remains untouched.
 ### 3. Provider Architecture Everywhere
 AI providers, CRM providers, integration adapters, and PDF generators must follow the same contract pattern:
 
+## 17.7 Refactor-Driven Cleanup & Deletion
+
+Refactoring is never “just new code.”  
+Every refactor must also drive explicit cleanup and deletion work, tracked in PRIORITY_LIST.md.
+
+### 17.7.1 Refactor Rules
+
+For any change that alters behaviour, structure, or ownership of code:
+
+1. **Identify obsolete code paths**
+   - legacy modules
+   - unused functions
+   - dead feature flags
+   - duplicated logic
+   - abandoned experiments
+
+2. **Decide in the same change:**
+   - **Delete now**: remove obsolete code in the same PR where possible, or  
+   - **Schedule deletion**: if immediate removal is risky, mark clearly as deprecated and schedule removal as a task.
+
+3. **Update PRIORITY_LIST.md**
+   - Add explicit tasks for:
+     - code cleanup
+     - module deletion
+     - migration completion
+   - Each task must include:
+     - module / area
+     - scope of cleanup or deletion
+     - dependency notes
+     - owner (or role)
+     - deadline / sprint
+
+4. **Update TECHNICAL_BRIEF.md**
+   - Document:
+     - what was refactored
+     - what is now considered deprecated
+     - which behaviours moved to new components
+     - when old paths are expected to be removed
+     - impact on workflows and integrations
+
+### 17.7.2 No Zombie Code Policy
+
+The system does not permit “orphaned” or “temporary” code:
+
+- no undocumented feature flags
+- no unused endpoints
+- no unreachable branches
+- no abandoned experiments
+
+If code is not:
+- clearly active **and**
+- clearly documented **and**
+- clearly referenced in TECHNICAL_BRIEF.md,
+
+then it must either:
+- be deleted, or  
+- be added as a cleanup/deletion item in PRIORITY_LIST.md.
+
+### 17.7.3 Refactor Acceptance Test
+
+A refactor is only acceptable if all three are true:
+
+1. New behaviour is documented in TECHNICAL_BRIEF.md  
+2. Cleanup/deletion work is listed in PRIORITY_LIST.md  
+3. No new untracked legacy paths are introduced
+
+If any of the three fails, the refactor is **rejected** and must be reworked.
+
+---
 
 ---

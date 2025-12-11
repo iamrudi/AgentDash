@@ -379,6 +379,69 @@ All security-relevant actions are logged to `audit_logs` table:
 
 ---
 
+## Workflow Engine Architecture
+
+### Overview
+
+The platform includes a deterministic workflow orchestration engine for automated processing of signals, rule evaluation, and action execution.
+
+### Components
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Workflow Engine                             │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │   Signal    │  │    Rule     │  │   Action/Transform      │ │
+│  │   Handler   │──▶│   Engine    │──▶│   Handlers             │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+│         │                │                      │               │
+│         ▼                ▼                      ▼               │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              Transaction Manager (Atomic)                    ││
+│  └─────────────────────────────────────────────────────────────┘│
+│         │                │                      │               │
+│         ▼                ▼                      ▼               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │ Executions  │  │   Events    │  │   Evaluations           │ │
+│  │   Table     │  │   Table     │  │   Table                 │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Step Types
+
+| Step Type | Description |
+|-----------|-------------|
+| `signal` | Match incoming signals by type/source |
+| `rule` | Evaluate conditions (inline or versioned rules) |
+| `action` | Execute business logic (create projects, tasks, invoices) |
+| `transform` | Modify execution context data |
+| `notification` | Send alerts and notifications |
+| `branch` | Conditional workflow branching |
+
+### Rule Engine
+
+The rule engine supports 16 operators:
+
+| Category | Operators |
+|----------|-----------|
+| Standard | eq, neq, gt, gte, lt, lte |
+| String | contains, not_contains, starts_with, ends_with |
+| Collection | in, not_in, is_null, is_not_null |
+| Threshold | percent_change_gt, percent_change_lt |
+| Anomaly | anomaly_zscore_gt |
+| Lifecycle | inactivity_days_gt, changed_to, changed_from |
+
+### Key Guarantees
+
+1. **Atomicity**: All step executions wrapped in database transactions
+2. **Idempotency**: Duplicate inputs return cached results via content hashing
+3. **Auditability**: Every step event logged with timing and results
+4. **Determinism**: Identical inputs produce identical outputs
+
+---
+
 ## Future Enhancements
 
 - [ ] WebSocket-based real-time updates (replacing polling)
@@ -387,6 +450,8 @@ All security-relevant actions are logged to `audit_logs` table:
 - [ ] Webhook integrations for external systems
 - [ ] Multi-language support (i18n)
 - [ ] Advanced AI model selection per task type
+- [ ] Visual workflow builder UI
+- [ ] Signal processing pipeline for external integrations
 
 ---
 

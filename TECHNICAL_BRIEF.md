@@ -585,6 +585,118 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 ---
 
+## Workflow Engine
+
+### Architecture
+
+The workflow engine provides deterministic automation with atomic transactions.
+
+```typescript
+// server/workflow/engine.ts
+class WorkflowEngine {
+  constructor(storage: IStorage) { ... }
+  
+  // Execute workflow with idempotency
+  async executeWorkflow(
+    workflowId: string, 
+    input: WorkflowInput
+  ): Promise<WorkflowExecution>
+  
+  // Check execution status
+  async getExecutionStatus(executionId: string): Promise<WorkflowExecution>
+}
+```
+
+### Step Handlers
+
+```typescript
+// All steps execute within transaction context
+type StepHandler = (
+  step: WorkflowStep, 
+  context: ExecutionContext
+) => Promise<StepResult>;
+
+// Step types: signal, rule, action, transform, notification, branch
+```
+
+### Idempotency
+
+```typescript
+// Input hashing prevents duplicate executions
+const inputHash = createHash('sha256')
+  .update(JSON.stringify(input))
+  .digest('hex');
+
+// Check for existing execution with same hash
+const existing = await db.query.workflowExecutions.findFirst({
+  where: and(
+    eq(workflowExecutions.workflowId, workflowId),
+    eq(workflowExecutions.inputHash, inputHash)
+  )
+});
+```
+
+---
+
+## Rule Engine
+
+### Versioned Rules
+
+```typescript
+// Rules have versions: draft → published → deprecated
+interface WorkflowRule {
+  id: string;
+  agencyId: string;
+  name: string;
+  category: 'threshold' | 'anomaly' | 'lifecycle' | 'integration' | 'custom';
+  defaultVersionId?: string;
+}
+
+// Versions contain conditions and actions
+interface WorkflowRuleVersion {
+  id: string;
+  ruleId: string;
+  version: number;
+  status: 'draft' | 'published' | 'deprecated';
+  conditionLogic: 'all' | 'any';
+}
+```
+
+### Rule Evaluation
+
+```typescript
+// server/workflow/rule-engine.ts
+class RuleEngine {
+  async evaluateRule(
+    rule: WorkflowRule, 
+    context: RuleEvaluationContext
+  ): Promise<RuleEvaluationResult>
+  
+  // 16 operators including:
+  // - Standard: eq, neq, gt, gte, lt, lte
+  // - String: contains, starts_with, ends_with
+  // - Advanced: percent_change_gt, anomaly_zscore_gt
+  // - Lifecycle: inactivity_days_gt, changed_to, changed_from
+}
+```
+
+### Workflow Integration
+
+```typescript
+// Rule steps can use inline conditions or reference versioned rules
+const ruleStep: WorkflowStep = {
+  id: 'step-1',
+  type: 'rule',
+  config: {
+    ruleId: 'rule-uuid',  // Reference versioned rule
+    // OR inline conditions:
+    conditions: [{ field: 'value', operator: 'gt', value: 100 }]
+  }
+};
+```
+
+---
+
 ## Development Workflow
 
 ```bash
@@ -599,6 +711,19 @@ npm run db:studio      # Open Drizzle Studio
 # Type checking
 npx tsc --noEmit
 ```
+
+---
+
+## Important Files Reference
+
+| File | Purpose |
+|------|---------|
+| `server/workflow/engine.ts` | WorkflowEngine class with step execution |
+| `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
+| `shared/schema.ts` | All database schemas including workflow tables |
+| `server/storage.ts` | Database operations including workflow/rule CRUD |
+| `server/routes.ts` | All API endpoints including workflow/rule endpoints |
+| `scripts/test-workflow.ts` | Workflow regression test suite |
 
 ---
 
