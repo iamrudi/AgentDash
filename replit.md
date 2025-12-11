@@ -1,107 +1,314 @@
-# Agency Client Portal
+# Agency Client Portal — Engineering Architecture (Replit Edition)
 
-## Overview
-The Agency Client Portal is a multi-tenant agency management platform designed to streamline client relationships, project management, and task automation. It provides secure, role-based portals for clients, staff, and administrators. The platform aims to enhance agency efficiency, improve client communication, and leverage AI for insightful recommendations, including a "10-second health check" dashboard and data-driven client recommendations, to foster better client relationships and operational effectiveness.
+## Purpose
+Multi-tenant, workflow-driven agency OS for automating client delivery, orchestrating AI systems, and enforcing deterministic operational flows.  
+All features, APIs, and automations must uphold:
+- strict tenant isolation  
+- deterministic behaviour  
+- atomic transactions  
+- auditability  
+- reproducibility  
+- workflow lineage
 
-## User Preferences
-I prefer concise and direct communication. When making changes, prioritize iterative development and provide clear explanations of the modifications. Before implementing any major architectural changes or introducing new external dependencies, please ask for approval. Ensure that all code adheres to modern JavaScript/TypeScript best practices.
+Replit is the execution surface; the architecture is engine-first.
 
-## System Architecture
-The platform is a full-stack JavaScript application utilizing React for the frontend, Express.js for the backend, and PostgreSQL (managed via Supabase) as the database with Drizzle ORM. Authentication relies on Supabase Auth with session-based tokens and a robust Role-Based Access Control (RBAC) system for Client, Staff, and Admin roles, ensuring strict tenant isolation.
+---
 
-### UI/UX Decisions
-- **Frontend Framework**: React 18 with Wouter for routing and TanStack Query for state management.
-- **Design System**: macOS-inspired aesthetic with Tailwind CSS and Shadcn/UI for styling, supporting dark mode and mobile-first responsiveness.
-- **Icons**: Lucide React for consistent line-art styling.
-- **Navigation**: Collapsible sidebar with icon-only mode and portal-specific branding.
-- **Mobile Responsiveness**: Comprehensive support with touch targets meeting WCAG AA standards.
+# 1. Architecture Model
 
-### Technical Implementations
-- **Authentication & Authorization**: Supabase Auth with stateless JWT optimization, RBAC, and tenant isolation, including a SuperAdmin role with cross-agency access.
-- **Atomic Transaction Enforcement**: Critical principle for all operations modifying multiple data stores, using `db.transaction()` with explicit verification and rollback.
-- **Orphaned User Prevention**: Compensation-based transaction system and nightly cron job for cleanup of Supabase Auth users.
-- **Row-Level Security (RLS)**: Database-level tenant isolation using Postgres RLS policies with idempotent migrations (safe to re-run). Covers all 14 tables with 40 policies total, using Supabase's built-in `auth.jwt()` for app_metadata access.
-- **Forms**: React Hook Form with Zod validation.
-- **Notifications**: Unified notification center with real-time updates.
-- **Security**: AES-256-GCM for sensitive data, HMAC-SHA256 for CSRF protection.
-- **OAuth Reliability**: Production-ready error handling, rate limiting, and retry logic for Google API calls, with secure context-aware redirects.
-- **AI Recommendation Engine**: Preset-driven system with pluggable AI provider architecture for strategic initiatives and task lists, incorporating CRM and social metrics.
-- **Client Strategy Card**: AI-powered consolidated client view.
-- **Metrics Sync**: Idempotent endpoint for syncing GA4/GSC data with bidirectional lead events.
-- **Trash System**: Soft delete for strategic initiatives with 30-day retention.
-- **Invoice Automation**: Node-cron for retainers and Puppeteer for PDF generation.
-- **Proposal PDF Export**: Secure browser-native PDF printing with short-lived tokens and tenant isolation.
-- **Client-to-Account Manager Chat**: Real-time messaging with Server-Sent Events (SSE) and AI-powered conversation analysis.
-- **Chat with your Data**: AI-powered analytics data querying.
-- **Analytics Dashboard**: GA4 and GSC metrics visualization.
-- **Performance Optimizations**: Server-side caching, aggregated API endpoints, frontend query optimization, and component memoization.
-- **Task Lists & Hierarchical Tasks**: ClickUp-inspired flexible task hierarchy with robust CRUD operations and five-layer defense-in-depth security.
-  - **Task List Management (Phase 2, Task 1 - Completed)**: Full CRUD operations for task lists with kanban layout, SuperAdmin authorization via project-to-agency join, defense-in-depth tenant isolation, and proper UI integration with create/edit dialogs. **Deferred**: Drag-and-drop list reordering (requires dnd-kit integration).
-  - **Enhanced Task Detail Dialog (Completed)**: Full-featured modal with URL deep linking, tabbed interface (Details/Subtasks/Activity), inline editing for all task properties (status, priority, dates, assignees, description), and comprehensive testing coverage.
-  - **Subtask Management (Completed)**: Complete parent-child task hierarchy with:
-    - **Backend**: GET `/api/agency/tasks/:taskId/subtasks` for fetching, POST `/api/tasks/:taskId/subtasks` for creation with Staff access, auto-assignment of creator via idempotent `onConflictDoNothing`, and inheritance of parent's projectId/listId.
-    - **Frontend**: Visual hierarchy indicators (CornerDownRight icon, "Subtask" label, lighter background), checkbox toggles for quick status changes, create form with Enter key support, and proper loading/empty states.
-    - **Security**: Staff can only create subtasks for tasks they're assigned to; tenant isolation via `requireTaskAccess` middleware; null-safe profile handling in storage layer.
-    - **Deferred**: Full inline editing for subtasks, delete functionality, drag-and-drop reordering.
-  - **Activity Tracking (Completed)**: Comprehensive audit trail system tracking all task changes:
-    - **Backend**: `task_activities` table with TaskActivityWithUser type, `logTaskActivity()` helper function, integrated into task updates (PATCH /api/tasks/:id), subtask creation, and assignment operations (POST/DELETE /api/agency/tasks/:taskId/assign).
-    - **Frontend**: Activity tab in task detail dialog with timeline UI, formatted messages for 8 action types (status, priority, dates, description, assignees, subtasks), defensive date formatting with human-readable output (e.g., "Nov 20, 2025"), and relative timestamps.
-    - **Activity Types**: status_changed, priority_changed, date_changed, description_changed, assignee_added, assignee_removed, subtask_created.
-    - **Security**: Type-safe with TaskActivityWithUser[], null filtering in storage layer, try/catch error handling, tenant isolation via requireTaskAccess middleware.
-  - **Task Messaging (Completed)**: Staff-to-account-manager communication system integrated into task detail dialog:
-    - **Backend**: `task_messages` table with TaskMessageWithSender type, GET `/api/tasks/:taskId/messages`, POST `/api/tasks/:taskId/messages`, PATCH `/api/tasks/messages/:messageId/read` endpoints.
-    - **Frontend**: Messages tab in task detail dialog with chat-style UI, 1-second polling for near real-time updates (`refetchInterval: 1000`, `refetchIntervalInBackground: true`), automatic read receipts on view, auto-scroll to newest messages, Enter-to-send functionality.
-    - **Security**: All endpoints protected by requireTaskAccess middleware ensuring users can only message on tasks they're assigned to; tenant isolation via task access verification.
-    - **Future Enhancement**: Consider upgrading from polling to WebSockets/SSE for true real-time message delivery.
-  - **Auto-Creation Workflow (Completed)**: Automated project, task list, and task generation from approved AI recommendations:
-    - **Backend** (server/routes.ts, lines 2102-2177): POST `/api/initiatives/:id/respond` with `response="approved"` triggers atomic workflow.
-    - **Transaction-Based Implementation**: Wrapped in `db.transaction()` for all-or-nothing semantics:
-      1. Client validation BEFORE any DB writes (returns 400 if client not found)
-      2. Project creation with initiative title/observation
-      3. Task list creation with required `agencyId` for RLS tenant isolation
-      4. Batch task creation from `actionTasks` array (all tasks created atomically)
-      5. Scoped variable handling: uses local `createdProjectId` inside transaction, only assigns to outer `projectId` after commit
-    - **Invoice Generation**: Separate flow for fixed-cost initiatives or those with specified costs, uses InvoiceGeneratorService
-    - **Error Handling**: Returns 500 with descriptive message on failure, preventing silent errors; defensive guards ensure IDs are set before proceeding
-    - **Defensive Programming**: Explicit null checks for project.id and createdProjectId to prevent undefined state propagation
-  - **Time Tracking (Completed)**: Simplified numeric time tracking with +/- controls:
-    - **Backend**: Both `timeEstimate` and `timeTracked` use `numeric` type with default 0; server-side validation enforces 0.5 hour increments (0, 0.5, 1, 1.5, etc.) on both PATCH endpoints (/api/agency/tasks/:id and /api/tasks/:id).
-    - **Frontend**: Both controls use increment/decrement buttons (±0.5h per click); formatted display shows hours in human-readable format (e.g., "2.5h").
-    - **UI**: Inline editing in Details tab with optimistic updates, disabled buttons during mutations prevent dialog close during save.
-    - **Security**: Tenant isolation via project access validation.
-    - **Task Hours Report Dashboard (Completed)**: Comprehensive time tracking analytics with project and staff breakdowns, showing time tracked vs estimated; staff hours are divided proportionally among assignees to prevent double-counting; unassigned tasks excluded from staff totals (noted in UI).
-    - **Enhancement Opportunities**: Move 0.5 increment validation into Zod schema for stronger guarantees across all code paths; surface unassigned task hours explicitly in report; add automated tests for validation and aggregation logic.
-  - **Task Relationships (Completed)**: Task-to-task relationship system with five-layer security:
-    - **Backend**: `task_relationships` table with unique index on (sourceTaskId, relatedTaskId, relationshipType), CRUD endpoints at GET/POST `/api/tasks/:taskId/relationships` and DELETE `/api/tasks/relationships/:relationshipId`.
-    - **Relationship Types**: blocks, blocked_by, relates_to, duplicates (duplicated_by removed from schema).
-    - **Security**: Fail-closed tenant isolation for ALL roles including SuperAdmin - rejects if either project.agencyId is null, enforces same-agency validation before allowing creation/deletion.
-    - **Frontend**: `TaskRelationships` component in task detail dialog with relationship type selector, task search, and delete functionality.
-    - **Bug Fixes**: Fixed NaN bug in time tracking increment by adding proper null/undefined handling, added stable wrapper test IDs for UI components.
-- **SuperAdmin Cross-Agency Access**: SuperAdmin users can view and manage all resources across all agencies, including task lists and tasks.
+## Core Principle
+The system is a **Workflow Engine**, not a traditional app.  
+Frontend, backend, and AI execution layers exist only as interfaces into this engine.
 
-### Feature Specifications
-- **Client Portal**: Dashboard, Projects, Strategic Initiatives, Billing, Profile, Support Chat, Chat with your Data.
-- **Agency Admin Portal**: Management for Clients, Staff, Tasks & Projects, Strategic Initiatives, Invoices, User Management, Trash, AI Provider Settings, and a full CRM system.
-- **Staff Portal**: View and update assigned tasks.
-- **SuperAdmin Portal**: Platform-wide user and agency management, including user credential management, promotion/demotion to SuperAdmin, and comprehensive audit logging.
-- **Strategic Initiative Workflow**: Defined lifecycle from `Needs Review` to `Measured`.
-- **Google Integrations**: GA4 Lead Event Configuration and Google Search Console.
-- **HubSpot Integration**: Agency-wide CRM integration for contacts, deals, and companies data.
-- **LinkedIn Integration**: Agency-wide social media integration for organization page metrics.
-- **CRM System**: Full-featured Customer Relationship Management with Companies, Contacts, and Deals modules.
-- **Form Creator**: Lead capture form builder with drag-and-drop fields, public endpoints, and CRM integration.
-- **AI-Powered Proposal Builder**: Professional proposal creation tool with AI content generation, templates, and secure PDF export.
+## Components
+- **Frontend**: React 18, Wouter, TanStack Query, Tailwind, Shadcn/UI  
+- **Backend**: Express.js with deterministic service boundaries  
+- **Database**: PostgreSQL (Supabase), Drizzle ORM  
+- **Auth**: Supabase Auth (stateless JWT)  
+- **AI Layer**: Pluggable provider system (Gemini, OpenAI)  
+- **PDF**: Puppeteer  
+- **Scheduler**: node-cron  
+- **Workflow Engine**: custom deterministic orchestration layer
 
-### System Design Choices
-- **Multi-tenancy**: Achieved through Application Layer middleware, Database Layer (Postgres RLS), and Resource-Level Protection on routes.
-- **API Structure**: RESTful endpoints with role-based access.
-- **Project Structure**: Separate frontend, backend, and shared codebases.
+---
 
-## External Dependencies
-- **Database**: PostgreSQL (via Supabase)
-- **Authentication**: Supabase Auth
-- **Cloud Services**: Supabase, Google Cloud (for GA4, GSC APIs)
-- **OAuth Integrations**: Google OAuth (GA4, Google Search Console), HubSpot (CRM data), LinkedIn (social media metrics)
-- **AI Services**: Pluggable provider system supporting Google Gemini AI (default) and OpenAI.
-- **PDF Generation**: Puppeteer
-- **Scheduling**: `node-cron`
+# 2. Mandatory Engineering Guarantees
+
+## Atomicity
+All multi-table operations must run inside `db.transaction()`.  
+No partial writes. No orphaned state.  
+Every initiative → project → task workflow is fully atomic.
+
+## Tenant Isolation
+Three layers:
+1. **App**: requireAgencyAccess, requireTaskAccess  
+2. **DB**: RLS on all 14 core tables, 40+ policies  
+3. **Resource**: route-level ownership enforcement  
+
+SuperAdmin bypass is read-only unless explicitly escalated.
+
+## Deterministic AI Execution
+AI output must be:
+- schema validated  
+- idempotent  
+- versioned  
+- hash-tracked  
+- logged with lineage  
+- replayable  
+
+AI cannot create state without passing through the workflow engine.
+
+---
+
+# 3. Frontend Architecture
+
+- macOS-inspired UI  
+- Sidebar with icon-only mode  
+- Mobile-first compliance (WCAG AA)  
+- Lucide icons  
+- React Hook Form + Zod  
+- TanStack Query with strict caching and stale-time rules  
+- Dialog-driven operations (task detail, strategic initiative review)  
+- Hierarchical task system (parent → subtask → subtask…)
+
+Performance constraints:
+- memoize expensive components  
+- co-locate state near usage  
+- batch requests with aggregated endpoints  
+
+---
+
+# 4. Backend Architecture
+
+## Services
+- Auth Service  
+- Task Service (CRUD, subtasks, assignments, activities, messages)  
+- Project Service  
+- Client Service  
+- CRM Service  
+- Integration Service (HubSpot, GA4, GSC, LinkedIn)  
+- AI Service  
+- Workflow Engine  
+- Invoice/PDF Service  
+- Audit Log Service  
+
+## Middleware
+- requireAuth  
+- requireAgencyAccess  
+- requireTaskAccess  
+- requireSuperAdmin  
+- payload sanitisation  
+- schema validation  
+
+## Messaging
+SSE for real-time client chat + task messaging.  
+Polling fallback at 1s interval where required.
+
+---
+
+# 5. Workflow Engine (Core)
+
+## Inputs (Signals)
+All external data and app events normalize to:
+{
+source,
+type,
+payload,
+urgency,
+clientId,
+agencyId,
+timestamp
+}
+
+Sources include GA4, GSC, HubSpot, LinkedIn, Internal.
+
+## Rules Engine
+Rules run before AI:
+- ranking drop thresholds  
+- PPC anomaly detection  
+- lead lifecycle changes  
+- inactivity triggers  
+
+Rules are versioned and auditable.
+
+## AI Execution Layer
+- provider abstraction  
+- retry logic  
+- schema validation  
+- idempotent writes using hashing  
+- lineage logging  
+
+## Workflow Output
+- create projects  
+- create task lists  
+- batch-create tasks  
+- create invoices  
+- update initiative state  
+- notify staff  
+
+All inside one atomic transaction.
+
+---
+
+# 6. AI Systems
+
+## Provider Interface
+generateText()
+generateRecommendation()
+generateAnalysis()
+
+## Governance
+Per-agency controls:
+- model allow/deny  
+- token quotas  
+- cost ceilings  
+- PII redaction  
+- prompt templates  
+- embedding isolation  
+
+## Chat With Your Data
+Analytics embedding storage (GA4 / GSC)  
+Vector indices are isolated per agency.
+
+---
+
+# 7. Integration Architecture
+
+## GA4 / GSC
+- idempotent sync  
+- metric aggregation  
+- anomaly detection feeding the signal engine  
+
+## HubSpot
+- bi-directional sync  
+- deal lifecycle triggers  
+- contact updates → workflows  
+
+## LinkedIn
+- page metrics ingestion  
+- engagement drops → signals  
+
+Each integration implements retries, token expiry detection, and backoff.
+
+---
+
+# 8. CRM Layer
+
+Modules:
+- Companies  
+- Contacts  
+- Deals  
+- Pipelines  
+- Lead Sources  
+- Form Creator (public endpoints)  
+
+All CRM operations emit workflow signals.
+
+---
+
+# 9. Task System
+
+## Structure
+- Projects → Lists → Tasks → Subtasks  
+- Relationship types: blocks, blocked_by, relates_to, duplicates  
+- Activities: full audit trail  
+- Messaging: internal task chat  
+
+## Capabilities (Completed)
+- CRUD for lists/tasks/subtasks  
+- Five-layer security  
+- Activity tracking (8 event types)  
+- Real-time task messaging  
+- Time tracking with validated increments  
+- Task hours analytics  
+- Relationship system with strict RLS controls  
+- Auto-create workflow for initiatives  
+
+---
+
+# 10. Strategic Initiatives
+
+Lifecycle:
+`Draft → Needs Review → Approved → In Progress → Completed → Measured`
+
+Approved initiative → atomic workflow:
+1. create project  
+2. create lists  
+3. batch-create tasks  
+4. optional invoice  
+5. notify staff  
+
+All changes logged to audit tables.
+
+---
+
+# 11. SuperAdmin Layer
+
+Capabilities:
+- cross-agency visibility  
+- agency CRUD  
+- user lifecycle management  
+- billing insights  
+- AI quotas + policies  
+- integration governance  
+- audit log search + filters  
+- platform health metrics  
+- read-only impersonation  
+
+SuperAdmin mutations are fully logged.
+
+---
+
+# 12. Security Model
+
+Layers:
+1. HTTPS, CORS, rate limits  
+2. JWT auth via Supabase  
+3. RBAC middleware  
+4. PostgreSQL RLS  
+5. Input validation (Zod)  
+6. Output sanitisation  
+7. Audit logging for all sensitive operations  
+
+Encryption:
+- AES-256-GCM  
+- bcrypt (Supabase)  
+- HMAC-SHA256  
+
+---
+
+# 13. Performance Optimisation
+
+- server-side caching  
+- aggregated API endpoints  
+- indexed SQL tables  
+- lazy route loading  
+- React.memo discipline  
+- reduced query waterfalls  
+- agency-isolated vector indexes  
+- materialized views for analytics workloads  
+
+---
+
+# 14. Deployment (Replit)
+
+- Express backend  
+- Vite frontend  
+- Supabase for DB/Auth  
+- Secrets in Replit env vars  
+- Cron tasks via node-cron  
+- Workflow jobs handled as background tasks  
+- Logs via Replit inspector  
+
+---
+
+# 15. Future Enhancements (Planned)
+
+- WebSockets for real-time updates  
+- Workflow builder UI  
+- Webhook system  
+- Multi-language support  
+- Native mobile shell  
+- Model routing per workflow type  
+
+---
