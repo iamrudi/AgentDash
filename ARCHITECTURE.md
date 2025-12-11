@@ -76,6 +76,254 @@ SuperAdmin
 
 ---
 
+## Frontend Portal Architecture
+
+The platform provides four distinct frontend portals, each tailored for specific user roles with dedicated navigation, pages, and backend API access.
+
+### Portal Overview Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           FRONTEND PORTALS                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
+│  │  AGENCY PORTAL  │  │  CLIENT PORTAL  │  │ STAFF/TALENT    │             │
+│  │  /agency/*      │  │  /client/*      │  │    PORTAL       │             │
+│  │                 │  │                 │  │ /staff          │             │
+│  │  Role: Admin    │  │  Role: Client   │  │ /staff/hours    │             │
+│  │                 │  │                 │  │ /staff/settings │             │
+│  │  • 16 pages     │  │  • 8 pages      │  │  • 3 pages      │             │
+│  │  • Full CRUD    │  │  • Read-focused │  │  • Task-focused │             │
+│  │  • All features │  │  • Self-service │  │  • Time track   │             │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘             │
+│           │                    │                    │                       │
+│           ▼                    ▼                    ▼                       │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                     TanStack Query (React Query)                        │ │
+│  │              Caching • Optimistic Updates • Refetching                  │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                          Express.js API                                  │ │
+│  │   ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐ │ │
+│  │   │ requireAuth  │→ │ requireRole  │→ │ Resource Access Middleware   │ │ │
+│  │   │  (JWT valid) │  │  (role check)│  │  (tenant isolation)          │ │ │
+│  │   └──────────────┘  └──────────────┘  └──────────────────────────────┘ │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                    PostgreSQL (Supabase) + Drizzle ORM                   │ │
+│  │                    Row-Level Security (RLS) Policies                     │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Agency Portal (`/agency/*`)
+
+Full-featured admin dashboard for agency owners and managers.
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/agency` | Dashboard | KPIs, client overview, recent activity |
+| `/agency/clients` | Clients List | Manage client accounts and retainers |
+| `/agency/clients/:id` | Client Detail | Individual client profile, metrics, projects |
+| `/agency/projects` | Projects List | All agency projects with filtering |
+| `/agency/projects/:id` | Project Detail | Tasks, lists, timeline, team assignments |
+| `/agency/tasks` | Tasks | Agency-wide task management |
+| `/agency/staff` | Staff | Team members and capacity |
+| `/agency/users` | Users | User accounts and role management |
+| `/agency/invoices` | Invoices | Billing and invoice management |
+| `/agency/messages` | Messages | Client communication center |
+| `/agency/recommendations` | AI Recommendations | Strategic insights per client |
+| `/agency/integrations` | Integrations | GA4, GSC, HubSpot connections |
+| `/agency/workflows` | Workflows | Automation workflow list |
+| `/agency/workflow-builder/:id?` | Workflow Builder | Visual DAG editor |
+| `/agency/hours` | Hours Report | Staff time tracking reports |
+| `/agency/settings` | Settings | Agency configuration, branding |
+| `/agency/trash` | Trash | Soft-deleted items recovery |
+
+**Backend API Endpoints:**
+- `GET /api/agency/clients` - List all clients
+- `GET /api/agency/clients/:clientId` - Get single client
+- `PATCH /api/agency/clients/:clientId` - Update client
+- `POST /api/agency/clients/:clientId/sync-metrics` - Sync analytics
+- `POST /api/agency/clients/:clientId/reset-retainer-hours` - Reset hours
+- `POST /api/agency/clients/:clientId/generate-recommendations` - AI insights
+- `GET /api/agency/projects` - List projects
+- `POST /api/agency/projects` - Create project
+- `GET /api/agency/projects/:id` - Get project detail
+- `PATCH /api/agency/projects/:id` - Update project
+- `GET /api/agency/tasks` - List tasks
+- `POST /api/agency/tasks` - Create task
+- `PATCH /api/agency/tasks/:id` - Update task
+- `DELETE /api/agency/tasks/:id` - Delete task
+- `GET /api/agency/staff` - List staff
+- `GET/PUT /api/agency/settings` - Agency configuration
+- `POST /api/invoices` - Create invoice
+- `GET /api/client/invoices` - List invoices (shared)
+- `GET /api/agency/metrics` - Dashboard metrics
+- `GET /api/agency/integrations` - Integration status
+
+**Layout Component:** `client/src/components/agency-layout.tsx`
+**Sidebar:** `client/src/components/agency-sidebar.tsx`
+
+---
+
+### Client Portal (`/client/*`)
+
+Self-service portal for agency clients to view their projects, invoices, and recommendations.
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/client` | Dashboard | Project overview, recent tasks, metrics |
+| `/client/projects` | Projects | Client's project list with status |
+| `/client/billing` | Billing | Invoices and payment history |
+| `/client/invoices/:id` | Invoice Detail | Individual invoice view |
+| `/client/recommendations` | Recommendations | AI-generated strategic insights |
+| `/client/reports` | Reports | Analytics and performance reports |
+| `/client/profile` | Profile | Client profile and preferences |
+| `/client/support` | Support | Chat with account manager, help center |
+
+**Backend API Endpoints:**
+- `GET /api/client/profile` - Client profile data
+- `GET /api/client/projects` - Client's projects
+- `GET /api/client/projects-with-tasks` - Projects with nested tasks
+- `GET /api/client/invoices` - Client's invoices
+- `GET /api/client/initiatives` - Strategic initiatives
+- `GET /api/client/tasks/recent` - Recent task activity
+
+**Layout Component:** `client/src/components/client-layout.tsx`
+**Sidebar:** `client/src/components/client-sidebar.tsx`
+
+---
+
+### Staff/Talent Portal
+
+Task-focused portal for agency delivery team members.
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/staff` | Dashboard | Assigned tasks, daily priorities |
+| `/staff/hours` | Hours | Personal time tracking and entries |
+| `/staff/settings` | Settings | Profile and notification preferences |
+
+**Backend API Endpoints:**
+- `GET /api/staff/tasks` - Staff's assigned tasks (summary)
+- `GET /api/staff/tasks/full` - Full task details with project info
+- `GET /api/staff/notifications/counts` - Notification badge counts
+- `GET /api/tasks/:taskId/messages` - Task chat messages (shared with Admin)
+- `POST /api/tasks/:taskId/subtasks` - Create subtasks (shared with Admin)
+- `PATCH /api/user/profile` - Profile updates
+
+**Dashboard Page:** `client/src/pages/staff-dashboard.tsx`
+**Hours Page:** `client/src/pages/staff-hours.tsx`
+**Settings Page:** `client/src/pages/staff-settings.tsx`
+
+---
+
+### SuperAdmin Portal (`/superadmin/*`)
+
+Platform-wide governance dashboard for system administrators.
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/superadmin` | Dashboard | Cross-agency overview, health checks |
+| `/superadmin/governance` | Governance | AI policies, rate limits, audit logs |
+
+**Backend API Endpoints:**
+- `GET /api/superadmin/agencies` - All agencies
+- `GET /api/superadmin/users` - All platform users
+- `GET /api/superadmin/audit-logs` - System audit trail
+- `GET /api/superadmin/metrics` - Platform-wide metrics
+
+---
+
+### Frontend-to-Backend Data Flow
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        REQUEST FLOW                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│   React Component                                                         │
+│        │                                                                  │
+│        │  useQuery({ queryKey: ['/api/agency/projects'] })               │
+│        ▼                                                                  │
+│   ┌─────────────┐                                                        │
+│   │ TanStack    │  Checks cache → If stale, fetches                     │
+│   │   Query     │                                                        │
+│   └──────┬──────┘                                                        │
+│          │                                                                │
+│          │  fetch('/api/agency/projects', { credentials: 'include' })    │
+│          ▼                                                                │
+│   ┌─────────────┐                                                        │
+│   │ Express.js  │                                                        │
+│   │   Router    │                                                        │
+│   └──────┬──────┘                                                        │
+│          │                                                                │
+│          ▼                                                                │
+│   ┌──────────────────────────────────────────────────────────────┐       │
+│   │              MIDDLEWARE CHAIN                                  │       │
+│   │                                                                │       │
+│   │  1. requireAuth(req, res, next)                               │       │
+│   │     └─ Validates JWT from session cookie                      │       │
+│   │     └─ Attaches user to req.user                              │       │
+│   │                                                                │       │
+│   │  2. requireRole("Admin", "Staff", "SuperAdmin")               │       │
+│   │     └─ Checks req.user.role against allowed roles             │       │
+│   │     └─ Returns 403 if unauthorized                            │       │
+│   │                                                                │       │
+│   │  3. resolveAgencyContext(req, options) [in handler]           │       │
+│   │     └─ SuperAdmin: may filter by agencyId via query/body      │       │
+│   │     └─ Admin/Staff: uses req.user.agencyId                    │       │
+│   │                                                                │       │
+│   │  4. requireProjectAccess(storage) [resource-specific]         │       │
+│   │     └─ Validates user's agency owns the resource              │       │
+│   │     └─ Enforces tenant isolation                              │       │
+│   └──────────────────────────────────────────────────────────────┘       │
+│          │                                                                │
+│          ▼                                                                │
+│   ┌─────────────┐                                                        │
+│   │  Route      │  storage.getProjects({ agencyId: req.user.agencyId }) │
+│   │  Handler    │                                                        │
+│   └──────┬──────┘                                                        │
+│          │                                                                │
+│          ▼                                                                │
+│   ┌─────────────┐                                                        │
+│   │ Drizzle ORM │  SELECT * FROM projects WHERE agency_id = $1          │
+│   │ + RLS       │  + Row-Level Security policies                        │
+│   └──────┬──────┘                                                        │
+│          │                                                                │
+│          ▼                                                                │
+│   ┌─────────────┐                                                        │
+│   │ PostgreSQL  │  Returns filtered, tenant-isolated data               │
+│   │ (Supabase)  │                                                        │
+│   └─────────────┘                                                        │
+│                                                                           │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### Role-Based API Access Matrix
+
+| API Prefix | Client | Staff | Admin | SuperAdmin |
+|------------|--------|-------|-------|------------|
+| `/api/client/*` | ✅ | ❌ | ✅ | ✅ |
+| `/api/staff/*` | ❌ | ✅ | ✅ | ❌ |
+| `/api/agency/*` | ❌ | 🟡¹ | ✅ | 🟡³ |
+| `/api/superadmin/*` | ❌ | ❌ | ❌ | ✅ |
+| `/api/tasks/*` | 🟡² | ✅ | ✅ | ✅ |
+| `/api/workflows/*` | ❌ | ❌ | ✅ | ✅ |
+
+¹ Staff has read-only access to assigned projects/tasks
+² Clients can view task activity on their projects
+³ SuperAdmin access to agency endpoints varies by route; has full task/list CRUD but limited client/project access
+
+---
+
 ## SuperAdmin Architecture
 
 ### Permissions Matrix
