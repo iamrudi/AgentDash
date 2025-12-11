@@ -1,99 +1,337 @@
-# Agency Client Portal
+# Agency Operational Intelligence Platform — Replit Documentation
 
-## Overview
-The Agency Client Portal is a multi-tenant, workflow-driven operating system designed for automating client delivery, orchestrating AI systems, and enforcing deterministic operational flows for agencies. Its core purpose is to provide a robust, auditable, and reproducible platform for managing client projects and tasks. The system prioritizes strict tenant isolation, deterministic behavior, atomic transactions, and workflow lineage across all features, APIs, and automations. The project aims to serve as a comprehensive engine for agency operations, with all front-end, back-end, and AI execution layers acting as interfaces to this central engine.
+## Purpose
 
-## User Preferences
-The system is a Workflow Engine, not a traditional app. Frontend, backend, and AI execution layers exist only as interfaces into this engine. A component is only accepted into the system if new features can be added without modifying its internal implementation. This rule guarantees long-term stability, predictable behavior, and rapid feature development. Every module (services, workflows, integrations, AI providers, UI panels) must expose explicit interfaces, handle external inputs through adapters, and never require internal rewrites to support new behaviors. If a new feature requires editing core logic, the component is rejected. All automation, rules, triggers, tasks, CRM events, and AI flows extend the Workflow Engine — not the underlying codebase. New features are implemented by adding new signal types, adding new rules, adding new DAG workflows, adding new AI prompt templates, and adding new output handlers. The core engine remains untouched. AI providers, CRM providers, integration adapters, and PDF generators must follow the same contract pattern. Refactoring is never “just new code.” Every refactor must also drive explicit cleanup and deletion work, tracked in PRIORITY_LIST.md. The system does not permit “orphaned” or “temporary” code: no undocumented feature flags, no unused endpoints, no unreachable branches, no abandoned experiments. If code is not clearly active and clearly documented and clearly referenced in TECHNICAL_BRIEF.md, then it must either be deleted, or be added as a cleanup/deletion item in PRIORITY_LIST.md. A refactor is only acceptable if new behavior is documented in TECHNICAL_BRIEF.md, cleanup/deletion work is listed in PRIORITY_LIST.md, and no new untracked legacy paths are introduced. If any of the three fails, the refactor is rejected and must be reworked.
+This repository contains the unified **Operational Intelligence System** for marketing agencies and in-house teams. It is a **multi-tenant, workflow-driven, AI-augmented operating system** that:
 
-## System Architecture
-The system is fundamentally a Workflow Engine. It uses a macOS-inspired UI built with React 18, Wouter, TanStack Query, Tailwind, and Shadcn/UI, ensuring mobile-first compliance (WCAG AA). The backend is an Express.js application with deterministic service boundaries. Data persistence is handled by PostgreSQL (Supabase) with Drizzle ORM, and authentication uses stateless JWT via Supabase Auth. A pluggable AI layer supports providers like Gemini and OpenAI. PDF generation uses Puppeteer, and scheduling is managed by `node-cron`. The core is a custom deterministic workflow orchestration layer.
+- connects data from analytics, CRM, commercial systems, and internal knowledge  
+- generates strategic recommendations through a central Intelligence Core  
+- enables human interpretation and approval  
+- converts strategy into structured projects and tasks  
+- orchestrates human and AI delivery resources  
+- continually learns from outcomes  
 
-Key architectural guarantees include:
-- **Atomicity:** All multi-table operations use `db.transaction()` to ensure no partial writes or orphaned state.
-- **Tenant Isolation:** Implemented at three layers: app-level access control, PostgreSQL Row Level Security (RLS) on core tables, and route-level resource ownership enforcement.
-- **Deterministic AI Execution:** AI outputs are schema-validated, idempotent, versioned, hash-tracked, logged with lineage, and replayable, preventing direct state creation outside the workflow engine.
+The entire platform operates on a **single deterministic workflow engine**, with front-end, back-end, and AI layers acting only as interfaces to this engine.
 
-The frontend employs React Hook Form with Zod for validation, TanStack Query for data fetching with strict caching, and dialog-driven operations. Performance is optimized through memoization, co-location of state, and batched requests.
+---
 
-The backend consists of modular services (Auth, Task, Project, Client, CRM, Integration, AI, Workflow Engine, Invoice/PDF, Audit Log) and middleware for authentication, authorization, payload sanitization, and schema validation. Real-time communication uses Server-Sent Events (SSE) with a polling fallback.
+# 1. Architectural Principles
 
-The Workflow Engine processes external signals from various sources (GA4, GSC, HubSpot, LinkedIn, Internal) using a Rule Engine with 16 operators for data evaluation before AI processing. The AI execution layer provides provider abstraction, retry logic, schema validation, and lineage logging. Workflow outputs include creating projects, tasks, invoices, updating initiative states, and staff notifications—all within atomic transactions.
+## 1.1 Core Philosophy
 
-The AI system features a provider interface (`generateText()`, `generateRecommendation()`, `generateAnalysis()`), per-agency governance for model usage, token quotas, cost ceilings, PII redaction, and prompt templates. Analytics data uses agency-isolated vector indices for "Chat With Your Data" functionality.
+This system is **not a traditional application**.  
+It is a **Workflow Engine** that orchestrates:
 
-Integrations with GA4, GSC, HubSpot, and LinkedIn are idempotent, handle metric aggregation, anomaly detection, bi-directional sync, and include retry logic and token expiry detection. The CRM layer covers Companies, Contacts, Deals, Pipelines, Lead Sources, and a Form Creator, with all CRM operations emitting workflow signals.
+- deterministic automations  
+- AI reasoning and generation  
+- client delivery  
+- CRM activity  
+- analytics ingestion  
+- multi-agent collaboration  
 
-The Task System supports a hierarchical structure (Projects → Lists → Tasks → Subtasks) with various relationship types, a full audit trail of activities, real-time messaging, time tracking, and robust security at five layers. Strategic Initiatives follow a lifecycle (`Draft → Needs Review → Approved → In Progress → Completed → Measured`), triggering atomic workflows upon approval.
+Every component — UI panels, backend services, integrations, AI providers — plugs into the workflow engine through **explicit contracts**.
 
-The SuperAdmin layer provides cross-agency visibility, management of agencies and users, billing insights, AI policy governance, integration oversight, and audit log search. The SLA & Escalation Engine tracks response/resolution times, supports business hours, multi-level escalation chains, and defines breach actions. The Multi-Agent Architecture includes specialized domain agents (SEO, PPC, CRM, Reporting) and an Orchestrator for intelligent routing and collaboration, integrating seamlessly as a workflow step.
+**If a feature requires editing core logic, it is rejected.**  
+All changes must be additive via:
 
-Security is multi-layered, encompassing HTTPS, CORS, rate limits, JWT auth, RBAC middleware, PostgreSQL RLS, input/output validation (Zod), and extensive audit logging. Encryption uses AES-256-GCM, bcrypt, and HMAC-SHA256. Performance optimizations include server-side caching, aggregated APIs, indexed SQL tables, lazy loading, and `React.memo` discipline.
+- new signal types  
+- new rules  
+- new workflow DAGs  
+- new AI prompt templates  
+- new output handlers  
 
-The project is deployed on Replit, using Express for the backend, Vite for the frontend, Supabase for DB/Auth, Replit environment variables for secrets, and `node-cron` for scheduled tasks.
+The core engine remains untouched.
 
-## External Dependencies
-- **Database:** PostgreSQL (via Supabase)
-- **Authentication:** Supabase Auth
-- **Frontend Frameworks/Libraries:** React 18, Wouter, TanStack Query, Tailwind CSS, Shadcn/UI, React Hook Form, Zod
-- **Backend Frameworks/Libraries:** Express.js, Drizzle ORM
-- **AI Providers:** Gemini, OpenAI (pluggable system)
-- **PDF Generation:** Puppeteer
-- **Scheduler:** node-cron
-- **Icons:** Lucide icons
-- **Integrations:** Google Analytics 4 (GA4), Google Search Console (GSC), HubSpot, LinkedIn
-- **Visual Workflow Builder:** @xyflow/react (React Flow) for drag-and-drop workflow creation
+## 1.2 Refactor & Cleanup Rules
 
-## Recent Changes (December 2024)
+Refactors must:
 
-### Priority 15: Visual Workflow Builder UI (In Progress)
-A no-code visual workflow editor using React Flow (@xyflow/react) for drag-and-drop workflow creation.
+1. Document all new behavior in `TECHNICAL_BRIEF.md`
+2. Register any cleanup/deletion work in `PRIORITY_LIST.md`
+3. Introduce **zero** new untracked legacy paths
 
-**Completed Features:**
-- `/agency/workflows` - Workflow list page with status badges, step counts, and CRUD operations
-- `/agency/workflow-builder/:id?` - Visual canvas editor with three-panel layout
-- **Step Palette:** 7 draggable step types with distinct visual styling:
-  - Signal (yellow) - Entry point triggers
-  - Rule (blue) - Conditional logic evaluation
-  - AI (purple) - AI execution steps
-  - Action (green) - Business logic operations
-  - Transform (orange) - Data transformation
-  - Notification (pink) - Alert/notification steps
-  - Branch (cyan) - Conditional flow branching
-- **React Flow Nodes:** Custom StepNode component with Handle components for edge connections (top/bottom, plus left/right for branch nodes)
-- **Backend Endpoints:**
-  - `POST /api/workflows/validate` - Zod schema validation for workflow structure
-  - `POST /api/workflows/:id/duplicate` - Clone existing workflow with tenant isolation
-- **Navigation:** "Workflows" link in agency sidebar under Strategy section
-- **Data Alignment:** Frontend uses `steps` array and `updatedAt` fields matching database schema
+The system forbids:
 
-**Pending Features:**
-- Properties panel for configuring selected nodes
-- Edge/connection validation
-- Variable binding system
-- Toolbar with save/validate/test controls
-- Workflow version comparison
-- Test execution mode
+- undocumented feature flags  
+- unused endpoints  
+- unreachable branches  
+- abandoned experiments  
 
-**Key Files:**
-- `client/src/pages/agency/workflows.tsx` - Workflow list page
-- `client/src/pages/agency/workflow-builder.tsx` - Visual canvas editor
-- `client/src/App.tsx` - Route registration
-- `client/src/components/agency-sidebar.tsx` - Navigation link
+Inactive or undocumented code must be deleted or added to `PRIORITY_LIST.md`.
 
-### Previous Completions (Priorities 1-14)
-All foundational workflow engine priorities (1-14) have been completed including:
-- Workflow Engine with deterministic execution
-- Rule Engine with 16 operators
-- Signal Processing & Ingestion
-- Hardened AI Execution Layer
-- Workflow Lineage & Event Logging
-- Tenant-Isolated Vector Stores
-- SLA & Escalation Engine
-- Multi-Agent Architecture
-- CRM Integration Triggers
-- Enhanced Analytics Ingestion
-- Task System Optimization
-- Template System
-- Real-Time WebSocket/SSE Layer
-- SuperAdmin Governance
+---
+
+# 2. High-Level Architecture
+
+📄 Source: *Architecture Documentation* :contentReference[oaicite:7]{index=7}
+
+## 2.1 Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Backend | Express.js, Node.js |
+| Frontend | React 18, Wouter, TanStack Query, Tailwind, Shadcn/UI |
+| Database | PostgreSQL (Supabase) with Drizzle ORM |
+| Auth | Supabase Auth (JWT session) |
+| AI Engine | Pluggable providers: OpenAI, Gemini |
+| Integrations | GA4, GSC, HubSpot, LinkedIn |
+| Workflow Engine | Custom deterministic orchestration layer |
+| Scheduling | node-cron |
+| PDF | Puppeteer |
+| Replit | Hosting + env vars |
+
+---
+
+# 3. Multi-Tenancy & Access Model
+
+The system supports four portals:
+
+- **Agency Portal** (`/agency`)  
+- **Client Portal** (`/client`)  
+- **Staff Portal** (`/staff`)  
+- **SuperAdmin Portal** (`/superadmin`)  
+
+Multi-tenancy is enforced at three layers:
+
+1. **App Layer:** role-based access middleware  
+2. **Database Layer:** PostgreSQL Row-Level Security (RLS)  
+3. **Resource Layer:** route-level ownership checks  
+
+This ensures **strict tenant isolation** and shared infrastructure.
+
+---
+
+# 4. Intelligence Core
+
+The Intelligence Core is composed of:
+
+### 4.1 AI Provider Layer
+- Unified interface:
+  - `generateText()`
+  - `generateRecommendation()`
+  - `generateAnalysis()`
+- Provider implementations (OpenAI, Gemini)
+- Per-agency governance:
+  - model policy  
+  - token quotas  
+  - cost ceilings  
+  - PII redaction  
+- Deterministic AI execution:
+  - schema validation  
+  - idempotency  
+  - output hashing  
+  - lineage logging  
+
+### 4.2 Multi-Agent Architecture
+Specialist agents:
+- SEO, PPC, CRM, Reporting  
+An **Orchestrator Agent** coordinates reasoning and routes tasks into workflows.
+
+### 4.3 Tenant-Isolated Vector Memory
+Stores:
+- analytics summaries  
+- CRM signals  
+- content history  
+- strategic notes  
+- task outcomes  
+
+Used for:
+- contextual retrieval  
+- brand knowledge modeling  
+- improved recommendation quality  
+
+---
+
+# 5. Workflow Engine
+
+The heart of the system.
+
+## 5.1 Step Types
+- **Signal** — triggers (analytics, CRM, internal)  
+- **Rule** — evaluate conditions with 16 operators  
+- **AI** — call intelligence core  
+- **Action** — create/update resources  
+- **Transform** — modify context  
+- **Notification** — staff/client alerts  
+- **Branch** — conditional logic  
+
+## 5.2 Guarantees
+- **Determinism** — identical inputs → identical outputs  
+- **Atomicity** — all steps run inside database transactions  
+- **Idempotency** — input hashing prevents duplicates  
+- **Auditability** — every step logged, timestamped, replayable  
+
+## 5.3 Data Tables
+- workflow_executions  
+- workflow_events  
+- rule_evaluations  
+
+---
+
+# 6. Strategic Initiatives (Human-in-the-loop AI)
+
+Lifecycle:  
+**Draft → Needs Review → Approved → In Progress → Completed → Measured** :contentReference[oaicite:8]{index=8}
+
+Upon approval, workflows generate:
+
+- projects  
+- task lists  
+- tasks  
+- optional invoices  
+
+This fulfills the “interpret → challenge → approve → deliver → learn” loop from your vision.
+
+---
+
+# 7. Task, Project & CRM System
+
+Hierarchy:  
+**Projects → Task Lists → Tasks → Subtasks** :contentReference[oaicite:9]{index=9}
+
+Features:
+- real-time messaging  
+- time tracking  
+- audit history  
+- staff assignments  
+
+CRM entities:  
+**Companies, Contacts, Deals, Pipelines, Lead Sources, Forms** — all emitting workflow signals.
+
+---
+
+# 8. Integrations & Data Engine
+
+Supported integrations (OAuth-based):
+
+- GA4  
+- Google Search Console  
+- HubSpot  
+- LinkedIn  
+
+Each sync produces **signals** into the workflow engine.  
+Capabilities:  
+- metric aggregation  
+- anomaly detection  
+- retry logic  
+- token expiry detection  
+
+---
+
+# 9. Portals & User Interfaces
+
+### 9.1 Agency Portal
+Full admin interface:
+- clients  
+- projects  
+- staff  
+- tasks  
+- initiatives  
+- invoices  
+- workflows  
+- settings  
+
+### 9.2 Client Portal
+Read-focused:
+- dashboard  
+- projects  
+- invoices  
+- strategic recommendations  
+- reporting  
+- support  
+
+### 9.3 Staff Portal
+Task-focused:
+- my tasks  
+- hours  
+- settings  
+
+### 9.4 SuperAdmin Portal
+Platform governance:
+- agencies  
+- users  
+- audit logs  
+- AI usage & model policies  
+- system health  
+
+---
+
+# 10. Security Model
+
+Defense-in-depth:
+
+- HTTPS, CORS, rate limits  
+- JWT authentication  
+- RBAC middleware  
+- PostgreSQL RLS  
+- Zod validation  
+- AES-256-GCM encryption  
+- HMAC-SHA256 signatures  
+- full audit logging  
+
+The SuperAdmin layer has strict read/write separation and fully audited actions.
+
+---
+
+# 11. Visual Workflow Builder
+
+Drag-and-drop DAG builder using **React Flow**:
+
+- step palette  
+- canvas  
+- node linking  
+- properties panel (WIP)  
+- validation endpoint  
+- duplicate workflow action  
+
+Routes:  
+- `/agency/workflows`  
+- `/agency/workflow-builder/:id?`
+
+---
+
+# 12. Deployment (Replit)
+
+The platform runs on Replit using:
+
+- Express backend  
+- Vite dev server for frontend  
+- Supabase (DB + Auth)  
+- env vars for secrets  
+- node-cron for scheduled tasks  
+
+---
+
+# 13. Recent Changes (December 2024)
+
+- Workflow builder UI (Priority 15)  
+- Enhanced analytics ingestion  
+- SLA & escalation engine  
+- Vector memory isolation  
+- Multi-agent system  
+- SuperAdmin governance  
+
+---
+
+# 14. Future Enhancements
+
+- Workflow version comparison  
+- Test execution sandbox  
+- Advanced reporting  
+- Mobile app support  
+- i18n support  
+- AI task-type model selection  
+
+---
+
+# 15. Getting Started
+
+1. Clone repository  
+2. Configure Replit secrets  
+3. Start backend: `npm run dev`  
+4. Start frontend: Vite auto-serves React  
+5. Run cron tasks automatically via node-cron  
+
+---
+
+*Last Updated: December 2024*

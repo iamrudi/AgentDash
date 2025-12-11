@@ -1,0 +1,389 @@
+Nice, this is exactly the missing “brain layer” we talked about. Let’s turn those bullets into something you could actually build tomorrow.
+
+I’ll design this as one canonical Intelligence module with 4 core tables:
+
+intelligence_signals
+
+intelligence_insights
+
+intelligence_priorities
+
+intelligence_feedback
+
+…all multi-tenant and wired into the Workflow Engine.
+
+1. Canonical Intelligence Layer – Overview
+
+Goal: Turn raw events into decisions that get smarter over time.
+
+Flow:
+
+Signals – Raw, typed events from analytics, CRM, workflows, humans.
+
+Insights – Aggregated, interpreted metrics & findings.
+
+Priorities – Ranked queue of “what should we act on next?”
+
+Learning Events – Feedback that updates how 1–3 behave in future.
+
+You do not replace existing tables (projects, tasks, initiatives). This layer sits beside them and feeds them.
+
+2. Signals Model
+
+“Create typed signal definitions (analytics events, CRM changes, workflow triggers) with a unified schema stored in a dedicated signals table.”
+
+2.1 Table: intelligence_signals
+
+Purpose: One canonical stream of “things that happened” across the whole platform.
+
+Proposed columns:
+
+intelligence_signals (
+  id                     uuid primary key,
+  agency_id              uuid not null,
+  source_system          text not null,     -- 'GA4', 'GSC', 'HUBSPOT', 'CRM', 'WORKFLOW', 'MANUAL', etc.
+  signal_type            text not null,     -- 'pageview_drop', 'pipeline_spike', 'deal_stage_changed', 'sla_breach', 'manual_flag', etc.
+  category               text not null,     -- 'anomaly', 'threshold', 'event'
+  severity               text,              -- 'info' | 'low' | 'medium' | 'high' | 'critical'
+  occurred_at            timestamptz not null,
+  ingested_at            timestamptz not null default now(),
+
+  -- linkage
+  client_id              uuid,              -- optional: client/brand this relates to
+  project_id             uuid,              -- if it ties to a project
+  initiative_id          uuid,              -- if triggered by/for a strategic initiative
+
+  -- payload
+  payload                jsonb not null,    -- raw event data in normalised shape
+  metrics_snapshot       jsonb,             -- flattened metrics (e.g. { "sessions": 120, "goal_completions": 5 })
+  dimensions             jsonb,             -- e.g. { "channel": "organic", "page_path": "/pricing" }
+
+  -- classification & metadata
+  detector               text,              -- which job/workflow produced this signal
+  version                text,              -- version of detector/prompt
+  correlation_key        text,              -- e.g. "client:123|site:main"
+  parent_signal_id       uuid,              -- if derived from another signal
+  tags                   text[] default '{}',
+
+  -- status flags
+  processed_to_insight   boolean default false,
+  discarded              boolean default false,
+  discard_reason         text,
+
+  created_at             timestamptz default now(),
+  updated_at             timestamptz default now()
+);
+
+
+Key ideas:
+
+category lets you easily filter anomalies, threshold breaches, and generic events.
+
+correlation_key lets you group related signals across systems (e.g. same client + domain).
+
+processed_to_insight is how your pipeline knows what’s been rolled up already.
+
+2.2 Enumerated Signal Types (examples)
+
+You don’t need a separate table at first, but you can later.
+
+Examples:
+
+ga4_traffic_drop
+
+gsc_impressions_spike
+
+hubspot_deal_stage_changed
+
+crm_churn_risk_flag
+
+workflow_sla_breached
+
+manual_strategy_note
+
+ai_recommendation_rejected
+
+3. Insight / Metric Store
+
+“Build a centralized insights table that aggregates processed signals into actionable metrics with timestamps, confidence scores, and source lineage.”
+
+3.1 Table: intelligence_insights
+
+Purpose: “Here’s something meaningful we’ve noticed.”
+
+These are aggregated, interpreted units, not raw events.
+
+intelligence_insights (
+  id                     uuid primary key,
+  agency_id              uuid not null,
+
+  insight_type           text not null,     -- 'traffic_drop', 'conversion_rate_issue', 'pipeline_shortfall', 'content_opportunity', etc.
+  title                  text not null,     -- short human-readable title
+  description            text,              -- explanation of what's going on (can be AI-generated)
+
+  -- scope
+  client_id              uuid,
+  project_id             uuid,
+  initiative_id          uuid,
+  metric_key             text,              -- e.g. 'sessions', 'mql_to_sql_conversion_rate', 'pipeline_value'
+  time_range_start       timestamptz,
+  time_range_end         timestamptz,
+
+  -- values
+  current_value          numeric,
+  baseline_value         numeric,
+  delta_absolute         numeric,
+  delta_percent          numeric,
+
+  -- quality & lineage
+  confidence_score       numeric,           -- 0–1
+  severity               text,              -- 'low' | 'medium' | 'high' | 'critical'
+  source_signal_ids      uuid[],            -- array of contributing signals
+  source_systems         text[],            -- e.g. ['GA4', 'HUBSPOT']
+
+  -- suggested next step (optional, AI-generated)
+  suggested_action       text,
+  suggested_action_type  text,              -- 'campaign_adjustment', 'new_initiative', 'task_update', etc.
+
+  -- lifecycle
+  status                 text not null default 'open',   -- 'open' | 'prioritised' | 'actioned' | 'ignored' | 'invalid'
+  created_by_agent       text,              -- e.g. 'anomaly_detector_v1', 'insight_aggregator_v2'
+  created_at             timestamptz default now(),
+  updated_at             timestamptz default now()
+);
+
+
+Notes:
+
+source_signal_ids is your lineage from raw signals to insights.
+
+confidence_score is built from:
+
+signal quality
+
+sample size
+
+detection method
+
+status ties into your prioritisation + workflow execution.
+
+4. Prioritisation Engine
+
+“Add a scoring algorithm that ranks insights by commercial impact, urgency, confidence, resource availability.”
+
+This can start as a deterministic scoring formula + a table to persist the queue.
+
+4.1 Table: intelligence_priorities
+
+Purpose: A ranked queue of work the system believes should happen.
+
+intelligence_priorities (
+  id                     uuid primary key,
+  agency_id              uuid not null,
+  insight_id             uuid not null references intelligence_insights(id),
+
+  -- scoring dimensions
+  commercial_impact_score numeric not null,    -- 0–1
+  urgency_score           numeric not null,    -- 0–1
+  confidence_score        numeric not null,    -- mirrored from insight
+  resource_feasibility_score numeric not null, -- 0–1 (based on capacity/skills)
+
+  -- final outcome
+  priority_score          numeric not null,    -- final weighted score
+
+  -- derived metadata
+  ranking_bucket          text,                -- 'now', 'next', 'later', 'backlog'
+  recommended_due_date    timestamptz,
+
+  -- resource context snapshot
+  computed_at             timestamptz default now(),
+  resource_context        jsonb,               -- snapshot of capacity/skills considered
+
+  -- workflow linkage
+  created_workflow_run_id uuid,                -- if/when actioned via workflow
+  status                  text default 'pending', -- 'pending' | 'in_progress' | 'done' | 'dismissed'
+
+  created_at              timestamptz default now(),
+  updated_at              timestamptz default now()
+);
+
+4.2 Scoring Formula (first-pass)
+
+You can start with something like:
+
+priority_score =
+  w_impact     * commercial_impact_score +
+  w_urgency    * urgency_score +
+  w_confidence * confidence_score +
+  w_resource   * resource_feasibility_score
+
+
+Where weights (per agency, even per client) live in a config table:
+
+intelligence_priority_config (
+  agency_id          uuid primary key,
+  w_impact           numeric default 0.4,
+  w_urgency          numeric default 0.3,
+  w_confidence       numeric default 0.2,
+  w_resource         numeric default 0.1,
+  updated_at         timestamptz default now()
+);
+
+
+Resource feasibility can come from:
+
+staff capacity data
+
+skill tags
+
+currently scheduled workload
+
+budgets remaining in retainers
+
+At first, you can just mark:
+
+1.0 = trivial to execute (enough capacity, correct skills)
+
+0.0 = no capacity / lacks skills
+
+5. Learning Events Pipeline
+
+“Create an intelligence_feedback table that tracks outcomes and connects back to original signals/insights.”
+
+This is where you close the loop.
+
+5.1 Table: intelligence_feedback
+
+Purpose: Store how reality turned out vs what the system suggested.
+
+intelligence_feedback (
+  id                     uuid primary key,
+  agency_id              uuid not null,
+
+  -- linkage
+  insight_id             uuid references intelligence_insights(id),
+  priority_id            uuid references intelligence_priorities(id),
+  initiative_id          uuid,                         -- if it became a strategic initiative
+  project_id             uuid,
+  task_id                uuid,
+
+  -- what happened?
+  recommendation_followed boolean not null,            -- did the team follow the suggestion?
+  follow_reason          text,                         -- why they followed (optional)
+  not_followed_reason    text,                         -- why they ignored/changed it
+
+  -- outcomes (quantitative)
+  outcome_type           text,                         -- 'metric_change', 'client_feedback', 'qa_evaluation'
+  outcome_window_start   timestamptz,
+  outcome_window_end     timestamptz,
+  outcome_metric_key     text,                         -- e.g. 'sessions', 'pipeline_value'
+  outcome_before_value   numeric,
+  outcome_after_value    numeric,
+  outcome_delta_absolute numeric,
+  outcome_delta_percent  numeric,
+
+  -- evaluation
+  outcome_score          numeric,                      -- 0–1; how "good" was this outcome?
+  human_rating           integer,                      -- 1–5 rating from strategist/AM
+  notes                  text,
+
+  -- lineage
+  source_signals         uuid[],                       -- optional: signals used in evaluation
+  created_by_user_id     uuid,                         -- who logged this (or NULL if automated)
+  created_by_agent       text,                         -- which agent/workflow produced it
+
+  created_at             timestamptz default now(),
+  updated_at             timestamptz default now()
+);
+
+5.2 How It’s Used to Learn
+
+You can use intelligence_feedback to:
+
+Re-tune priority weights:
+
+If high-impact insights get low outcome_score, adjust the scoring model.
+
+Improve insight detection:
+
+Track which insight types consistently underperform.
+
+Improve AI prompts/models:
+
+Feed high outcome_score cases as positive examples, low as negatives.
+
+Refine AI vs human allocation:
+
+If tasks coming from certain insight types perform better with human ownership, encode that as a rule.
+
+6. How It Plugs Into the System You Already Have
+
+Putting it all together with your existing architecture:
+
+Ingestion & Signals
+
+GA4 job runs → detects 40% drop in organic sessions for Client A → inserts intelligence_signals with category anomaly.
+
+HubSpot deal creation/updates and SLA breaches also emit signals.
+
+Insight Generation
+
+A periodic “Insight Aggregator” workflow:
+
+Looks at unprocessed signals (per client)
+
+Aggregates them into intelligence_insights (e.g. “Organic traffic down 40% week-on-week”).
+
+Marks signals as processed_to_insight = true.
+
+Prioritisation
+
+Priority Engine workflow:
+
+Reads open insights
+
+Calculates commercial_impact_score (e.g. based on pipeline/revenue nailed to that channel)
+
+Computes urgency from severity + time window
+
+Computes resource feasibility from your existing staff/capacity model
+
+Inserts/updates intelligence_priorities.
+
+Action
+
+High-priority items:
+
+Create Strategic Initiatives in “Draft” with references to the insight/priority IDs
+
+Kick off your existing human layers (interpret, approve)
+
+When approved, your current workflows produce projects/tasks.
+
+Feedback
+
+After execution + measurement:
+
+A measurement workflow or human logs:
+
+what actually happened (metrics before/after)
+
+whether they followed or diverged from the recommendation
+
+qualitative rating
+
+Insert into intelligence_feedback.
+
+Learning
+
+Offline or scheduled job:
+
+Reads intelligence_feedback
+
+Updates:
+
+intelligence_priority_config weights
+
+insight generation thresholds
+
+AI prompts and long-term models.
