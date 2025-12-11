@@ -140,6 +140,88 @@ Used for:
 - brand knowledge modeling  
 - improved recommendation quality  
 
+### 4.4 Duration Intelligence (Completed December 2024)
+
+Predictive duration modeling and resource optimization:
+
+**Duration Model Service:**
+- Layered prediction: heuristic baselines → assignee offsets → client adjustments
+- Confidence scoring from sample count, variance, recency weighting
+- Cold start strategy with global defaults and fast adaptation
+
+**Resource Optimizer Service:**
+- Greedy allocation algorithm prioritizing skill fit and capacity
+- Objective function minimizing overload, SLA breach, context switching
+- Capacity profile management per staff member
+
+**Commercial Impact Service:**
+- Configurable scoring: revenue × w1 + client_tier × w2 + deadline_risk × w3 + strategic_value × w4
+- SLA risk detection and proactive breach alerts
+- Priority queue generation for optimized delivery
+
+**Task Lifecycle Integration:**
+- Task creation triggers async duration prediction
+- Task completion updates history and generates outcome feedback
+- Variance tracking for model improvement
+
+Data Tables:
+- task_execution_history
+- task_duration_predictions
+- resource_capacity_profiles
+- resource_allocation_plans
+- commercial_impact_factors
+
+### 4.5 Closed Feedback Loop (In Progress)
+
+Explicit "Outcome → Adapt AI → Improve Future Recommendations" cycle:
+
+**Outcome Tracking:**
+- Initiative outcomes captured on completion (success/failure, actual vs predicted impact)
+- Recommendation acceptance/rejection rates per client and type
+- Variance scoring between predicted and actual results
+
+**Quality Metrics:**
+- Rolling quality scores per recommendation type
+- Client-specific pattern detection
+- Calibration signal emission on threshold breaches
+
+**AI Calibration:**
+- Confidence adjustment based on historical accuracy
+- Client-weighted pattern influence on future suggestions
+- SuperAdmin governance visibility for calibration insights
+
+Data Tables (Planned):
+- recommendation_outcomes
+- recommendation_quality_metrics
+- ai_calibration_parameters
+
+### 4.6 Brand Knowledge Layer (In Progress)
+
+Formalized knowledge ingestion pipeline:
+
+**Knowledge Categories:**
+- Brand voice and messaging guidelines
+- Business constraints and preferences
+- Industry context and competitor information
+- Historical decisions and rationale
+- Client-specific operational notes
+
+**Ingestion Pipeline:**
+- Structured schemas per knowledge category
+- Validation against category definitions
+- Conflict detection with existing knowledge
+- Versioning and validity period tracking
+
+**Retrieval Integration:**
+- Context assembly for AI reasoning
+- Freshness-weighted retrieval
+- Category-based filtering for different AI tasks
+
+Data Tables (Planned):
+- knowledge_documents
+- knowledge_categories
+- knowledge_ingestion_log
+
 ---
 
 # 5. Workflow Engine
@@ -310,6 +392,9 @@ The platform runs on Replit using:
 - Vector memory isolation  
 - Multi-agent system  
 - SuperAdmin governance  
+- **Duration Intelligence** - Predictive duration modeling, resource optimization, commercial impact scoring
+- **Closed Feedback Loop** (In Progress) - Outcome tracking, quality metrics, AI calibration
+- **Brand Knowledge Layer** (In Progress) - Structured knowledge ingestion pipeline
 
 ---
 
@@ -320,7 +405,9 @@ The platform runs on Replit using:
 - Advanced reporting  
 - Mobile app support  
 - i18n support  
-- AI task-type model selection  
+- AI task-type model selection
+- Knowledge graph visualization
+- Cross-client pattern learning (with governance)  
 
 ---
 
