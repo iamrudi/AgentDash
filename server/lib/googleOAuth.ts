@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { googleApiRateLimiter } from './googleApiRateLimiter';
 import { retryWithBackoff } from './googleApiRetry';
 import { parseGoogleApiError, GoogleApiError } from './googleApiErrors';
+import logger from '../middleware/logger';
 
 /**
  * Helper to execute Google API calls with rate limiting and retry logic
@@ -132,22 +133,61 @@ export async function exchangeCodeForTokens(code: string) {
 }
 
 /**
+ * Token refresh result - includes status for callers to handle re-auth scenarios
+ */
+export type TokenRefreshResult = 
+  | { success: true; accessToken: string; expiresAt: Date | null }
+  | { success: false; needsReauth: boolean; error: string };
+
+/**
  * Refresh an expired access token
  * @param refreshToken - The refresh token
- * @returns New access token and expiry
+ * @param clientId - Optional client ID for logging context
+ * @returns New access token and expiry, or error status requiring re-auth
  */
-export async function refreshAccessToken(refreshToken: string) {
+export async function refreshAccessToken(refreshToken: string, clientId?: string): Promise<TokenRefreshResult> {
   const oauth2Client = createOAuth2Client();
   oauth2Client.setCredentials({
     refresh_token: refreshToken,
   });
 
-  const { credentials } = await oauth2Client.refreshAccessToken();
-  
-  return {
-    accessToken: credentials.access_token!,
-    expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
-  };
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    
+    return {
+      success: true,
+      accessToken: credentials.access_token!,
+      expiresAt: credentials.expiry_date ? new Date(credentials.expiry_date) : null,
+    };
+  } catch (error: any) {
+    const errorMessage = error?.message || 'Unknown error';
+    const errorCode = error?.response?.data?.error || error?.code || '';
+    
+    // Detect errors that require re-authentication
+    const needsReauth = 
+      errorCode === 'invalid_grant' ||
+      errorMessage.includes('invalid_grant') ||
+      errorMessage.includes('Token has been expired or revoked') ||
+      errorMessage.includes('Token has been revoked') ||
+      errorMessage.includes('refresh token') ||
+      error?.response?.status === 401 ||
+      error?.response?.status === 400;
+
+    logger.warn('Token refresh failed', {
+      clientId,
+      error: errorMessage,
+      errorCode,
+      needsReauth,
+    });
+
+    return {
+      success: false,
+      needsReauth,
+      error: needsReauth 
+        ? 'Integration requires re-authorization. Please reconnect your Google account.'
+        : `Token refresh failed: ${errorMessage}`,
+    };
+  }
 }
 
 /**

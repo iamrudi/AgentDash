@@ -1,10 +1,12 @@
 import crypto from 'crypto';
 
 // State signing key from environment - REQUIRED in production
-const STATE_SECRET = process.env.JWT_SECRET;
-
-if (!STATE_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required for OAuth state signing');
+function getStateSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required for OAuth state signing');
+  }
+  return secret;
 }
 
 interface OAuthState {
@@ -42,7 +44,7 @@ export function generateOAuthState(clientId: string, initiatedBy: string, servic
   const payloadBase64 = Buffer.from(payload).toString('base64url');
   
   // Create HMAC signature
-  const hmac = crypto.createHmac('sha256', STATE_SECRET);
+  const hmac = crypto.createHmac('sha256', getStateSecret());
   hmac.update(payloadBase64);
   const signature = hmac.digest('base64url');
 
@@ -65,7 +67,7 @@ export function verifyOAuthState(signedState: string): OAuthState {
   const [payloadBase64, signature] = parts;
 
   // Verify signature
-  const hmac = crypto.createHmac('sha256', STATE_SECRET);
+  const hmac = crypto.createHmac('sha256', getStateSecret());
   hmac.update(payloadBase64);
   const expectedSignature = hmac.digest('base64url');
 
