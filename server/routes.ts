@@ -6516,6 +6516,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, superadminHealthRouter);
 
+  /* WORKFLOW ROUTES MOVED TO server/routes/workflows.ts, workflow-executions.ts, lineage.ts - 15 routes
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================
@@ -7138,6 +7139,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       res.status(500).json({ message: "Failed to replay workflow execution", error: error.message });
     }
   });
+  END WORKFLOW ROUTES MOVED TO server/routes/workflows.ts, workflow-executions.ts, lineage.ts */
 
   // ==================== RULE ENGINE API ====================
 

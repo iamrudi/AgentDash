@@ -437,9 +437,9 @@ Current Status (December 2024):
 - Intelligence Layer: 82 🟢
 - AI Providers: 84 🟢
 - Real-time: 81 🟢 ← Health checks & metrics added
-- Domain Routers (mounted): 82 🟢 ← auth, user, client, agency, staff, crm, settings, superadmin, invoices, tasks, intelligence, knowledge (151 routes)
+- Domain Routers (mounted): 82 🟢 ← auth, user, client, agency, staff, crm, settings, superadmin, invoices, tasks, intelligence, knowledge, workflows, workflow-executions, lineage (166 routes)
 - Workflow Engine: 79 🟡
-- Core Backend (routes.ts, storage.ts): 58 🔴 ← Decomposition in progress (~65% complete)
+- Core Backend (routes.ts, storage.ts): 58 🔴 ← Decomposition in progress (~85% complete)
 
 ---
 
