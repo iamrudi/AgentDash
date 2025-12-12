@@ -18,6 +18,7 @@ import { metricsMiddleware, metricsHandler } from "./middleware/metrics";
 import { swaggerSpec } from "./config/swagger";
 import { features } from "./config/features";
 import { env } from "./env";
+import { maintenanceMiddleware } from "./middleware/maintenance";
 
 // Ensure uploads directory exists for branding logos
 const uploadsDir = path.join(process.cwd(), 'uploads', 'logos');
@@ -75,6 +76,9 @@ app.use('/api', (req, res, next) => {
   res.setHeader('Surrogate-Control', 'no-store');
   next();
 });
+
+// Maintenance mode check - returns 503 for non-SuperAdmin users when enabled
+app.use('/api', maintenanceMiddleware);
 
 
 // Health check endpoint (before auth)

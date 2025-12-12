@@ -6496,6 +6496,20 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     next();
   }, governanceRouter);
 
+  // Register SuperAdmin Health routes (system health, maintenance mode)
+  const superadminHealthRouter = (await import("./routes/superadmin-health")).default;
+  app.use("/api/superadmin", requireAuth, (req, res, next) => {
+    const authReq = req as AuthRequest;
+    (req as any).user = {
+      id: authReq.user?.id,
+      agencyId: authReq.user?.agencyId,
+      email: authReq.user?.email,
+      role: authReq.user?.role,
+      isSuperAdmin: authReq.user?.isSuperAdmin,
+    };
+    next();
+  }, superadminHealthRouter);
+
   // ===========================================
   // WORKFLOW ENGINE ROUTES
   // ===========================================

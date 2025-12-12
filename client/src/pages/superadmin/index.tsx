@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Profile, Agency, AuditLog, Client, Initiative } from "@shared/schema";
-import { Shield, Users, Building2, ScrollText, Trash2, UserCog, Mail, Key, Bot, Lightbulb, Sparkles, Loader2 } from "lucide-react";
+import { Shield, Users, Building2, ScrollText, Trash2, UserCog, Mail, Key, Bot, Lightbulb, Sparkles, Loader2, Activity, CheckCircle, AlertTriangle, XCircle, RefreshCw, Power } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useState } from "react";
 import {
@@ -65,6 +65,31 @@ type InitiativeWithClient = Initiative & {
   agencyName?: string;
 };
 
+type HealthCheck = {
+  name: string;
+  status: "healthy" | "degraded" | "unhealthy";
+  latency?: number;
+  details?: Record<string, unknown>;
+  error?: string;
+};
+
+type SystemHealth = {
+  status: "healthy" | "degraded" | "unhealthy";
+  timestamp: string;
+  totalLatency: number;
+  maintenance: {
+    enabled: boolean;
+    message?: string;
+    enabledAt?: string;
+  };
+  checks: HealthCheck[];
+  summary: {
+    healthy: number;
+    degraded: number;
+    unhealthy: number;
+  };
+};
+
 export default function SuperAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserWithAgency | null>(null);
   const [newRole, setNewRole] = useState<string>("");
@@ -105,6 +130,31 @@ export default function SuperAdminPage() {
   const { data: agencySettings, isLoading: settingsLoading } = useQuery<AgencySettings>({
     queryKey: ["/api/superadmin/agencies", selectedAgencyForSettings, "settings"],
     enabled: !!selectedAgencyForSettings,
+  });
+
+  const { data: systemHealth, isLoading: healthLoading, refetch: refetchHealth } = useQuery<SystemHealth>({
+    queryKey: ["/api/superadmin/health"],
+    refetchInterval: 30000,
+  });
+
+  const toggleMaintenanceMutation = useMutation({
+    mutationFn: async ({ enabled, message }: { enabled: boolean; message?: string }) => {
+      return await apiRequest("POST", "/api/superadmin/maintenance", { enabled, message });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/superadmin/health"] });
+      toast({
+        title: "Success",
+        description: "Maintenance mode updated",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update maintenance mode",
+        variant: "destructive",
+      });
+    },
   });
 
   const updateAIProviderMutation = useMutation({
@@ -333,7 +383,7 @@ export default function SuperAdminPage() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+        <TabsList className="grid w-full grid-cols-7 max-w-5xl">
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="w-4 h-4 mr-2" />
             Users
@@ -353,6 +403,10 @@ export default function SuperAdminPage() {
           <TabsTrigger value="recommendations" data-testid="tab-recommendations">
             <Lightbulb className="w-4 h-4 mr-2" />
             Recommendations
+          </TabsTrigger>
+          <TabsTrigger value="health" data-testid="tab-health">
+            <Activity className="w-4 h-4 mr-2" />
+            System Health
           </TabsTrigger>
           <TabsTrigger value="audit" data-testid="tab-audit">
             <ScrollText className="w-4 h-4 mr-2" />
@@ -850,6 +904,228 @@ export default function SuperAdminPage() {
                 )}
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="health" className="mt-6">
+          <div className="grid gap-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium">System Health Dashboard</h3>
+                <p className="text-sm text-muted-foreground">
+                  Real-time monitoring of platform health and services
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchHealth()}
+                disabled={healthLoading}
+                data-testid="button-refresh-health"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${healthLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            {healthLoading && !systemHealth ? (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Loading health status...
+                  </div>
+                </CardContent>
+              </Card>
+            ) : systemHealth ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-4">
+                        {systemHealth.status === "healthy" ? (
+                          <CheckCircle className="w-8 h-8 text-green-500" />
+                        ) : systemHealth.status === "degraded" ? (
+                          <AlertTriangle className="w-8 h-8 text-yellow-500" />
+                        ) : (
+                          <XCircle className="w-8 h-8 text-red-500" />
+                        )}
+                        <div>
+                          <p className="text-sm text-muted-foreground">Overall Status</p>
+                          <p className="text-xl font-semibold capitalize" data-testid="text-overall-status">
+                            {systemHealth.status}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-green-100 dark:bg-green-900">
+                          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Healthy</p>
+                          <p className="text-xl font-semibold" data-testid="text-healthy-count">
+                            {systemHealth.summary.healthy}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-yellow-100 dark:bg-yellow-900">
+                          <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Degraded</p>
+                          <p className="text-xl font-semibold" data-testid="text-degraded-count">
+                            {systemHealth.summary.degraded}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-md bg-red-100 dark:bg-red-900">
+                          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Unhealthy</p>
+                          <p className="text-xl font-semibold" data-testid="text-unhealthy-count">
+                            {systemHealth.summary.unhealthy}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Power className="w-5 h-5" />
+                      Maintenance Mode
+                    </CardTitle>
+                    <CardDescription>
+                      Enable maintenance mode to block non-SuperAdmin access
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Badge 
+                          variant={systemHealth.maintenance.enabled ? "destructive" : "secondary"}
+                          data-testid="badge-maintenance-status"
+                        >
+                          {systemHealth.maintenance.enabled ? "ENABLED" : "DISABLED"}
+                        </Badge>
+                        {systemHealth.maintenance.enabled && systemHealth.maintenance.message && (
+                          <span className="text-sm text-muted-foreground">
+                            {systemHealth.maintenance.message}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant={systemHealth.maintenance.enabled ? "outline" : "destructive"}
+                        size="sm"
+                        onClick={() => toggleMaintenanceMutation.mutate({ 
+                          enabled: !systemHealth.maintenance.enabled 
+                        })}
+                        disabled={toggleMaintenanceMutation.isPending}
+                        data-testid="button-toggle-maintenance"
+                      >
+                        {toggleMaintenanceMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : systemHealth.maintenance.enabled ? (
+                          "Disable Maintenance"
+                        ) : (
+                          "Enable Maintenance"
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Health Checks</CardTitle>
+                    <CardDescription>
+                      Detailed status of all system components (Last check: {new Date(systemHealth.timestamp).toLocaleTimeString()}, {systemHealth.totalLatency}ms)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Component</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Latency</TableHead>
+                            <TableHead>Details</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {systemHealth.checks.map((check) => (
+                            <TableRow key={check.name} data-testid={`row-check-${check.name}`}>
+                              <TableCell className="font-medium capitalize">
+                                {check.name.replace(/_/g, ' ')}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={
+                                    check.status === "healthy" ? "default" :
+                                    check.status === "degraded" ? "secondary" : "destructive"
+                                  }
+                                  data-testid={`badge-check-status-${check.name}`}
+                                >
+                                  {check.status === "healthy" && <CheckCircle className="w-3 h-3 mr-1" />}
+                                  {check.status === "degraded" && <AlertTriangle className="w-3 h-3 mr-1" />}
+                                  {check.status === "unhealthy" && <XCircle className="w-3 h-3 mr-1" />}
+                                  {check.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {check.latency !== undefined ? `${check.latency}ms` : '-'}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground max-w-md truncate">
+                                {check.error ? (
+                                  <span className="text-red-500">{check.error}</span>
+                                ) : check.details ? (
+                                  <span title={JSON.stringify(check.details, null, 2)}>
+                                    {Object.entries(check.details).slice(0, 3).map(([k, v]) => (
+                                      <span key={k} className="mr-2">
+                                        {k}: {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                                      </span>
+                                    ))}
+                                  </span>
+                                ) : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center text-muted-foreground">
+                    Unable to load health status
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 
