@@ -14,6 +14,7 @@ import knowledgeRoutes from './knowledge';
 import workflowsRoutes from './workflows';
 import workflowExecutionsRoutes from './workflow-executions';
 import lineageRoutes from './lineage';
+import publicRoutes from './public';
 
 export interface DomainRouter {
   subpath: string;
@@ -44,6 +45,7 @@ registerDomainRouter('/knowledge', knowledgeRoutes);
 registerDomainRouter('/workflows', workflowsRoutes);
 registerDomainRouter('/workflow-executions', workflowExecutionsRoutes);
 registerDomainRouter('/lineage', lineageRoutes);
+registerDomainRouter('/public', publicRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {
