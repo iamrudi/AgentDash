@@ -2437,6 +2437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /* INVOICE ROUTES MOVED TO server/routes/invoices.ts - 6 routes
   app.post("/api/invoices", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
       const validatedData = insertInvoiceSchema.parse(req.body);
@@ -2625,6 +2626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to generate PDF" });
     }
   });
+  END INVOICE ROUTES MOVED TO server/routes/invoices.ts */
 
   app.post("/api/initiatives", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
     try {
