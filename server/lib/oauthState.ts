@@ -1,7 +1,11 @@
 import crypto from 'crypto';
 
-// State signing key from environment (same as JWT secret for consistency)
-const STATE_SECRET = process.env.JWT_SECRET || 'development_secret_key_change_in_production';
+// State signing key from environment - REQUIRED in production
+const STATE_SECRET = process.env.JWT_SECRET;
+
+if (!STATE_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for OAuth state signing');
+}
 
 interface OAuthState {
   clientId: string;
