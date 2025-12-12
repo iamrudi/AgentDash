@@ -242,6 +242,83 @@ Platform-wide governance dashboard for system administrators.
 
 ---
 
+## Backend Domain Router Architecture
+
+As of December 2024, the monolithic `routes.ts` is being decomposed into domain-specific routers for improved maintainability.
+
+### Domain Router Structure
+
+```
+server/routes/
+├── index.ts       # Router composition and registration (5 routers mounted)
+├── auth.ts        # Authentication endpoints (3 routes)
+├── user.ts        # User profile endpoints (2 routes)
+├── client.ts      # Client portal endpoints (10 routes)
+├── agency.ts      # Agency admin endpoints (17 routes)
+├── staff.ts       # Staff portal endpoints (3 routes)
+├── crm.ts         # CRM endpoints (34 routes, not yet registered)
+├── settings.ts    # Settings endpoints (2 routes, not yet registered)
+│
+│   (Planned - still in routes.ts)
+├── superadmin.ts  # SuperAdmin endpoints
+├── tasks.ts       # Task management
+├── workflows.ts   # Workflow engine
+└── intelligence.ts # AI/Intelligence
+```
+
+### Router Registration Pattern
+
+```typescript
+// server/routes/index.ts
+import { Router, type Express } from 'express';
+import authRoutes from './auth';
+import agencyRoutes from './agency';
+// ...
+
+export function registerDomainRouter(subpath: string, router: Router): void {
+  domainRegistry.push({ subpath, router });
+}
+
+registerDomainRouter('/auth', authRoutes);
+registerDomainRouter('/agency', agencyRoutes);
+// ...
+
+export function mountDomainRouters(app: Express): void {
+  for (const { subpath, router } of domainRegistry) {
+    app.use(`/api${subpath}`, router);
+  }
+}
+```
+
+### Migration Status (December 2024)
+
+| Domain | Status | Routes | Notes |
+|--------|--------|--------|-------|
+| auth | ✅ Mounted | 3 | Login, logout, session |
+| user | ✅ Mounted | 2 | Profile get/update |
+| client | ✅ Mounted | 10 | Client portal endpoints |
+| agency | ✅ Mounted | 17 | Clients, projects, metrics, staff, messages |
+| staff | ✅ Mounted | 3 | Tasks, notifications |
+| crm | 🟡 Extracted | 34 | CRM endpoints (not yet registered in index.ts) |
+| settings | 🟡 Extracted | 2 | Rate limit settings (not yet registered) |
+| superadmin | 🔴 Pending | ~15 | Platform governance |
+| tasks | 🔴 Pending | ~20 | Task CRUD, subtasks, relationships |
+| workflows | 🔴 Pending | ~25 | Workflow engine API |
+| intelligence | 🔴 Pending | ~10 | AI, knowledge, feedback |
+
+**Total extracted:** 71 routes (35 mounted via index.ts + 36 in separate files)
+
+### Security Guarantees
+
+All extracted domain routers maintain:
+- **Zod validation** on POST/PATCH request bodies
+- **requireAuth** middleware for JWT validation
+- **requireRole** middleware for RBAC enforcement
+- **Cross-tenant protection** via agencyId injection from user context
+- **Resource ownership validation** (e.g., clientId belongs to user's agency)
+
+---
+
 ### Frontend-to-Backend Data Flow
 
 ```

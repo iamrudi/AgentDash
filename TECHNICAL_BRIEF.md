@@ -59,7 +59,16 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   └── App.tsx             # Main router
 │   └── index.html
 ├── server/
-│   ├── routes.ts               # API route definitions
+│   ├── routes.ts               # Legacy monolithic routes (being decomposed)
+│   ├── routes/                 # Domain-specific routers (new)
+│   │   ├── index.ts            # Router composition (5 routers mounted)
+│   │   ├── auth.ts             # Authentication (3 routes)
+│   │   ├── user.ts             # User profile (2 routes)
+│   │   ├── client.ts           # Client portal (10 routes)
+│   │   ├── agency.ts           # Agency admin (17 routes)
+│   │   ├── staff.ts            # Staff portal (3 routes)
+│   │   ├── crm.ts              # CRM (34 routes, not yet registered)
+│   │   └── settings.ts         # Settings (2 routes, not yet registered)
 │   ├── storage.ts              # Database operations (DbStorage)
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point

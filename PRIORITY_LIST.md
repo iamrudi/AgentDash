@@ -1049,8 +1049,36 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 
 | Item | File | Lines | Issue | Effort |
 |------|------|-------|-------|--------|
-| Monolithic routes.ts | `server/routes.ts` | 9,638 | Single file with all API handlers | 16 hrs |
+| Monolithic routes.ts | `server/routes.ts` | ~8,000 | Decomposition in progress (~40% complete) | 8 hrs remaining |
 | Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern | 12 hrs |
+
+### Routes Decomposition Progress (December 2024)
+
+**Mounted via index.ts (35 routes):**
+- ✅ `server/routes/auth.ts` - 3 routes (login, logout, session)
+- ✅ `server/routes/user.ts` - 2 routes (profile get/update)
+- ✅ `server/routes/client.ts` - 10 routes (client portal endpoints)
+- ✅ `server/routes/agency.ts` - 17 routes (clients, projects, metrics, staff, messages)
+- ✅ `server/routes/staff.ts` - 3 routes (tasks, notifications)
+- ✅ `server/routes/index.ts` - Router registration pattern
+
+**Extracted but not yet registered (36 routes):**
+- 🟡 `server/routes/crm.ts` - 34 routes (companies, contacts, deals, proposals, forms)
+- 🟡 `server/routes/settings.ts` - 2 routes (rate limit settings)
+
+**Pending Extractions:**
+- 🔴 `superadmin.ts` - ~15 routes (platform governance)
+- 🔴 `tasks.ts` - ~20 routes (task CRUD, subtasks, relationships)
+- 🔴 `workflows.ts` - ~25 routes (workflow engine API)
+- 🔴 `intelligence.ts` - ~10 routes (AI, knowledge, feedback)
+- 🔴 `invoices.ts` - ~8 routes (billing)
+
+**Security Guarantees Maintained:**
+- Zod validation on POST/PATCH request bodies
+- requireAuth middleware for JWT validation
+- requireRole middleware for RBAC enforcement
+- Cross-tenant protection via agencyId injection from user context
+- Resource ownership validation (e.g., clientId belongs to user's agency)
 
 ### High Priority (🟠 Should Address Soon)
 

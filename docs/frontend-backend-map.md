@@ -50,6 +50,21 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │                            BACKEND LAYER                                     │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                    Domain Router Architecture (Dec 2024)              │   │
+│  │                                                                        │   │
+│  │  server/routes/                                                       │   │
+│  │  ├── index.ts      (5 routers mounted)                               │   │
+│  │  ├── auth.ts       (3 routes)                                        │   │
+│  │  ├── user.ts       (2 routes)                                        │   │
+│  │  ├── client.ts     (10 routes)                                       │   │
+│  │  ├── agency.ts     (17 routes)                                       │   │
+│  │  ├── staff.ts      (3 routes)                                        │   │
+│  │  ├── crm.ts        (34 routes, not registered)                       │   │
+│  │  └── settings.ts   (2 routes, not registered)                        │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                         │
+│                                    ▼                                         │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                       Express.js Middleware Chain                     │   │
 │  │                                                                        │   │
 │  │  Request → [requestId] → [logger] → [rateLimiter] →                  │   │
