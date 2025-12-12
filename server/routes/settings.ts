@@ -1,7 +1,7 @@
 // server/routes/settings.ts
 
 import { Router } from 'express';
-import { requireAuth, requireRole } from '../middleware/auth';
+import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { runtimeSettings } from '../config/runtimeSettings';
 
 const settingsRouter = Router();
