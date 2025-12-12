@@ -396,6 +396,7 @@ The platform runs on Replit using:
 - **Closed Feedback Loop** ✅ - Outcome tracking, quality metrics, AI calibration
 - **Brand Knowledge Layer** ✅ - Structured knowledge ingestion pipeline with UI
 - **Platform Audit** ✅ - Maintenance scoring, technical debt register, documentation updates
+- **Routes Decomposition** 🔄 - Phase 2 in progress: auth, user, client routes extracted to domain modules
 
 ---
 
@@ -409,7 +410,7 @@ The platform runs on Replit using:
 - AI task-type model selection
 - Knowledge graph visualization
 - Cross-client pattern learning (with governance)
-- Routes.ts/storage.ts refactoring (see Technical Debt Register)
+- ~~Routes.ts/storage.ts refactoring~~ → In progress via domain router pattern
 
 ---
 
