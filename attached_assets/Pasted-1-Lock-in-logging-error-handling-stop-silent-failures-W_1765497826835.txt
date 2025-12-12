@@ -1,0 +1,132 @@
+1. Lock in logging + error handling (stop silent failures)
+
+Why: Core backend has the worst health score, and you’re still using legacy logging + console.log in places. That kills debuggability when things go wrong.
+
+1.1 Standardise structured logging
+
+Files to touch
+
+server/middleware/logger.ts (modernise)
+
+Replace console.log across server/routes.ts, server/storage.ts, jobs, and cron services with the logger.
+
+Concrete change
+
+Upgrade logger.ts to a single Winston-based logger with:
+
+// server/middleware/logger.ts
+import winston from 'winston';
+
+export const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  defaultMeta: { service: 'agency-client-portal' },
+  transports: [
+    new winston.transports.Console({
+      format: winston.format.simple(),
+    }),
+  ],
+});
+
+
+Add request-level logging (already hinted in frontend-backend map) so every API call passes through [requestId] → [logger] with correlation ID.
+
+Complexity: O(1) per request; essentially constant-time logging overhead.
+
+1.2 Central Express error handler
+
+Files
+
+New: server/middleware/error-handler.ts
+
+Wire in server/index.ts after routes.
+
+Pattern
+
+Require all route handlers in server/routes.ts (and soon domain route files) to use a small asyncHandler wrapper so thrown errors funnel into one error handler:
+
+// server/middleware/async-handler.ts
+export const asyncHandler =
+  (fn: express.RequestHandler): express.RequestHandler =>
+  (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+
+// server/middleware/error-handler.ts
+import { logger } from './logger';
+
+export function errorHandler(
+  err: any,
+  req: express.Request,
+  res: express.Response,
+  _next: express.NextFunction
+) {
+  logger.error('Request failed', {
+    requestId: req.headers['x-request-id'],
+    path: req.path,
+    method: req.method,
+    userId: (req as any).user?.id,
+    error: { message: err.message, stack: err.stack },
+  });
+
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    message: status === 500 ? 'Internal server error' : err.message,
+  });
+}
+
+
+Why this matters for stability
+
+One consistent error shape for frontend (ties into existing toast pattern).
+
+No “forgot a try/catch” explosions that crash the process.
+
+2. Fix core middleware & rate limiting (avoid auth / throttling surprises)
+
+Auth & rate limiting are already flagged as yellow, with redundant verifies and deprecated methods.
+
+2.1 Consolidate auth helpers
+
+Files
+
+server/middleware/auth.ts (or server/auth.ts depending on current)
+
+server/middleware/agency-context.ts (already good).
+
+Fix
+
+Collapse multiple verifyXAccess helpers into:
+
+requireAuth
+
+requireRole(['Client' | 'Staff' | 'Admin' | 'SuperAdmin'])
+
+requireAgencyMembership
+
+Ensure every route path in /api/agency/*, /api/staff/*, /api/client/*, /api/superadmin/* uses:
+
+router.use('/api/agency', requireAuth, requireRole(['Admin', 'Staff']), agencyContext);
+
+
+This aligns with the role-based access matrix and keeps tenant isolation explicit.
+
+2.2 Replace deprecated rate limit methods
+
+Files
+
+server/middleware/rateLimiter.ts (general)
+
+server/lib/googleApiRateLimiter.ts (external integrations)
+
+Per the cleanup queue and priority list, remove checkRateLimit() and recordRequest() and use the newer reserveRequest() API only.
+
+Why it helps stability
+
+Predictable throttling under load (no double-counting, no missed limits).
+
+Lower risk of burst failures against Google APIs leading to cascading errors.
+
+Complexity
+
+Rate limiting/check calls remain O(1) using Redis/in-memory bucket; simple and fast.
