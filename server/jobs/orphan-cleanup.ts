@@ -1,22 +1,24 @@
 import cron from 'node-cron';
 import { cleanupOrphanedUsers, detectOrphanedUsers } from '../lib/user-provisioning';
 import logger from '../middleware/logger';
+import { cronHeartbeat } from '../services/cronHeartbeat';
 
-/**
- * Automated orphan user cleanup job
- * Runs nightly at 2:00 AM to detect and clean up orphaned users
- */
+const JOB_NAME = "orphan-cleanup";
+const SCHEDULE = "0 2 * * *";
+
 export function scheduleOrphanCleanup() {
-  // Run every night at 2:00 AM
-  cron.schedule('0 2 * * *', async () => {
+  cronHeartbeat.register(JOB_NAME, SCHEDULE);
+
+  cron.schedule(SCHEDULE, async () => {
+    cronHeartbeat.recordStart(JOB_NAME);
     logger.info('[ORPHAN_CLEANUP_JOB] Starting scheduled orphan cleanup');
     
     try {
-      // First detect to log what we find
       const orphans = await detectOrphanedUsers();
       
       if (orphans.length === 0) {
         logger.info('[ORPHAN_CLEANUP_JOB] No orphaned users found');
+        cronHeartbeat.recordSuccess(JOB_NAME);
         return;
       }
       
@@ -25,7 +27,6 @@ export function scheduleOrphanCleanup() {
         logger.warn(`[ORPHAN_CLEANUP_JOB]   - ${orphan.id} (${orphan.email})`);
       });
       
-      // Clean up orphaned users
       const result = await cleanupOrphanedUsers();
       
       logger.info(`[ORPHAN_CLEANUP_JOB] Cleanup complete: ${result.deleted} deleted, ${result.errors} errors`);
@@ -33,7 +34,10 @@ export function scheduleOrphanCleanup() {
       if (result.errors > 0) {
         logger.error(`[ORPHAN_CLEANUP_JOB] Some orphans could not be deleted - manual intervention may be required`);
       }
+      
+      cronHeartbeat.recordSuccess(JOB_NAME);
     } catch (error: any) {
+      cronHeartbeat.recordError(JOB_NAME, error.message || "Unknown error");
       logger.error(`[ORPHAN_CLEANUP_JOB] Job failed: ${error.message}`);
       logger.error(error);
     }

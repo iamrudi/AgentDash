@@ -1,6 +1,11 @@
 import cron from "node-cron";
 import { InvoiceGeneratorService } from "./invoiceGenerator";
 import type { IStorage } from "../storage";
+import { cronHeartbeat } from "./cronHeartbeat";
+import logger from "../middleware/logger";
+
+const JOB_NAME = "invoice-scheduler";
+const SCHEDULE = "0 9 * * *";
 
 export class InvoiceScheduler {
   private invoiceGenerator: InvoiceGeneratorService;
@@ -9,32 +14,29 @@ export class InvoiceScheduler {
     this.invoiceGenerator = new InvoiceGeneratorService(storage);
   }
 
-  /**
-   * Start the invoice generation scheduler
-   * Runs daily at 9:00 AM to check if any invoices need to be generated
-   */
   start(): void {
-    // Run every day at 9:00 AM
-    cron.schedule("0 9 * * *", async () => {
+    cronHeartbeat.register(JOB_NAME, SCHEDULE);
+
+    cron.schedule(SCHEDULE, async () => {
+      cronHeartbeat.recordStart(JOB_NAME);
       try {
         const currentDay = new Date().getDate();
-        console.log(`Running invoice generation check for day ${currentDay}`);
+        logger.info(`Running invoice generation check for day ${currentDay}`);
         await this.invoiceGenerator.generateMonthlyRetainerInvoices(currentDay);
-        console.log("Invoice generation check completed");
-      } catch (error) {
-        console.error("Error in scheduled invoice generation:", error);
+        cronHeartbeat.recordSuccess(JOB_NAME);
+        logger.info("Invoice generation check completed");
+      } catch (error: any) {
+        cronHeartbeat.recordError(JOB_NAME, error.message || "Unknown error");
+        logger.error("Error in scheduled invoice generation:", error);
       }
     });
 
-    console.log("Invoice scheduler started - will run daily at 9:00 AM");
+    logger.info("Invoice scheduler started - will run daily at 9:00 AM");
   }
 
-  /**
-   * Run invoice generation immediately for testing
-   */
   async runNow(): Promise<void> {
     const currentDay = new Date().getDate();
-    console.log(`Running immediate invoice generation for day ${currentDay}`);
+    logger.info(`Running immediate invoice generation for day ${currentDay}`);
     await this.invoiceGenerator.generateMonthlyRetainerInvoices(currentDay);
   }
 }

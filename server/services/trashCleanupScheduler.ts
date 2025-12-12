@@ -3,6 +3,11 @@ import type { IStorage } from "../storage";
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { initiatives } from "@shared/schema";
+import { cronHeartbeat } from "./cronHeartbeat";
+import logger from "../middleware/logger";
+
+const JOB_NAME = "trash-cleanup";
+const SCHEDULE = "0 2 * * *";
 
 export class TrashCleanupScheduler {
   private storage: IStorage;
@@ -11,23 +16,23 @@ export class TrashCleanupScheduler {
     this.storage = storage;
   }
 
-  /**
-   * Start the trash cleanup scheduler
-   * Runs daily at 2:00 AM to permanently delete initiatives that have been in trash for 30+ days
-   */
   start(): void {
-    // Run every day at 2:00 AM
-    cron.schedule("0 2 * * *", async () => {
+    cronHeartbeat.register(JOB_NAME, SCHEDULE);
+
+    cron.schedule(SCHEDULE, async () => {
+      cronHeartbeat.recordStart(JOB_NAME);
       try {
-        console.log("Running trash cleanup check...");
+        logger.info("Running trash cleanup check...");
         await this.cleanupOldDeletedInitiatives();
-        console.log("Trash cleanup completed");
-      } catch (error) {
-        console.error("Error in scheduled trash cleanup:", error);
+        cronHeartbeat.recordSuccess(JOB_NAME);
+        logger.info("Trash cleanup completed");
+      } catch (error: any) {
+        cronHeartbeat.recordError(JOB_NAME, error.message || "Unknown error");
+        logger.error("Error in scheduled trash cleanup:", error);
       }
     });
 
-    console.log("Trash cleanup scheduler started - will run daily at 2:00 AM");
+    logger.info("Trash cleanup scheduler started - will run daily at 2:00 AM");
   }
 
   /**

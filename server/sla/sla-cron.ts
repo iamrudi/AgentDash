@@ -4,6 +4,10 @@ import { db } from "../db";
 import { profiles } from "@shared/schema";
 import { isNotNull } from "drizzle-orm";
 import logger from "../middleware/logger";
+import { cronHeartbeat } from "../services/cronHeartbeat";
+
+const JOB_NAME = "sla-monitoring";
+const SCHEDULE = "*/5 * * * *";
 
 let slaMonitoringJob: ReturnType<typeof cron.schedule> | null = null;
 
@@ -13,7 +17,10 @@ export async function startSlaMonitoring(): Promise<void> {
     return;
   }
 
-  slaMonitoringJob = cron.schedule("*/5 * * * *", async () => {
+  cronHeartbeat.register(JOB_NAME, SCHEDULE);
+
+  slaMonitoringJob = cron.schedule(SCHEDULE, async () => {
+    cronHeartbeat.recordStart(JOB_NAME);
     logger.info("Running SLA breach detection scan");
     
     try {
@@ -48,8 +55,10 @@ export async function startSlaMonitoring(): Promise<void> {
         }
       }
 
+      cronHeartbeat.recordSuccess(JOB_NAME);
       logger.info("SLA breach detection scan completed");
-    } catch (error) {
+    } catch (error: any) {
+      cronHeartbeat.recordError(JOB_NAME, error.message || "Unknown error");
       logger.error("SLA monitoring job failed:", error);
     }
   });
