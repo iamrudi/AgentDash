@@ -1,54 +1,58 @@
 import winston from 'winston';
 import { mkdirSync } from 'fs';
 import type { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 
-// Ensure logs directory exists
 try {
   mkdirSync('logs', { recursive: true });
 } catch (err) {
   // Directory already exists or cannot be created
 }
 
-const { combine, timestamp, printf, colorize, errors } = winston.format;
+const { combine, timestamp, printf, colorize, errors, json } = winston.format;
 
-const logFormat = printf(({ level, message, timestamp, stack, requestId }) => {
+const isProduction = process.env.NODE_ENV === 'production';
+
+const consoleFormat = printf(({ level, message, timestamp, stack, requestId, ...meta }) => {
   const reqId = requestId ? `[${requestId}] ` : '';
-  return `${timestamp} ${reqId}[${level}]: ${stack || message}`;
+  const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : '';
+  return `${timestamp} ${reqId}[${level}]: ${stack || message}${metaStr}`;
 });
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
+  defaultMeta: { service: 'agency-client-portal' },
   format: combine(
     errors({ stack: true }),
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    logFormat
+    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' })
   ),
   transports: [
     new winston.transports.Console({
-      format: combine(
-        colorize(),
-        timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        logFormat
-      )
+      format: isProduction
+        ? combine(timestamp(), json())
+        : combine(colorize(), timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }), consoleFormat)
     }),
     new winston.transports.File({ 
       filename: 'logs/error.log', 
-      level: 'error' 
+      level: 'error',
+      format: combine(timestamp(), json())
     }),
     new winston.transports.File({ 
-      filename: 'logs/combined.log' 
+      filename: 'logs/combined.log',
+      format: combine(timestamp(), json())
     })
   ]
 });
 
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: combine(
-      colorize(),
-      timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-      logFormat
-    )
-  }));
+export function generateRequestId(): string {
+  return randomUUID().slice(0, 8);
+}
+
+export function requestIdMiddleware(req: Request, res: Response, next: NextFunction) {
+  const requestId = (req.headers['x-request-id'] as string) || generateRequestId();
+  (req as any).requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
 }
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
@@ -59,26 +63,36 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const duration = Date.now() - startTime;
     const contentLength = res.get('Content-Length') || 0;
     
-    // Mask sensitive token parameters to prevent logging
     let sanitizedUrl = req.originalUrl;
     if (sanitizedUrl.includes('token=')) {
       sanitizedUrl = sanitizedUrl.replace(/([?&]token=)[^&]+/, '$1[REDACTED]');
     }
     
-    const logMessage = `${req.method} ${sanitizedUrl} ${res.statusCode} - ${duration}ms - ${contentLength} bytes`;
-    
-    const logContext = { requestId };
+    const logData = {
+      requestId,
+      method: req.method,
+      path: sanitizedUrl,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`,
+      contentLength,
+      userId: (req as any).user?.id,
+      userAgent: req.get('User-Agent')?.slice(0, 50)
+    };
     
     if (res.statusCode >= 500) {
-      logger.error(logMessage, logContext);
+      logger.error('Request failed', logData);
     } else if (res.statusCode >= 400) {
-      logger.warn(logMessage, logContext);
+      logger.warn('Request error', logData);
     } else {
-      logger.info(logMessage, logContext);
+      logger.info('Request completed', logData);
     }
   });
 
   next();
+}
+
+export function createChildLogger(requestId: string) {
+  return logger.child({ requestId });
 }
 
 export default logger;
