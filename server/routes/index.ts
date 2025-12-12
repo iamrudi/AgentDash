@@ -2,6 +2,8 @@ import { Router, type Express } from 'express';
 import authRoutes from './auth';
 import userRoutes from './user';
 import clientRoutes from './client';
+import agencyRoutes from './agency';
+import staffRoutes from './staff';
 
 export interface DomainRouter {
   subpath: string;
@@ -20,6 +22,8 @@ export function registerDomainRouter(subpath: string, router: Router): void {
 registerDomainRouter('/auth', authRoutes);
 registerDomainRouter('/user', userRoutes);
 registerDomainRouter('/client', clientRoutes);
+registerDomainRouter('/agency', agencyRoutes);
+registerDomainRouter('/staff', staffRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {

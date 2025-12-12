@@ -1,0 +1,164 @@
+3. Stabilise external integrations (Google, HubSpot, LinkedIn)
+
+Integrations are all 🟡 with noted issues around token refresh & error handling.
+
+3.1 Harden OAuth + token refresh
+
+Files
+
+server/lib/googleOAuth.ts – “Token refresh edge cases”.
+
+oauthState.ts – “Hardcoded dev fallbacks”.
+
+Fixes
+
+Add explicit handling for:
+
+expired/invalid refresh tokens → mark integration as “needs re-auth” rather than looping failures.
+
+network timeouts with retry via googleApiRetry.ts (already good).
+
+Remove any dev secret fallbacks in oauthState.ts and require env-configured secrets only.
+
+3.2 Standardise integration error handling
+
+Files
+
+server/lib/hubspot.ts – “Needs error handling review”.
+
+server/crm/crm-webhook-handler.ts – already has signed webhook verification.
+
+Pattern
+
+Wrap all external calls with:
+
+async function withIntegrationGuard<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: any) {
+    logger.error('Integration error', {
+      provider: 'hubspot',
+      error: err.message,
+    });
+    // Surface a 503 to callers
+    throw Object.assign(new Error('Upstream service unavailable'), { statusCode: 503 });
+  }
+}
+
+
+Why this helps
+
+Fail fast and clearly instead of causing weird downstream nulls or partial writes.
+
+Keeps the workflow engine & SLA logic from acting on half-baked CRM data.
+
+4. Tackle the two red-flag God files (routes.ts & storage.ts) incrementally
+
+These are your biggest structural risks: monolithic files that make it hard to reason about behaviour or add guardrails.
+
+Strategy: introduce new modules and slowly migrate, not a big bang rewrite.
+
+4.1 Introduce domain routers without breaking anything
+
+Goal: move from one server/routes.ts (9638 lines) to server/routes/* domain modules.
+
+Step plan
+
+Create:
+
+server/routes/
+  index.ts           // new top-level composer
+  agency.ts
+  client.ts
+  staff.ts
+  superadmin.ts
+  tasks.ts
+  projects.ts
+  invoices.ts
+  workflows.ts
+  intelligence.ts
+  auth.ts
+
+
+In server/routes/index.ts:
+
+import express from 'express';
+import { agencyRouter } from './agency';
+import { clientRouter } from './client';
+// ...
+
+export function buildApiRouter() {
+  const router = express.Router();
+
+  router.use('/api/agency', agencyRouter);
+  router.use('/api/client', clientRouter);
+  // ...other prefixes
+
+  return router;
+}
+
+
+In server/index.ts, switch from using routes.ts directly to buildApiRouter().
+
+Start moving endpoints by domain from server/routes.ts into the new files, keeping:
+
+requireAuth
+
+requireRole
+
+agencyContext
+
+Zod validation patterns from the technical brief.
+
+Stability guardrails
+
+Move one domain at a time (e.g., /api/agency/clients), keep tests and existing paths identical.
+
+Use TypeScript types from shared/schema.ts to ensure responses don’t change.
+
+Complexity
+
+Routing lookup is still O(1); the change is organisational, not runtime.
+
+4.2 Extract domain storage services from server/storage.ts
+
+server/storage.ts is 3713 lines and a God object.
+
+Step plan
+
+Define a base interface:
+
+// server/storage/base-storage.ts
+export interface AgencyStorage {
+  getAgencyById(agencyId: string): Promise<Agency | null>;
+  listClients(agencyId: string): Promise<Client[]>;
+  // ...
+}
+
+
+Create domain-specific storage files (initially delegating to existing DbStorage):
+
+// server/storage/agency-storage.ts
+import { db } from '../db';
+import { agencies } from '../../shared/schema';
+
+export class AgencyStorageImpl implements AgencyStorage {
+  async getAgencyById(agencyId: string) { /* drizzle query with RLS */ }
+  async listClients(agencyId: string) { /* ... */ }
+}
+
+
+Replace direct storage calls in routes with domain storages:
+
+// old
+const clients = await storage.getAgencyClients(agencyId);
+
+// new
+const clients = await agencyStorage.listClients(agencyId);
+
+
+Once coverage is sufficient, strip moved methods out of server/storage.ts.
+
+Security
+
+All domain storages must always include agencyId in filters (app-layer isolation) even though RLS backs you up.
