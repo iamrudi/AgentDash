@@ -9,6 +9,8 @@ import settingsRoutes from './settings';
 import superadminRoutes from './superadmin';
 import invoicesRoutes from './invoices';
 import tasksRoutes from './tasks';
+import intelligenceRoutes from './intelligence';
+import knowledgeRoutes from './knowledge';
 
 export interface DomainRouter {
   subpath: string;
@@ -34,6 +36,8 @@ registerDomainRouter('/settings', settingsRoutes);
 registerDomainRouter('/superadmin', superadminRoutes);
 registerDomainRouter('/invoices', invoicesRoutes);
 registerDomainRouter('/tasks', tasksRoutes);
+registerDomainRouter('/intelligence', intelligenceRoutes);
+registerDomainRouter('/knowledge', knowledgeRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {

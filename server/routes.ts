@@ -9022,6 +9022,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  /* INTELLIGENCE ROUTES MOVED TO server/routes/intelligence.ts - 21 routes
   // Resource Optimization - Get allocation plans
   app.get("/api/intelligence/resource-optimization/plans", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
     try {
@@ -9426,7 +9427,9 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       res.status(500).json({ message: "Failed to update calibration parameter" });
     }
   });
+  END INTELLIGENCE ROUTES MOVED TO server/routes/intelligence.ts */
 
+  /* KNOWLEDGE ROUTES MOVED TO server/routes/knowledge.ts - 12 routes
   // ============================================
   // BRAND KNOWLEDGE LAYER API ROUTES
   // ============================================
@@ -9660,6 +9663,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       res.status(500).json({ message: "Failed to get prompt context" });
     }
   });
+  END KNOWLEDGE ROUTES MOVED TO server/routes/knowledge.ts */
 
   const httpServer = createServer(app);
   return httpServer;
