@@ -64,22 +64,6 @@ class GoogleApiRateLimiter {
   }
 
   /**
-   * Check if a request is allowed under rate limits (deprecated - use reserveRequest)
-   * @deprecated Use reserveRequest instead for atomic check-and-increment
-   */
-  checkRateLimit(service: 'GA4' | 'GSC', clientId: string): { allowed: boolean; retryAfter?: number } {
-    return this.reserveRequest(service, clientId);
-  }
-
-  /**
-   * Record a successful API call (deprecated - use reserveRequest)
-   * @deprecated Use reserveRequest instead for atomic check-and-increment
-   */
-  recordRequest(service: 'GA4' | 'GSC', clientId: string): void {
-    // No-op: reserveRequest now handles incrementing
-  }
-
-  /**
    * Check a specific limit
    */
   private checkLimit(key: string, limit: number, now: number, window: number): { allowed: boolean; retryAfter?: number } {

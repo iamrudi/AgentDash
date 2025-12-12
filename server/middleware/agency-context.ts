@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import logger from "./logger";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -78,7 +79,7 @@ export function resolveAgencyContext(
     // For GET requests: allow optional query parameter filtering
     if (allowQueryParam && req.query.agencyId) {
       agencyId = req.query.agencyId as string;
-      console.log(`[resolveAgencyContext] SuperAdmin ${req.user.email} filtering by agency: ${agencyId}`);
+      logger.info('SuperAdmin filtering by agency', { email: req.user.email, agencyId });
     }
     
     // For CREATE/UPDATE/DELETE requests: require body field
@@ -92,12 +93,12 @@ export function resolveAgencyContext(
         };
       }
       
-      console.log(`[resolveAgencyContext] SuperAdmin ${req.user.email} operating on agency: ${agencyId}`);
+      logger.info('SuperAdmin operating on agency', { email: req.user.email, agencyId });
     }
     
     // If no filtering specified, SuperAdmin sees all agencies
     if (!agencyId) {
-      console.log(`[resolveAgencyContext] SuperAdmin ${req.user.email} accessing all agencies`);
+      logger.info('SuperAdmin accessing all agencies', { email: req.user.email });
     }
     
     return {
@@ -114,7 +115,7 @@ export function resolveAgencyContext(
     };
   }
   
-  console.log(`[resolveAgencyContext] ${req.user.role} ${req.user.email} accessing agency: ${req.user.agencyId}`);
+  logger.info('User accessing agency', { role: req.user.role, email: req.user.email, agencyId: req.user.agencyId });
   
   return {
     agencyId: req.user.agencyId,

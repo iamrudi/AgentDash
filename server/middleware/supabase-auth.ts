@@ -4,6 +4,7 @@ import { db } from "../db";
 import { profiles, clients } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import type { IStorage } from "../storage";
+import logger from "./logger";
 
 export interface AuthRequest extends Request {
   user?: {
@@ -72,7 +73,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       }
       
       if (!client.agencyId) {
-        console.warn(`Client user ${user.id} has no agencyId in client record`);
+        logger.warn('Client user has no agencyId in client record', { userId: user.id });
         return res.status(401).json({ message: "Agency association not found for client" });
       }
       
@@ -90,7 +91,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       agencyId = profile.agencyId ?? undefined;
       
       if (!agencyId) {
-        console.warn(`Admin/Staff user ${user.id} has no agencyId in profile or app_metadata`);
+        logger.warn('Admin/Staff user has no agencyId in profile or app_metadata', { userId: user.id });
         return res.status(401).json({ message: "Agency association not found" });
       }
     }
@@ -106,11 +107,18 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       isSuperAdmin,
     };
 
-    console.log(`[AUTH] User ${user.email} authenticated - Role: ${role}, AgencyId: ${agencyId}, ClientId: ${clientId}, SuperAdmin: ${isSuperAdmin}`);
+    logger.info('User authenticated', {
+      requestId: (req as any).requestId,
+      email: user.email,
+      role,
+      agencyId,
+      clientId,
+      isSuperAdmin,
+    });
     
     next();
   } catch (error) {
-    console.error("Auth error:", error);
+    logger.error('Auth error', { error: (error as Error).message });
     res.status(401).json({ message: "Invalid or expired token" });
   }
 }
@@ -147,26 +155,26 @@ export async function verifyClientAccess(
 
   // Super Admins can access any client across all agencies
   if (req.user.isSuperAdmin) {
-    console.log(`[SUPER ADMIN ACCESS] User ${req.user.id} granted access to client ${resourceClientId}`);
+    logger.info('Super admin access granted', { userId: req.user.id, resourceClientId });
     return true;
   }
 
   // Admins can ONLY access clients in their own agency
   if (req.user.role === "Admin") {
     if (!req.user.agencyId) {
-      console.warn(`Admin user ${req.user.id} has no agencyId - denying client access`);
+      logger.warn('Admin user has no agencyId - denying client access', { userId: req.user.id });
       return false;
     }
     
     const client = await storage.getClientById(resourceClientId);
     if (!client) {
-      console.warn(`Client ${resourceClientId} not found`);
+      logger.warn('Client not found', { resourceClientId });
       return false;
     }
     
     // Critical: Admin can only access clients in their own agency
     if (client.agencyId !== req.user.agencyId) {
-      console.warn(`Admin ${req.user.id} (agency: ${req.user.agencyId}) attempted to access client ${resourceClientId} (agency: ${client.agencyId})`);
+      logger.warn('Admin attempted cross-agency access', { userId: req.user.id, userAgencyId: req.user.agencyId, resourceClientId, resourceAgencyId: client.agencyId });
       return false;
     }
     
@@ -181,19 +189,19 @@ export async function verifyClientAccess(
   // Staff users can access clients in their own agency (read-only for now)
   if (req.user.role === "Staff") {
     if (!req.user.agencyId) {
-      console.warn(`Staff user ${req.user.id} has no agencyId - denying client access`);
+      logger.warn('Staff user has no agencyId - denying client access', { userId: req.user.id });
       return false;
     }
     
     const client = await storage.getClientById(resourceClientId);
     if (!client) {
-      console.warn(`Client ${resourceClientId} not found`);
+      logger.warn('Client not found', { resourceClientId });
       return false;
     }
     
     // Staff can only access clients in their own agency
     if (client.agencyId !== req.user.agencyId) {
-      console.warn(`Staff ${req.user.id} (agency: ${req.user.agencyId}) attempted to access client ${resourceClientId} (agency: ${client.agencyId})`);
+      logger.warn('Staff attempted cross-agency access', { userId: req.user.id, userAgencyId: req.user.agencyId, resourceClientId, resourceAgencyId: client.agencyId });
       return false;
     }
     
@@ -215,7 +223,7 @@ export async function verifyProjectAccess(
 
   const project = await storage.getProjectById(projectId);
   if (!project) {
-    console.warn(`Project ${projectId} not found`);
+    logger.warn('Project not found', { projectId });
     return false;
   }
 
@@ -235,14 +243,19 @@ export async function verifyTaskAccess(
 
   const task = await storage.getTaskById(taskId);
   if (!task) {
-    console.warn(`Task ${taskId} not found`);
+    logger.warn('Task not found', { taskId });
+    return false;
+  }
+
+  if (!task.projectId) {
+    logger.warn('Task has no associated project', { taskId });
     return false;
   }
 
   // Get the project to find the client
   const project = await storage.getProjectById(task.projectId);
   if (!project) {
-    console.warn(`Project ${task.projectId} for task ${taskId} not found`);
+    logger.warn('Project for task not found', { projectId: task.projectId, taskId });
     return false;
   }
 
@@ -262,7 +275,7 @@ export async function verifyInitiativeAccess(
 
   const initiative = await storage.getInitiativeById(initiativeId);
   if (!initiative) {
-    console.warn(`Initiative ${initiativeId} not found`);
+    logger.warn('Initiative not found', { initiativeId });
     return false;
   }
 
@@ -282,7 +295,7 @@ export async function verifyInvoiceAccess(
 
   const invoice = await storage.getInvoiceById(invoiceId);
   if (!invoice) {
-    console.warn(`Invoice ${invoiceId} not found`);
+    logger.warn('Invoice not found', { invoiceId });
     return false;
   }
 
@@ -392,10 +405,10 @@ export function requireSuperAdmin(req: AuthRequest, res: Response, next: NextFun
   }
 
   if (!req.user.isSuperAdmin) {
-    console.warn(`[SUPER ADMIN REQUIRED] User ${req.user.id} (${req.user.email}) attempted to access Super Admin route`);
+    logger.warn('Non-super admin attempted super admin route access', { userId: req.user.id, email: req.user.email, path: req.path });
     return res.status(403).json({ message: "Super Admin access required" });
   }
 
-  console.log(`[SUPER ADMIN] User ${req.user.id} (${req.user.email}) accessing Super Admin route`);
+  logger.info('Super admin route access', { userId: req.user.id, email: req.user.email, path: req.path });
   next();
 }
