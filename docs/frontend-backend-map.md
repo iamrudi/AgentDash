@@ -59,8 +59,8 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │  │  ├── client.ts     (10 routes)                                       │   │
 │  │  ├── agency.ts     (17 routes)                                       │   │
 │  │  ├── staff.ts      (3 routes)                                        │   │
-│  │  ├── crm.ts        (34 routes, not registered)                       │   │
-│  │  └── settings.ts   (2 routes, not registered)                        │   │
+│  │  ├── crm.ts        (34 routes, extracted but not mounted)            │   │
+│  │  └── settings.ts   (2 routes, extracted but not mounted)             │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    ▼                                         │
@@ -142,6 +142,7 @@ This document maps React pages to their backend API endpoints, query keys, and s
 | Create Task | Mutation | `POST /api/agency/tasks` | `storage.createTask()` | `Task` |
 | Update Task | Mutation | `PATCH /api/agency/tasks/:id` | `storage.updateTask()` | `Task` |
 | Create List | Mutation | `POST /api/projects/:id/lists` | `storage.createTaskList()` | `TaskList` |
+| Create Subtask | Mutation | `POST /api/tasks/:taskId/subtasks` | `storage.createSubtask()` | `Task` |
 
 ### Tasks (`/agency/tasks`)
 

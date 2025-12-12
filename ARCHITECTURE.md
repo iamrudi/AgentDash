@@ -74,6 +74,16 @@ SuperAdmin
             └── Clients
 ```
 
+### SuperAdmin Access Model
+
+SuperAdmin routes use the Supabase **service role key** (`supabaseAdmin`) which **bypasses PostgreSQL RLS policies** entirely. Because RLS is not enforced for service-role queries, the following compensating controls are required:
+
+1. **Application-layer filtering** — All `/api/superadmin/*` handlers must explicitly validate `agencyId` conditions
+2. **Scope constraints** — Queries should request only the minimum data needed
+3. **Audit logging** — All cross-agency operations must be logged for security review
+
+Regular user routes continue to use the standard `supabase` client (anon key) where RLS policies are enforced automatically. This dual-client pattern ensures tenant isolation for normal operations while allowing controlled platform-wide access for SuperAdmin governance tasks.
+
 ---
 
 ## Frontend Portal Architecture
@@ -256,8 +266,8 @@ server/routes/
 ├── client.ts      # Client portal endpoints (10 routes)
 ├── agency.ts      # Agency admin endpoints (17 routes)
 ├── staff.ts       # Staff portal endpoints (3 routes)
-├── crm.ts         # CRM endpoints (34 routes, not yet registered)
-├── settings.ts    # Settings endpoints (2 routes, not yet registered)
+├── crm.ts         # CRM endpoints (34 routes, extracted but not mounted)
+├── settings.ts    # Settings endpoints (2 routes, extracted but not mounted)
 │
 │   (Planned - still in routes.ts)
 ├── superadmin.ts  # SuperAdmin endpoints
@@ -299,14 +309,14 @@ export function mountDomainRouters(app: Express): void {
 | client | ✅ Mounted | 10 | Client portal endpoints |
 | agency | ✅ Mounted | 17 | Clients, projects, metrics, staff, messages |
 | staff | ✅ Mounted | 3 | Tasks, notifications |
-| crm | 🟡 Extracted | 34 | CRM endpoints (not yet registered in index.ts) |
-| settings | 🟡 Extracted | 2 | Rate limit settings (not yet registered) |
+| crm | 🟡 Extracted | 34 | CRM endpoints (extracted but not mounted in index.ts) |
+| settings | 🟡 Extracted | 2 | Rate limit settings (extracted but not mounted) |
 | superadmin | 🔴 Pending | ~15 | Platform governance |
 | tasks | 🔴 Pending | ~20 | Task CRUD, subtasks, relationships |
 | workflows | 🔴 Pending | ~25 | Workflow engine API |
 | intelligence | 🔴 Pending | ~10 | AI, knowledge, feedback |
 
-**Progress:** ~45% complete (71 routes extracted: 35 mounted + 36 extracted not registered)
+**Progress:** ~45% complete (71 routes extracted: 35 mounted + 36 extracted but not mounted)
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 

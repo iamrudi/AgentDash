@@ -1,0 +1,137 @@
+✅ GLOBAL ASSESSMENT
+
+Your updates reflect:
+
+The router decomposition status and architecture accurately
+(mounted routers vs extracted vs pending).
+
+The workflow engine, rule engine, signals, agents, SLA, AI executor, vector store reflect the actual implemented features.
+
+The maintenance matrix now reflects the new “green” areas and ongoing “yellow/red” areas correctly.
+
+The frontend-backend map is extremely solid and accurate to the real routing & storage design.
+
+The priority list is up to date, scoped, and matches implemented features.
+
+There are no blocking issues.
+Only minor clarifications and enhancements would make these docs airtight for future engineers or auditors.
+
+🔧 REQUIRED FIXES (SMALL, BUT IMPORTANT)
+1. ARCHITECTURE.md — Missing explicit RLS enforcement description for SuperAdmin
+
+The doc mentions SuperAdmin’s cross-agency access but doesn’t clarify the application-layer override mechanics vs RLS — specifically how SuperAdmin bypasses application filters but does not bypass RLS by default unless using the service key.
+
+Recommend adding:
+
+SuperAdmin Access Model
+SuperAdmin routes do not bypass PostgreSQL RLS. Instead, handlers use the Supabase service role key to run elevated queries when required. All /api/superadmin/* handlers must explicitly execute queries through the privileged client and validate agencyId conditions at the application layer.
+
+This prevents ambiguity between:
+
+what Supabase automatically enforces
+
+what handlers override intentionally
+
+🔧 Action: Add ~3 lines under Security Architecture → RBAC.
+
+2. TECHNICAL_BRIEF.md — storage.ts dependency should reflect new domain storage split
+
+The brief still describes:
+
+server/storage.ts — the main DbStorage class
+
+…but your architecture now (correctly) says that storage is being decomposed into domain services.
+
+Recommend updating the brief to:
+
+“The legacy DbStorage class still exists but is gradually being replaced by domain-specific storage modules (client-storage.ts, project-storage.ts, etc.). New features must not add new methods to storage.ts.”
+
+This is consistent with the maintenance matrix.
+
+3. Maintenance Matrix — Route decomposition progress numbers need slight correction
+
+In the matrix:
+
+It lists 71 routes extracted (35 mounted + 36 extracted)
+But after reviewing the updated architecture doc and FB map, the correct number seems to be:
+
+35 mounted (auth, user, client, agency, staff)
+
+34 CRM routes extracted
+
+2 settings extracted
+→ 71 total extracted, correct.
+
+But the extracted CRM routes are not actually wired yet, so consider rewording:
+
+“Extracted but not mounted” instead of “Extracted not registered”.
+
+Small clarification, but important for engineering clarity.
+
+4. frontend-backend-map.md — Two missing pages in Agency Portal section
+
+In /agency/project-detail mapping, you correctly list:
+
+Lists
+
+Tasks
+
+Create List
+
+Create Task
+
+However, the subtask creation route (POST /api/tasks/:taskId/subtasks) is missing from the project detail page mapping.
+
+This endpoint exists in the Staff portal section — but belongs in Agency as well since Admin can also create subtasks.
+
+🔧 Action: Add:
+
+| Create Subtask | Mutation | POST /api/tasks/:taskId/subtasks | storage.createSubtask() | Task |
+
+5. PRIORITY_LIST.md — Phase 15 needs explicit dependency update
+
+The document begins Phase 15 (Workflow Builder UI) but the architecture description implies:
+
+Workflow steps
+
+Versioned rules
+
+Template system
+
+Real-time layer
+
+…are already complete and the builder relies on these.
+
+But the Priority List still has Phase 15 marked as “Not Started” (red).
+Given your platform status, I recommend marking it:
+
+🟡 In Progress — Core workflow execution, templates, and rule engine completed; UI builder implementation pending.
+
+It's already “in progress” per your earlier message.
+
+🧠 OPTIONAL (BUT STRONG) IMPROVEMENTS
+1. Add a “Data Lineage Map” diagram to ARCHITECTURE.md
+
+Your system now has:
+
+workflowExecutionId on tasks/lists/projects
+
+lineage API (/api/workflow-executions/:id/lineage)
+
+signal → workflow → AI → task creation flow
+
+This should be shown visually.
+Engineers rely on lineage to debug cross-system automation.
+
+2. Add a “Domain Storage Architecture” diagram to TECHNICAL_BRIEF.md
+
+Even if storage split is ongoing, documenting the target shape helps new engineers avoid the old anti-pattern.
+
+3. Add a “Mounted vs Extracted vs Pending” table in the ARCHITECTURE.md routing section
+
+Your maintenance matrix has it, but the architecture doc should show it too — engineers reference this doc far more.
+
+4. Add a small “Frontend Query Key Rules” summary to ARCHITECTURE.md
+
+Currently only in the FE/BE Map.
+Architects should see the conventions in the main architecture doc for consistency.

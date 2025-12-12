@@ -43,8 +43,8 @@ Where:
 | **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2024 | 10 routes, client portal |
 | **Agency Router** | `server/routes/agency.ts` | 80 | 🟢 | Core Team | Dec 2024 | 17 routes, cross-tenant protection |
 | **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2024 | 3 routes, task filtering |
-| **CRM Router** | `server/routes/crm.ts` | 75 | 🟡 | Core Team | Dec 2024 | 34 routes, not yet registered |
-| **Settings Router** | `server/routes/settings.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, not yet registered |
+| **CRM Router** | `server/routes/crm.ts` | 75 | 🟡 | Core Team | Dec 2024 | 34 routes, extracted but not mounted |
+| **Settings Router** | `server/routes/settings.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, extracted but not mounted |
 | **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 5 routers mounted |
 | **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2024 | **3235 lines** — well-organized but large |
 
@@ -232,7 +232,7 @@ server/storage/
 | `agency.ts` | 17 | clients, projects, metrics, staff, messages | ✅ Mounted |
 | `staff.ts` | 3 | tasks, tasks/full, notifications/counts | ✅ Mounted |
 
-### Extracted but not registered (36 routes)
+### Extracted but not mounted (36 routes)
 | Router | Routes | Endpoints | Status |
 |--------|--------|-----------|--------|
 | `crm.ts` | 34 | companies, contacts, deals, proposals, forms | 🟡 Extracted |

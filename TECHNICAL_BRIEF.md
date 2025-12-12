@@ -67,9 +67,9 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   ├── client.ts           # Client portal (10 routes)
 │   │   ├── agency.ts           # Agency admin (17 routes)
 │   │   ├── staff.ts            # Staff portal (3 routes)
-│   │   ├── crm.ts              # CRM (34 routes, not yet registered)
-│   │   └── settings.ts         # Settings (2 routes, not yet registered)
-│   ├── storage.ts              # Database operations (DbStorage)
+│   │   ├── crm.ts              # CRM (34 routes, extracted but not mounted)
+│   │   └── settings.ts         # Settings (2 routes, extracted but not mounted)
+│   ├── storage.ts              # Database operations (DbStorage - legacy, being decomposed)
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point
 │   ├── vite.ts                 # Vite dev server integration
@@ -861,7 +861,7 @@ npx tsc --noEmit
 | `server/workflow/engine.ts` | WorkflowEngine class with step execution |
 | `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
 | `shared/schema.ts` | All database schemas including workflow tables |
-| `server/storage.ts` | Database operations including workflow/rule CRUD |
+| `server/storage.ts` | Database operations (legacy - new features should use domain storage modules) |
 | `server/routes.ts` | All API endpoints including workflow/rule endpoints |
 | `scripts/test-workflow.ts` | Workflow regression test suite |
 
@@ -1469,7 +1469,7 @@ class KnowledgeRetrievalService {
 | File | Purpose |
 |------|---------|
 | `shared/schema.ts` | All database schemas (3,235 lines) |
-| `server/storage.ts` | Database operations (3,713 lines) |
+| `server/storage.ts` | Database operations - legacy DbStorage (3,713 lines, decomposition in progress) |
 | `server/routes.ts` | All API endpoints (9,638 lines) |
 
 ### Workflow Engine
