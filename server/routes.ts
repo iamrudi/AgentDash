@@ -5843,6 +5843,7 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
     }
   });
 
+  /* SUPERADMIN ROUTES MOVED TO server/routes/superadmin.ts - 16 routes
   // ============================================================================
   // SUPER ADMIN ROUTES - Platform-level administration
   // ============================================================================
@@ -6418,9 +6419,10 @@ Keep the analysis concise and actionable (2-3 paragraphs).`;
       res.status(500).json({ message: "Failed to fetch audit logs" });
     }
   });
+  END SUPERADMIN ROUTES MOVED TO server/routes/superadmin.ts */
 
-  // Register Settings routes
-  app.use("/api/settings", settingsRouter);
+  // Register Settings routes - MOVED TO domain routers
+  // app.use("/api/settings", settingsRouter);
 
   // Register SLA routes
   const { slaRouter } = await import("./sla/sla-routes");
