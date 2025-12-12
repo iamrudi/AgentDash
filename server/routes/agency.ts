@@ -102,9 +102,21 @@ router.post('/projects', requireAuth, requireRole('Admin'), async (req: AuthRequ
       return res.status(403).json({ message: 'Agency association required' });
     }
     
+    const agencyId = req.user!.isSuperAdmin ? req.body.agencyId : req.user!.agencyId;
+    
+    if (req.body.clientId) {
+      const client = await storage.getClientById(req.body.clientId);
+      if (!client) {
+        return res.status(404).json({ message: 'Client not found' });
+      }
+      if (client.agencyId !== agencyId) {
+        return res.status(403).json({ message: 'Client does not belong to your agency' });
+      }
+    }
+    
     const projectData = insertProjectSchema.parse({
       ...req.body,
-      agencyId: req.user!.isSuperAdmin ? req.body.agencyId : req.user!.agencyId,
+      agencyId,
     });
     const newProject = await storage.createProject(projectData);
     res.status(201).json(newProject);
