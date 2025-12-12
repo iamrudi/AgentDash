@@ -545,6 +545,69 @@ mutation.mutate(data, {
 
 ## Testing Conventions
 
+### Unit Testing with Vitest
+
+```typescript
+// tests/utils/test-helpers.ts
+import { vi } from 'vitest';
+
+// Mock Express request
+export function createMockRequest(overrides?: Partial<AuthRequest>) {
+  return {
+    user: undefined,
+    params: {},
+    query: {},
+    body: {},
+    path: '/test',
+    ...overrides
+  };
+}
+
+// Mock Express response
+export function createMockResponse() {
+  const res = {
+    status: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+    send: vi.fn().mockReturnThis(),
+    _json: null
+  };
+  res.getJson = () => res._json;
+  return res;
+}
+
+// Pre-configured test users
+export const testUsers = {
+  superAdmin: { id: 'super-admin-uuid', role: 'Admin', isSuperAdmin: true },
+  adminAgencyA: { id: 'admin-a-uuid', role: 'Admin', agencyId: 'agency-a-uuid' },
+  staffAgencyA: { id: 'staff-a-uuid', role: 'Staff', agencyId: 'agency-a-uuid' },
+  clientUserA: { id: 'client-a-uuid', role: 'Client', clientId: 'client-a-uuid' }
+};
+```
+
+### Running Tests
+
+```bash
+# Run 44 stability tests (auth, maintenance, SLA)
+npx vitest run tests/middleware tests/sla
+
+# Run all tests
+npx vitest run
+
+# Watch mode
+npx vitest
+
+# Coverage report
+npx vitest run --coverage
+```
+
+### Test Categories
+
+| Category | Path | Purpose |
+|----------|------|---------|
+| Middleware | `tests/middleware/*.test.ts` | Auth, role, maintenance logic |
+| SLA | `tests/sla/*.test.ts` | Breach detection, deadline calculation |
+| Integration | `tests/integration/*.test.ts` | API flow validation |
+
 ### Data Test IDs
 
 ```
@@ -569,6 +632,57 @@ await page.goto('/agency/tasks');
 
 // Use data-testid selectors
 await page.click('[data-testid="button-create-task"]');
+```
+
+### Structured Logging Standards
+
+```typescript
+// Winston JSON logging format
+import { logger } from './lib/logger';
+
+// Info level - normal operations
+logger.info('Operation completed', {
+  service: 'agency-client-portal',
+  userId: req.user?.id,
+  path: req.path
+});
+
+// Warn level - potential issues
+logger.warn('Cross-tenant access attempted', {
+  service: 'agency-client-portal',
+  userId: req.user?.id,
+  userAgencyId: req.user?.agencyId,
+  resourceAgencyId: resource.agencyId
+});
+
+// Error level - failures
+logger.error('Database operation failed', {
+  service: 'agency-client-portal',
+  error: error.message,
+  stack: error.stack
+});
+```
+
+### Maintenance Mode API
+
+```typescript
+// Maintenance mode bypass logic
+// server/middleware/maintenance.ts
+
+// Allowed paths during maintenance
+const BYPASS_PATHS = ['/api/auth/login', '/api/auth/session', '/api/auth/logout'];
+
+// Bypass conditions (in order):
+// 1. Path is in BYPASS_PATHS
+// 2. User is SuperAdmin (isSuperAdmin: true)
+// All other requests return 503
+
+// 503 Response format
+{
+  error: 'maintenance_mode',
+  message: 'System is under maintenance. Please try again later.',
+  retryAfter: 300
+}
 ```
 
 ---

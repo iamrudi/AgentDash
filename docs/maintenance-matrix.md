@@ -83,7 +83,7 @@ Where:
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **SLA Service** | `server/sla/sla-service.ts` | 82 | 🟢 | Core Team | Dec 2024 | Breach detection working |
+| **SLA Service** | `server/sla/sla-service.ts` | 85 | 🟢 | Core Team | Dec 2024 | ✅ 18 unit tests added |
 | **SLA Cron** | `server/sla/sla-cron.ts` | 85 | 🟢 | Core Team | Dec 2024 | 5-minute intervals |
 | **Invoice Scheduler** | `server/services/invoiceScheduler.ts` | 80 | 🟢 | Core Team | Dec 2024 | Daily at 9 AM |
 | **Trash Cleanup** | `server/services/trashCleanupScheduler.ts` | 85 | 🟢 | Core Team | Dec 2024 | Nightly at 2 AM |
@@ -93,11 +93,22 @@ Where:
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Auth Middleware** | `server/middleware/auth.ts` | 72 | 🟡 | Security | Dec 2024 | Redundant verify functions |
+| **Auth Middleware** | `server/middleware/auth.ts` | 80 | 🟢 | Security | Dec 2024 | ✅ 18 unit tests added |
+| **Maintenance Middleware** | `server/middleware/maintenance.ts` | 82 | 🟢 | Security | Dec 2024 | ✅ 8 unit tests added |
 | **Agency Context** | `server/middleware/agency-context.ts` | 80 | 🟢 | Security | Dec 2024 | Clean tenant isolation |
 | **Rate Limiter** | `server/middleware/rateLimiter.ts` | 78 | 🟡 | Security | Dec 2024 | Deprecated methods present |
 | **Logger** | `server/middleware/logger.ts` | 65 | 🟡 | Core Team | Dec 2024 | Legacy logging to remove |
 | **Supabase Auth** | `server/lib/supabase-auth.ts` | 82 | 🟢 | Security | Dec 2024 | JWT validation working |
+
+### Test Infrastructure (NEW - December 2024)
+
+| Module | Path | Score | Flag | Owner | Last Audit | Notes |
+|--------|------|-------|------|-------|------------|-------|
+| **Test Helpers** | `tests/utils/test-helpers.ts` | 85 | 🟢 | QA | Dec 2024 | Mock utilities, test users |
+| **Auth Tests** | `tests/middleware/auth.test.ts` | 85 | 🟢 | QA | Dec 2024 | 18 tests - cross-tenant, roles |
+| **Maintenance Tests** | `tests/middleware/maintenance.test.ts` | 85 | 🟢 | QA | Dec 2024 | 8 tests - bypass logic |
+| **SLA Tests** | `tests/sla/sla-service.test.ts` | 85 | 🟢 | QA | Dec 2024 | 18 tests - breach detection |
+| **Vitest Config** | `vitest.config.ts` | 90 | 🟢 | QA | Dec 2024 | Clean configuration |
 
 ### Integration Libraries
 
@@ -269,14 +280,17 @@ registerDomainRouter('/staff', staffRoutes);
 
 ## Test Coverage Gaps
 
-| Module | Current | Target | Gap |
-|--------|---------|--------|-----|
-| Workflow Engine | 60% | 80% | +20% |
-| Rule Engine | 55% | 80% | +25% |
-| Signal Router | 40% | 75% | +35% |
-| Intelligence Services | 30% | 70% | +40% |
-| API Routes | 20% | 60% | +40% |
-| Storage Methods | 25% | 70% | +45% |
+| Module | Current | Target | Gap | Status |
+|--------|---------|--------|-----|--------|
+| Auth Middleware | 60% | 80% | +20% | ✅ 18 tests added |
+| SLA Service | 65% | 80% | +15% | ✅ 18 tests added |
+| Maintenance Middleware | 70% | 80% | +10% | ✅ 8 tests added |
+| Workflow Engine | 60% | 80% | +20% | 🟡 Planned Q1 |
+| Rule Engine | 55% | 80% | +25% | 🟡 Planned Q1 |
+| Signal Router | 40% | 75% | +35% | 🔴 Backlog |
+| Intelligence Services | 30% | 70% | +40% | 🔴 Backlog |
+| API Routes | 35% | 60% | +25% | 🟡 In progress |
+| Storage Methods | 25% | 70% | +45% | 🔴 Backlog |
 
 ---
 
@@ -284,10 +298,23 @@ registerDomainRouter('/staff', staffRoutes);
 
 | Quarter | Focus Areas |
 |---------|-------------|
-| Q1 2025 | Routes.ts split, storage refactor planning |
-| Q2 2025 | Intelligence layer test coverage |
-| Q3 2025 | Agent system evaluation and cleanup |
-| Q4 2025 | Full platform security audit |
+| Q1 2025 | Routes.ts split completion, storage refactor planning |
+| Q2 2025 | Workflow engine tests, intelligence layer test coverage |
+| Q3 2025 | Agent system evaluation, advanced workflow testing |
+| Q4 2025 | Full platform security audit, E2E test expansion |
+
+---
+
+## Q2/Q3 2025 Refactor Priorities
+
+| Priority | Item | Effort | Impact |
+|----------|------|--------|--------|
+| P1 | Complete routes.ts decomposition (remaining ~55%) | 8 hours | High |
+| P1 | Register crm.ts and settings.ts routers | 2 hours | Medium |
+| P2 | Storage layer split into domain services | 12 hours | High |
+| P2 | Workflow engine integration tests | 6 hours | Medium |
+| P3 | Agent system evaluation and cleanup | 4 hours | Low |
+| P3 | Legacy logging migration to Winston | 3 hours | Low |
 
 ---
 

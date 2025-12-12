@@ -426,4 +426,51 @@ const mutation = useMutation({
 
 ---
 
+## SuperAdmin Health & Maintenance API
+
+### Health Monitoring
+
+| Endpoint | Method | Handler | Response |
+|----------|--------|---------|----------|
+| `/api/superadmin/health` | GET | Route handler | `{ db, rls, cron, ai, realtime }` status |
+| `/api/superadmin/health/db` | GET | Route handler | Database connection status |
+| `/api/superadmin/health/rls` | GET | Route handler | RLS policy verification |
+| `/api/superadmin/health/realtime` | GET | Route handler | WebSocket/SSE health |
+
+### Maintenance Mode
+
+| Endpoint | Method | Handler | Response |
+|----------|--------|---------|----------|
+| `/api/superadmin/maintenance` | GET | Route handler | Current maintenance state |
+| `/api/superadmin/maintenance` | POST | Route handler | Toggle maintenance mode |
+
+**Maintenance Mode Behavior:**
+- SuperAdmin can always access all endpoints
+- Auth endpoints (`/api/auth/*`) remain accessible
+- All other endpoints return 503 with `retryAfter: 300`
+
+---
+
+## Test Infrastructure Mapping
+
+### Test Files → Middleware → Storage
+
+| Test File | Tests | Middleware | Storage Methods |
+|-----------|-------|------------|-----------------|
+| `tests/middleware/auth.test.ts` | 18 | `requireAuth`, `requireRole`, `requireSuperAdmin` | `storage.getClient()` |
+| `tests/middleware/maintenance.test.ts` | 8 | `maintenanceMiddleware` | `db.select().from(settings)` |
+| `tests/sla/sla-service.test.ts` | 18 | None (unit tests) | None (pure functions) |
+
+### Test Utilities
+
+| Utility | Purpose | Used By |
+|---------|---------|---------|
+| `createMockRequest()` | Mock Express request | Auth, maintenance tests |
+| `createMockResponse()` | Mock Express response with `getJson()` | All middleware tests |
+| `createMockNext()` | Mock Express next function | All middleware tests |
+| `createMockStorage()` | Mock IStorage interface | Auth tests |
+| `testUsers.*` | Pre-configured user fixtures | All tests |
+
+---
+
 *Generated: December 2024*

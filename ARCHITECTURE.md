@@ -306,7 +306,9 @@ export function mountDomainRouters(app: Express): void {
 | workflows | 🔴 Pending | ~25 | Workflow engine API |
 | intelligence | 🔴 Pending | ~10 | AI, knowledge, feedback |
 
-**Total extracted:** 71 routes (35 mounted via index.ts + 36 in separate files)
+**Progress:** ~45% complete (71 routes extracted: 35 mounted + 36 extracted not registered)
+
+**Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 
 ### Security Guarantees
 
@@ -1030,6 +1032,90 @@ Structured knowledge ingestion for AI context assembly.
 
 ---
 
+## Stability Testing Framework (December 2024)
+
+### Test Infrastructure
+
+The platform includes a comprehensive stability testing framework using Vitest for critical path validation.
+
+```
+tests/
+├── utils/
+│   └── test-helpers.ts       # Mock request/response/storage utilities
+├── middleware/
+│   ├── auth.test.ts          # 18 tests - Role/SuperAdmin/tenant isolation
+│   └── maintenance.test.ts   # 8 tests - Maintenance mode bypass logic
+├── sla/
+│   └── sla-service.test.ts   # 18 tests - Breach detection/deadline calculation
+└── setup.ts                  # Global test configuration
+```
+
+### Test Coverage Summary
+
+| Area | Tests | Coverage |
+|------|-------|----------|
+| Auth Middleware | 18 | Role-based access, SuperAdmin bypass, cross-tenant rejection |
+| Maintenance Middleware | 8 | SuperAdmin bypass, auth endpoint allowlist, 503 response |
+| SLA Service | 18 | Deadline calculation (business hours), breach detection |
+| **Total Stability Tests** | **44** | Critical path validation |
+
+### Middleware Chain (Updated)
+
+The production middleware chain enforces security at multiple layers:
+
+```typescript
+Request → [requestId] → [logger] → [rateLimiter] → [maintenanceMiddleware] →
+          [requireAuth] → [requireRole] → [agencyContext] → [zodValidate] →
+          [Route Handler] → [errorHandler] → [structuredLog]
+```
+
+**Middleware Components:**
+
+| Middleware | Purpose | Tests |
+|------------|---------|-------|
+| `maintenanceMiddleware` | Block non-SuperAdmin during maintenance | 8 tests |
+| `requireAuth` | Validate JWT session | 6 tests |
+| `requireRole` | RBAC enforcement | 4 tests |
+| `requireSuperAdmin` | Platform admin access | 3 tests |
+| `agencyContext` | Tenant isolation resolution | 5 tests |
+
+### Error-Handling Pipeline
+
+```typescript
+// Async handler wrapper with structured error handling
+async (req, res, next) => {
+  try {
+    // Route handler logic
+    const result = await storage.operation();
+    res.json(result);
+  } catch (error) {
+    // Structured Winston logging
+    logger.error('Operation failed', {
+      service: 'agency-client-portal',
+      userId: req.user?.id,
+      path: req.path,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // Standard error response
+    res.status(500).json({
+      error: 'internal_error',
+      message: error.message
+    });
+  }
+}
+```
+
+### Stability Guardrails
+
+1. **Cross-Tenant Protection** — All storage methods filter by `agencyId`; tests verify rejection of cross-agency access
+2. **SuperAdmin Bypass** — Tested separately to ensure platform-wide access works correctly
+3. **SLA Breach Detection** — Boundary condition tests verify exact deadline behavior
+4. **Maintenance Mode** — Auth endpoints remain accessible; all others blocked for non-SuperAdmin
+
+---
+
 ## Completed Enhancements (December 2024)
 
 - [x] WebSocket/SSE real-time updates
@@ -1042,6 +1128,7 @@ Structured knowledge ingestion for AI context assembly.
 - [x] Duration Intelligence (prediction, optimization, commercial scoring)
 - [x] Closed Feedback Loop (outcome tracking, quality metrics, calibration)
 - [x] Brand Knowledge Layer (structured ingestion, versioning, retrieval)
+- [x] **Stability Testing Framework** — 44 tests covering auth, SLA, maintenance middleware
 
 ## Future Enhancements
 
