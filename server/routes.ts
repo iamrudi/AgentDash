@@ -224,6 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   END AUTH ROUTES MOVED TO server/routes/auth.ts */
 
+  /* USER ROUTES MOVED TO server/routes/user.ts - Remove after validation
   // Update user's own profile (Staff Settings page)
   app.patch("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {
     try {
@@ -284,6 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message || "Failed to fetch profile" });
     }
   });
+  END USER ROUTES MOVED TO server/routes/user.ts */
 
   // Public Form Routes (no authentication required)
   
