@@ -127,8 +127,8 @@ Where:
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **WebSocket Server** | `server/realtime/websocket-server.ts` | 75 | 🟡 | Core Team | Dec 2024 | URL config bug in Vite HMR |
-| **Realtime Service** | `server/realtime/realtime-service.ts` | 78 | 🟡 | Core Team | Dec 2024 | Message broadcasting |
+| **WebSocket Server** | `server/realtime/websocket-server.ts` | 82 | 🟢 | Core Team | Dec 2024 | ✅ Health checks & metrics added |
+| **Realtime Service** | `server/realtime/realtime-service.ts` | 80 | 🟢 | Core Team | Dec 2024 | ✅ Integrated WS+SSE health checks |
 
 ---
 
@@ -252,16 +252,18 @@ registerDomainRouter('/staff', staffRoutes);
 ## Migration Files Review
 
 ### Duplicate/Redundant Files
+✅ **Completed December 2024:**
+
 | File | Status | Action |
 |------|--------|--------|
-| `0001_enable_rls_policies.sql` | Original | Keep |
-| `0001_enable_rls_policies_fixed.sql` | Duplicate | Remove |
-| `0009_add_task_lists_rls.sql` | Original | Keep |
-| `add_task_lists_rls.sql` | Duplicate (no number) | Remove |
-| `apply_admin_delete_permissions.sql` | Duplicate of 0004 | Remove |
-| `simple_rls_check.sql` | Utility script | Move to scripts/ |
-| `all_in_one_rls_check_and_fix.sql` | Utility script | Move to scripts/ |
-| `verify_rls_complete.sql` | Utility script | Move to scripts/ |
+| `0001_enable_rls_policies.sql` | Original | ✅ Kept |
+| `0001_enable_rls_policies_fixed.sql` | Duplicate | ✅ Deleted |
+| `0009_add_task_lists_rls.sql` | Original | ✅ Kept |
+| `add_task_lists_rls.sql` | Duplicate (no number) | ✅ Deleted |
+| `apply_admin_delete_permissions.sql` | Duplicate of 0004 | ✅ Deleted |
+| `simple_rls_check.sql` | Utility script | ✅ Moved to scripts/ |
+| `all_in_one_rls_check_and_fix.sql` | Utility script | ✅ Moved to scripts/ |
+| `verify_rls_complete.sql` | Utility script | ✅ Moved to scripts/ |
 
 ---
 

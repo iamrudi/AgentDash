@@ -163,4 +163,32 @@ router.get("/stats", requireAuth, requireRole("SuperAdmin"), async (req: AuthReq
   }
 });
 
+router.get("/health", async (req, res) => {
+  try {
+    const isHealthy = realtimeService.isHealthy();
+    const metrics = realtimeService.getDetailedMetrics();
+    
+    const statusCode = metrics.overall.status === "unhealthy" ? 503 : 200;
+    
+    res.status(statusCode).json({
+      status: metrics.overall.status,
+      healthy: isHealthy,
+      uptime: metrics.websocket.uptime,
+    });
+  } catch (error: any) {
+    logger.error("[Realtime Route] Failed to get health:", error);
+    res.status(503).json({ status: "unhealthy", healthy: false });
+  }
+});
+
+router.get("/metrics", requireAuth, requireRole("SuperAdmin"), async (req: AuthRequest, res) => {
+  try {
+    const metrics = realtimeService.getDetailedMetrics();
+    res.json(metrics);
+  } catch (error: any) {
+    logger.error("[Realtime Route] Failed to get metrics:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 export default router;

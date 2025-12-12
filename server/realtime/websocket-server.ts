@@ -40,6 +40,25 @@ const HEARTBEAT_TIMEOUT = 35000; // 35 seconds (grace period)
 const AWAY_TIMEOUT = 300000; // 5 minutes for away status
 const MESSAGE_BUFFER_SIZE = 100; // Messages to keep for replay
 
+export interface WebSocketMetrics {
+  connections: {
+    current: number;
+    peak: number;
+    totalSinceStart: number;
+  };
+  channels: {
+    active: number;
+    subscriptions: number;
+  };
+  messages: {
+    broadcast: number;
+    direct: number;
+    errors: number;
+  };
+  uptime: number;
+  status: "healthy" | "degraded" | "unhealthy";
+}
+
 class RealtimeServer extends EventEmitter {
   private wss: WebSocketServer | null = null;
   private clients: Map<string, WebSocketClient> = new Map();
@@ -47,6 +66,15 @@ class RealtimeServer extends EventEmitter {
   private channelClients: Map<string, Set<string>> = new Map(); // channel -> clientIds
   private messageBuffer: Map<string, RealtimeMessage[]> = new Map(); // channel -> messages
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  
+  private metricsData = {
+    peakConnections: 0,
+    totalConnections: 0,
+    broadcastCount: 0,
+    directMessageCount: 0,
+    errorCount: 0,
+    startTime: Date.now(),
+  };
 
   initialize(server: Server): void {
     this.wss = new WebSocketServer({ 
@@ -103,6 +131,11 @@ class RealtimeServer extends EventEmitter {
     };
 
     this.clients.set(clientId, client);
+    
+    this.metricsData.totalConnections++;
+    if (this.clients.size > this.metricsData.peakConnections) {
+      this.metricsData.peakConnections = this.clients.size;
+    }
 
     if (!this.userClients.has(user.userId)) {
       this.userClients.set(user.userId, new Set());
@@ -352,6 +385,7 @@ class RealtimeServer extends EventEmitter {
         timestamp: Date.now()
       }));
     } catch (error) {
+      this.metricsData.errorCount++;
       logger.error(`[WS] Failed to send to client ${clientId}:`, error);
     }
   }
@@ -387,6 +421,8 @@ class RealtimeServer extends EventEmitter {
     const channelClients = this.channelClients.get(channel);
     if (!channelClients) return;
 
+    this.metricsData.broadcastCount++;
+    
     const clientIds = Array.from(channelClients);
     for (const clientId of clientIds) {
       if (clientId === excludeClientId) continue;
@@ -398,6 +434,8 @@ class RealtimeServer extends EventEmitter {
     const clientIds = this.userClients.get(userId);
     if (!clientIds) return;
 
+    this.metricsData.directMessageCount++;
+    
     const ids = Array.from(clientIds);
     for (const clientId of ids) {
       this.sendToClient(clientId, {
@@ -445,6 +483,48 @@ class RealtimeServer extends EventEmitter {
 
   getClientCount(): number {
     return this.clients.size;
+  }
+
+  getMetrics(): WebSocketMetrics {
+    let totalSubscriptions = 0;
+    const channelValues = Array.from(this.channelClients.values());
+    for (const clients of channelValues) {
+      totalSubscriptions += clients.size;
+    }
+
+    const errorRate = this.metricsData.broadcastCount + this.metricsData.directMessageCount > 0
+      ? this.metricsData.errorCount / (this.metricsData.broadcastCount + this.metricsData.directMessageCount)
+      : 0;
+
+    let status: "healthy" | "degraded" | "unhealthy" = "healthy";
+    if (errorRate > 0.1) {
+      status = "unhealthy";
+    } else if (errorRate > 0.01 || !this.wss) {
+      status = "degraded";
+    }
+
+    return {
+      connections: {
+        current: this.clients.size,
+        peak: this.metricsData.peakConnections,
+        totalSinceStart: this.metricsData.totalConnections,
+      },
+      channels: {
+        active: this.channelClients.size,
+        subscriptions: totalSubscriptions,
+      },
+      messages: {
+        broadcast: this.metricsData.broadcastCount,
+        direct: this.metricsData.directMessageCount,
+        errors: this.metricsData.errorCount,
+      },
+      uptime: Date.now() - this.metricsData.startTime,
+      status,
+    };
+  }
+
+  isHealthy(): boolean {
+    return this.wss !== null && this.getMetrics().status !== "unhealthy";
   }
 
   shutdown(): void {

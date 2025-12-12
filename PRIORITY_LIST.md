@@ -1087,7 +1087,7 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 | Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | 1 hr |
 | Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | 2 hrs |
 | Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | 4 hrs |
-| Duplicate migrations | `migrations/` | Multiple versions of same migration | 2 hrs |
+| ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | Done |
 | Console.log statements | Various | Should use structured logging | 3 hrs |
 
 ### Medium Priority (🟡 Schedule for Cleanup)
@@ -1097,7 +1097,7 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 | Agent system evaluation | `server/agents/` | Limited active usage | 4 hrs |
 | Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | 2 hrs |
 | Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | 1 hr |
-| WebSocket URL bug | Vite HMR | `wss://localhost:undefined` error | 2 hrs |
+| WebSocket URL bug | Vite HMR | `wss://localhost:undefined` - requires vite.config.ts change (protected) | N/A |
 
 ### Low Priority (📝 Document for Later)
 
@@ -1113,14 +1113,13 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 
 ### Migration Files to Clean
 
-| Action | File | Reason |
-|--------|------|--------|
-| Delete | `0001_enable_rls_policies_fixed.sql` | Duplicate of original |
-| Delete | `add_task_lists_rls.sql` | Duplicate of 0009 (no number) |
-| Delete | `apply_admin_delete_permissions.sql` | Duplicate of 0004 |
-| Move to scripts/ | `simple_rls_check.sql` | Utility, not migration |
-| Move to scripts/ | `all_in_one_rls_check_and_fix.sql` | Utility, not migration |
-| Move to scripts/ | `verify_rls_complete.sql` | Utility, not migration |
+✅ **Completed December 2024:**
+- Deleted `0001_enable_rls_policies_fixed.sql` (duplicate)
+- Deleted `add_task_lists_rls.sql` (duplicate of 0009)
+- Deleted `apply_admin_delete_permissions.sql` (duplicate of 0004)
+- Moved `simple_rls_check.sql` to scripts/
+- Moved `all_in_one_rls_check_and_fix.sql` to scripts/
+- Moved `verify_rls_complete.sql` to scripts/
 
 ### Code to Remove
 
@@ -1166,7 +1165,7 @@ See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-
 | Domain Routers (extracted) | 2 | 77 | 🟡 Good |
 | Core Backend | 2 | 54 | 🔴 Needs Attention |
 | Integration Libraries | 5 | 75 | 🟡 Good |
-| Real-time | 2 | 76 | 🟡 Good |
+| Real-time | 2 | 81 | 🟢 Healthy |
 
 ---
 

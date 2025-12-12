@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { realtimeServer, RealtimeMessage } from "./websocket-server";
+import { realtimeServer, RealtimeMessage, WebSocketMetrics } from "./websocket-server";
 import logger from "../middleware/logger";
 import { nanoid } from "nanoid";
 
@@ -285,6 +285,37 @@ class RealtimeService {
       sseClients: this.sseClients.size,
       totalClients: realtimeServer.getClientCount() + this.sseClients.size
     };
+  }
+
+  getDetailedMetrics(): {
+    websocket: WebSocketMetrics;
+    sse: {
+      clients: number;
+    };
+    overall: {
+      totalClients: number;
+      status: "healthy" | "degraded" | "unhealthy";
+    };
+  } {
+    const wsMetrics = realtimeServer.getMetrics();
+    const sseCount = this.sseClients.size;
+    
+    return {
+      websocket: wsMetrics,
+      sse: {
+        clients: sseCount,
+      },
+      overall: {
+        totalClients: wsMetrics.connections.current + sseCount,
+        status: wsMetrics.status,
+      },
+    };
+  }
+
+  isHealthy(): boolean {
+    const wsHealthy = realtimeServer.isHealthy();
+    const sseHealthy = this.sseHeartbeatInterval !== null;
+    return wsHealthy && sseHealthy;
   }
 
   shutdown(): void {
