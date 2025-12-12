@@ -8,6 +8,7 @@ import crmRoutes from './crm';
 import settingsRoutes from './settings';
 import superadminRoutes from './superadmin';
 import invoicesRoutes from './invoices';
+import tasksRoutes from './tasks';
 
 export interface DomainRouter {
   subpath: string;
@@ -32,6 +33,7 @@ registerDomainRouter('/crm', crmRoutes);
 registerDomainRouter('/settings', settingsRoutes);
 registerDomainRouter('/superadmin', superadminRoutes);
 registerDomainRouter('/invoices', invoicesRoutes);
+registerDomainRouter('/tasks', tasksRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {

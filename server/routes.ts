@@ -1963,6 +1963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  /* TASK ROUTES MOVED TO server/routes/tasks.ts - 9 routes
   // Create subtask (Staff can create subtasks for tasks they're assigned to)
   app.post("/api/tasks/:taskId/subtasks", requireAuth, requireRole("Staff", "Admin", "SuperAdmin"), requireTaskAccess(storage), async (req: AuthRequest, res) => {
     try {
@@ -2436,6 +2437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+  END TASK ROUTES MOVED TO server/routes/tasks.ts */
 
   /* INVOICE ROUTES MOVED TO server/routes/invoices.ts - 6 routes
   app.post("/api/invoices", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
