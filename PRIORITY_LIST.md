@@ -1102,9 +1102,9 @@ npx vitest --coverage                      # Coverage report
 - ✅ `server/routes/staff.ts` - 3 routes (tasks, notifications)
 - ✅ `server/routes/index.ts` - Router registration pattern
 
-**Extracted but not mounted (36 routes):**
-- 🟡 `server/routes/crm.ts` - 34 routes (companies, contacts, deals, proposals, forms)
-- 🟡 `server/routes/settings.ts` - 2 routes (rate limit settings)
+**Recently Mounted (36 routes):**
+- ✅ `server/routes/crm.ts` - 34 routes (companies, contacts, deals, proposals, forms)
+- ✅ `server/routes/settings.ts` - 2 routes (rate limit settings)
 
 **Pending Extractions:**
 - 🔴 `superadmin.ts` - ~15 routes (platform governance)

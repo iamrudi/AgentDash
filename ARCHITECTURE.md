@@ -266,8 +266,8 @@ server/routes/
 ├── client.ts      # Client portal endpoints (10 routes)
 ├── agency.ts      # Agency admin endpoints (17 routes)
 ├── staff.ts       # Staff portal endpoints (3 routes)
-├── crm.ts         # CRM endpoints (34 routes, extracted but not mounted)
-├── settings.ts    # Settings endpoints (2 routes, extracted but not mounted)
+├── crm.ts         # CRM endpoints (34 routes)
+├── settings.ts    # Settings endpoints (2 routes)
 │
 │   (Planned - still in routes.ts)
 ├── superadmin.ts  # SuperAdmin endpoints
@@ -309,14 +309,14 @@ export function mountDomainRouters(app: Express): void {
 | client | ✅ Mounted | 10 | Client portal endpoints |
 | agency | ✅ Mounted | 17 | Clients, projects, metrics, staff, messages |
 | staff | ✅ Mounted | 3 | Tasks, notifications |
-| crm | 🟡 Extracted | 34 | CRM endpoints (extracted but not mounted in index.ts) |
-| settings | 🟡 Extracted | 2 | Rate limit settings (extracted but not mounted) |
+| crm | ✅ Mounted | 34 | CRM endpoints (companies, contacts, deals, proposals, forms) |
+| settings | ✅ Mounted | 2 | Rate limit settings |
 | superadmin | 🔴 Pending | ~15 | Platform governance |
 | tasks | 🔴 Pending | ~20 | Task CRUD, subtasks, relationships |
 | workflows | 🔴 Pending | ~25 | Workflow engine API |
 | intelligence | 🔴 Pending | ~10 | AI, knowledge, feedback |
 
-**Progress:** ~45% complete (71 routes extracted: 35 mounted + 36 extracted but not mounted)
+**Progress:** ~48% complete (71 routes mounted via domain routers, ~78 routes pending extraction)
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 

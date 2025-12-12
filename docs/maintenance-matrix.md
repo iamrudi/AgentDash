@@ -43,9 +43,9 @@ Where:
 | **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2024 | 10 routes, client portal |
 | **Agency Router** | `server/routes/agency.ts` | 80 | 🟢 | Core Team | Dec 2024 | 17 routes, cross-tenant protection |
 | **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2024 | 3 routes, task filtering |
-| **CRM Router** | `server/routes/crm.ts` | 75 | 🟡 | Core Team | Dec 2024 | 34 routes, extracted but not mounted |
-| **Settings Router** | `server/routes/settings.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, extracted but not mounted |
-| **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 5 routers mounted |
+| **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2024 | 34 routes, mounted |
+| **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, mounted |
+| **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 7 routers mounted (71 routes) |
 | **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2024 | **3235 lines** — well-organized but large |
 
 ### Intelligence Layer
@@ -232,11 +232,10 @@ server/storage/
 | `agency.ts` | 17 | clients, projects, metrics, staff, messages | ✅ Mounted |
 | `staff.ts` | 3 | tasks, tasks/full, notifications/counts | ✅ Mounted |
 
-### Extracted but not mounted (36 routes)
-| Router | Routes | Endpoints | Status |
-|--------|--------|-----------|--------|
-| `crm.ts` | 34 | companies, contacts, deals, proposals, forms | 🟡 Extracted |
-| `settings.ts` | 2 | rate-limit-status, toggle-rate-limit | 🟡 Extracted |
+### All Domain Routers Now Mounted (71 routes)
+
+All extracted routers are now mounted via `server/routes/index.ts`:
+- auth (3), user (2), client (10), agency (17), staff (3), crm (34), settings (2)
 
 ### Pending Extractions
 | Router | Estimated Routes | Priority |
