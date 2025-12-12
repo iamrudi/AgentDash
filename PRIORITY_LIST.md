@@ -1089,29 +1089,35 @@ npx vitest --coverage                      # Coverage report
 
 | Item | File | Lines | Issue | Effort |
 |------|------|-------|-------|--------|
-| Monolithic routes.ts | `server/routes.ts` | ~8,000 | Decomposition in progress (~40% complete) | 8 hrs remaining |
+| Monolithic routes.ts | `server/routes.ts` | ~3,000 | Decomposition ~85% complete (~25 routes remaining) | 3 hrs remaining |
 | Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern | 12 hrs |
 
 ### Routes Decomposition Progress (December 2024)
 
-**Mounted via index.ts (35 routes):**
-- ✅ `server/routes/auth.ts` - 3 routes (login, logout, session)
-- ✅ `server/routes/user.ts` - 2 routes (profile get/update)
-- ✅ `server/routes/client.ts` - 10 routes (client portal endpoints)
-- ✅ `server/routes/agency.ts` - 17 routes (clients, projects, metrics, staff, messages)
-- ✅ `server/routes/staff.ts` - 3 routes (tasks, notifications)
-- ✅ `server/routes/index.ts` - Router registration pattern
+**15 Domain Routers Mounted (156 routes total):**
 
-**Recently Mounted (36 routes):**
-- ✅ `server/routes/crm.ts` - 34 routes (companies, contacts, deals, proposals, forms)
-- ✅ `server/routes/settings.ts` - 2 routes (rate limit settings)
+| Router | Routes | Description |
+|--------|--------|-------------|
+| `auth.ts` | 3 | Login, logout, session |
+| `user.ts` | 2 | Profile get/update |
+| `client.ts` | 10 | Client portal endpoints |
+| `agency.ts` | 17 | Clients, projects, metrics, staff, messages |
+| `staff.ts` | 3 | Tasks, notifications |
+| `crm.ts` | 34 | Companies, contacts, deals, proposals, forms |
+| `settings.ts` | 2 | Rate limit settings |
+| `superadmin.ts` | 24 | Platform governance, agencies, users, audit logs |
+| `invoices.ts` | 6 | Invoice CRUD, PDF generation, scheduling |
+| `tasks.ts` | 9 | Task CRUD, subtasks, relationships |
+| `intelligence.ts` | 21 | Duration model, resource optimization, commercial impact |
+| `knowledge.ts` | 12 | Knowledge ingestion, retrieval, context assembly |
+| `workflows.ts` | 9 | Workflow CRUD, execution, validation, duplication |
+| `workflow-executions.ts` | 2 | Execution events and lineage queries |
+| `lineage.ts` | 2 | Task and project lineage tracing |
 
-**Pending Extractions:**
-- 🔴 `superadmin.ts` - ~15 routes (platform governance)
-- 🔴 `tasks.ts` - ~20 routes (task CRUD, subtasks, relationships)
-- 🔴 `workflows.ts` - ~25 routes (workflow engine API)
-- 🔴 `intelligence.ts` - ~10 routes (AI, knowledge, feedback)
-- 🔴 `invoices.ts` - ~8 routes (billing)
+**Remaining in routes.ts (~25 routes):**
+- 🔴 Rule engine routes (workflow rules CRUD)
+- 🔴 Miscellaneous duration intelligence routes
+- 🔴 SuperAdmin health routes (mounted separately in routes.ts)
 
 **Security Guarantees Maintained:**
 - Zod validation on POST/PATCH request bodies
@@ -1178,9 +1184,10 @@ npx vitest --coverage                      # Coverage report
 - Clean migration files
 - Replace console.log with logger
 
-**Phase 2: Major Refactors (Q2 2025)**
-- Split routes.ts into domain modules
-- Extract storage into domain services
+**Phase 2: Major Refactors (Q2 2025)** — Routes ~85% Complete!
+- ✅ Split routes.ts into domain modules (15 routers, 156 routes)
+- 🔴 Extract remaining ~25 routes (rule engine, superadmin-health, misc)
+- 🔴 Extract storage into domain services
 - Add comprehensive test coverage
 
 **Phase 3: Architecture (Q3 2025)**

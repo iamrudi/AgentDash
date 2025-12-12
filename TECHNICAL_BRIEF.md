@@ -59,16 +59,24 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   └── App.tsx             # Main router
 │   └── index.html
 ├── server/
-│   ├── routes.ts               # Legacy monolithic routes (being decomposed)
-│   ├── routes/                 # Domain-specific routers (new)
-│   │   ├── index.ts            # Router composition (5 routers mounted)
+│   ├── routes.ts               # Legacy monolithic routes (~25 routes remaining)
+│   ├── routes/                 # Domain-specific routers (15 routers, 156 routes)
+│   │   ├── index.ts            # Router composition and registration
 │   │   ├── auth.ts             # Authentication (3 routes)
 │   │   ├── user.ts             # User profile (2 routes)
 │   │   ├── client.ts           # Client portal (10 routes)
 │   │   ├── agency.ts           # Agency admin (17 routes)
 │   │   ├── staff.ts            # Staff portal (3 routes)
-│   │   ├── crm.ts              # CRM (34 routes, extracted but not mounted)
-│   │   └── settings.ts         # Settings (2 routes, extracted but not mounted)
+│   │   ├── crm.ts              # CRM (34 routes)
+│   │   ├── settings.ts         # Settings (2 routes)
+│   │   ├── superadmin.ts       # SuperAdmin governance (24 routes)
+│   │   ├── invoices.ts         # Invoice management (6 routes)
+│   │   ├── tasks.ts            # Task CRUD, subtasks (9 routes)
+│   │   ├── intelligence.ts     # Duration intelligence, optimization (21 routes)
+│   │   ├── knowledge.ts        # Knowledge ingestion/retrieval (12 routes)
+│   │   ├── workflows.ts        # Workflow CRUD, execution (9 routes)
+│   │   ├── workflow-executions.ts # Execution events (2 routes)
+│   │   └── lineage.ts          # Lineage tracing (2 routes)
 │   ├── storage.ts              # Database operations (DbStorage - legacy, being decomposed)
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point

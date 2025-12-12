@@ -260,20 +260,27 @@ As of December 2024, the monolithic `routes.ts` is being decomposed into domain-
 
 ```
 server/routes/
-├── index.ts       # Router composition and registration (5 routers mounted)
-├── auth.ts        # Authentication endpoints (3 routes)
-├── user.ts        # User profile endpoints (2 routes)
-├── client.ts      # Client portal endpoints (10 routes)
-├── agency.ts      # Agency admin endpoints (17 routes)
-├── staff.ts       # Staff portal endpoints (3 routes)
-├── crm.ts         # CRM endpoints (34 routes)
-├── settings.ts    # Settings endpoints (2 routes)
+├── index.ts                # Router composition and registration (15 routers mounted, 156 routes)
+├── auth.ts                 # Authentication endpoints (3 routes)
+├── user.ts                 # User profile endpoints (2 routes)
+├── client.ts               # Client portal endpoints (10 routes)
+├── agency.ts               # Agency admin endpoints (17 routes)
+├── staff.ts                # Staff portal endpoints (3 routes)
+├── crm.ts                  # CRM endpoints (34 routes)
+├── settings.ts             # Settings endpoints (2 routes)
+├── superadmin.ts           # SuperAdmin governance endpoints (24 routes)
+├── invoices.ts             # Invoice management endpoints (6 routes)
+├── tasks.ts                # Task CRUD, subtasks, relationships (9 routes)
+├── intelligence.ts         # Duration intelligence, resource optimization (21 routes)
+├── knowledge.ts            # Knowledge ingestion, retrieval, context assembly (12 routes)
+├── workflows.ts            # Workflow CRUD, execution, validation, duplication (9 routes)
+├── workflow-executions.ts  # Execution events and lineage queries (2 routes)
+└── lineage.ts              # Task and project lineage tracing (2 routes)
 │
-│   (Planned - still in routes.ts)
-├── superadmin.ts  # SuperAdmin endpoints
-├── tasks.ts       # Task management
-├── workflows.ts   # Workflow engine
-└── intelligence.ts # AI/Intelligence
+│   (Remaining in routes.ts - ~25 routes)
+├── rule-engine             # Workflow rules CRUD (~12 routes)
+├── duration-intelligence   # Misc duration intelligence routes (~10 routes)
+└── superadmin-health       # Health check routes (mounted separately, 3 routes)
 ```
 
 ### Router Registration Pattern
@@ -311,12 +318,19 @@ export function mountDomainRouters(app: Express): void {
 | staff | ✅ Mounted | 3 | Tasks, notifications |
 | crm | ✅ Mounted | 34 | CRM endpoints (companies, contacts, deals, proposals, forms) |
 | settings | ✅ Mounted | 2 | Rate limit settings |
-| superadmin | 🔴 Pending | ~15 | Platform governance |
-| tasks | 🔴 Pending | ~20 | Task CRUD, subtasks, relationships |
-| workflows | 🔴 Pending | ~25 | Workflow engine API |
-| intelligence | 🔴 Pending | ~10 | AI, knowledge, feedback |
+| superadmin | ✅ Mounted | 24 | Platform governance, agencies, users, audit logs |
+| invoices | ✅ Mounted | 6 | Invoice CRUD, PDF generation, scheduling |
+| tasks | ✅ Mounted | 9 | Task CRUD, subtasks, relationships, time tracking |
+| intelligence | ✅ Mounted | 21 | Duration model, resource optimization, commercial impact |
+| knowledge | ✅ Mounted | 12 | Knowledge ingestion, retrieval, context assembly |
+| workflows | ✅ Mounted | 9 | Workflow CRUD, execution, validation, duplication |
+| workflow-executions | ✅ Mounted | 2 | Execution events and lineage queries |
+| lineage | ✅ Mounted | 2 | Task and project lineage tracing |
+| rule-engine | 🔴 Pending | ~12 | Workflow rules CRUD |
+| duration-intelligence | 🔴 Pending | ~10 | Misc duration intelligence routes |
+| superadmin-health | 🔴 Pending | 3 | Health check routes (mounted separately in routes.ts) |
 
-**Progress:** ~48% complete (71 routes mounted via domain routers, ~78 routes pending extraction)
+**Progress:** ~85% complete (156 routes mounted via 15 domain routers, ~25 routes pending extraction)
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 

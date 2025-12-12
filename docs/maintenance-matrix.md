@@ -36,7 +36,7 @@ Where:
 | **Rule Engine** | `server/workflow/rule-engine.ts` | 78 | 🟡 | Core Team | Dec 2024 | 16 operators, needs more edge case tests |
 | **Signal Router** | `server/workflow/signal-router.ts` | 75 | 🟡 | Core Team | Dec 2024 | Coverage gaps in route matching |
 | **Signal Adapters** | `server/workflow/signal-adapters.ts` | 80 | 🟢 | Core Team | Dec 2024 | Clean adapter pattern |
-| **API Routes** | `server/routes.ts` | 52 | 🔴 | Core Team | Dec 2024 | **~8000 lines** — decomposition in progress (~40%) |
+| **API Routes** | `server/routes.ts` | 62 | 🟡 | Core Team | Dec 2024 | **~3000 lines** — decomposition ~85% complete, ~25 routes remaining |
 | **Storage Layer** | `server/storage.ts` | 55 | 🔴 | Core Team | Dec 2024 | **3713 lines** — extract domain services |
 | **Auth Router** | `server/routes/auth.ts` | 82 | 🟢 | Core Team | Dec 2024 | 3 routes, clean extraction |
 | **User Router** | `server/routes/user.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, profile management |
@@ -45,7 +45,15 @@ Where:
 | **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2024 | 3 routes, task filtering |
 | **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2024 | 34 routes, mounted |
 | **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, mounted |
-| **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 7 routers mounted (71 routes) |
+| **SuperAdmin Router** | `server/routes/superadmin.ts` | 82 | 🟢 | Core Team | Dec 2024 | 24 routes, governance |
+| **Invoices Router** | `server/routes/invoices.ts` | 80 | 🟢 | Core Team | Dec 2024 | 6 routes, PDF generation |
+| **Tasks Router** | `server/routes/tasks.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD + subtasks |
+| **Intelligence Router** | `server/routes/intelligence.ts` | 82 | 🟢 | Core Team | Dec 2024 | 21 routes, duration/optimization |
+| **Knowledge Router** | `server/routes/knowledge.ts` | 82 | 🟢 | Core Team | Dec 2024 | 12 routes, ingestion/retrieval |
+| **Workflows Router** | `server/routes/workflows.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD/execution |
+| **Workflow Executions Router** | `server/routes/workflow-executions.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, events/lineage |
+| **Lineage Router** | `server/routes/lineage.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, tracing |
+| **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 15 routers mounted (156 routes) |
 | **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2024 | **3235 lines** — well-organized but large |
 
 ### Intelligence Layer

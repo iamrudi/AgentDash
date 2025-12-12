@@ -52,15 +52,23 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                    Domain Router Architecture (Dec 2024)              │   │
 │  │                                                                        │   │
-│  │  server/routes/                                                       │   │
-│  │  ├── index.ts      (5 routers mounted)                               │   │
-│  │  ├── auth.ts       (3 routes)                                        │   │
-│  │  ├── user.ts       (2 routes)                                        │   │
-│  │  ├── client.ts     (10 routes)                                       │   │
-│  │  ├── agency.ts     (17 routes)                                       │   │
-│  │  ├── staff.ts      (3 routes)                                        │   │
-│  │  ├── crm.ts        (34 routes, extracted but not mounted)            │   │
-│  │  └── settings.ts   (2 routes, extracted but not mounted)             │   │
+│  │  server/routes/ (15 routers, 156 routes mounted)                     │   │
+│  │  ├── index.ts                (router composition)                    │   │
+│  │  ├── auth.ts                 (3 routes)                              │   │
+│  │  ├── user.ts                 (2 routes)                              │   │
+│  │  ├── client.ts               (10 routes)                             │   │
+│  │  ├── agency.ts               (17 routes)                             │   │
+│  │  ├── staff.ts                (3 routes)                              │   │
+│  │  ├── crm.ts                  (34 routes)                             │   │
+│  │  ├── settings.ts             (2 routes)                              │   │
+│  │  ├── superadmin.ts           (24 routes)                             │   │
+│  │  ├── invoices.ts             (6 routes)                              │   │
+│  │  ├── tasks.ts                (9 routes)                              │   │
+│  │  ├── intelligence.ts         (21 routes)                             │   │
+│  │  ├── knowledge.ts            (12 routes)                             │   │
+│  │  ├── workflows.ts            (9 routes)                              │   │
+│  │  ├── workflow-executions.ts  (2 routes)                              │   │
+│  │  └── lineage.ts              (2 routes)                              │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    ▼                                         │
