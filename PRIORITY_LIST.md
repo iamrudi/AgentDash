@@ -1162,7 +1162,9 @@ See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-
 | Workflow Engine | 4 | 79 | 🟡 Good |
 | Intelligence Layer | 6 | 82 | 🟢 Healthy |
 | AI Providers | 4 | 84 | 🟢 Healthy |
-| Core Backend | 3 | 57 | 🔴 Needs Attention |
+| Domain Routers (mounted) | 6 | 80 | 🟢 Healthy |
+| Domain Routers (extracted) | 2 | 77 | 🟡 Good |
+| Core Backend | 2 | 54 | 🔴 Needs Attention |
 | Integration Libraries | 5 | 75 | 🟡 Good |
 | Real-time | 2 | 76 | 🟡 Good |
 
