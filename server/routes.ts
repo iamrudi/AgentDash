@@ -2,6 +2,7 @@ import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import settingsRouter from "./routes/settings";
+import { mountDomainRouters } from "./routes/index";
 import { 
   requireAuth, 
   requireRole, 
@@ -81,6 +82,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await pdfStorageService.initialize();
   app.use('/invoices', express.static(path.join(process.cwd(), 'public', 'invoices')));
 
+  // Mount domain routers (modular route handlers)
+  mountDomainRouters(app);
+
+  /* AUTH ROUTES MOVED TO server/routes/auth.ts - Remove after validation
   // Authentication Routes (public)
   app.post("/api/auth/signup", async (req, res) => {
     try {
@@ -217,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(401).json({ message: "Token refresh failed" });
     }
   });
+  END AUTH ROUTES MOVED TO server/routes/auth.ts */
 
   // Update user's own profile (Staff Settings page)
   app.patch("/api/user/profile", requireAuth, async (req: AuthRequest, res) => {

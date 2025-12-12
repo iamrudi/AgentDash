@@ -2,27 +2,29 @@ import { Router, type Express } from 'express';
 import authRoutes from './auth';
 
 export interface DomainRouter {
-  prefix: string;
+  subpath: string;
   router: Router;
 }
 
-const domainRouters: DomainRouter[] = [
-  { prefix: '/api/auth', router: authRoutes },
-];
+const domainRegistry: DomainRouter[] = [];
 
-export function buildApiRouter(): Router {
-  const apiRouter = Router();
-
-  for (const { prefix, router } of domainRouters) {
-    apiRouter.use(prefix.replace('/api', ''), router);
+export function registerDomainRouter(subpath: string, router: Router): void {
+  if (!subpath.startsWith('/')) {
+    throw new Error(`Domain subpath must start with /: ${subpath}`);
   }
-
-  return apiRouter;
+  domainRegistry.push({ subpath, router });
 }
 
+registerDomainRouter('/auth', authRoutes);
+
 export function mountDomainRouters(app: Express): void {
-  const apiRouter = buildApiRouter();
-  app.use('/api', apiRouter);
+  for (const { subpath, router } of domainRegistry) {
+    app.use(`/api${subpath}`, router);
+  }
+}
+
+export function getDomainRouters(): readonly DomainRouter[] {
+  return domainRegistry;
 }
 
 export { authRoutes };
