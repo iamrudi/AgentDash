@@ -3,6 +3,8 @@ import { db } from '../db';
 import { agencySettings } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { decrypt } from './encryption';
+import { withIntegrationGuard, needsReauth } from './integration-guard';
+import logger from '../middleware/logger';
 
 const HUBSPOT_API_BASE = 'https://api.hubapi.com';
 
@@ -86,7 +88,7 @@ async function getHubSpotCredentials(agencyId: string): Promise<HubSpotCredentia
 
     return { accessToken };
   } catch (error) {
-    console.error('[HubSpot] Failed to decrypt credentials:', error);
+    logger.error('Failed to decrypt HubSpot credentials', { agencyId, error });
     return null;
   }
 }
@@ -109,25 +111,22 @@ export async function fetchHubSpotContacts(agencyId: string, limit: number = 100
     throw new Error('HubSpot not connected for this agency');
   }
 
-  try {
-    const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
-      headers: {
-        'Authorization': `Bearer ${credentials.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      params: {
-        limit,
-        properties: 'email,firstname,lastname,company,phone,lifecyclestage,createdate,lastmodifieddate',
-      },
-    });
-
-    return response.data.results || [];
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`HubSpot API error: ${error.response?.data?.message || error.message}`);
-    }
-    throw error;
-  }
+  return withIntegrationGuard(
+    async () => {
+      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/contacts`, {
+        headers: {
+          'Authorization': `Bearer ${credentials.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        params: {
+          limit,
+          properties: 'email,firstname,lastname,company,phone,lifecyclestage,createdate,lastmodifieddate',
+        },
+      });
+      return response.data.results || [];
+    },
+    { provider: 'hubspot', operation: 'fetchContacts' }
+  );
 }
 
 /**
@@ -140,25 +139,22 @@ export async function fetchHubSpotDeals(agencyId: string, limit: number = 100): 
     throw new Error('HubSpot not connected for this agency');
   }
 
-  try {
-    const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
-      headers: {
-        'Authorization': `Bearer ${credentials.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      params: {
-        limit,
-        properties: 'dealname,amount,dealstage,pipeline,closedate,createdate,hs_lastmodifieddate',
-      },
-    });
-
-    return response.data.results || [];
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`HubSpot API error: ${error.response?.data?.message || error.message}`);
-    }
-    throw error;
-  }
+  return withIntegrationGuard(
+    async () => {
+      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/deals`, {
+        headers: {
+          'Authorization': `Bearer ${credentials.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        params: {
+          limit,
+          properties: 'dealname,amount,dealstage,pipeline,closedate,createdate,hs_lastmodifieddate',
+        },
+      });
+      return response.data.results || [];
+    },
+    { provider: 'hubspot', operation: 'fetchDeals' }
+  );
 }
 
 /**
@@ -171,25 +167,22 @@ export async function fetchHubSpotCompanies(agencyId: string, limit: number = 10
     throw new Error('HubSpot not connected for this agency');
   }
 
-  try {
-    const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/companies`, {
-      headers: {
-        'Authorization': `Bearer ${credentials.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      params: {
-        limit,
-        properties: 'name,domain,industry,numberofemployees,annualrevenue,createdate,hs_lastmodifieddate',
-      },
-    });
-
-    return response.data.results || [];
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(`HubSpot API error: ${error.response?.data?.message || error.message}`);
-    }
-    throw error;
-  }
+  return withIntegrationGuard(
+    async () => {
+      const response = await axios.get(`${HUBSPOT_API_BASE}/crm/v3/objects/companies`, {
+        headers: {
+          'Authorization': `Bearer ${credentials.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        params: {
+          limit,
+          properties: 'name,domain,industry,numberofemployees,annualrevenue,createdate,hs_lastmodifieddate',
+        },
+      });
+      return response.data.results || [];
+    },
+    { provider: 'hubspot', operation: 'fetchCompanies' }
+  );
 }
 
 /**
