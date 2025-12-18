@@ -52,7 +52,7 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │                    Domain Router Architecture (Dec 2025) ✅ COMPLETE  │   │
 │  │                                                                        │   │
-│  │  server/routes/ (37 registrations, ~294 routes mounted)              │   │
+│  │  server/routes/ (37 registrations, ~325 routes mounted)              │   │
 │  │  ├── index.ts                (router composition)                    │   │
 │  │  ├── auth.ts                 (3 routes)                              │   │
 │  │  ├── user.ts                 (2 routes)                              │   │
