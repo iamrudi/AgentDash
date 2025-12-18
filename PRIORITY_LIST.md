@@ -2,26 +2,28 @@
 
 ## Executive Summary
 
-This document outlines the **18-phase roadmap** for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
+This document outlines the **20-phase roadmap** for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
 
 Each priority is ordered by dependency—completing earlier phases unlocks capabilities required by later phases.
 
-### Phase Summary (December 2024)
+### Phase Summary (December 2025)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1-14 | Core Engine, Rules, Signals, AI, Lineage, Vectors, SLA, Agents, CRM, Analytics, Tasks, Templates, WebSocket, SuperAdmin | ✅ Complete |
 | 15 | Visual Workflow Builder UI | 🟡 In Progress |
 | 16-18 | Duration Intelligence, Closed Feedback Loop, Brand Knowledge Layer | ✅ Complete |
+| 19 | Stability Testing Framework | ✅ Complete |
+| 20 | Storage Layer Decomposition | 🟡 In Progress |
 
 ---
 
 ## Priority 1: Workflow Engine (Core Orchestration)
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** None (foundational)  
-**Estimated Duration:** 3-4 weeks
+**Tokens Needed:** High
 
 ### Description
 Build the deterministic workflow orchestration core that processes signals, executes rules, invokes AI, and produces atomic outputs (projects, tasks, invoices).
@@ -59,10 +61,10 @@ class WorkflowEngine {
 
 ## Priority 2: Rule Engine (Versioned Rule System)
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Implement a versioned rule engine with advanced operators for threshold detection, anomaly detection, and lifecycle triggers that integrates with the workflow engine.
@@ -121,10 +123,10 @@ interface WorkflowRuleVersion {
 
 ## Priority 3: Signal Processing & Ingestion
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 2  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Create a normalized signal format that ingests events from GA4, GSC, HubSpot, LinkedIn, and internal application events into the workflow engine.
@@ -207,10 +209,10 @@ async function processSignal(signal: WorkflowSignal) {
 
 ## Priority 4: Hardened AI Execution Layer
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Strengthen the AI invocation layer with schema validation, retry logic, idempotency guarantees, and output hashing for reproducibility.
@@ -252,10 +254,10 @@ server/workflow/engine.ts (AI step handler uses HardenedAIExecutor)
 
 ## Priority 5: Workflow Lineage & Event Logging
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 4  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Implement comprehensive event logging that captures every workflow execution, enabling full replay and debugging.
@@ -303,10 +305,10 @@ server/routes.ts (lineage query, replay, retention policy APIs)
 
 ## Priority 6: Tenant-Isolated Vector Stores
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** None (can parallel with 1-5)  
-**Estimated Duration:** 3-4 weeks
+**Tokens Needed:** High
 
 ### Description
 Create per-agency vector stores for SOPs, brand assets, analytics embeddings, and knowledge bases for "Chat with Your Data" features.
@@ -359,10 +361,10 @@ POST /api/embedding-index/prune (Admin only)
 
 ## Priority 7: SLA & Escalation Engine
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 3  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add deadline monitoring, SLA breach detection, and automatic escalation to fallback owners.
@@ -413,10 +415,10 @@ shared/schema.ts (slaDefinitions, slaBreaches, slaBreachEvents, escalationChains
 
 ## Priority 8: Multi-Agent Architecture
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Very High  
 **Dependencies:** Priority 1, 4, 6  
-**Estimated Duration:** 4-6 weeks
+**Tokens Needed:** Very High
 
 ### Description
 Implement specialized AI agents for different domains (SEO, PPC, CRM, Reporting) that can be orchestrated by the workflow engine.
@@ -500,10 +502,10 @@ abstract class BaseAgent {
 
 ## Priority 9: Expanded CRM Integration Triggers
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 2, 3  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add lifecycle-based triggers from CRM events that feed into the workflow engine.
@@ -554,10 +556,10 @@ POST /api/crm/sync/:agencyId    - Trigger manual CRM sync
 
 ## Priority 10: Enhanced Analytics Ingestion
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 2  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add anomaly detection to analytics pipelines that automatically generates signals for significant changes.
@@ -614,10 +616,10 @@ type AnomalyType =
 
 ## Priority 11: Optimized Task System for Workflow Output
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 1-2 weeks
+**Tokens Needed:** Low
 
 ### Description
 Make task/project creation idempotent so workflows can safely retry without creating duplicates.
@@ -664,10 +666,10 @@ server/tasks/task-routes.ts
 
 ## Priority 12: Template System
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 11  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Create reusable templates for projects, task lists, workflows, and AI prompts.
@@ -734,10 +736,10 @@ Create reusable templates for projects, task lists, workflows, and AI prompts.
 
 ## Priority 13: Real-Time Layer Improvements
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** None (can parallel)  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Migrate messaging and presence from polling to WebSocket/SSE for true real-time updates.
@@ -812,10 +814,10 @@ function useRealtimeChannel(channel, onMessage): { send, isConnected }
 
 ## Priority 14: SuperAdmin Governance Enhancements
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 4, 8  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add comprehensive governance controls for AI quotas, token caps, and integration health monitoring.
@@ -891,7 +893,7 @@ interface IntegrationHealth {
 **Status:** 🔴 Not Started  
 **Complexity:** Very High  
 **Dependencies:** Priority 1, 3, 12  
-**Estimated Duration:** 4-6 weeks
+**Tokens Needed:** Very High
 
 ### Description
 Create a visual DAG (Directed Acyclic Graph) editor for building and modifying workflows without code.
@@ -975,7 +977,7 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 | Automation | 7, 11, 12 | 4-6 weeks | 2 engineers |
 | Polish | 13, 14, 15 | 6-8 weeks | 2-3 engineers |
 
-**Total Estimated Duration:** 26-36 weeks
+**Total Tokens:** High (multi-phase)
 
 ---
 
@@ -1008,32 +1010,74 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 
 | Priority | Status | Completed |
 |----------|--------|-----------|
-| Priority 1: Workflow Engine | ✅ Complete | December 2024 |
-| Priority 2: Rule Engine | ✅ Complete | December 2024 |
-| Priority 3: Signal Processing | ✅ Complete | December 2024 |
-| Priority 4: Hardened AI Execution | ✅ Complete | December 2024 |
-| Priority 5: Workflow Lineage | ✅ Complete | December 2024 |
-| Priority 6: Tenant-Isolated Vector Stores | ✅ Complete | December 2024 |
-| Priority 7: SLA & Escalation Engine | ✅ Complete | December 2024 |
-| Priority 8: Multi-Agent Architecture | ✅ Complete | December 2024 |
-| Priority 9: CRM Integration Triggers | ✅ Complete | December 2024 |
-| Priority 10: Enhanced Analytics Ingestion | ✅ Complete | December 2024 |
-| Priority 11: Task System Optimization | ✅ Complete | December 2024 |
-| Priority 12: Template System | ✅ Complete | December 2024 |
-| Priority 13: Real-Time WebSocket/SSE Layer | ✅ Complete | December 2024 |
-| Priority 14: SuperAdmin Governance | ✅ Complete | December 2024 |
-| Priority 15: Visual Workflow Builder UI | 🟡 In Progress | December 2024 |
-| Priority 16: Duration Intelligence | ✅ Complete | December 2024 |
-| Priority 17: Closed Feedback Loop | ✅ Complete | December 2024 |
-| Priority 18: Brand Knowledge Layer | ✅ Complete | December 2024 |
-| **Priority 19: Stability Testing Framework** | ✅ Complete | December 2024 |
+| Priority 1: Workflow Engine | ✅ Complete | December 2025 |
+| Priority 2: Rule Engine | ✅ Complete | December 2025 |
+| Priority 3: Signal Processing | ✅ Complete | December 2025 |
+| Priority 4: Hardened AI Execution | ✅ Complete | December 2025 |
+| Priority 5: Workflow Lineage | ✅ Complete | December 2025 |
+| Priority 6: Tenant-Isolated Vector Stores | ✅ Complete | December 2025 |
+| Priority 7: SLA & Escalation Engine | ✅ Complete | December 2025 |
+| Priority 8: Multi-Agent Architecture | ✅ Complete | December 2025 |
+| Priority 9: CRM Integration Triggers | ✅ Complete | December 2025 |
+| Priority 10: Enhanced Analytics Ingestion | ✅ Complete | December 2025 |
+| Priority 11: Task System Optimization | ✅ Complete | December 2025 |
+| Priority 12: Template System | ✅ Complete | December 2025 |
+| Priority 13: Real-Time WebSocket/SSE Layer | ✅ Complete | December 2025 |
+| Priority 14: SuperAdmin Governance | ✅ Complete | December 2025 |
+| Priority 15: Visual Workflow Builder UI | 🟡 In Progress | December 2025 |
+| Priority 16: Duration Intelligence | ✅ Complete | December 2025 |
+| Priority 17: Closed Feedback Loop | ✅ Complete | December 2025 |
+| Priority 18: Brand Knowledge Layer | ✅ Complete | December 2025 |
+| **Priority 19: Stability Testing Framework** | ✅ Complete | December 2025 |
+| **Priority 20: Storage Layer Decomposition** | 🟡 In Progress | December 2025 |
+
+### Priority 20: Storage Layer Decomposition 🟡
+
+**Status:** 🟡 IN PROGRESS (December 2025)  
+**Complexity:** High  
+**Dependencies:** None  
+**Tokens Needed:** High
+
+#### Description
+Decompose the monolithic `server/storage.ts` (originally 3,713 lines) into domain-specific modules using bounded context approach aligned with existing router boundaries.
+
+#### Progress
+- ✅ **Phase 1 - Identity Domain** (12 methods): Users, profiles, sessions, password reset
+- ✅ **Phase 2 - Task Domain** (27 methods): Task lists, tasks, assignments, activities, relationships, messages
+- ⏳ **Phase 3** - Project/Client Domain (planned)
+- ⏳ **Phase 4** - Invoice/Initiative Domain (planned)
+
+#### Architecture Pattern
+```
+server/storage/
+├── contracts/           # Domain interfaces
+│   ├── identity.ts      # IdentityStorage interface
+│   ├── agency.ts        # AgencyStorage interface
+│   └── task.ts          # TaskStorage interface
+└── domains/             # Function-based implementations
+    ├── identity.storage.ts   # identityStorage(ctx)
+    ├── agency.storage.ts     # agencyStorage(ctx)
+    └── task.storage.ts       # taskStorage(ctx, getProjectById)
+```
+
+#### Metrics
+- **Original:** 3,713 lines, ~150 methods
+- **Current:** 3,245 lines (12.6% reduction)
+- **Extracted:** 43 methods across 3 domains
+
+#### Validation Gates (per phase)
+1. Behavior parity check vs pre-refactor signatures
+2. Storage-only compile gate (tsc)
+3. Authenticated E2E verification
+
+---
 
 ### Priority 19: Stability Testing Framework ✅
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 7, 14  
-**Duration:** 1 week
+**Tokens Needed:** Medium
 
 #### Deliverables ✅
 - ✅ Vitest test infrastructure with configuration
@@ -1087,12 +1131,12 @@ npx vitest --coverage                      # Coverage report
 
 ### Critical (🔴 Must Address)
 
-| Item | File | Lines | Issue | Effort |
+| Item | File | Lines | Issue | Status |
 |------|------|-------|-------|--------|
-| ~~Monolithic routes.ts~~ | ~~`server/routes.ts`~~ | ~~300~~ | ~~Decomposition complete~~ | ✅ DONE Dec 2024 |
-| Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern — NOW TOP PRIORITY | 12 hrs |
+| ~~Monolithic routes.ts~~ | ~~`server/routes.ts`~~ | ~~300~~ | ~~Decomposition complete~~ | ✅ DONE |
+| Monolithic storage.ts | `server/storage.ts` | 3,245 | God object — decomposition in progress | 🟡 Phase 1-2 done |
 
-### Routes Decomposition Progress (December 2024) — ✅ COMPLETE
+### Routes Decomposition Progress (December 2025) — ✅ COMPLETE
 
 **Summary:**
 - **Before:** 4,832 lines in routes.ts with ~270 routes
@@ -1186,7 +1230,7 @@ npx vitest --coverage                      # Coverage report
 
 ### Migration Files to Clean
 
-✅ **Completed December 2024:**
+✅ **Completed December 2025:**
 - Deleted `0001_enable_rls_policies_fixed.sql` (duplicate)
 - Deleted `add_task_lists_rls.sql` (duplicate of 0009)
 - Deleted `apply_admin_delete_permissions.sql` (duplicate of 0004)
@@ -1212,9 +1256,9 @@ npx vitest --coverage                      # Coverage report
 - Replace console.log with logger
 
 **Phase 2: Major Refactors (Q1-Q2 2025)** — Routes ✅ COMPLETE!
-- ✅ Split routes.ts into domain modules (37 registrations, ~294 routes) — December 2024
+- ✅ Split routes.ts into domain modules (37 registrations, ~294 routes) — December 2025
 - ✅ All routes extracted (only 3 intentional routes remain in routes.ts)
-- 🔴 Next priority: Split storage.ts into domain services
+- 🟡 storage.ts decomposition in progress (Phase 1-2 complete, 43 methods extracted)
 - Add comprehensive test coverage
 
 **Phase 3: Architecture (Q3 2025)**
@@ -1228,7 +1272,7 @@ npx vitest --coverage                      # Coverage report
 
 See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-module health scores.
 
-### Summary (December 2024)
+### Summary (December 2025)
 
 | Category | Modules | Avg Score | Status |
 |----------|---------|-----------|--------|
@@ -1286,4 +1330,4 @@ With the stability testing framework in place, the following features are now un
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

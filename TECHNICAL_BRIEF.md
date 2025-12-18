@@ -98,7 +98,17 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   ├── proposals.ts        # Proposals (2 routes)
 │   │   ├── retention-policies.ts # Retention policies (4 routes)
 │   │   └── public.ts           # Public endpoints (2 routes)
-│   ├── storage.ts              # Database operations (DbStorage - legacy, to be decomposed)
+│   ├── storage.ts              # DbStorage facade (3,245 lines - decomposition in progress)
+│   ├── storage/
+│   │   ├── index.ts            # Storage module exports
+│   │   ├── contracts/          # Domain interfaces
+│   │   │   ├── identity.ts     # Identity domain (12 methods)
+│   │   │   ├── agency.ts       # Agency domain (4 methods)
+│   │   │   └── task.ts         # Task domain (27 methods)
+│   │   └── domains/            # Domain implementations
+│   │       ├── identity.storage.ts  # User, profile, session
+│   │       ├── agency.storage.ts    # Agency CRUD
+│   │       └── task.storage.ts      # Tasks, lists, assignments
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point
 │   ├── vite.ts                 # Vite dev server integration
@@ -1571,4 +1581,4 @@ class KnowledgeRetrievalService {
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

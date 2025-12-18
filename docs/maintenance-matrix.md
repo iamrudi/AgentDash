@@ -1,6 +1,6 @@
 # Agency Client Portal — Maintenance Matrix
 
-## Last Audit: December 2024
+## Last Audit: December 2025
 
 ---
 
@@ -32,143 +32,145 @@ Where:
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Workflow Engine** | `server/workflow/engine.ts` | 82 | 🟢 | Core Team | Dec 2024 | Well-tested, atomic transactions |
-| **Rule Engine** | `server/workflow/rule-engine.ts` | 78 | 🟡 | Core Team | Dec 2024 | 16 operators, needs more edge case tests |
-| **Signal Router** | `server/workflow/signal-router.ts` | 75 | 🟡 | Core Team | Dec 2024 | Coverage gaps in route matching |
-| **Signal Adapters** | `server/workflow/signal-adapters.ts` | 80 | 🟢 | Core Team | Dec 2024 | Clean adapter pattern |
-| **API Routes** | `server/routes.ts` | 88 | 🟢 | Core Team | Dec 2024 | **300 lines** — decomposition ✅ complete, 3 routes remaining |
-| **Storage Layer** | `server/storage.ts` | 52 | 🔴 | Core Team | Dec 2024 | **3713 lines** — next priority: extract domain services |
-| **Router Index** | `server/routes/index.ts` | 90 | 🟢 | Core Team | Dec 2024 | 37 registrations (~294 routes) |
-| **Auth Router** | `server/routes/auth.ts` | 82 | 🟢 | Core Team | Dec 2024 | 3 routes, clean extraction |
-| **User Router** | `server/routes/user.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, profile management |
-| **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2024 | 10 routes, client portal |
-| **Agency Router** | `server/routes/agency.ts` | 80 | 🟢 | Core Team | Dec 2024 | 17 routes, cross-tenant protection |
-| **Agency Clients Router** | `server/routes/agency-clients.ts` | 82 | 🟢 | Core Team | Dec 2024 | 7 routes, client management |
-| **Agency Settings Router** | `server/routes/agency-settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 5 routes, configuration |
-| **Agency Tasks Router** | `server/routes/agency-tasks.ts` | 80 | 🟢 | Core Team | Dec 2024 | 13 routes, task management |
-| **Agency Users Router** | `server/routes/agency-users.ts` | 80 | 🟢 | Core Team | Dec 2024 | 5 routes, user management |
-| **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2024 | 3 routes, task filtering |
-| **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2024 | 34 routes, mounted |
-| **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, mounted |
-| **SuperAdmin Router** | `server/routes/superadmin.ts` | 82 | 🟢 | Core Team | Dec 2024 | 24 routes, governance |
-| **SuperAdmin Health Router** | `server/routes/superadmin-health.ts` | 82 | 🟢 | Core Team | Dec 2024 | 3 routes, health checks |
-| **Invoices Router** | `server/routes/invoices.ts` | 80 | 🟢 | Core Team | Dec 2024 | 6 routes, PDF generation |
-| **Tasks Router** | `server/routes/tasks.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD + subtasks |
-| **Intelligence Router** | `server/routes/intelligence.ts` | 82 | 🟢 | Core Team | Dec 2024 | 21 routes, duration/optimization |
-| **Intelligence Extended Router** | `server/routes/intelligence-extended.ts` | 82 | 🟢 | Core Team | Dec 2024 | 27 routes, predictions/feedback |
-| **Knowledge Router** | `server/routes/knowledge.ts` | 82 | 🟢 | Core Team | Dec 2024 | 12 routes, ingestion/retrieval |
-| **Knowledge Documents Router** | `server/routes/knowledge-documents.ts` | 82 | 🟢 | Core Team | Dec 2024 | 12 routes, document management |
-| **Workflows Router** | `server/routes/workflows.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD/execution |
-| **Workflow Executions Router** | `server/routes/workflow-executions.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, events/lineage |
-| **Lineage Router** | `server/routes/lineage.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, tracing |
-| **Rule Engine Router** | `server/routes/rule-engine.ts` | 80 | 🟢 | Core Team | Dec 2024 | 12 routes, workflow rules |
-| **Signals Router** | `server/routes/signals.ts` | 80 | 🟢 | Core Team | Dec 2024 | 11 routes, signal ingestion |
-| **AI Execution Router** | `server/routes/ai-execution.ts` | 82 | 🟢 | Core Team | Dec 2024 | 5 routes, AI execution |
-| **AI Chat Router** | `server/routes/ai-chat.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, chat endpoints |
-| **Integrations Router** | `server/routes/integrations.ts` | 80 | 🟢 | Core Team | Dec 2024 | 19 routes, integration management |
-| **OAuth Router** | `server/routes/oauth.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, OAuth flows |
-| **Analytics Router** | `server/routes/analytics.ts` | 80 | 🟢 | Core Team | Dec 2024 | 6 routes, analytics data |
-| **Initiatives Router** | `server/routes/initiatives.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, initiative management |
-| **Notifications Router** | `server/routes/notifications.ts` | 80 | 🟢 | Core Team | Dec 2024 | 5 routes, notifications |
-| **Messages Router** | `server/routes/messages.ts` | 80 | 🟢 | Core Team | Dec 2024 | 7 routes, messaging |
-| **Objectives Router** | `server/routes/objectives.ts` | 80 | 🟢 | Core Team | Dec 2024 | 4 routes, objectives |
-| **Proposals Router** | `server/routes/proposals.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, proposals |
-| **Retention Policies Router** | `server/routes/retention-policies.ts` | 80 | 🟢 | Core Team | Dec 2024 | 4 routes, retention |
-| **Public Router** | `server/routes/public.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, public endpoints |
-| **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2024 | **3235 lines** — well-organized but large |
+| **Workflow Engine** | `server/workflow/engine.ts` | 82 | 🟢 | Core Team | Dec 2025 | Well-tested, atomic transactions |
+| **Rule Engine** | `server/workflow/rule-engine.ts` | 78 | 🟡 | Core Team | Dec 2025 | 16 operators, needs more edge case tests |
+| **Signal Router** | `server/workflow/signal-router.ts` | 75 | 🟡 | Core Team | Dec 2025 | Coverage gaps in route matching |
+| **Signal Adapters** | `server/workflow/signal-adapters.ts` | 80 | 🟢 | Core Team | Dec 2025 | Clean adapter pattern |
+| **API Routes** | `server/routes.ts` | 88 | 🟢 | Core Team | Dec 2025 | **300 lines** — decomposition ✅ complete, 3 routes remaining |
+| **Storage Layer** | `server/storage.ts` | 65 | 🟡 | Core Team | Dec 2025 | **3,245 lines** — decomposition in progress (Phase 1-2 complete) |
+| **Storage Contracts** | `server/storage/contracts/` | 85 | 🟢 | Core Team | Dec 2025 | Domain interfaces: identity, agency, task |
+| **Storage Domains** | `server/storage/domains/` | 85 | 🟢 | Core Team | Dec 2025 | Domain implementations: 43 methods extracted |
+| **Router Index** | `server/routes/index.ts` | 90 | 🟢 | Core Team | Dec 2025 | 37 registrations (~294 routes) |
+| **Auth Router** | `server/routes/auth.ts` | 82 | 🟢 | Core Team | Dec 2025 | 3 routes, clean extraction |
+| **User Router** | `server/routes/user.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, profile management |
+| **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2025 | 10 routes, client portal |
+| **Agency Router** | `server/routes/agency.ts` | 80 | 🟢 | Core Team | Dec 2025 | 17 routes, cross-tenant protection |
+| **Agency Clients Router** | `server/routes/agency-clients.ts` | 82 | 🟢 | Core Team | Dec 2025 | 7 routes, client management |
+| **Agency Settings Router** | `server/routes/agency-settings.ts` | 82 | 🟢 | Core Team | Dec 2025 | 5 routes, configuration |
+| **Agency Tasks Router** | `server/routes/agency-tasks.ts` | 80 | 🟢 | Core Team | Dec 2025 | 13 routes, task management |
+| **Agency Users Router** | `server/routes/agency-users.ts` | 80 | 🟢 | Core Team | Dec 2025 | 5 routes, user management |
+| **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2025 | 3 routes, task filtering |
+| **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2025 | 34 routes, mounted |
+| **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2025 | 2 routes, mounted |
+| **SuperAdmin Router** | `server/routes/superadmin.ts` | 82 | 🟢 | Core Team | Dec 2025 | 24 routes, governance |
+| **SuperAdmin Health Router** | `server/routes/superadmin-health.ts` | 82 | 🟢 | Core Team | Dec 2025 | 3 routes, health checks |
+| **Invoices Router** | `server/routes/invoices.ts` | 80 | 🟢 | Core Team | Dec 2025 | 6 routes, PDF generation |
+| **Tasks Router** | `server/routes/tasks.ts` | 80 | 🟢 | Core Team | Dec 2025 | 9 routes, CRUD + subtasks |
+| **Intelligence Router** | `server/routes/intelligence.ts` | 82 | 🟢 | Core Team | Dec 2025 | 21 routes, duration/optimization |
+| **Intelligence Extended Router** | `server/routes/intelligence-extended.ts` | 82 | 🟢 | Core Team | Dec 2025 | 27 routes, predictions/feedback |
+| **Knowledge Router** | `server/routes/knowledge.ts` | 82 | 🟢 | Core Team | Dec 2025 | 12 routes, ingestion/retrieval |
+| **Knowledge Documents Router** | `server/routes/knowledge-documents.ts` | 82 | 🟢 | Core Team | Dec 2025 | 12 routes, document management |
+| **Workflows Router** | `server/routes/workflows.ts` | 80 | 🟢 | Core Team | Dec 2025 | 9 routes, CRUD/execution |
+| **Workflow Executions Router** | `server/routes/workflow-executions.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, events/lineage |
+| **Lineage Router** | `server/routes/lineage.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, tracing |
+| **Rule Engine Router** | `server/routes/rule-engine.ts` | 80 | 🟢 | Core Team | Dec 2025 | 12 routes, workflow rules |
+| **Signals Router** | `server/routes/signals.ts` | 80 | 🟢 | Core Team | Dec 2025 | 11 routes, signal ingestion |
+| **AI Execution Router** | `server/routes/ai-execution.ts` | 82 | 🟢 | Core Team | Dec 2025 | 5 routes, AI execution |
+| **AI Chat Router** | `server/routes/ai-chat.ts` | 82 | 🟢 | Core Team | Dec 2025 | 2 routes, chat endpoints |
+| **Integrations Router** | `server/routes/integrations.ts` | 80 | 🟢 | Core Team | Dec 2025 | 19 routes, integration management |
+| **OAuth Router** | `server/routes/oauth.ts` | 82 | 🟢 | Core Team | Dec 2025 | 2 routes, OAuth flows |
+| **Analytics Router** | `server/routes/analytics.ts` | 80 | 🟢 | Core Team | Dec 2025 | 6 routes, analytics data |
+| **Initiatives Router** | `server/routes/initiatives.ts` | 80 | 🟢 | Core Team | Dec 2025 | 9 routes, initiative management |
+| **Notifications Router** | `server/routes/notifications.ts` | 80 | 🟢 | Core Team | Dec 2025 | 5 routes, notifications |
+| **Messages Router** | `server/routes/messages.ts` | 80 | 🟢 | Core Team | Dec 2025 | 7 routes, messaging |
+| **Objectives Router** | `server/routes/objectives.ts` | 80 | 🟢 | Core Team | Dec 2025 | 4 routes, objectives |
+| **Proposals Router** | `server/routes/proposals.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, proposals |
+| **Retention Policies Router** | `server/routes/retention-policies.ts` | 80 | 🟢 | Core Team | Dec 2025 | 4 routes, retention |
+| **Public Router** | `server/routes/public.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, public endpoints |
+| **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2025 | **3235 lines** — well-organized but large |
 
 ### Intelligence Layer
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Duration Model** | `server/intelligence/duration-model-service.ts` | 85 | 🟢 | AI Team | Dec 2024 | Clean layered prediction |
-| **Resource Optimizer** | `server/intelligence/resource-optimizer-service.ts` | 82 | 🟢 | AI Team | Dec 2024 | Greedy allocation working well |
-| **Commercial Impact** | `server/intelligence/commercial-impact-service.ts` | 80 | 🟢 | AI Team | Dec 2024 | Configurable scoring |
-| **Outcome Feedback** | `server/intelligence/outcome-feedback-service.ts` | 85 | 🟢 | AI Team | Dec 2024 | Fire-and-forget pattern |
-| **Knowledge Ingestion** | `server/intelligence/knowledge-ingestion-service.ts` | 83 | 🟢 | AI Team | Dec 2024 | Versioning, validation |
-| **Knowledge Retrieval** | `server/intelligence/knowledge-retrieval-service.ts` | 80 | 🟢 | AI Team | Dec 2024 | Freshness-weighted retrieval |
-| **Signal Emitter** | `server/intelligence/signal-emitter.ts` | 78 | 🟡 | AI Team | Dec 2024 | Needs integration tests |
-| **Priority Engine** | `server/intelligence/priority-engine.ts` | 75 | 🟡 | AI Team | Dec 2024 | Complex scoring logic |
+| **Duration Model** | `server/intelligence/duration-model-service.ts` | 85 | 🟢 | AI Team | Dec 2025 | Clean layered prediction |
+| **Resource Optimizer** | `server/intelligence/resource-optimizer-service.ts` | 82 | 🟢 | AI Team | Dec 2025 | Greedy allocation working well |
+| **Commercial Impact** | `server/intelligence/commercial-impact-service.ts` | 80 | 🟢 | AI Team | Dec 2025 | Configurable scoring |
+| **Outcome Feedback** | `server/intelligence/outcome-feedback-service.ts` | 85 | 🟢 | AI Team | Dec 2025 | Fire-and-forget pattern |
+| **Knowledge Ingestion** | `server/intelligence/knowledge-ingestion-service.ts` | 83 | 🟢 | AI Team | Dec 2025 | Versioning, validation |
+| **Knowledge Retrieval** | `server/intelligence/knowledge-retrieval-service.ts` | 80 | 🟢 | AI Team | Dec 2025 | Freshness-weighted retrieval |
+| **Signal Emitter** | `server/intelligence/signal-emitter.ts` | 78 | 🟡 | AI Team | Dec 2025 | Needs integration tests |
+| **Priority Engine** | `server/intelligence/priority-engine.ts` | 75 | 🟡 | AI Team | Dec 2025 | Complex scoring logic |
 
 ### AI Providers
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Hardened Executor** | `server/ai/hardened-executor.ts` | 85 | 🟢 | AI Team | Dec 2024 | Retry, caching, validation |
-| **Gemini Provider** | `server/ai/gemini-provider.ts` | 80 | 🟢 | AI Team | Dec 2024 | Well-structured |
-| **OpenAI Provider** | `server/ai/openai-provider.ts` | 80 | 🟢 | AI Team | Dec 2024 | Parallel to Gemini |
-| **Provider Interface** | `server/ai/provider.ts` | 90 | 🟢 | AI Team | Dec 2024 | Clean abstraction |
+| **Hardened Executor** | `server/ai/hardened-executor.ts` | 85 | 🟢 | AI Team | Dec 2025 | Retry, caching, validation |
+| **Gemini Provider** | `server/ai/gemini-provider.ts` | 80 | 🟢 | AI Team | Dec 2025 | Well-structured |
+| **OpenAI Provider** | `server/ai/openai-provider.ts` | 80 | 🟢 | AI Team | Dec 2025 | Parallel to Gemini |
+| **Provider Interface** | `server/ai/provider.ts` | 90 | 🟢 | AI Team | Dec 2025 | Clean abstraction |
 
 ### Agent System
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Base Agent** | `server/agents/base-agent.ts` | 75 | 🟡 | AI Team | Dec 2024 | Abstract class, needs cleanup |
-| **Domain Agents** | `server/agents/domain-agents.ts` | 70 | 🟡 | AI Team | Dec 2024 | Not actively used in routes |
-| **Orchestrator** | `server/agents/orchestrator.ts` | 65 | 🟡 | AI Team | Dec 2024 | Limited usage, evaluate removal |
-| **Agent Routes** | `server/agents/agent-routes.ts` | 68 | 🟡 | AI Team | Dec 2024 | Low traffic endpoints |
+| **Base Agent** | `server/agents/base-agent.ts` | 75 | 🟡 | AI Team | Dec 2025 | Abstract class, needs cleanup |
+| **Domain Agents** | `server/agents/domain-agents.ts` | 70 | 🟡 | AI Team | Dec 2025 | Not actively used in routes |
+| **Orchestrator** | `server/agents/orchestrator.ts` | 65 | 🟡 | AI Team | Dec 2025 | Limited usage, evaluate removal |
+| **Agent Routes** | `server/agents/agent-routes.ts` | 68 | 🟡 | AI Team | Dec 2025 | Low traffic endpoints |
 
 ### SLA & Scheduling
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **SLA Service** | `server/sla/sla-service.ts` | 85 | 🟢 | Core Team | Dec 2024 | ✅ 18 unit tests added |
-| **SLA Cron** | `server/sla/sla-cron.ts` | 85 | 🟢 | Core Team | Dec 2024 | 5-minute intervals |
-| **Invoice Scheduler** | `server/services/invoiceScheduler.ts` | 80 | 🟢 | Core Team | Dec 2024 | Daily at 9 AM |
-| **Trash Cleanup** | `server/services/trashCleanupScheduler.ts` | 85 | 🟢 | Core Team | Dec 2024 | Nightly at 2 AM |
-| **Orphan Cleanup** | `server/jobs/orphan-cleanup.ts` | 82 | 🟢 | Core Team | Dec 2024 | User lifecycle |
+| **SLA Service** | `server/sla/sla-service.ts` | 85 | 🟢 | Core Team | Dec 2025 | ✅ 18 unit tests added |
+| **SLA Cron** | `server/sla/sla-cron.ts` | 85 | 🟢 | Core Team | Dec 2025 | 5-minute intervals |
+| **Invoice Scheduler** | `server/services/invoiceScheduler.ts` | 80 | 🟢 | Core Team | Dec 2025 | Daily at 9 AM |
+| **Trash Cleanup** | `server/services/trashCleanupScheduler.ts` | 85 | 🟢 | Core Team | Dec 2025 | Nightly at 2 AM |
+| **Orphan Cleanup** | `server/jobs/orphan-cleanup.ts` | 82 | 🟢 | Core Team | Dec 2025 | User lifecycle |
 
 ### Authentication & Middleware
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Auth Middleware** | `server/middleware/auth.ts` | 80 | 🟢 | Security | Dec 2024 | ✅ 18 unit tests added |
-| **Maintenance Middleware** | `server/middleware/maintenance.ts` | 82 | 🟢 | Security | Dec 2024 | ✅ 8 unit tests added |
-| **Agency Context** | `server/middleware/agency-context.ts` | 80 | 🟢 | Security | Dec 2024 | Clean tenant isolation |
-| **Rate Limiter** | `server/middleware/rateLimiter.ts` | 78 | 🟡 | Security | Dec 2024 | Deprecated methods present |
-| **Logger** | `server/middleware/logger.ts` | 65 | 🟡 | Core Team | Dec 2024 | Legacy logging to remove |
-| **Supabase Auth** | `server/lib/supabase-auth.ts` | 82 | 🟢 | Security | Dec 2024 | JWT validation working |
+| **Auth Middleware** | `server/middleware/auth.ts` | 80 | 🟢 | Security | Dec 2025 | ✅ 18 unit tests added |
+| **Maintenance Middleware** | `server/middleware/maintenance.ts` | 82 | 🟢 | Security | Dec 2025 | ✅ 8 unit tests added |
+| **Agency Context** | `server/middleware/agency-context.ts` | 80 | 🟢 | Security | Dec 2025 | Clean tenant isolation |
+| **Rate Limiter** | `server/middleware/rateLimiter.ts` | 78 | 🟡 | Security | Dec 2025 | Deprecated methods present |
+| **Logger** | `server/middleware/logger.ts` | 65 | 🟡 | Core Team | Dec 2025 | Legacy logging to remove |
+| **Supabase Auth** | `server/lib/supabase-auth.ts` | 82 | 🟢 | Security | Dec 2025 | JWT validation working |
 
-### Test Infrastructure (NEW - December 2024)
+### Test Infrastructure (NEW - December 2025)
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Test Helpers** | `tests/utils/test-helpers.ts` | 85 | 🟢 | QA | Dec 2024 | Mock utilities, test users |
-| **Auth Tests** | `tests/middleware/auth.test.ts` | 85 | 🟢 | QA | Dec 2024 | 18 tests - cross-tenant, roles |
-| **Maintenance Tests** | `tests/middleware/maintenance.test.ts` | 85 | 🟢 | QA | Dec 2024 | 8 tests - bypass logic |
-| **SLA Tests** | `tests/sla/sla-service.test.ts` | 85 | 🟢 | QA | Dec 2024 | 18 tests - breach detection |
-| **Vitest Config** | `vitest.config.ts` | 90 | 🟢 | QA | Dec 2024 | Clean configuration |
+| **Test Helpers** | `tests/utils/test-helpers.ts` | 85 | 🟢 | QA | Dec 2025 | Mock utilities, test users |
+| **Auth Tests** | `tests/middleware/auth.test.ts` | 85 | 🟢 | QA | Dec 2025 | 18 tests - cross-tenant, roles |
+| **Maintenance Tests** | `tests/middleware/maintenance.test.ts` | 85 | 🟢 | QA | Dec 2025 | 8 tests - bypass logic |
+| **SLA Tests** | `tests/sla/sla-service.test.ts` | 85 | 🟢 | QA | Dec 2025 | 18 tests - breach detection |
+| **Vitest Config** | `vitest.config.ts` | 90 | 🟢 | QA | Dec 2025 | Clean configuration |
 
 ### Integration Libraries
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Google OAuth** | `server/lib/googleOAuth.ts` | 78 | 🟡 | Integrations | Dec 2024 | Token refresh edge cases |
-| **Google API Retry** | `server/lib/googleApiRetry.ts` | 80 | 🟢 | Integrations | Dec 2024 | Exponential backoff |
-| **Google API Rate Limiter** | `server/lib/googleApiRateLimiter.ts` | 70 | 🟡 | Integrations | Dec 2024 | Deprecated methods |
-| **HubSpot** | `server/lib/hubspot.ts` | 75 | 🟡 | Integrations | Dec 2024 | Needs error handling review |
-| **LinkedIn** | `server/lib/linkedin.ts` | 72 | 🟡 | Integrations | Dec 2024 | Limited functionality |
+| **Google OAuth** | `server/lib/googleOAuth.ts` | 78 | 🟡 | Integrations | Dec 2025 | Token refresh edge cases |
+| **Google API Retry** | `server/lib/googleApiRetry.ts` | 80 | 🟢 | Integrations | Dec 2025 | Exponential backoff |
+| **Google API Rate Limiter** | `server/lib/googleApiRateLimiter.ts` | 70 | 🟡 | Integrations | Dec 2025 | Deprecated methods |
+| **HubSpot** | `server/lib/hubspot.ts` | 75 | 🟡 | Integrations | Dec 2025 | Needs error handling review |
+| **LinkedIn** | `server/lib/linkedin.ts` | 72 | 🟡 | Integrations | Dec 2025 | Limited functionality |
 
 ### CRM
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **CRM Routes** | `server/crm/crm-routes.ts` | 78 | 🟡 | CRM Team | Dec 2024 | Webhook handling |
-| **CRM Webhook Handler** | `server/crm/crm-webhook-handler.ts` | 80 | 🟢 | CRM Team | Dec 2024 | HubSpot signature verification |
-| **Routes CRM** | `server/routes/crm.ts` | 72 | 🟡 | CRM Team | Dec 2024 | Duplicated with crm-routes |
+| **CRM Routes** | `server/crm/crm-routes.ts` | 78 | 🟡 | CRM Team | Dec 2025 | Webhook handling |
+| **CRM Webhook Handler** | `server/crm/crm-webhook-handler.ts` | 80 | 🟢 | CRM Team | Dec 2025 | HubSpot signature verification |
+| **Routes CRM** | `server/routes/crm.ts` | 72 | 🟡 | CRM Team | Dec 2025 | Duplicated with crm-routes |
 
 ### Vector & Embeddings
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **Embedding Service** | `server/vector/embedding-service.ts` | 80 | 🟢 | AI Team | Dec 2024 | Dual provider support |
+| **Embedding Service** | `server/vector/embedding-service.ts` | 80 | 🟢 | AI Team | Dec 2025 | Dual provider support |
 
 ### Real-time
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **WebSocket Server** | `server/realtime/websocket-server.ts` | 82 | 🟢 | Core Team | Dec 2024 | ✅ Health checks & metrics added |
-| **Realtime Service** | `server/realtime/realtime-service.ts` | 80 | 🟢 | Core Team | Dec 2024 | ✅ Integrated WS+SSE health checks |
+| **WebSocket Server** | `server/realtime/websocket-server.ts` | 82 | 🟢 | Core Team | Dec 2025 | ✅ Health checks & metrics added |
+| **Realtime Service** | `server/realtime/realtime-service.ts` | 80 | 🟢 | Core Team | Dec 2025 | ✅ Integrated WS+SSE health checks |
 
 ---
 
@@ -176,18 +178,18 @@ Where:
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
 |--------|------|-------|------|-------|------------|-------|
-| **App Router** | `client/src/App.tsx` | 75 | 🟡 | Frontend | Dec 2024 | Large routing file |
-| **Query Client** | `client/src/lib/queryClient.ts` | 85 | 🟢 | Frontend | Dec 2024 | Token refresh, hierarchical keys |
-| **Agency Layout** | `client/src/components/agency-layout.tsx` | 80 | 🟢 | Frontend | Dec 2024 | Clean layout |
-| **Client Layout** | `client/src/components/client-layout.tsx` | 80 | 🟢 | Frontend | Dec 2024 | Clean layout |
-| **Agency Sidebar** | `client/src/components/agency-sidebar.tsx` | 78 | 🟡 | Frontend | Dec 2024 | Many menu items |
-| **Knowledge Page** | `client/src/pages/agency/knowledge.tsx` | 82 | 🟢 | Frontend | Dec 2024 | Full CRUD, filtering |
+| **App Router** | `client/src/App.tsx` | 75 | 🟡 | Frontend | Dec 2025 | Large routing file |
+| **Query Client** | `client/src/lib/queryClient.ts` | 85 | 🟢 | Frontend | Dec 2025 | Token refresh, hierarchical keys |
+| **Agency Layout** | `client/src/components/agency-layout.tsx` | 80 | 🟢 | Frontend | Dec 2025 | Clean layout |
+| **Client Layout** | `client/src/components/client-layout.tsx` | 80 | 🟢 | Frontend | Dec 2025 | Clean layout |
+| **Agency Sidebar** | `client/src/components/agency-sidebar.tsx` | 78 | 🟡 | Frontend | Dec 2025 | Many menu items |
+| **Knowledge Page** | `client/src/pages/agency/knowledge.tsx` | 82 | 🟢 | Frontend | Dec 2025 | Full CRUD, filtering |
 
 ---
 
 ## Critical Items (🔴 Red Flag)
 
-### 1. `server/routes.ts` — ✅ RESOLVED (December 2024)
+### 1. `server/routes.ts` — ✅ RESOLVED (December 2025)
 **Previous Problem:** Monolithic API file containing all route handlers (9638 lines)
 **Resolution:** Successfully decomposed into 37 domain-specific routers (~294 routes)
 **Current State:** Only 300 lines with 3 intentional remaining routes
@@ -237,7 +239,7 @@ server/storage/
 
 ---
 
-## Routes Decomposition Progress (December 2024) — ✅ COMPLETE
+## Routes Decomposition Progress (December 2025) — ✅ COMPLETE
 
 ### Summary
 - **Before:** 4,832 lines in routes.ts with ~270 routes
@@ -310,7 +312,7 @@ registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
 ## Migration Files Review
 
 ### Duplicate/Redundant Files
-✅ **Completed December 2024:**
+✅ **Completed December 2025:**
 
 | File | Status | Action |
 |------|--------|--------|
@@ -356,8 +358,8 @@ registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
 
 | Priority | Item | Effort | Impact | Status |
 |----------|------|--------|--------|--------|
-| ~~P1~~ | ~~Complete routes.ts decomposition~~ | ~~8 hours~~ | ~~High~~ | ✅ DONE Dec 2024 |
-| ~~P1~~ | ~~Register all domain routers~~ | ~~2 hours~~ | ~~Medium~~ | ✅ DONE Dec 2024 |
+| ~~P1~~ | ~~Complete routes.ts decomposition~~ | ~~8 hours~~ | ~~High~~ | ✅ DONE Dec 2025 |
+| ~~P1~~ | ~~Register all domain routers~~ | ~~2 hours~~ | ~~Medium~~ | ✅ DONE Dec 2025 |
 | P1 | Storage layer split into domain services | 12 hours | High | 🔴 Next priority |
 | P2 | Workflow engine integration tests | 6 hours | Medium | 🟡 Planned Q1 |
 | P3 | Agent system evaluation and cleanup | 4 hours | Low | Backlog |
@@ -365,5 +367,5 @@ registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
 
 ---
 
-*Generated: December 2024*
+*Generated: December 2025*
 *Next Review: March 2025*

@@ -140,7 +140,7 @@ Used for:
 - brand knowledge modeling  
 - improved recommendation quality  
 
-### 4.4 Duration Intelligence (Completed December 2024)
+### 4.4 Duration Intelligence (Completed December 2025)
 
 Predictive duration modeling and resource optimization:
 
@@ -384,7 +384,7 @@ The platform runs on Replit using:
 
 ---
 
-# 13. Recent Changes (December 2024)
+# 13. Recent Changes (December 2025)
 
 - Workflow builder UI (Priority 15)  
 - Enhanced analytics ingestion  
@@ -411,8 +411,8 @@ The platform runs on Replit using:
 - AI task-type model selection
 - Knowledge graph visualization
 - Cross-client pattern learning (with governance)
-- ~~Routes.ts refactoring~~ → ✅ COMPLETE (December 2024)
-- storage.ts decomposition → Next priority (domain services pattern)
+- ~~Routes.ts refactoring~~ → ✅ COMPLETE (December 2025)
+- storage.ts decomposition → 🟡 IN PROGRESS (Phase 1-2 complete, 43 methods extracted)
 
 ---
 
@@ -434,14 +434,15 @@ MaintenanceScore = 100 - (5×Complexity + 10×TechDebt + 15×Incidents + 5×Test
 🟢 ≥80: Healthy    🟡 60-79: Needs attention    🔴 <60: Critical
 ```
 
-Current Status (December 2024):
+Current Status (December 2025):
 - Intelligence Layer: 82 🟢
 - AI Providers: 84 🟢
 - Real-time: 81 🟢 ← Health checks & metrics added
 - Domain Routers: 85 🟢 ← 37 registrations, ~294 routes, decomposition COMPLETE
 - Workflow Engine: 79 🟡
 - routes.ts: 85 🟢 ← Decomposition complete (300 lines, 3 routes)
-- storage.ts: 52 🔴 ← Now TOP PRIORITY for decomposition (3,713 lines, god object)
+- storage.ts: 65 🟡 ← Decomposition in progress (3,245 lines, Phase 1-2 complete)
+- Storage Domains: 85 🟢 ← identity, agency, task domains extracted (43 methods)
 
 ---
 
@@ -455,4 +456,4 @@ Current Status (December 2024):
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

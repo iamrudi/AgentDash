@@ -50,7 +50,7 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │                            BACKEND LAYER                                     │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                    Domain Router Architecture (Dec 2024) ✅ COMPLETE  │   │
+│  │                    Domain Router Architecture (Dec 2025) ✅ COMPLETE  │   │
 │  │                                                                        │   │
 │  │  server/routes/ (37 registrations, ~294 routes mounted)              │   │
 │  │  ├── index.ts                (router composition)                    │   │
@@ -503,4 +503,4 @@ const mutation = useMutation({
 
 ---
 
-*Generated: December 2024*
+*Generated: December 2025*

@@ -1,6 +1,6 @@
 # Storage Legacy Artifacts
 
-Legacy storage artifacts were removed during the storage.ts decomposition refactor (December 2024).
+Legacy storage artifacts were removed during the storage.ts decomposition refactor (December 2025).
 
 ## Removed Files
 

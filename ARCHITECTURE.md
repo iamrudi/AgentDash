@@ -254,7 +254,7 @@ Platform-wide governance dashboard for system administrators.
 
 ## Backend Domain Router Architecture
 
-As of December 2024, the monolithic `routes.ts` has been fully decomposed into domain-specific routers for improved maintainability.
+As of December 2025, the monolithic `routes.ts` has been fully decomposed into domain-specific routers for improved maintainability.
 
 ### Domain Router Structure
 
@@ -331,7 +331,7 @@ export function mountDomainRouters(app: Express): void {
 }
 ```
 
-### Migration Status (December 2024) — ✅ COMPLETE
+### Migration Status (December 2025) — ✅ COMPLETE
 
 | Domain | Status | Routes | Notes |
 |--------|--------|--------|-------|
@@ -386,6 +386,49 @@ All extracted domain routers maintain:
 - **requireRole** middleware for RBAC enforcement
 - **Cross-tenant protection** via agencyId injection from user context
 - **Resource ownership validation** (e.g., clientId belongs to user's agency)
+
+---
+
+### Storage Layer Decomposition (December 2025) — 🟡 IN PROGRESS
+
+The monolithic `server/storage.ts` is being decomposed into domain-specific modules using a bounded context approach.
+
+#### Architecture Pattern
+
+```
+server/storage/
+├── contracts/                 # Domain interfaces (TypeScript)
+│   ├── identity.ts           # IdentityStorage interface (12 methods)
+│   ├── agency.ts             # AgencyStorage interface (4 methods)
+│   └── task.ts               # TaskStorage interface (27 methods)
+└── domains/                   # Function-based implementations
+    ├── identity.storage.ts   # identityStorage(ctx) → IdentityStorage
+    ├── agency.storage.ts     # agencyStorage(ctx) → AgencyStorage
+    └── task.storage.ts       # taskStorage(ctx, getProjectById) → TaskStorage
+```
+
+#### Decomposition Progress
+
+| Phase | Domain | Methods | Status |
+|-------|--------|---------|--------|
+| 1 | Identity | 12 | ✅ Complete |
+| 1 | Agency | 4 | ✅ Complete |
+| 2 | Task | 27 | ✅ Complete |
+| 3 | Project/Client | ~20 | ⏳ Planned |
+| 4 | Invoice/Initiative | ~25 | ⏳ Planned |
+
+**Metrics:**
+- **Original:** 3,713 lines, ~150 methods
+- **Current:** 3,245 lines (12.6% reduction)
+- **Extracted:** 43 methods across 3 domains
+
+#### Design Decisions
+
+1. **Function-based modules** taking `DbCtx` context rather than classes
+2. **DbStorage as facade** delegating to domain modules
+3. **No method renames** during extraction to maintain behavior parity
+4. **Multi-tenant isolation** preserved via agencyId parameters
+5. **Validation gates** per phase: signature parity, compile, E2E
 
 ---
 
@@ -1100,7 +1143,7 @@ Structured knowledge ingestion for AI context assembly.
 
 ---
 
-## Stability Testing Framework (December 2024)
+## Stability Testing Framework (December 2025)
 
 ### Test Infrastructure
 
@@ -1184,7 +1227,7 @@ async (req, res, next) => {
 
 ---
 
-## Completed Enhancements (December 2024)
+## Completed Enhancements (December 2025)
 
 - [x] WebSocket/SSE real-time updates
 - [x] Visual workflow builder UI (in progress)
@@ -1223,4 +1266,4 @@ async (req, res, next) => {
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*
