@@ -378,6 +378,8 @@ export function mountDomainRouters(app: Express): void {
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 
+> **Note:** CRM routes and integrations are mounted and production-safe, but CRM is not yet a required dependency for core agency workflows. The platform operates fully without CRM enabled.
+
 ### Security Guarantees
 
 All extracted domain routers maintain:

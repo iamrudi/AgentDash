@@ -35,6 +35,8 @@ This README serves as the **single source of truth** for key metrics. All other 
 | **schema.ts Lines** | ~3,235 | All database schemas |
 | **Test Cases** | 44 | 18 auth + 8 maintenance + 18 SLA |
 
+> **Note:** CRM routes and integrations are mounted and production-safe, but CRM is not yet a required dependency for core agency workflows. The platform operates fully without CRM enabled.
+
 ### Documentation Status
 
 | Document | Last Updated | Aligned |
