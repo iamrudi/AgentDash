@@ -936,48 +936,61 @@ Create a visual DAG (Directed Acyclic Graph) editor for building and modifying w
 
 ---
 
-## Dependency Graph
+## Dependency Graph (December 2025)
 
 ```
-Priority 1 (Workflow Engine) ✅ COMPLETED
+Priority 1 (Workflow Engine) ✅
     │
-    ├──▶ Priority 2 (Rule Engine) ✅ COMPLETED
+    ├──▶ Priority 2 (Rule Engine) ✅
     │        │
-    │        └──▶ Priority 3 (Signal Processing) ← NEXT
+    │        └──▶ Priority 3 (Signal Processing) ✅
     │                 │
-    │                 └──▶ Priority 7 (SLA Engine)
-    │                 └──▶ Priority 9 (CRM Triggers)
-    │                 └──▶ Priority 10 (Analytics Ingestion)
+    │                 └──▶ Priority 7 (SLA Engine) ✅
+    │                 └──▶ Priority 9 (CRM Triggers) ✅
+    │                 └──▶ Priority 10 (Analytics Ingestion) ✅
     │
-    ├──▶ Priority 4 (AI Execution Layer)
+    ├──▶ Priority 4 (AI Execution Layer) ✅
     │        │
-    │        └──▶ Priority 5 (Lineage & Logging)
-    │        └──▶ Priority 8 (Multi-Agent)
-    │        └──▶ Priority 14 (SuperAdmin Governance)
+    │        └──▶ Priority 5 (Lineage & Logging) ✅
+    │        └──▶ Priority 8 (Multi-Agent) ✅
+    │        └──▶ Priority 14 (SuperAdmin Governance) ✅
     │
-    ├──▶ Priority 11 (Task System Optimization)
+    ├──▶ Priority 11 (Task System Optimization) ✅
     │        │
-    │        └──▶ Priority 12 (Template System)
+    │        └──▶ Priority 12 (Template System) ✅
     │                 │
-    │                 └──▶ Priority 15 (Workflow Builder UI)
+    │                 └──▶ Priority 15 (Workflow Builder UI) 🟡 IN PROGRESS
     │
-    └──▶ Priority 6 (Vector Stores) [parallel]
-    └──▶ Priority 13 (Real-Time Layer) [parallel]
+    ├──▶ Priority 6 (Vector Stores) ✅
+    │
+    ├──▶ Priority 13 (Real-Time Layer) ✅
+    │
+    ├──▶ Priority 16 (Duration Intelligence) ✅
+    │        │
+    │        └──▶ Priority 17 (Closed Feedback Loop) ✅
+    │                 │
+    │                 └──▶ Priority 18 (Brand Knowledge Layer) ✅
+    │
+    ├──▶ Priority 19 (Stability Testing Framework) ✅
+    │
+    └──▶ Priority 20 (Storage Layer Decomposition) 🟡 IN PROGRESS
 ```
 
 ---
 
-## Implementation Timeline (Estimated)
+## Implementation Timeline
 
-| Phase | Priorities | Duration | Team Size |
-|-------|------------|----------|-----------|
-| Foundation | 1, 2, 4 | 6-8 weeks | 2 engineers |
-| Rules & Signals | 3, 10, 9 | 4-6 weeks | 2 engineers |
-| AI & Lineage | 5, 6, 8 | 6-8 weeks | 2-3 engineers |
-| Automation | 7, 11, 12 | 4-6 weeks | 2 engineers |
-| Polish | 13, 14, 15 | 6-8 weeks | 2-3 engineers |
+| Phase | Priorities | Tokens Needed | Status |
+|-------|------------|---------------|--------|
+| Foundation | 1, 2, 4 | High | ✅ Complete |
+| Rules & Signals | 3, 10, 9 | High | ✅ Complete |
+| AI & Lineage | 5, 6, 8 | Very High | ✅ Complete |
+| Automation | 7, 11, 12 | High | ✅ Complete |
+| Polish | 13, 14, 15 | Very High | 🟡 In Progress |
+| Intelligence | 16, 17, 18 | Very High | ✅ Complete |
+| Stability | 19, 20 | High | 🟡 In Progress |
 
-**Total Tokens:** High (multi-phase)
+**Total Progress:** 18/20 priorities complete (90%)
 
 ---
 
@@ -1198,31 +1211,31 @@ npx vitest --coverage                      # Coverage report
 
 ### High Priority (🟠 Should Address Soon)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | 1 hr |
-| Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | 2 hrs |
-| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | 4 hrs |
-| ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | Done |
-| Console.log statements | Various | Should use structured logging | 3 hrs |
+| Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | Low |
+| Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | Low |
+| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | Medium |
+| ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | ✅ Done |
+| Console.log statements | Various | Should use structured logging | Medium |
 
 ### Medium Priority (🟡 Schedule for Cleanup)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Empty email in users table | `client/src/pages/agency/users.tsx` | Shows blank email - `getAllUsersWithProfiles` returns empty email/password (Supabase Auth is source of truth). Fix: fetch email from Supabase Auth or add to profiles table | 3 hrs |
-| Agent system evaluation | `server/agents/` | Limited active usage | 4 hrs |
-| Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | 2 hrs |
-| Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | 1 hr |
+| Empty email in users table | `client/src/pages/agency/users.tsx` | Shows blank email - `getAllUsersWithProfiles` returns empty email/password (Supabase Auth is source of truth). Fix: fetch email from Supabase Auth or add to profiles table | Medium |
+| Agent system evaluation | `server/agents/` | Limited active usage | Medium |
+| Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | Low |
+| Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | Low |
 | WebSocket URL bug | Vite HMR | `wss://localhost:undefined` - requires vite.config.ts change (protected) | N/A |
 
 ### Low Priority (📝 Document for Later)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Split schema.ts | `shared/schema.ts` | 3,235 lines - consider domain splits | 8 hrs |
-| Test coverage gaps | Various | Intelligence services need tests | 20 hrs |
-| Forms page cleanup | `pages/forms/` | Only embed.tsx used | 1 hr |
+| Split schema.ts | `shared/schema.ts` | 3,235 lines - consider domain splits | High |
+| Test coverage gaps | Various | Intelligence services need tests | Very High |
+| Forms page cleanup | `pages/forms/` | Only embed.tsx used | Low |
 
 ---
 
@@ -1293,29 +1306,29 @@ See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-
 
 With the stability testing framework in place, the following features are now unblocked:
 
-### P1 — Critical Path (Q1 2025)
+### P1 — Critical Path
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| ~~Complete routes.ts decomposition~~ | ~~Stability tests~~ | ~~8 hrs~~ | ~~Register remaining routers~~ ✅ DONE Dec 2025 |
-| Storage layer domain split | Routes complete | 12 hrs | 🟡 In progress — Phase 1-2 complete (43 methods extracted) |
-| Workflow engine integration tests | Stability tests | 6 hrs | Full workflow execution path validation |
+| ~~Complete routes.ts decomposition~~ | ~~Stability tests~~ | ~~High~~ | ~~Register remaining routers~~ ✅ DONE Dec 2025 |
+| Storage layer domain split | Routes complete | High | 🟡 In progress — Phase 1-2 complete (43 methods extracted) |
+| Workflow engine integration tests | Stability tests | High | Full workflow execution path validation |
 
-### P2 — Foundation Improvements (Q2 2025)
+### P2 — Foundation Improvements
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| SuperAdmin observability dashboard | Maintenance mode | 8 hrs | Real-time metrics, health checks UI |
-| AI-assisted task recommendations | Intelligence layer | 10 hrs | Proactive task suggestions based on patterns |
-| Advanced SLA reporting | SLA tests | 6 hrs | Breach analytics, trend visualization |
+| SuperAdmin observability dashboard | Maintenance mode | High | Real-time metrics, health checks UI |
+| AI-assisted task recommendations | Intelligence layer | High | Proactive task suggestions based on patterns |
+| Advanced SLA reporting | SLA tests | High | Breach analytics, trend visualization |
 
-### P3 — Feature Expansion (Q3 2025)
+### P3 — Feature Expansion
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| Cross-client pattern learning | Knowledge layer | 12 hrs | Agency-wide insights with governance |
-| Workflow version comparison UI | Workflow builder | 8 hrs | Visual diff between workflow versions |
-| Mobile-responsive staff portal | Staff router | 6 hrs | Task management on mobile devices |
+| Cross-client pattern learning | Knowledge layer | High | Agency-wide insights with governance |
+| Workflow version comparison UI | Workflow builder | High | Visual diff between workflow versions |
+| Mobile-responsive staff portal | Staff router | High | Task management on mobile devices |
 
 ---
 

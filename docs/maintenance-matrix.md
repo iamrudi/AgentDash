@@ -217,26 +217,26 @@ server/storage/
 ## Cleanup Queue
 
 ### High Priority (Do First)
-| Item | File | Action | Effort |
+| Item | File | Action | Tokens |
 |------|------|--------|--------|
-| Deprecated rate limit methods | `googleApiRateLimiter.ts` | Remove `checkRateLimit`, `recordRequest` | 1 hour |
-| Legacy logging | `logger.ts` | Remove after confirming Winston adoption | 2 hours |
-| Redundant CRM routes | `routes/crm.ts` vs `crm/crm-routes.ts` | Consolidate into one | 4 hours |
-| Deprecated auth helpers | `auth.ts` | Consolidate `verifyClientAccess` patterns | 2 hours |
+| Deprecated rate limit methods | `googleApiRateLimiter.ts` | Remove `checkRateLimit`, `recordRequest` | Low |
+| Legacy logging | `logger.ts` | Remove after confirming Winston adoption | Low |
+| Redundant CRM routes | `routes/crm.ts` vs `crm/crm-routes.ts` | Consolidate into one | Medium |
+| Deprecated auth helpers | `auth.ts` | Consolidate `verifyClientAccess` patterns | Low |
 
 ### Medium Priority
-| Item | File | Action | Effort |
+| Item | File | Action | Tokens |
 |------|------|--------|--------|
-| Console.log statements | Various | Replace with logger.info/debug | 3 hours |
-| Hardcoded dev fallbacks | `oauthState.ts` | Remove fallback secrets | 1 hour |
-| Agent system evaluation | `server/agents/` | Determine if actively used | 2 hours |
+| Console.log statements | Various | Replace with logger.info/debug | Medium |
+| Hardcoded dev fallbacks | `oauthState.ts` | Remove fallback secrets | Low |
+| Agent system evaluation | `server/agents/` | Determine if actively used | Low |
 
 ### Low Priority (Schedule Later)
-| Item | File | Action | Effort |
+| Item | File | Action | Tokens |
 |------|------|--------|--------|
-| ~~Continue routes.ts decomposition~~ | ~~`routes.ts`~~ | ~~Extract remaining routers~~ | ~~8 hours~~ ✅ DONE |
-| Split storage.ts | `storage.ts` | 🟡 In progress — Phase 1-2 complete | 12 hours |
-| Migration file cleanup | `migrations/` | Remove duplicate/unused SQL | 4 hours |
+| ~~Continue routes.ts decomposition~~ | ~~`routes.ts`~~ | ~~Extract remaining routers~~ | ~~High~~ ✅ DONE |
+| Split storage.ts | `storage.ts` | 🟡 In progress — Phase 1-2 complete | High |
+| Migration file cleanup | `migrations/` | Remove duplicate/unused SQL | Medium |
 
 ---
 
@@ -355,16 +355,16 @@ registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
 
 ---
 
-## Q1/Q2 2025 Refactor Priorities
+## Refactor Priorities (December 2025)
 
-| Priority | Item | Effort | Impact | Status |
+| Priority | Item | Tokens | Impact | Status |
 |----------|------|--------|--------|--------|
-| ~~P1~~ | ~~Complete routes.ts decomposition~~ | ~~8 hours~~ | ~~High~~ | ✅ DONE Dec 2025 |
-| ~~P1~~ | ~~Register all domain routers~~ | ~~2 hours~~ | ~~Medium~~ | ✅ DONE Dec 2025 |
-| P1 | Storage layer split into domain services | 12 hours | High | 🔴 Next priority |
-| P2 | Workflow engine integration tests | 6 hours | Medium | 🟡 Planned Q1 |
-| P3 | Agent system evaluation and cleanup | 4 hours | Low | Backlog |
-| P3 | Legacy logging migration to Winston | 3 hours | Low | Backlog |
+| ~~P1~~ | ~~Complete routes.ts decomposition~~ | ~~High~~ | ~~High~~ | ✅ DONE Dec 2025 |
+| ~~P1~~ | ~~Register all domain routers~~ | ~~Low~~ | ~~Medium~~ | ✅ DONE Dec 2025 |
+| P1 | Storage layer split into domain services | High | High | 🟡 In progress (Phase 1-2 done) |
+| P2 | Workflow engine integration tests | High | Medium | 🟡 Planned |
+| P3 | Agent system evaluation and cleanup | Medium | Low | Backlog |
+| P3 | Legacy logging migration to Winston | Medium | Low | Backlog |
 
 ---
 
