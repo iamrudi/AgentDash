@@ -393,6 +393,9 @@ export interface IStorage {
   // Super Admin - User Management
   getAllUsersForSuperAdmin(): Promise<Array<Profile & { agencyName?: string; clientName?: string }>>;
   
+  // Agency
+  getDefaultAgency(): Promise<Agency | undefined>;
+  
   // Super Admin - Agency Management
   getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>>;
   getAgencyById(id: string): Promise<Agency | undefined>;

@@ -1,0 +1,172 @@
+How to group (rules that won’t bite you later)
+
+Group by bounded context, not by table name. Use your existing router boundaries as the first draft (because routes already encode domain ownership) 
+
+TECHNICAL_BRIEF (4)
+
+:
+
+Auth (login/session/logout)
+
+User/Profile
+
+Agency (dashboard/metrics, agency-wide)
+
+AgencyClients (client CRUD + onboarding)
+
+AgencyTasks (task mgmt from agency view)
+
+AgencyUsers (role mgmt, invites)
+
+ClientPortal (client-scoped reads/actions)
+
+StaffPortal (assigned tasks, hours)
+
+CRM (companies/contacts/deals)
+
+Invoices/Billing
+
+Tasks (core task/list/project primitives if shared)
+
+Workflows (CRUD + execution)
+
+Knowledge
+
+Intelligence
+
+Messaging/Chat
+
+Integrations (GA4/GSC/HubSpot/LinkedIn)
+
+SuperAdmin (cross-tenant governance)
+
+Maintenance/System (maintenance mode, health, audit logs)
+
+This aligns naturally with the doc’d router split you’ve already done (~37 router registrations) 
+
+TECHNICAL_BRIEF (4)
+
+.
+
+Practical method inventory (fast)
+
+Make a single “inventory” file in-repo (not in docs) listing:
+
+// storage/inventory.ts
+export const storageInventory = {
+  auth: ['getSession', 'login', 'logout'],
+  crm: ['getCompanies', 'createDeal', ...],
+  // ...
+} as const;
+
+
+You’ll use that inventory as a checklist while extracting.
+
+2) Create domain interfaces that split IStorage into focused contracts
+Pattern: small interfaces + a composed “Storage” type
+
+Create interfaces per domain, then compose:
+
+// storage/contracts/auth.ts
+export interface AuthStorage {
+  getSession(userId: string): Promise<Session>;
+  // ...
+}
+
+// storage/contracts/crm.ts
+export interface CRMStorage {
+  getCompanies(agencyId: string): Promise<Company[]>;
+  // ...
+}
+
+// storage/contracts/index.ts
+export type Storage =
+  & AuthStorage
+  & CRMStorage
+  & TasksStorage
+  & WorkflowsStorage
+  & KnowledgeStorage
+  & IntelligenceStorage
+  & SuperAdminStorage
+  & IntegrationsStorage
+  & AuditStorage
+  & /* etc */;
+
+
+Key rule: don’t keep “IStorage” as the god-interface. Replace it with Storage (an intersection) or a minimal IStorage = Storage.
+
+Route-level typing (optional but powerful)
+
+If you want to stop routes from “reaching across domains”, you can type routes by only what they need:
+
+// routes/crm.ts
+export function registerCrmRoutes(app: Express, storage: CRMStorage) { ... }
+
+
+You can do this gradually.
+
+3) Extract implementations into separate files while keeping DbStorage as a facade
+Structure that stays readable at ~150 methods
+server/storage/
+  db/
+    DbStorage.ts               // facade
+    db.ts                      // drizzle/supabase clients
+  domains/
+    auth.storage.ts
+    crm.storage.ts
+    tasks.storage.ts
+    workflows.storage.ts
+    knowledge.storage.ts
+    intelligence.storage.ts
+    integrations.storage.ts
+    superadmin.storage.ts
+    audit.storage.ts
+  contracts/
+    auth.ts
+    crm.ts
+    tasks.ts
+    workflows.ts
+    knowledge.ts
+    intelligence.ts
+    integrations.ts
+    superadmin.ts
+    audit.ts
+    index.ts
+  index.ts                     // exports `storage` instance
+
+Implementation approach: domain modules export pure functions or classes
+
+Option A (my recommendation): functions that take a context
+Keeps things simple and avoids class soup:
+
+// storage/domains/crm.storage.ts
+import { DbCtx } from '../db/db';
+
+export function crmStorage(ctx: DbCtx) {
+  return {
+    async getCompanies(agencyId: string) { /* drizzle query */ },
+    async createDeal(...) { /* ... */ }
+  };
+}
+
+
+Then DbStorage composes them:
+
+// storage/db/DbStorage.ts
+import { crmStorage } from '../domains/crm.storage';
+import { authStorage } from '../domains/auth.storage';
+import type { Storage } from '../contracts';
+
+export class DbStorage implements Storage {
+  private crm = crmStorage(this.ctx);
+  private auth = authStorage(this.ctx);
+
+  constructor(private ctx: DbCtx) {}
+
+  // facade methods delegate (keeps old callsites intact)
+  getCompanies = this.crm.getCompanies;
+  createDeal = this.crm.createDeal;
+
+  getSession = this.auth.getSession;
+  login = this.auth.login;
+}

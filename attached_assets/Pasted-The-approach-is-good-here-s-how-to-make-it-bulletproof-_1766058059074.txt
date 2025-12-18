@@ -1,0 +1,125 @@
+The approach is good — here’s how to make it bulletproof
+1) Add one “guardrail step” up front
+
+Before extraction, generate a method list once so you don’t miss anything.
+
+storageInventory.ts checklist (or even a quick script output you paste into a file)
+
+Track migration per domain: ✅ extracted / ❌ still in legacy
+
+This avoids “it compiles but feature X broke.”
+
+Recommended execution order (lowest risk → highest risk)
+
+This order minimizes blast radius and lets you validate continuously:
+
+Extract DB setup from storage
+
+DbCtx + db.ts (drizzle/supabase clients)
+
+Auth domain
+
+small surface, easy to test quickly
+
+User/Profile domain
+
+Agency operations
+
+Client management
+
+Tasks
+
+Invoicing + goals
+
+CRM
+
+Workflows + rules
+
+Knowledge
+
+Intelligence + feedback
+
+Integrations
+
+Messaging + notifications
+
+SuperAdmin (high sensitivity: cross-tenant + service role) 
+
+ARCHITECTURE (5)
+
+SuperAdmin last because it’s the easiest place to accidentally break tenant-safety.
+
+Domain module naming tweak
+
+Your list is perfect; I’d just slightly standardize naming to match routers:
+
+agencyClients instead of client management
+
+agencyTasks vs tasks if you have portal-specific behavior
+
+billing for invoices + goals
+
+rules might sit inside workflows (unless rules are separate)
+
+This helps future contributors instantly map “router → storage domain.”
+
+Combine all domain modules: best practice
+
+Use composition in DbStorage but keep the public API unchanged until the end:
+
+export class DbStorage implements Storage {
+  private auth = authStorage(this.ctx);
+  login = this.auth.login;
+  // ...
+}
+
+
+That’s why this stays safe.
+
+Update server route imports: one stable import only
+
+Make routes import from one file:
+
+import { storage } from '../storage';
+
+
+If some routes currently import IStorage, keep export type IStorage = Storage as a temporary alias, then remove later.
+
+Validation: what “works correctly” should mean
+
+Your docs already define the key testing commands and focus areas (middleware, SLA, integration) — use those as the gate. 
+
+TECHNICAL_BRIEF (3)
+
+Minimum acceptance after each domain extraction:
+
+app boots
+
+login/session works
+
+one “happy path” route in that domain works
+
+tests still pass (vitest)
+
+“Archive old file, update score” — yes, do it
+
+When finished:
+
+move old storage.ts → storage.legacy.ts (or /legacy/)
+
+leave a header comment: “archived after refactor, do not import”
+
+update your maintenance score / matrix to reflect:
+
+storage god-object reduced
+
+domain boundaries improved
+
+risk lowered
+
+One thing I’d add to your checklist
+
+✅ Add a temporary runtime assert in DbStorage during migration:
+
+if a method is missing / undefined, throw with a clear message
+This catches “forgot to delegate” instantly.
