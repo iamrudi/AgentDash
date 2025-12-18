@@ -11,6 +11,21 @@ import { users, profiles, clients } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
+/**
+ * Identity Domain Storage Module
+ * 
+ * IMPORTANT: This system uses Supabase Auth as the source of truth for user authentication.
+ * The local `users` table is a legacy artifact. User email and password are managed by Supabase Auth.
+ * 
+ * Methods like `getAllUsersWithProfiles` return empty strings for email/password fields because:
+ * - email: Fetched from Supabase Auth when needed (not stored locally)
+ * - password: Never stored locally (Supabase Auth handles authentication)
+ * 
+ * The `profiles` table is the primary identity record, with profile.id = Supabase Auth user ID.
+ * 
+ * Known issue: Frontend pages expecting email from these methods will show blank values.
+ * TODO: Refactor frontend to fetch email from Supabase Auth or add email to profiles table.
+ */
 export function identityStorage(db: DbCtx): IdentityStorage {
   async function getClientByProfileId(profileId: string): Promise<Client | undefined> {
     const result = await db.select().from(clients).where(eq(clients.profileId, profileId)).limit(1);

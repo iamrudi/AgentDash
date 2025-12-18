@@ -1166,6 +1166,7 @@ npx vitest --coverage                      # Coverage report
 
 | Item | File | Issue | Effort |
 |------|------|-------|--------|
+| Empty email in users table | `client/src/pages/agency/users.tsx` | Shows blank email - `getAllUsersWithProfiles` returns empty email/password (Supabase Auth is source of truth). Fix: fetch email from Supabase Auth or add to profiles table | 3 hrs |
 | Agent system evaluation | `server/agents/` | Limited active usage | 4 hrs |
 | Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | 2 hrs |
 | Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | 1 hr |
