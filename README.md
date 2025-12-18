@@ -1,8 +1,67 @@
-# Agency Client Portal
+# Agency Operational Intelligence Platform
 
 [![CI Status](https://github.com/your-org/agency-portal/workflows/CI/badge.svg)](https://github.com/your-org/agency-portal/actions)
 
 A production-ready, multi-tenant SaaS platform for agency-client relationship management with AI-powered insights, project tracking, and automated workflows.
+
+---
+
+## Documentation Hub
+
+This README serves as the **single source of truth** for key metrics. All other documentation files reference these values.
+
+### Core Documentation
+
+| Document | Purpose | Location |
+|----------|---------|----------|
+| [Architecture](./ARCHITECTURE.md) | System design, diagrams, Intelligence Core, multi-tenancy | Root |
+| [Technical Brief](./TECHNICAL_BRIEF.md) | Implementation patterns, API contracts, code examples | Root |
+| [Priority List](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt register | Root |
+| [Maintenance Matrix](./docs/maintenance-matrix.md) | Module health scores, cleanup queue | docs/ |
+| [Frontend-Backend Map](./docs/frontend-backend-map.md) | React → API → Storage mapping | docs/ |
+
+### Authoritative Metrics Reference
+
+**Last Updated:** December 2025 | **Next Review:** March 2026
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| **Total Routes** | ~325 | Across 37 domain routers |
+| **Router Registrations** | 37 | In `server/routes/` |
+| **routes.ts Lines** | 300 | 3 intentional routes remain |
+| **routes.ts Reduction** | 94% | From 4,832 → 300 lines |
+| **storage.ts Lines** | 3,245 | Decomposition in progress |
+| **Extracted Storage Methods** | 43 | 12 identity + 4 agency + 27 task |
+| **schema.ts Lines** | ~3,235 | All database schemas |
+| **Test Cases** | 44 | 18 auth + 8 maintenance + 18 SLA |
+
+### Documentation Status
+
+| Document | Last Updated | Aligned |
+|----------|--------------|---------|
+| README.md | Dec 2025 | ✅ |
+| ARCHITECTURE.md | Dec 2025 | ✅ |
+| TECHNICAL_BRIEF.md | Dec 2025 | ✅ |
+| PRIORITY_LIST.md | Dec 2025 | ✅ |
+| maintenance-matrix.md | Dec 2025 | ✅ |
+| frontend-backend-map.md | Dec 2025 | ✅ |
+
+### Maintenance Health Scores
+
+```
+🟢 ≥80: Healthy    🟡 60-79: Needs attention    🔴 <60: Critical
+```
+
+| Module | Score | Status |
+|--------|-------|--------|
+| Intelligence Layer | 82 | 🟢 |
+| AI Providers | 84 | 🟢 |
+| Domain Routers | 85 | 🟢 |
+| routes.ts | 85 | 🟢 |
+| storage.ts | 65 | 🟡 |
+| Storage Domains | 85 | 🟢 |
+
+---
 
 ## 🚀 Features
 
@@ -544,7 +603,33 @@ Winston-based logging with:
 3. **Database** → RLS policy check → Encrypted data handling
 4. **Response** → Structured JSON → Client
 
-See [Architecture Documentation](./replit.md) for detailed design decisions.
+See [Architecture Documentation](./ARCHITECTURE.md) and [Technical Brief](./TECHNICAL_BRIEF.md) for detailed design decisions.
+
+---
+
+## 📋 Documentation Maintenance Protocol
+
+When making codebase changes that affect metrics:
+
+1. **Update README.md first** — This is the authoritative source
+2. **Update relevant specialized docs** — Reference README values where possible
+3. **Update Documentation Status table** — Mark docs as aligned/misaligned
+4. **Set next review date** — Currently March 2026
+
+### Verification Commands
+
+```bash
+# Route count
+grep -c "router\." server/routes/*.ts | awk -F: '{sum+=$2} END {print sum}'
+
+# Line counts
+wc -l server/routes.ts server/storage.ts shared/schema.ts
+
+# Test count
+grep -c "it(\|test(" tests/**/*.test.ts | awk -F: '{sum+=$2} END {print sum}'
+```
+
+---
 
 ## 🤝 Contributing
 
