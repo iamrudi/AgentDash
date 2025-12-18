@@ -1262,7 +1262,7 @@ async (req, res, next) => {
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt |
 | [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores, cleanup queue |
 | [frontend-backend-map.md](./frontend-backend-map.md) | API integration mapping |
-| [README.md](../README.md) | Documentation hub, authoritative metrics |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 

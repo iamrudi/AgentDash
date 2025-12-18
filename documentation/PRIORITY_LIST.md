@@ -1340,7 +1340,7 @@ With the stability testing framework in place, the following features are now un
 | [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns |
 | [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
 | [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
-| [README.md](../README.md) | Documentation hub, authoritative metrics |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 

@@ -1581,7 +1581,7 @@ class KnowledgeRetrievalService {
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, technical debt |
 | [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
 | [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
-| [README.md](../README.md) | Documentation hub, authoritative metrics |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 
