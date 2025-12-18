@@ -229,6 +229,9 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             return { rows: [], rowCount: 0, totals: [] };
           }
           const newTokens = await refreshAccessToken(integration.refreshToken);
+          if (!newTokens.success) {
+            return { rows: [], rowCount: 0, totals: [] };
+          }
           integration = await storage.updateIntegration(integration.id, {
             accessToken: newTokens.accessToken,
             expiresAt: newTokens.expiresAt,
@@ -253,6 +256,9 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             return { rows: [] };
           }
           const newTokens = await refreshAccessToken(integration.refreshToken);
+          if (!newTokens.success) {
+            return { rows: [] };
+          }
           integration = await storage.updateIntegration(integration.id, {
             accessToken: newTokens.accessToken,
             expiresAt: newTokens.expiresAt,
@@ -277,6 +283,9 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             return { rows: [] };
           }
           const newTokens = await refreshAccessToken(integration.refreshToken);
+          if (!newTokens.success) {
+            return { rows: [] };
+          }
           integration = await storage.updateIntegration(integration.id, {
             accessToken: newTokens.accessToken,
             expiresAt: newTokens.expiresAt,
@@ -325,10 +334,12 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
               if (integration.refreshToken) {
                 const newTokens = await refreshAccessToken(integration.refreshToken);
-                integration = await storage.updateIntegration(integration.id, {
-                  accessToken: newTokens.accessToken,
-                  expiresAt: newTokens.expiresAt,
-                });
+                if (newTokens.success) {
+                  integration = await storage.updateIntegration(integration.id, {
+                    accessToken: newTokens.accessToken,
+                    expiresAt: newTokens.expiresAt,
+                  });
+                }
               }
             }
 
@@ -380,10 +391,12 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
               if (integration.refreshToken) {
                 const newTokens = await refreshAccessToken(integration.refreshToken);
-                integration = await storage.updateIntegration(integration.id, {
-                  accessToken: newTokens.accessToken,
-                  expiresAt: newTokens.expiresAt,
-                });
+                if (newTokens.success) {
+                  integration = await storage.updateIntegration(integration.id, {
+                    accessToken: newTokens.accessToken,
+                    expiresAt: newTokens.expiresAt,
+                  });
+                }
               }
             }
 
@@ -421,10 +434,12 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
               if (integration.refreshToken) {
                 const newTokens = await refreshAccessToken(integration.refreshToken);
-                integration = await storage.updateIntegration(integration.id, {
-                  accessToken: newTokens.accessToken,
-                  expiresAt: newTokens.expiresAt,
-                });
+                if (newTokens.success) {
+                  integration = await storage.updateIntegration(integration.id, {
+                    accessToken: newTokens.accessToken,
+                    expiresAt: newTokens.expiresAt,
+                  });
+                }
               }
             }
 
@@ -471,10 +486,12 @@ agencyClientsRouter.get("/:clientId/dashboard-summary", requireAuth, requireRole
             if (integration.expiresAt && new Date(integration.expiresAt) < new Date()) {
               if (integration.refreshToken) {
                 const newTokens = await refreshAccessToken(integration.refreshToken);
-                integration = await storage.updateIntegration(integration.id, {
-                  accessToken: newTokens.accessToken,
-                  expiresAt: newTokens.expiresAt,
-                });
+                if (newTokens.success) {
+                  integration = await storage.updateIntegration(integration.id, {
+                    accessToken: newTokens.accessToken,
+                    expiresAt: newTokens.expiresAt,
+                  });
+                }
               }
             }
 
