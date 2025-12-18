@@ -182,6 +182,10 @@ import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { encryptToken, decryptToken } from "./lib/encryption";
+import { identityStorage } from "./storage/domains/identity.storage";
+import { agencyStorage } from "./storage/domains/agency.storage";
+import type { IdentityStorage } from "./storage/contracts/identity";
+import type { AgencyStorage } from "./storage/contracts/agency";
 
 export interface IStorage {
   // Users
@@ -541,159 +545,33 @@ export interface IStorage {
 }
 
 export class DbStorage implements IStorage {
-  // Users
-  async getUserById(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
+  private identity: IdentityStorage;
+  private agency: AgencyStorage;
+
+  constructor() {
+    this.identity = identityStorage(db);
+    this.agency = agencyStorage(db);
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return result[0];
-  }
+  // === IDENTITY DOMAIN (delegated) ===
+  getUserById = (id: string) => this.identity.getUserById(id);
+  getUserByEmail = (email: string) => this.identity.getUserByEmail(email);
+  createUser = (user: InsertUser) => this.identity.createUser(user);
+  getAllUsersWithProfiles = (agencyId?: string) => this.identity.getAllUsersWithProfiles(agencyId);
+  updateUserRole = (userId: string, role: string) => this.identity.updateUserRole(userId, role);
+  deleteUser = (userId: string) => this.identity.deleteUser(userId);
+  getProfileByUserId = (userId: string) => this.identity.getProfileByUserId(userId);
+  getProfileById = (id: string) => this.identity.getProfileById(id);
+  getStaffProfileById = (id: string) => this.identity.getStaffProfileById(id);
+  getAllStaff = (agencyId?: string) => this.identity.getAllStaff(agencyId);
+  createProfile = (profile: InsertProfile) => this.identity.createProfile(profile);
+  updateUserProfile = (userId: string, data: { fullName?: string; skills?: string[] }) => this.identity.updateUserProfile(userId, data);
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
-    const result = await db.insert(users).values({
-      ...insertUser,
-      password: hashedPassword,
-    }).returning();
-    return result[0];
-  }
-
-  async getAllUsersWithProfiles(agencyId?: string): Promise<Array<User & { profile: Profile | null; client?: Client | null }>> {
-    if (agencyId) {
-      // Get all profiles and clients for this agency
-      const [agencyProfiles, agencyClients] = await Promise.all([
-        db.select().from(profiles).where(eq(profiles.agencyId, agencyId)),
-        db.select().from(clients).where(eq(clients.agencyId, agencyId))
-      ]);
-      
-      // Build client map for efficiency
-      const clientMap = new Map(agencyClients.map(c => [c.profileId, c]));
-      
-      // Build user objects from profiles (profile.id IS the Supabase Auth user ID)
-      const usersWithProfiles = agencyProfiles.map((profile) => {
-        let client = null;
-        if (profile.role === "Client") {
-          client = clientMap.get(profile.id) || null;
-        }
-        // Create a compatible User object from profile data
-        return {
-          id: profile.id, // Supabase Auth user ID
-          email: '', // Will be fetched from Supabase Auth if needed
-          password: '', // Not stored locally anymore
-          createdAt: profile.createdAt,
-          profile,
-          client,
-        };
-      });
-      
-      return usersWithProfiles.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    }
-    
-    // Original implementation without agency filtering
-    const allProfiles = await db.select().from(profiles).orderBy(desc(profiles.createdAt));
-    
-    const usersWithProfiles = await Promise.all(
-      allProfiles.map(async (profile) => {
-        let client = null;
-        if (profile.role === "Client") {
-          client = await this.getClientByProfileId(profile.id);
-        }
-        return {
-          id: profile.id, // Supabase Auth user ID
-          email: '', // Will be fetched from Supabase Auth if needed
-          password: '', // Not stored locally anymore
-          createdAt: profile.createdAt,
-          profile,
-          client: client || null,
-        };
-      })
-    );
-    
-    return usersWithProfiles;
-  }
-
-  async updateUserRole(userId: string, role: string): Promise<void> {
-    const profile = await this.getProfileByUserId(userId);
-    if (!profile) {
-      throw new Error("Profile not found");
-    }
-    
-    await db.update(profiles)
-      .set({ role })
-      .where(eq(profiles.id, userId)); // profile.id IS the user ID
-  }
-
-  async deleteUser(userId: string): Promise<void> {
-    // Delete user will cascade to related records (profile, client, etc.) due to foreign key constraints
-    await db.delete(users).where(eq(users.id, userId));
-  }
-
-  // Profiles
-  async getProfileByUserId(userId: string): Promise<Profile | undefined> {
-    // With Supabase Auth, profile.id IS the user ID
-    const result = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
-    return result[0];
-  }
-
-  async getProfileById(id: string): Promise<Profile | undefined> {
-    const result = await db.select().from(profiles).where(eq(profiles.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getStaffProfileById(id: string): Promise<Profile | undefined> {
-    const result = await db.select().from(profiles)
-      .where(and(eq(profiles.id, id), eq(profiles.role, "Staff")))
-      .limit(1);
-    return result[0];
-  }
-
-  async createProfile(profile: InsertProfile): Promise<Profile> {
-    const result = await db.insert(profiles).values(profile).returning();
-    return result[0];
-  }
-
-  async updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined> {
-    // Only update provided fields
-    const updateFields: Record<string, unknown> = {};
-    if (data.fullName !== undefined) {
-      updateFields.fullName = data.fullName;
-    }
-    if (data.skills !== undefined) {
-      updateFields.skills = data.skills;
-    }
-    
-    // Return early if no fields to update
-    if (Object.keys(updateFields).length === 0) {
-      return this.getProfileByUserId(userId);
-    }
-    
-    const result = await db.update(profiles)
-      .set(updateFields)
-      .where(eq(profiles.id, userId))
-      .returning();
-    
-    return result[0];
-  }
-
-  // Agencies
-  async getDefaultAgency(): Promise<Agency | undefined> {
-    const result = await db.select().from(agencies).orderBy(agencies.createdAt).limit(1);
-    return result[0];
-  }
-
-  async getAllStaff(agencyId?: string): Promise<Profile[]> {
-    if (agencyId) {
-      return await db.select().from(profiles)
-        .where(and(eq(profiles.role, "Staff"), eq(profiles.agencyId, agencyId)))
-        .orderBy(desc(profiles.createdAt));
-    }
-    return await db.select().from(profiles).where(eq(profiles.role, "Staff")).orderBy(desc(profiles.createdAt));
-  }
+  // === AGENCY DOMAIN (delegated) ===
+  getDefaultAgency = () => this.agency.getDefaultAgency();
+  getAgencyById = (id: string) => this.agency.getAgencyById(id);
+  deleteAgency = (id: string) => this.agency.deleteAgency(id);
+  getAllAgenciesForSuperAdmin = () => this.agency.getAllAgenciesForSuperAdmin();
 
   // Clients
   async getClientById(id: string): Promise<Client | undefined> {
@@ -2346,31 +2224,6 @@ export class DbStorage implements IStorage {
       agencyName: row.agencyName ?? undefined,
       clientName: row.clientName ?? undefined,
     }));
-  }
-
-  // Super Admin - Agency Management
-  async getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>> {
-    const result = await db
-      .select({
-        id: agencies.id,
-        name: agencies.name,
-        createdAt: agencies.createdAt,
-        userCount: sql<number>`(SELECT COUNT(*) FROM ${profiles} WHERE ${profiles.agencyId} = ${agencies.id})`,
-        clientCount: sql<number>`(SELECT COUNT(*) FROM ${clients} WHERE ${clients.agencyId} = ${agencies.id})`,
-      })
-      .from(agencies)
-      .orderBy(desc(agencies.createdAt));
-
-    return result;
-  }
-
-  async getAgencyById(id: string): Promise<Agency | undefined> {
-    const result = await db.select().from(agencies).where(eq(agencies.id, id)).limit(1);
-    return result[0];
-  }
-
-  async deleteAgency(id: string): Promise<void> {
-    await db.delete(agencies).where(eq(agencies.id, id));
   }
 
   // Super Admin - Client Management
