@@ -1089,35 +1089,61 @@ npx vitest --coverage                      # Coverage report
 
 | Item | File | Lines | Issue | Effort |
 |------|------|-------|-------|--------|
-| Monolithic routes.ts | `server/routes.ts` | ~3,000 | Decomposition ~85% complete (~25 routes remaining) | 3 hrs remaining |
-| Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern | 12 hrs |
+| ~~Monolithic routes.ts~~ | ~~`server/routes.ts`~~ | ~~300~~ | ~~Decomposition complete~~ | ✅ DONE Dec 2024 |
+| Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern — NOW TOP PRIORITY | 12 hrs |
 
-### Routes Decomposition Progress (December 2024)
+### Routes Decomposition Progress (December 2024) — ✅ COMPLETE
 
-**15 Domain Routers Mounted (156 routes total):**
+**Summary:**
+- **Before:** 4,832 lines in routes.ts with ~270 routes
+- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~294 routes)
+- **Reduction:** 94% file size reduction
+
+**37 Domain Router Registrations (~294 routes total):**
 
 | Router | Routes | Description |
 |--------|--------|-------------|
 | `auth.ts` | 3 | Login, logout, session |
 | `user.ts` | 2 | Profile get/update |
 | `client.ts` | 10 | Client portal endpoints |
-| `agency.ts` | 17 | Clients, projects, metrics, staff, messages |
+| `agency.ts` | 17 | Projects, metrics, staff |
+| `agency-clients.ts` | 7 | Client management, sync |
+| `agency-settings.ts` | 5 | Agency configuration |
+| `agency-tasks.ts` | 13 | Task CRUD, bulk ops |
+| `agency-users.ts` | 5 | User management |
 | `staff.ts` | 3 | Tasks, notifications |
-| `crm.ts` | 34 | Companies, contacts, deals, proposals, forms |
+| `crm.ts` | 34 | Companies, contacts, deals |
 | `settings.ts` | 2 | Rate limit settings |
-| `superadmin.ts` | 24 | Platform governance, agencies, users, audit logs |
-| `invoices.ts` | 6 | Invoice CRUD, PDF generation, scheduling |
-| `tasks.ts` | 9 | Task CRUD, subtasks, relationships |
-| `intelligence.ts` | 21 | Duration model, resource optimization, commercial impact |
-| `knowledge.ts` | 12 | Knowledge ingestion, retrieval, context assembly |
-| `workflows.ts` | 9 | Workflow CRUD, execution, validation, duplication |
-| `workflow-executions.ts` | 2 | Execution events and lineage queries |
-| `lineage.ts` | 2 | Task and project lineage tracing |
+| `superadmin.ts` | 24 | Governance, agencies, users |
+| `superadmin-health.ts` | 3 | Health checks |
+| `invoices.ts` | 6 | Invoice CRUD, PDF |
+| `tasks.ts` | 9 | Task CRUD, subtasks |
+| `intelligence.ts` | 21 | Duration, optimization |
+| `intelligence-extended.ts` | 27 | Predictions, feedback |
+| `knowledge.ts` | 12 | Ingestion, retrieval |
+| `knowledge-documents.ts` | 12 | Document management |
+| `workflows.ts` | 9 | Workflow CRUD |
+| `workflow-executions.ts` | 2 | Execution events |
+| `lineage.ts` | 2 | Lineage tracing |
+| `rule-engine.ts` | 12 | Workflow rules |
+| `signals.ts` | 11 | Signal ingestion |
+| `ai-execution.ts` | 5 | AI execution |
+| `ai-chat.ts` | 2 | AI chat |
+| `integrations.ts` | 19 | Integration management |
+| `oauth.ts` | 2 | OAuth flows |
+| `analytics.ts` | 6 | Analytics data |
+| `initiatives.ts` | 9 | Initiative management |
+| `notifications.ts` | 5 | Notifications |
+| `messages.ts` | 7 | Messaging |
+| `objectives.ts` | 4 | Objectives |
+| `proposals.ts` | 2 | Proposals |
+| `retention-policies.ts` | 4 | Retention policies |
+| `public.ts` | 2 | Public endpoints |
 
-**Remaining in routes.ts (~25 routes):**
-- 🔴 Rule engine routes (workflow rules CRUD)
-- 🔴 Miscellaneous duration intelligence routes
-- 🔴 SuperAdmin health routes (mounted separately in routes.ts)
+**Remaining in routes.ts (3 routes - intentional):**
+- ✅ `POST /api/metrics` — Create metric
+- ✅ `POST /api/agency/initiatives/mark-viewed` — Mark initiatives viewed  
+- ✅ `POST /api/test/create-user` — Development test endpoint
 
 **Security Guarantees Maintained:**
 - Zod validation on POST/PATCH request bodies
@@ -1184,10 +1210,10 @@ npx vitest --coverage                      # Coverage report
 - Clean migration files
 - Replace console.log with logger
 
-**Phase 2: Major Refactors (Q2 2025)** — Routes ~85% Complete!
-- ✅ Split routes.ts into domain modules (15 routers, 156 routes)
-- 🔴 Extract remaining ~25 routes (rule engine, superadmin-health, misc)
-- 🔴 Extract storage into domain services
+**Phase 2: Major Refactors (Q1-Q2 2025)** — Routes ✅ COMPLETE!
+- ✅ Split routes.ts into domain modules (37 registrations, ~294 routes) — December 2024
+- ✅ All routes extracted (only 3 intentional routes remain in routes.ts)
+- 🔴 Next priority: Split storage.ts into domain services
 - Add comprehensive test coverage
 
 **Phase 3: Architecture (Q3 2025)**

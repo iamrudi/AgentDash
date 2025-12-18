@@ -36,24 +36,45 @@ Where:
 | **Rule Engine** | `server/workflow/rule-engine.ts` | 78 | 🟡 | Core Team | Dec 2024 | 16 operators, needs more edge case tests |
 | **Signal Router** | `server/workflow/signal-router.ts` | 75 | 🟡 | Core Team | Dec 2024 | Coverage gaps in route matching |
 | **Signal Adapters** | `server/workflow/signal-adapters.ts` | 80 | 🟢 | Core Team | Dec 2024 | Clean adapter pattern |
-| **API Routes** | `server/routes.ts` | 62 | 🟡 | Core Team | Dec 2024 | **~3000 lines** — decomposition ~85% complete, ~25 routes remaining |
-| **Storage Layer** | `server/storage.ts` | 55 | 🔴 | Core Team | Dec 2024 | **3713 lines** — extract domain services |
+| **API Routes** | `server/routes.ts` | 88 | 🟢 | Core Team | Dec 2024 | **300 lines** — decomposition ✅ complete, 3 routes remaining |
+| **Storage Layer** | `server/storage.ts` | 52 | 🔴 | Core Team | Dec 2024 | **3713 lines** — next priority: extract domain services |
+| **Router Index** | `server/routes/index.ts` | 90 | 🟢 | Core Team | Dec 2024 | 37 registrations (~294 routes) |
 | **Auth Router** | `server/routes/auth.ts` | 82 | 🟢 | Core Team | Dec 2024 | 3 routes, clean extraction |
 | **User Router** | `server/routes/user.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, profile management |
 | **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2024 | 10 routes, client portal |
 | **Agency Router** | `server/routes/agency.ts` | 80 | 🟢 | Core Team | Dec 2024 | 17 routes, cross-tenant protection |
+| **Agency Clients Router** | `server/routes/agency-clients.ts` | 82 | 🟢 | Core Team | Dec 2024 | 7 routes, client management |
+| **Agency Settings Router** | `server/routes/agency-settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 5 routes, configuration |
+| **Agency Tasks Router** | `server/routes/agency-tasks.ts` | 80 | 🟢 | Core Team | Dec 2024 | 13 routes, task management |
+| **Agency Users Router** | `server/routes/agency-users.ts` | 80 | 🟢 | Core Team | Dec 2024 | 5 routes, user management |
 | **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2024 | 3 routes, task filtering |
 | **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2024 | 34 routes, mounted |
 | **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, mounted |
 | **SuperAdmin Router** | `server/routes/superadmin.ts` | 82 | 🟢 | Core Team | Dec 2024 | 24 routes, governance |
+| **SuperAdmin Health Router** | `server/routes/superadmin-health.ts` | 82 | 🟢 | Core Team | Dec 2024 | 3 routes, health checks |
 | **Invoices Router** | `server/routes/invoices.ts` | 80 | 🟢 | Core Team | Dec 2024 | 6 routes, PDF generation |
 | **Tasks Router** | `server/routes/tasks.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD + subtasks |
 | **Intelligence Router** | `server/routes/intelligence.ts` | 82 | 🟢 | Core Team | Dec 2024 | 21 routes, duration/optimization |
+| **Intelligence Extended Router** | `server/routes/intelligence-extended.ts` | 82 | 🟢 | Core Team | Dec 2024 | 27 routes, predictions/feedback |
 | **Knowledge Router** | `server/routes/knowledge.ts` | 82 | 🟢 | Core Team | Dec 2024 | 12 routes, ingestion/retrieval |
+| **Knowledge Documents Router** | `server/routes/knowledge-documents.ts` | 82 | 🟢 | Core Team | Dec 2024 | 12 routes, document management |
 | **Workflows Router** | `server/routes/workflows.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, CRUD/execution |
 | **Workflow Executions Router** | `server/routes/workflow-executions.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, events/lineage |
 | **Lineage Router** | `server/routes/lineage.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, tracing |
-| **Router Index** | `server/routes/index.ts` | 85 | 🟢 | Core Team | Dec 2024 | 15 routers mounted (156 routes) |
+| **Rule Engine Router** | `server/routes/rule-engine.ts` | 80 | 🟢 | Core Team | Dec 2024 | 12 routes, workflow rules |
+| **Signals Router** | `server/routes/signals.ts` | 80 | 🟢 | Core Team | Dec 2024 | 11 routes, signal ingestion |
+| **AI Execution Router** | `server/routes/ai-execution.ts` | 82 | 🟢 | Core Team | Dec 2024 | 5 routes, AI execution |
+| **AI Chat Router** | `server/routes/ai-chat.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, chat endpoints |
+| **Integrations Router** | `server/routes/integrations.ts` | 80 | 🟢 | Core Team | Dec 2024 | 19 routes, integration management |
+| **OAuth Router** | `server/routes/oauth.ts` | 82 | 🟢 | Core Team | Dec 2024 | 2 routes, OAuth flows |
+| **Analytics Router** | `server/routes/analytics.ts` | 80 | 🟢 | Core Team | Dec 2024 | 6 routes, analytics data |
+| **Initiatives Router** | `server/routes/initiatives.ts` | 80 | 🟢 | Core Team | Dec 2024 | 9 routes, initiative management |
+| **Notifications Router** | `server/routes/notifications.ts` | 80 | 🟢 | Core Team | Dec 2024 | 5 routes, notifications |
+| **Messages Router** | `server/routes/messages.ts` | 80 | 🟢 | Core Team | Dec 2024 | 7 routes, messaging |
+| **Objectives Router** | `server/routes/objectives.ts` | 80 | 🟢 | Core Team | Dec 2024 | 4 routes, objectives |
+| **Proposals Router** | `server/routes/proposals.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, proposals |
+| **Retention Policies Router** | `server/routes/retention-policies.ts` | 80 | 🟢 | Core Team | Dec 2024 | 4 routes, retention |
+| **Public Router** | `server/routes/public.ts` | 80 | 🟢 | Core Team | Dec 2024 | 2 routes, public endpoints |
 | **Schema** | `shared/schema.ts` | 68 | 🟡 | Core Team | Dec 2024 | **3235 lines** — well-organized but large |
 
 ### Intelligence Layer
@@ -166,26 +187,13 @@ Where:
 
 ## Critical Items (🔴 Red Flag)
 
-### 1. `server/routes.ts` — 9638 lines
-**Problem:** Monolithic API file containing all route handlers
-**Impact:** Hard to maintain, slow to navigate, merge conflicts
-**Recommendation:** Split into domain-specific route files:
-```
-server/routes/
-├── agency.ts      (~2000 lines)
-├── client.ts      (~800 lines)
-├── staff.ts       (~400 lines)
-├── superadmin.ts  (~600 lines)
-├── auth.ts        (~500 lines)
-├── tasks.ts       (~1200 lines)
-├── projects.ts    (~800 lines)
-├── invoices.ts    (~600 lines)
-├── workflows.ts   (~1000 lines)
-├── intelligence.ts (~800 lines)
-└── index.ts       (router composition)
-```
+### 1. `server/routes.ts` — ✅ RESOLVED (December 2024)
+**Previous Problem:** Monolithic API file containing all route handlers (9638 lines)
+**Resolution:** Successfully decomposed into 37 domain-specific routers (~294 routes)
+**Current State:** Only 300 lines with 3 intentional remaining routes
+**Impact:** 94% reduction in file size, improved maintainability
 
-### 2. `server/storage.ts` — 3713 lines
+### 2. `server/storage.ts` — 3713 lines (NOW TOP PRIORITY)
 **Problem:** Single storage class with all database operations
 **Impact:** God object anti-pattern, testing difficulty
 **Recommendation:** Extract domain services:
@@ -223,46 +231,78 @@ server/storage/
 ### Low Priority (Schedule Later)
 | Item | File | Action | Effort |
 |------|------|--------|--------|
-| Continue routes.ts decomposition | `routes.ts` | Extract superadmin, tasks, workflows, intelligence | 8 hours |
-| Split storage.ts | `storage.ts` | Major refactor | 12 hours |
+| ~~Continue routes.ts decomposition~~ | ~~`routes.ts`~~ | ~~Extract remaining routers~~ | ~~8 hours~~ ✅ DONE |
+| Split storage.ts | `storage.ts` | Major refactor — NOW TOP PRIORITY | 12 hours |
 | Migration file cleanup | `migrations/` | Remove duplicate/unused SQL | 4 hours |
 
 ---
 
-## Routes Decomposition Progress (December 2024)
+## Routes Decomposition Progress (December 2024) — ✅ COMPLETE
 
-### Mounted via index.ts (35 routes)
-| Router | Routes | Endpoints | Status |
-|--------|--------|-----------|--------|
-| `auth.ts` | 3 | login, logout, session | ✅ Mounted |
-| `user.ts` | 2 | profile get/update | ✅ Mounted |
-| `client.ts` | 10 | Client portal endpoints | ✅ Mounted |
-| `agency.ts` | 17 | clients, projects, metrics, staff, messages | ✅ Mounted |
-| `staff.ts` | 3 | tasks, tasks/full, notifications/counts | ✅ Mounted |
+### Summary
+- **Before:** 4,832 lines in routes.ts with ~270 routes
+- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~294 routes)
+- **Reduction:** 94% file size reduction
 
-### All Domain Routers Now Mounted (71 routes)
+### All Domain Routers Mounted (~294 routes via 37 registrations)
 
-All extracted routers are now mounted via `server/routes/index.ts`:
-- auth (3), user (2), client (10), agency (17), staff (3), crm (34), settings (2)
+| Router | Routes | Key Endpoints |
+|--------|--------|---------------|
+| `auth.ts` | 3 | login, logout, session |
+| `user.ts` | 2 | profile get/update |
+| `client.ts` | 10 | Client portal endpoints |
+| `agency.ts` | 17 | projects, metrics, staff |
+| `agency-clients.ts` | 7 | client management, sync |
+| `agency-settings.ts` | 5 | agency configuration |
+| `agency-tasks.ts` | 13 | task CRUD, bulk ops |
+| `agency-users.ts` | 5 | user management |
+| `staff.ts` | 3 | tasks, notifications |
+| `crm.ts` | 34 | companies, contacts, deals |
+| `settings.ts` | 2 | rate limit settings |
+| `superadmin.ts` | 24 | governance, agencies, users |
+| `superadmin-health.ts` | 3 | health checks |
+| `invoices.ts` | 6 | invoice CRUD, PDF |
+| `tasks.ts` | 9 | task CRUD, subtasks |
+| `intelligence.ts` | 21 | duration, optimization |
+| `intelligence-extended.ts` | 27 | predictions, feedback |
+| `knowledge.ts` | 12 | ingestion, retrieval |
+| `knowledge-documents.ts` | 12 | document management |
+| `workflows.ts` | 9 | workflow CRUD |
+| `workflow-executions.ts` | 2 | execution events |
+| `lineage.ts` | 2 | lineage tracing |
+| `rule-engine.ts` | 12 | workflow rules |
+| `signals.ts` | 11 | signal ingestion |
+| `ai-execution.ts` | 5 | AI execution |
+| `ai-chat.ts` | 2 | AI chat |
+| `integrations.ts` | 19 | integration management |
+| `oauth.ts` | 2 | OAuth flows |
+| `analytics.ts` | 6 | analytics data |
+| `initiatives.ts` | 9 | initiative management |
+| `notifications.ts` | 5 | notifications |
+| `messages.ts` | 7 | messaging |
+| `objectives.ts` | 4 | objectives |
+| `proposals.ts` | 2 | proposals |
+| `retention-policies.ts` | 4 | retention policies |
+| `public.ts` | 2 | public endpoints |
 
-### Pending Extractions
-| Router | Estimated Routes | Priority |
-|--------|------------------|----------|
-| `superadmin.ts` | ~15 | High |
-| `tasks.ts` | ~20 | High |
-| `workflows.ts` | ~25 | Medium |
-| `intelligence.ts` | ~10 | Medium |
-| `invoices.ts` | ~8 | Low |
-| `projects.ts` | ~10 | Low |
+### Remaining in routes.ts (3 routes - intentional)
+```
+POST /api/metrics                         # Create metric
+POST /api/agency/initiatives/mark-viewed  # Mark initiatives viewed
+POST /api/test/create-user               # Development test endpoint
+```
 
 ### Router Registration Pattern
 ```typescript
-// server/routes/index.ts
+// server/routes/index.ts (37 registrations)
 registerDomainRouter('/auth', authRoutes);
 registerDomainRouter('/user', userRoutes);
 registerDomainRouter('/client', clientRoutes);
 registerDomainRouter('/agency', agencyRoutes);
-registerDomainRouter('/staff', staffRoutes);
+registerDomainRouter('/agency/clients', agencyClientsRouter);
+registerDomainRouter('/intelligence', intelligenceRoutes);
+registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
+// ... 37 total registrations
 ```
 
 ---
@@ -312,16 +352,16 @@ registerDomainRouter('/staff', staffRoutes);
 
 ---
 
-## Q2/Q3 2025 Refactor Priorities
+## Q1/Q2 2025 Refactor Priorities
 
-| Priority | Item | Effort | Impact |
-|----------|------|--------|--------|
-| P1 | Complete routes.ts decomposition (remaining ~55%) | 8 hours | High |
-| P1 | Register crm.ts and settings.ts routers | 2 hours | Medium |
-| P2 | Storage layer split into domain services | 12 hours | High |
-| P2 | Workflow engine integration tests | 6 hours | Medium |
-| P3 | Agent system evaluation and cleanup | 4 hours | Low |
-| P3 | Legacy logging migration to Winston | 3 hours | Low |
+| Priority | Item | Effort | Impact | Status |
+|----------|------|--------|--------|--------|
+| ~~P1~~ | ~~Complete routes.ts decomposition~~ | ~~8 hours~~ | ~~High~~ | ✅ DONE Dec 2024 |
+| ~~P1~~ | ~~Register all domain routers~~ | ~~2 hours~~ | ~~Medium~~ | ✅ DONE Dec 2024 |
+| P1 | Storage layer split into domain services | 12 hours | High | 🔴 Next priority |
+| P2 | Workflow engine integration tests | 6 hours | Medium | 🟡 Planned Q1 |
+| P3 | Agent system evaluation and cleanup | 4 hours | Low | Backlog |
+| P3 | Legacy logging migration to Winston | 3 hours | Low | Backlog |
 
 ---
 
