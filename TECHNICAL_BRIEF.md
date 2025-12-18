@@ -901,7 +901,8 @@ npx tsc --noEmit
 | `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
 | `shared/schema.ts` | All database schemas including workflow tables |
 | `server/storage.ts` | Database operations (legacy - new features should use domain storage modules) |
-| `server/routes.ts` | All API endpoints including workflow/rule endpoints |
+| `server/routes.ts` | Legacy shim (~300 lines, 3 routes) - routes decomposed to server/routes/ |
+| `server/routes/` | Domain routers (37 registrations, ~294 routes) |
 | `scripts/test-workflow.ts` | Workflow regression test suite |
 
 ---
@@ -1508,8 +1509,10 @@ class KnowledgeRetrievalService {
 | File | Purpose |
 |------|---------|
 | `shared/schema.ts` | All database schemas (3,235 lines) |
-| `server/storage.ts` | Database operations - legacy DbStorage (3,713 lines, decomposition in progress) |
-| `server/routes.ts` | All API endpoints (9,638 lines) |
+| `server/storage.ts` | Database operations - legacy DbStorage (3,245 lines, decomposition in progress) |
+| `server/routes.ts` | Legacy shim (~300 lines, 3 routes) |
+| `server/routes/` | Domain routers (37 registrations, ~294 routes) - decomposition ✅ complete |
+| `server/storage/` | Domain storage modules (43 methods extracted) |
 
 ### Workflow Engine
 | File | Purpose |
