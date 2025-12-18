@@ -17,6 +17,10 @@ import lineageRoutes from './lineage';
 import publicRoutes from './public';
 import ruleEngineRoutes from './rule-engine';
 import signalsRoutes from './signals';
+import aiExecutionRoutes from './ai-execution';
+import retentionPoliciesRoutes from './retention-policies';
+import notificationsRoutes from './notifications';
+import knowledgeDocumentsRoutes from './knowledge-documents';
 
 export interface DomainRouter {
   subpath: string;
@@ -50,6 +54,10 @@ registerDomainRouter('/lineage', lineageRoutes);
 registerDomainRouter('/public', publicRoutes);
 registerDomainRouter('/', ruleEngineRoutes);
 registerDomainRouter('/', signalsRoutes);
+registerDomainRouter('/', aiExecutionRoutes);
+registerDomainRouter('/retention-policies', retentionPoliciesRoutes);
+registerDomainRouter('/notifications', notificationsRoutes);
+registerDomainRouter('/knowledge-documents', knowledgeDocumentsRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {
