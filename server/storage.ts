@@ -244,7 +244,7 @@ export interface IStorage {
   getTasksByListId(listId: string): Promise<Task[]>;
   getTasksByStaffId(staffProfileId: string): Promise<Task[]>;
   getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>>;
-  getAllTasks(): Promise<Task[]>;
+  getAllTasks(agencyId?: string): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task>;
   deleteTask(id: string): Promise<void>;

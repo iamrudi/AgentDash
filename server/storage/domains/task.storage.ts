@@ -33,7 +33,7 @@ import {
   clients, 
   profiles 
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 
 /**
  * Task Domain Storage Module
@@ -142,7 +142,8 @@ export function taskStorage(db: DbCtx, getProjectById: (id: string) => Promise<P
       
       if (taskIds.length === 0) return [];
       
-      return await db.select().from(tasks).where(eq(tasks.id, taskIds[0])).orderBy(desc(tasks.createdAt));
+      // Use inArray to fetch all assigned tasks, not just the first one
+      return await db.select().from(tasks).where(inArray(tasks.id, taskIds)).orderBy(desc(tasks.createdAt));
     },
 
     async getSubtasksByParentId(parentId: string): Promise<TaskWithAssignments[]> {
@@ -182,28 +183,17 @@ export function taskStorage(db: DbCtx, getProjectById: (id: string) => Promise<P
 
     async getAllTasks(agencyId?: string): Promise<Task[]> {
       if (agencyId) {
+        // Select full task rows for behavior parity - join only used for filtering
         const results = await db
           .select({
-            id: tasks.id,
-            description: tasks.description,
-            status: tasks.status,
-            dueDate: tasks.dueDate,
-            priority: tasks.priority,
-            projectId: tasks.projectId,
-            initiativeId: tasks.initiativeId,
-            createdAt: tasks.createdAt,
-            startDate: tasks.startDate,
-            listId: tasks.listId,
-            parentId: tasks.parentId,
-            timeEstimate: tasks.timeEstimate,
-            timeTracked: tasks.timeTracked,
+            task: tasks,
           })
           .from(tasks)
           .innerJoin(projects, eq(tasks.projectId, projects.id))
           .innerJoin(clients, eq(projects.clientId, clients.id))
           .where(eq(clients.agencyId, agencyId))
           .orderBy(desc(tasks.createdAt));
-        return results as Task[];
+        return results.map(r => r.task);
       }
       return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
     },
@@ -235,19 +225,17 @@ export function taskStorage(db: DbCtx, getProjectById: (id: string) => Promise<P
 
     async getAllTaskAssignments(agencyId?: string): Promise<StaffAssignment[]> {
       if (agencyId) {
+        // Select full assignment rows for behavior parity - join only used for filtering
         const results = await db
           .select({
-            id: staffAssignments.id,
-            taskId: staffAssignments.taskId,
-            staffProfileId: staffAssignments.staffProfileId,
-            createdAt: staffAssignments.createdAt,
+            assignment: staffAssignments,
           })
           .from(staffAssignments)
           .innerJoin(tasks, eq(staffAssignments.taskId, tasks.id))
           .innerJoin(projects, eq(tasks.projectId, projects.id))
           .innerJoin(clients, eq(projects.clientId, clients.id))
           .where(eq(clients.agencyId, agencyId));
-        return results;
+        return results.map(r => r.assignment);
       }
       return await db.select().from(staffAssignments);
     },
