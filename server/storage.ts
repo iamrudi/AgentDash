@@ -184,8 +184,10 @@ import bcrypt from "bcryptjs";
 import { encryptToken, decryptToken } from "./lib/encryption";
 import { identityStorage } from "./storage/domains/identity.storage";
 import { agencyStorage } from "./storage/domains/agency.storage";
+import { taskStorage } from "./storage/domains/task.storage";
 import type { IdentityStorage } from "./storage/contracts/identity";
 import type { AgencyStorage } from "./storage/contracts/agency";
+import type { TaskStorage } from "./storage/contracts/task";
 
 export interface IStorage {
   // Users
@@ -547,10 +549,12 @@ export interface IStorage {
 export class DbStorage implements IStorage {
   private identity: IdentityStorage;
   private agency: AgencyStorage;
+  private task: TaskStorage;
 
   constructor() {
     this.identity = identityStorage(db);
     this.agency = agencyStorage(db);
+    this.task = taskStorage(db, this.getProjectById.bind(this));
   }
 
   // === IDENTITY DOMAIN (delegated) ===
@@ -784,324 +788,34 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  // Task Lists
-  async getTaskListById(id: string, agencyId?: string): Promise<TaskList | undefined> {
-    if (agencyId) {
-      // Enforce tenant isolation: verify list belongs to agency
-      const result = await db.select().from(taskLists)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .limit(1);
-      return result[0];
-    }
-    // SuperAdmin path (no agencyId) - access any list
-    const result = await db.select().from(taskLists).where(eq(taskLists.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getTaskListsByProjectId(projectId: string, agencyId?: string): Promise<TaskList[]> {
-    if (agencyId) {
-      // Enforce tenant isolation: verify lists belong to agency's project
-      return await db.select().from(taskLists)
-        .where(and(eq(taskLists.projectId, projectId), eq(taskLists.agencyId, agencyId)))
-        .orderBy(desc(taskLists.createdAt));
-    }
-    // SuperAdmin path - get all lists for project
-    return await db.select().from(taskLists)
-      .where(eq(taskLists.projectId, projectId))
-      .orderBy(desc(taskLists.createdAt));
-  }
-
-  async createTaskList(taskList: InsertTaskList): Promise<TaskList> {
-    const result = await db.insert(taskLists).values(taskList).returning();
-    return result[0];
-  }
-
-  async updateTaskList(id: string, data: Partial<TaskList>, agencyId?: string): Promise<TaskList> {
-    // SECURITY: Sanitize update payload - prevent tampering with immutable/audit fields
-    const { id: _id, agencyId: _agencyId, projectId: _projectId, createdAt: _createdAt, updatedAt: _updatedAt, ...sanitizedData } = data as any;
-    
-    if (agencyId) {
-      // Enforce tenant isolation: update only if list belongs to agency
-      const result = await db.update(taskLists)
-        .set(sanitizedData)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .returning();
-      
-      // Throw if no rows affected (list not found or wrong agency)
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found or access denied`);
-      }
-      
-      return result[0];
-    }
-    
-    // SuperAdmin path - update any list
-    const result = await db.update(taskLists)
-      .set(sanitizedData)
-      .where(eq(taskLists.id, id))
-      .returning();
-    
-    if (!result || result.length === 0) {
-      throw new Error(`Task list ${id} not found`);
-    }
-    
-    return result[0];
-  }
-
-  async deleteTaskList(id: string, agencyId?: string): Promise<void> {
-    if (agencyId) {
-      // Enforce tenant isolation: delete only if list belongs to agency
-      // CASCADE will handle task deletion via foreign key constraint
-      const result = await db.delete(taskLists)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .returning();
-      
-      // Throw if no rows affected (list not found or wrong agency)
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found or access denied`);
-      }
-    } else {
-      // SuperAdmin path - delete any list
-      const result = await db.delete(taskLists)
-        .where(eq(taskLists.id, id))
-        .returning();
-      
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found`);
-      }
-    }
-  }
-
-  // Tasks
-  async getTaskById(id: string): Promise<Task | undefined> {
-    const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getTasksByProjectId(projectId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.createdAt));
-  }
-
-  async getTasksByListId(listId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.listId, listId)).orderBy(desc(tasks.createdAt));
-  }
-
-  async getTasksByStaffId(staffProfileId: string): Promise<Task[]> {
-    const assignments = await db.select().from(staffAssignments).where(eq(staffAssignments.staffProfileId, staffProfileId));
-    const taskIds = assignments.map(a => a.taskId);
-    
-    if (taskIds.length === 0) return [];
-    
-    return await db.select().from(tasks).where(eq(tasks.id, taskIds[0])).orderBy(desc(tasks.createdAt));
-  }
-
-  async getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>> {
-    // Fetch all subtasks for the parent task
-    const subtasks = await db.select().from(tasks).where(eq(tasks.parentId, parentId));
-    
-    // Fetch assignments and staff profiles for each subtask
-    const subtasksWithAssignments = await Promise.all(
-      subtasks.map(async (subtask) => {
-        const assignments = await db
-          .select({
-            id: staffAssignments.id,
-            taskId: staffAssignments.taskId,
-            staffProfileId: staffAssignments.staffProfileId,
-            createdAt: staffAssignments.createdAt,
-            staffProfile: profiles,
-          })
-          .from(staffAssignments)
-          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
-          .where(eq(staffAssignments.taskId, subtask.id));
-
-        return {
-          ...subtask,
-          assignments: assignments
-            .filter((a) => a.staffProfile !== null)
-            .map((a) => ({
-              id: a.id,
-              taskId: a.taskId,
-              staffProfileId: a.staffProfileId,
-              createdAt: a.createdAt,
-              staffProfile: a.staffProfile as Profile,
-            })),
-        };
-      })
-    );
-
-    return subtasksWithAssignments;
-  }
-
-  async getAllTasks(agencyId?: string): Promise<Task[]> {
-    if (agencyId) {
-      // Join through projects -> clients to filter by agencyId
-      const results = await db
-        .select({
-          id: tasks.id,
-          description: tasks.description,
-          status: tasks.status,
-          dueDate: tasks.dueDate,
-          priority: tasks.priority,
-          projectId: tasks.projectId,
-          initiativeId: tasks.initiativeId,
-          createdAt: tasks.createdAt,
-          startDate: tasks.startDate,
-          listId: tasks.listId,
-          parentId: tasks.parentId,
-          timeEstimate: tasks.timeEstimate,
-          timeTracked: tasks.timeTracked,
-        })
-        .from(tasks)
-        .innerJoin(projects, eq(tasks.projectId, projects.id))
-        .innerJoin(clients, eq(projects.clientId, clients.id))
-        .where(eq(clients.agencyId, agencyId))
-        .orderBy(desc(tasks.createdAt));
-      return results;
-    }
-    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
-  }
-
-  async createTask(task: InsertTask): Promise<Task> {
-    const result = await db.insert(tasks).values(task).returning();
-    return result[0];
-  }
-
-  async updateTask(id: string, data: Partial<Task>): Promise<Task> {
-    const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
-    return result[0];
-  }
-
-  async deleteTask(id: string): Promise<void> {
-    // First delete all staff assignments for this task
-    await db.delete(staffAssignments).where(eq(staffAssignments.taskId, id));
-    // Then delete the task
-    await db.delete(tasks).where(eq(tasks.id, id));
-  }
-
-  // Staff Assignments
-  async createStaffAssignment(assignment: InsertStaffAssignment): Promise<StaffAssignment> {
-    const result = await db.insert(staffAssignments).values(assignment).returning();
-    return result[0];
-  }
-
-  async getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]> {
-    return await db.select().from(staffAssignments).where(eq(staffAssignments.taskId, taskId));
-  }
-
-  async getAllTaskAssignments(agencyId?: string): Promise<StaffAssignment[]> {
-    if (agencyId) {
-      // Filter by agency through the task -> project -> client -> agency relationship
-      const results = await db
-        .select({
-          id: staffAssignments.id,
-          taskId: staffAssignments.taskId,
-          staffProfileId: staffAssignments.staffProfileId,
-          createdAt: staffAssignments.createdAt,
-        })
-        .from(staffAssignments)
-        .innerJoin(tasks, eq(staffAssignments.taskId, tasks.id))
-        .innerJoin(projects, eq(tasks.projectId, projects.id))
-        .innerJoin(clients, eq(projects.clientId, clients.id))
-        .where(eq(clients.agencyId, agencyId));
-      return results;
-    }
-    return await db.select().from(staffAssignments);
-  }
-
-  async deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void> {
-    await db.delete(staffAssignments)
-      .where(
-        and(
-          eq(staffAssignments.taskId, taskId),
-          eq(staffAssignments.staffProfileId, staffProfileId)
-        )
-      );
-  }
-
-  // Task Activities
-  async createTaskActivity(activity: InsertTaskActivity): Promise<TaskActivity> {
-    const result = await db.insert(taskActivities).values(activity).returning();
-    return result[0];
-  }
-
-  async getTaskActivities(taskId: string): Promise<TaskActivityWithUser[]> {
-    const activities = await db
-      .select()
-      .from(taskActivities)
-      .leftJoin(profiles, eq(taskActivities.userId, profiles.id))
-      .where(eq(taskActivities.taskId, taskId))
-      .orderBy(desc(taskActivities.createdAt));
-
-    // Filter out activities with null users (shouldn't happen, but defensive)
-    return activities
-      .filter(a => a.profiles !== null)
-      .map(a => ({
-        ...a.task_activities,
-        user: a.profiles as Profile
-      }));
-  }
-
-  async createTaskRelationship(relationship: InsertTaskRelationship): Promise<TaskRelationship> {
-    const result = await db.insert(taskRelationships).values(relationship).returning();
-    return result[0];
-  }
-
-  async getTaskRelationships(taskId: string): Promise<TaskRelationshipWithTask[]> {
-    const relationships = await db
-      .select()
-      .from(taskRelationships)
-      .leftJoin(tasks, eq(taskRelationships.relatedTaskId, tasks.id))
-      .where(eq(taskRelationships.taskId, taskId))
-      .orderBy(desc(taskRelationships.createdAt));
-
-    return relationships
-      .filter(r => r.tasks !== null)
-      .map(r => ({
-        ...r.task_relationships,
-        relatedTask: r.tasks as Task
-      }));
-  }
-
-  async deleteTaskRelationship(id: string): Promise<void> {
-    await db.delete(taskRelationships).where(eq(taskRelationships.id, id));
-  }
-
-  // Project with Tasks
-  async getProjectWithTasks(projectId: string): Promise<{
-    project: Project;
-    tasks: Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>;
-  } | undefined> {
-    // Get the project
-    const project = await this.getProjectById(projectId);
-    if (!project) return undefined;
-
-    // Get all tasks for this project
-    const projectTasks = await db.select().from(tasks).where(eq(tasks.projectId, projectId));
-
-    // For each task, get staff assignments with profile details
-    const tasksWithAssignments = await Promise.all(
-      projectTasks.map(async (task) => {
-        const assignments = await db
-          .select()
-          .from(staffAssignments)
-          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
-          .where(eq(staffAssignments.taskId, task.id));
-
-        return {
-          ...task,
-          assignments: assignments.map(a => ({
-            ...a.staff_assignments,
-            staffProfile: a.profiles!
-          }))
-        };
-      })
-    );
-
-    return {
-      project,
-      tasks: tasksWithAssignments
-    };
-  }
+  // === TASK DOMAIN (delegated) ===
+  getTaskListById = (id: string, agencyId?: string) => this.task.getTaskListById(id, agencyId);
+  getTaskListsByProjectId = (projectId: string, agencyId?: string) => this.task.getTaskListsByProjectId(projectId, agencyId);
+  createTaskList = (taskList: InsertTaskList) => this.task.createTaskList(taskList);
+  updateTaskList = (id: string, data: Partial<TaskList>, agencyId?: string) => this.task.updateTaskList(id, data, agencyId);
+  deleteTaskList = (id: string, agencyId?: string) => this.task.deleteTaskList(id, agencyId);
+  getTaskById = (id: string) => this.task.getTaskById(id);
+  getTasksByProjectId = (projectId: string) => this.task.getTasksByProjectId(projectId);
+  getTasksByListId = (listId: string) => this.task.getTasksByListId(listId);
+  getTasksByStaffId = (staffProfileId: string) => this.task.getTasksByStaffId(staffProfileId);
+  getSubtasksByParentId = (parentId: string) => this.task.getSubtasksByParentId(parentId);
+  getAllTasks = (agencyId?: string) => this.task.getAllTasks(agencyId);
+  createTask = (task: InsertTask) => this.task.createTask(task);
+  updateTask = (id: string, data: Partial<Task>) => this.task.updateTask(id, data);
+  deleteTask = (id: string) => this.task.deleteTask(id);
+  createStaffAssignment = (assignment: InsertStaffAssignment) => this.task.createStaffAssignment(assignment);
+  getAssignmentsByTaskId = (taskId: string) => this.task.getAssignmentsByTaskId(taskId);
+  getAllTaskAssignments = (agencyId?: string) => this.task.getAllTaskAssignments(agencyId);
+  deleteStaffAssignment = (taskId: string, staffProfileId: string) => this.task.deleteStaffAssignment(taskId, staffProfileId);
+  createTaskActivity = (activity: InsertTaskActivity) => this.task.createTaskActivity(activity);
+  getTaskActivities = (taskId: string) => this.task.getTaskActivities(taskId);
+  createTaskRelationship = (relationship: InsertTaskRelationship) => this.task.createTaskRelationship(relationship);
+  getTaskRelationships = (taskId: string) => this.task.getTaskRelationships(taskId);
+  deleteTaskRelationship = (id: string) => this.task.deleteTaskRelationship(id);
+  getTaskMessagesByTaskId = (taskId: string) => this.task.getTaskMessagesByTaskId(taskId);
+  createTaskMessage = (message: InsertTaskMessage) => this.task.createTaskMessage(message);
+  markTaskMessageAsRead = (messageId: string) => this.task.markTaskMessageAsRead(messageId);
+  getProjectWithTasks = (projectId: string) => this.task.getProjectWithTasks(projectId);
 
   // Invoices
   async getInvoiceById(id: string): Promise<Invoice | undefined> {
@@ -1702,44 +1416,6 @@ export class DbStorage implements IStorage {
     await db.update(clientMessages)
       .set({ isRead: "true" })
       .where(eq(clientMessages.id, id));
-  }
-
-  // Task Messages
-  async getTaskMessagesByTaskId(taskId: string): Promise<TaskMessageWithSender[]> {
-    const messages = await db.select({
-      id: taskMessages.id,
-      taskId: taskMessages.taskId,
-      senderId: taskMessages.senderId,
-      message: taskMessages.message,
-      isRead: taskMessages.isRead,
-      createdAt: taskMessages.createdAt,
-      sender: profiles,
-    })
-      .from(taskMessages)
-      .leftJoin(profiles, eq(taskMessages.senderId, profiles.id))
-      .where(eq(taskMessages.taskId, taskId))
-      .orderBy(taskMessages.createdAt);
-
-    return messages.map(row => ({
-      id: row.id,
-      taskId: row.taskId,
-      senderId: row.senderId,
-      message: row.message,
-      isRead: row.isRead,
-      createdAt: row.createdAt,
-      sender: row.sender || undefined,
-    }));
-  }
-
-  async createTaskMessage(message: InsertTaskMessage): Promise<TaskMessage> {
-    const result = await db.insert(taskMessages).values(message).returning();
-    return result[0];
-  }
-
-  async markTaskMessageAsRead(messageId: string): Promise<void> {
-    await db.update(taskMessages)
-      .set({ isRead: "true" })
-      .where(eq(taskMessages.id, messageId));
   }
 
   // Notifications

@@ -203,7 +203,7 @@ export function taskStorage(db: DbCtx, getProjectById: (id: string) => Promise<P
           .innerJoin(clients, eq(projects.clientId, clients.id))
           .where(eq(clients.agencyId, agencyId))
           .orderBy(desc(tasks.createdAt));
-        return results;
+        return results as Task[];
       }
       return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
     },
