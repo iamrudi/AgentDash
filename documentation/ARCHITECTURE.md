@@ -1260,9 +1260,9 @@ async (req, res, next) => {
 |----------|---------|
 | [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns, API contracts |
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores, cleanup queue |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration mapping |
-| [replit.md](./replit.md) | Quick reference for development |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores, cleanup queue |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration mapping |
+| [README.md](../README.md) | Documentation hub, authoritative metrics |
 
 ---
 

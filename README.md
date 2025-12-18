@@ -12,13 +12,13 @@ This README serves as the **single source of truth** for key metrics. All other 
 
 ### Core Documentation
 
-| Document | Purpose | Location |
-|----------|---------|----------|
-| [Architecture](./ARCHITECTURE.md) | System design, diagrams, Intelligence Core, multi-tenancy | Root |
-| [Technical Brief](./TECHNICAL_BRIEF.md) | Implementation patterns, API contracts, code examples | Root |
-| [Priority List](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt register | Root |
-| [Maintenance Matrix](./docs/maintenance-matrix.md) | Module health scores, cleanup queue | docs/ |
-| [Frontend-Backend Map](./docs/frontend-backend-map.md) | React → API → Storage mapping | docs/ |
+| Document | Purpose |
+|----------|---------|
+| [Architecture](./documentation/ARCHITECTURE.md) | System design, diagrams, Intelligence Core, multi-tenancy |
+| [Technical Brief](./documentation/TECHNICAL_BRIEF.md) | Implementation patterns, API contracts, code examples |
+| [Priority List](./documentation/PRIORITY_LIST.md) | Roadmap, priorities, technical debt register |
+| [Maintenance Matrix](./documentation/maintenance-matrix.md) | Module health scores, cleanup queue |
+| [Frontend-Backend Map](./documentation/frontend-backend-map.md) | React → API → Storage mapping |
 
 ### Authoritative Metrics Reference
 
@@ -603,7 +603,7 @@ Winston-based logging with:
 3. **Database** → RLS policy check → Encrypted data handling
 4. **Response** → Structured JSON → Client
 
-See [Architecture Documentation](./ARCHITECTURE.md) and [Technical Brief](./TECHNICAL_BRIEF.md) for detailed design decisions.
+See [Architecture Documentation](./documentation/ARCHITECTURE.md) and [Technical Brief](./documentation/TECHNICAL_BRIEF.md) for detailed design decisions.
 
 ---
 

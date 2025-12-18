@@ -420,11 +420,11 @@ The platform runs on Replit using:
 
 | Document | Purpose | Location |
 |----------|---------|----------|
-| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | Root |
-| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | Root |
-| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | Root |
-| **docs/maintenance-matrix.md** | Module health scores, cleanup queue | docs/ |
-| **docs/frontend-backend-map.md** | React → API → Storage mapping | docs/ |
+| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | documentation/ |
+| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | documentation/ |
+| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | documentation/ |
+| **maintenance-matrix.md** | Module health scores, cleanup queue | documentation/ |
+| **frontend-backend-map.md** | React → API → Storage mapping | documentation/ |
 
 ### Maintenance Scoring Quick Reference
 

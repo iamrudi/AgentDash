@@ -1283,7 +1283,7 @@ npx vitest --coverage                      # Coverage report
 
 ## Maintenance Scoring
 
-See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-module health scores.
+See [maintenance-matrix.md](./maintenance-matrix.md) for detailed per-module health scores.
 
 ### Summary (December 2025)
 
@@ -1338,8 +1338,9 @@ With the stability testing framework in place, the following features are now un
 |----------|---------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
 | [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
+| [README.md](../README.md) | Documentation hub, authoritative metrics |
 
 ---
 

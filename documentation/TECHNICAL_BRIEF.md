@@ -1579,8 +1579,9 @@ class KnowledgeRetrievalService {
 |----------|---------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, technical debt |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
+| [README.md](../README.md) | Documentation hub, authoritative metrics |
 
 ---
 
