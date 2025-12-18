@@ -20,7 +20,7 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 - **Express.js** with TypeScript
 - **Drizzle ORM** for database operations
 - **Zod** for request validation
-- **Passport.js** for session management
+- **Supabase Auth** + JWT for session management
 - **node-cron** for scheduled tasks
 - **Puppeteer** for PDF generation
 
@@ -60,7 +60,7 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   └── index.html
 ├── server/
 │   ├── routes.ts               # Legacy file with 3 remaining routes
-│   ├── routes/                 # Domain-specific routers (37 registrations, ~294 routes)
+│   ├── routes/                 # Domain-specific routers (37 registrations, ~325 routes)
 │   │   ├── index.ts            # Router composition and registration
 │   │   ├── auth.ts             # Authentication (3 routes)
 │   │   ├── user.ts             # User profile (2 routes)
@@ -902,7 +902,7 @@ npx tsc --noEmit
 | `shared/schema.ts` | All database schemas including workflow tables |
 | `server/storage.ts` | Database operations (legacy - new features should use domain storage modules) |
 | `server/routes.ts` | Legacy shim (~300 lines, 3 routes) - routes decomposed to server/routes/ |
-| `server/routes/` | Domain routers (37 registrations, ~294 routes) |
+| `server/routes/` | Domain routers (37 registrations, ~325 routes) |
 | `scripts/test-workflow.ts` | Workflow regression test suite |
 
 ---
@@ -1511,7 +1511,7 @@ class KnowledgeRetrievalService {
 | `shared/schema.ts` | All database schemas (3,235 lines) |
 | `server/storage.ts` | Database operations - legacy DbStorage (3,245 lines, decomposition in progress) |
 | `server/routes.ts` | Legacy shim (~300 lines, 3 routes) |
-| `server/routes/` | Domain routers (37 registrations, ~294 routes) - decomposition ✅ complete |
+| `server/routes/` | Domain routers (37 registrations, ~325 routes) - decomposition ✅ complete |
 | `server/storage/` | Domain storage modules (43 methods extracted) |
 
 ### Workflow Engine

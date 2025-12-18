@@ -396,7 +396,7 @@ The platform runs on Replit using:
 - **Closed Feedback Loop** ✅ - Outcome tracking, quality metrics, AI calibration
 - **Brand Knowledge Layer** ✅ - Structured knowledge ingestion pipeline with UI
 - **Platform Audit** ✅ - Maintenance scoring, technical debt register, documentation updates
-- **Routes Decomposition** ✅ - COMPLETE: 37 router registrations (~294 routes), 94% file size reduction (4,832→300 lines)
+- **Routes Decomposition** ✅ - COMPLETE: 37 router registrations (~325 routes), 94% file size reduction (4,832→300 lines)
 - **Stability Testing Framework** ✅ - 44 Vitest tests (auth: 18, SLA: 18, maintenance: 8)
 
 ---
@@ -438,7 +438,7 @@ Current Status (December 2025):
 - Intelligence Layer: 82 🟢
 - AI Providers: 84 🟢
 - Real-time: 81 🟢 ← Health checks & metrics added
-- Domain Routers: 85 🟢 ← 37 registrations, ~294 routes, decomposition COMPLETE
+- Domain Routers: 85 🟢 ← 37 registrations, ~325 routes, decomposition COMPLETE
 - Workflow Engine: 79 🟡
 - routes.ts: 85 🟢 ← Decomposition complete (300 lines, 3 routes)
 - storage.ts: 65 🟡 ← Decomposition in progress (3,245 lines, Phase 1-2 complete)

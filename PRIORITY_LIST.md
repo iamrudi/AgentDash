@@ -1153,10 +1153,10 @@ npx vitest --coverage                      # Coverage report
 
 **Summary:**
 - **Before:** 4,832 lines in routes.ts with ~270 routes
-- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~294 routes)
+- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~325 routes)
 - **Reduction:** 94% file size reduction
 
-**37 Domain Router Registrations (~294 routes total):**
+**37 Domain Router Registrations (~325 routes total):**
 
 | Router | Routes | Description |
 |--------|--------|-------------|
@@ -1269,7 +1269,7 @@ npx vitest --coverage                      # Coverage report
 - Replace console.log with logger
 
 **Phase 2: Major Refactors (Q1-Q2 2025)** — Routes ✅ COMPLETE!
-- ✅ Split routes.ts into domain modules (37 registrations, ~294 routes) — December 2025
+- ✅ Split routes.ts into domain modules (37 registrations, ~325 routes) — December 2025
 - ✅ All routes extracted (only 3 intentional routes remain in routes.ts)
 - 🟡 storage.ts decomposition in progress (Phase 1-2 complete, 43 methods extracted)
 - Add comprehensive test coverage

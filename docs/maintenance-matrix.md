@@ -40,7 +40,7 @@ Where:
 | **Storage Layer** | `server/storage.ts` | 65 | 🟡 | Core Team | Dec 2025 | **3,245 lines** — decomposition in progress (Phase 1-2 complete) |
 | **Storage Contracts** | `server/storage/contracts/` | 85 | 🟢 | Core Team | Dec 2025 | Domain interfaces: identity, agency, task |
 | **Storage Domains** | `server/storage/domains/` | 85 | 🟢 | Core Team | Dec 2025 | Domain implementations: 43 methods extracted |
-| **Router Index** | `server/routes/index.ts` | 90 | 🟢 | Core Team | Dec 2025 | 37 registrations (~294 routes) |
+| **Router Index** | `server/routes/index.ts` | 90 | 🟢 | Core Team | Dec 2025 | 37 registrations (~325 routes) |
 | **Auth Router** | `server/routes/auth.ts` | 82 | 🟢 | Core Team | Dec 2025 | 3 routes, clean extraction |
 | **User Router** | `server/routes/user.ts` | 80 | 🟢 | Core Team | Dec 2025 | 2 routes, profile management |
 | **Client Router** | `server/routes/client.ts` | 78 | 🟡 | Core Team | Dec 2025 | 10 routes, client portal |
@@ -191,7 +191,7 @@ Where:
 
 ### 1. `server/routes.ts` — ✅ RESOLVED (December 2025)
 **Previous Problem:** Monolithic API file containing all route handlers (9638 lines)
-**Resolution:** Successfully decomposed into 37 domain-specific routers (~294 routes)
+**Resolution:** Successfully decomposed into 37 domain-specific routers (~325 routes)
 **Current State:** Only 300 lines with 3 intentional remaining routes
 **Impact:** 94% reduction in file size, improved maintainability
 
@@ -244,10 +244,10 @@ server/storage/
 
 ### Summary
 - **Before:** 4,832 lines in routes.ts with ~270 routes
-- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~294 routes)
+- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~325 routes)
 - **Reduction:** 94% file size reduction
 
-### All Domain Routers Mounted (~294 routes via 37 registrations)
+### All Domain Routers Mounted (~325 routes via 37 registrations)
 
 | Router | Routes | Key Endpoints |
 |--------|--------|---------------|

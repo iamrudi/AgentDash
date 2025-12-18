@@ -260,7 +260,7 @@ As of December 2025, the monolithic `routes.ts` has been fully decomposed into d
 
 ```
 server/routes/
-├── index.ts                  # Router composition and registration (37 registrations, ~294 routes)
+├── index.ts                  # Router composition and registration (37 registrations, ~325 routes)
 ├── auth.ts                   # Authentication endpoints (3 routes)
 ├── user.ts                   # User profile endpoints (2 routes)
 ├── client.ts                 # Client portal endpoints (10 routes)
@@ -372,7 +372,7 @@ export function mountDomainRouters(app: Express): void {
 | retention-policies | ✅ Mounted | 4 | Retention policy management |
 | public | ✅ Mounted | 2 | Public form endpoints |
 
-**Progress:** ✅ 99% complete (~294 routes via 37 domain router registrations, 3 intentional routes in routes.ts)
+**Progress:** ✅ 99% complete (~325 routes via 37 domain router registrations, 3 intentional routes in routes.ts)
 
 **routes.ts Reduction:** 4,832 lines → 300 lines (94% reduction)
 
