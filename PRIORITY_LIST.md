@@ -1297,8 +1297,8 @@ With the stability testing framework in place, the following features are now un
 
 | Item | Dependencies | Effort | Description |
 |------|--------------|--------|-------------|
-| Complete routes.ts decomposition | Stability tests | 8 hrs | Register remaining routers (crm, settings, superadmin) |
-| Storage layer domain split | Routes complete | 12 hrs | Extract agency, client, project storage services |
+| ~~Complete routes.ts decomposition~~ | ~~Stability tests~~ | ~~8 hrs~~ | ~~Register remaining routers~~ ✅ DONE Dec 2025 |
+| Storage layer domain split | Routes complete | 12 hrs | 🟡 In progress — Phase 1-2 complete (43 methods extracted) |
 | Workflow engine integration tests | Stability tests | 6 hrs | Full workflow execution path validation |
 
 ### P2 — Foundation Improvements (Q2 2025)

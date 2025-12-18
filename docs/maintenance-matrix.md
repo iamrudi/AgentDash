@@ -195,21 +195,22 @@ Where:
 **Current State:** Only 300 lines with 3 intentional remaining routes
 **Impact:** 94% reduction in file size, improved maintainability
 
-### 2. `server/storage.ts` — 3713 lines (NOW TOP PRIORITY)
-**Problem:** Single storage class with all database operations
-**Impact:** God object anti-pattern, testing difficulty
-**Recommendation:** Extract domain services:
+### 2. `server/storage.ts` — 🟡 IN PROGRESS (3,245 lines, Phase 1-2 complete)
+**Original Problem:** Single storage class with all database operations (3,713 lines)
+**Current Status:** Decomposition in progress — 43 methods extracted (12.6% reduction)
+**Architecture Pattern:**
 ```
 server/storage/
-├── base-storage.ts        (IStorage interface)
-├── agency-storage.ts      (agency operations)
-├── client-storage.ts      (client operations)
-├── project-storage.ts     (project/task operations)
-├── invoice-storage.ts     (billing operations)
-├── workflow-storage.ts    (workflow operations)
-├── intelligence-storage.ts (feedback, knowledge)
-└── index.ts               (composition)
+├── contracts/                 # Domain interfaces
+│   ├── identity.ts           # IdentityStorage (12 methods) ✅
+│   ├── agency.ts             # AgencyStorage (4 methods) ✅
+│   └── task.ts               # TaskStorage (27 methods) ✅
+└── domains/                   # Function-based implementations
+    ├── identity.storage.ts   # Users, profiles, sessions ✅
+    ├── agency.storage.ts     # Agency CRUD ✅
+    └── task.storage.ts       # Tasks, lists, assignments ✅
 ```
+**Remaining Phases:** Project/Client (~20 methods), Invoice/Initiative (~25 methods)
 
 ---
 
@@ -234,7 +235,7 @@ server/storage/
 | Item | File | Action | Effort |
 |------|------|--------|--------|
 | ~~Continue routes.ts decomposition~~ | ~~`routes.ts`~~ | ~~Extract remaining routers~~ | ~~8 hours~~ ✅ DONE |
-| Split storage.ts | `storage.ts` | Major refactor — NOW TOP PRIORITY | 12 hours |
+| Split storage.ts | `storage.ts` | 🟡 In progress — Phase 1-2 complete | 12 hours |
 | Migration file cleanup | `migrations/` | Remove duplicate/unused SQL | 4 hours |
 
 ---
