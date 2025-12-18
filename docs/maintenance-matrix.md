@@ -369,4 +369,4 @@ registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
 ---
 
 *Generated: December 2025*
-*Next Review: March 2025*
+*Next Review: March 2026*
