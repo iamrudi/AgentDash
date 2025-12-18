@@ -21,6 +21,18 @@ import aiExecutionRoutes from './ai-execution';
 import retentionPoliciesRoutes from './retention-policies';
 import notificationsRoutes from './notifications';
 import knowledgeDocumentsRoutes from './knowledge-documents';
+import initiativesRoutes from './initiatives';
+import oauthRoutes from './oauth';
+import integrationsRoutes from './integrations';
+import agencySettingsRoutes from './agency-settings';
+import agencyTasksRoutes from './agency-tasks';
+import agencyUsersRoutes from './agency-users';
+import analyticsRoutes from './analytics';
+import messagesRoutes from './messages';
+import objectivesRoutes from './objectives';
+import aiChatRoutes from './ai-chat';
+import proposalsRoutes from './proposals';
+import { agencyClientsRouter, clientsRouter as agencyClientsClientRouter } from './agency-clients';
 
 export interface DomainRouter {
   subpath: string;
@@ -58,6 +70,20 @@ registerDomainRouter('/', aiExecutionRoutes);
 registerDomainRouter('/retention-policies', retentionPoliciesRoutes);
 registerDomainRouter('/notifications', notificationsRoutes);
 registerDomainRouter('/knowledge-documents', knowledgeDocumentsRoutes);
+registerDomainRouter('/initiatives', initiativesRoutes);
+registerDomainRouter('/oauth', oauthRoutes);
+registerDomainRouter('/integrations', integrationsRoutes);
+registerDomainRouter('/', integrationsRoutes);
+registerDomainRouter('/agency/settings', agencySettingsRoutes);
+registerDomainRouter('/agency', agencyTasksRoutes);
+registerDomainRouter('/agency', agencyUsersRoutes);
+registerDomainRouter('/analytics', analyticsRoutes);
+registerDomainRouter('/agency/messages', messagesRoutes);
+registerDomainRouter('/agency', objectivesRoutes);
+registerDomainRouter('/ai', aiChatRoutes);
+registerDomainRouter('/proposals', proposalsRoutes);
+registerDomainRouter('/agency/clients', agencyClientsRouter);
+registerDomainRouter('/clients', agencyClientsClientRouter);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {
