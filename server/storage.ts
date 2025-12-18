@@ -200,7 +200,7 @@ export interface IStorage {
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
   getProfileById(id: string): Promise<Profile | undefined>;
   getStaffProfileById(id: string): Promise<Profile | undefined>;
-  getAllStaff(): Promise<Profile[]>;
+  getAllStaff(agencyId?: string): Promise<Profile[]>;
   createProfile(profile: InsertProfile): Promise<Profile>;
   updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined>;
   
