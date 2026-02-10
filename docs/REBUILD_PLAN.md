@@ -59,6 +59,11 @@ Goal: Re-center architecture around primitives in `docs/PRIMITIVES.md` without d
   - Platform operators can answer “who changed what, when, and what failed next” from dashboards.
   - Event volume remains manageable via retention policies.
 
+### Status (2026-02-10)
+- Ops dashboards: added summary, trends, AI usage, quota warnings/burndown, workflow failures, rule publishes, integration health.
+- Retention: added plan/preview, count estimates, dry-run execution path, scheduled dry-run job, archive handler hook.
+- Policy bundles: added schema plus read/write endpoints for bundles and versions.
+
 ---
 
 ## Sequencing & Risk Controls
