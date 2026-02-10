@@ -4,7 +4,7 @@ import { db } from "../db";
 import { aiExecutions, aiUsageTracking, type InsertAIExecution } from "@shared/schema";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { getAIProvider } from "./provider";
-import type { AIProvider, GenerateTextOptions, TokenUsage } from "./types";
+import type { AIProvider, GenerateTextOptions, TokenUsage, GenerateEmbeddingOptions, EmbeddingResult } from "./types";
 import { quotaService } from "../governance/quota-service";
 
 export interface AIExecutionContext {
@@ -297,6 +297,147 @@ export class HardenedAIExecutor {
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
       
+      if (executionId) {
+        await this.updateExecution(executionId, {
+          status: "failed",
+          error: error.message,
+          durationMs,
+        });
+      }
+
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false);
+
+      return {
+        success: false,
+        error: error.message,
+        cached: false,
+        executionId: executionId || "unknown",
+        durationMs,
+      };
+    }
+  }
+
+  async executeEmbeddingWithSchema<T>(
+    context: AIExecutionContext,
+    options: GenerateEmbeddingOptions,
+    outputSchema: z.ZodSchema<T>
+  ): Promise<HardenedExecutionResult<T>> {
+    const startTime = Date.now();
+    const inputHash = this.computeInputHash({ ...options });
+    const providerName = context.provider || "gemini";
+    const modelName = context.model || options.model || "default";
+    let executionId = "";
+
+    try {
+      const requestQuotaCheck = await quotaService.checkAIRequestQuota(context.agencyId);
+      if (!requestQuotaCheck.allowed) {
+        return {
+          success: false,
+          error: requestQuotaCheck.message || "AI request quota exceeded",
+          cached: false,
+          executionId: "",
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      const estimatedTokens = this.estimateTokens(options.input) * 2;
+      const tokenQuotaCheck = await quotaService.checkAITokenQuota(context.agencyId, estimatedTokens);
+      if (!tokenQuotaCheck.allowed) {
+        return {
+          success: false,
+          error: tokenQuotaCheck.message || "AI token quota exceeded",
+          cached: false,
+          executionId: "",
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      executionId = await this.logExecution({
+        agencyId: context.agencyId,
+        workflowExecutionId: context.workflowExecutionId,
+        stepId: context.stepId,
+        provider: providerName,
+        model: modelName,
+        operation: context.operation,
+        inputHash,
+        prompt: options.input,
+        input: options,
+        status: "pending",
+      });
+
+      const provider = await getAIProvider(context.agencyId);
+      const embeddingResult = await provider.generateEmbedding(options);
+
+      const validationResult = validateAIOutput(outputSchema, embeddingResult);
+      if (!validationResult.success) {
+        const validationErrors = validationResult.errors;
+        await this.updateExecution(executionId, {
+          status: "failed",
+          output: embeddingResult,
+          outputValidated: false,
+          validationErrors,
+          error: `Schema validation failed: ${validationErrors.map(e => e.message).join(", ")}`,
+          durationMs: Date.now() - startTime,
+          promptTokens: embeddingResult.tokenCount,
+          completionTokens: 0,
+          totalTokens: embeddingResult.tokenCount,
+        });
+
+        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, {
+          prompt: embeddingResult.tokenCount,
+          completion: 0,
+          total: embeddingResult.tokenCount,
+        });
+
+        return {
+          success: false,
+          error: `Schema validation failed: ${validationErrors.map(e => e.message).join(", ")}`,
+          cached: false,
+          executionId,
+          tokens: {
+            prompt: embeddingResult.tokenCount,
+            completion: 0,
+            total: embeddingResult.tokenCount,
+          },
+          durationMs: Date.now() - startTime,
+        };
+      }
+
+      const outputHash = this.computeOutputHash(validationResult.data);
+
+      await this.updateExecution(executionId, {
+        status: "success",
+        output: validationResult.data,
+        outputHash,
+        outputValidated: true,
+        durationMs: Date.now() - startTime,
+        promptTokens: embeddingResult.tokenCount,
+        completionTokens: 0,
+        totalTokens: embeddingResult.tokenCount,
+      });
+
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, {
+        prompt: embeddingResult.tokenCount,
+        completion: 0,
+        total: embeddingResult.tokenCount,
+      });
+
+      await quotaService.incrementAIUsage(context.agencyId, embeddingResult.tokenCount);
+
+      return {
+        success: true,
+        data: validationResult.data,
+        cached: false,
+        executionId,
+        tokens: {
+          prompt: embeddingResult.tokenCount,
+          completion: 0,
+          total: embeddingResult.tokenCount,
+        },
+        durationMs: Date.now() - startTime,
+      };
+    } catch (error: any) {
+      const durationMs = Date.now() - startTime;
       if (executionId) {
         await this.updateExecution(executionId, {
           status: "failed",

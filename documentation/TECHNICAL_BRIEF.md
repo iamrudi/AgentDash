@@ -20,7 +20,7 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 - **Express.js** with TypeScript
 - **Drizzle ORM** for database operations
 - **Zod** for request validation
-- **Passport.js** for session management
+- **Supabase Auth** + JWT for session management
 - **node-cron** for scheduled tasks
 - **Puppeteer** for PDF generation
 
@@ -59,25 +59,56 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   └── App.tsx             # Main router
 │   └── index.html
 ├── server/
-│   ├── routes.ts               # Legacy monolithic routes (~25 routes remaining)
-│   ├── routes/                 # Domain-specific routers (15 routers, 156 routes)
+│   ├── routes.ts               # Legacy file with 3 remaining routes
+│   ├── routes/                 # Domain-specific routers (37 registrations, ~325 routes)
 │   │   ├── index.ts            # Router composition and registration
 │   │   ├── auth.ts             # Authentication (3 routes)
 │   │   ├── user.ts             # User profile (2 routes)
 │   │   ├── client.ts           # Client portal (10 routes)
 │   │   ├── agency.ts           # Agency admin (17 routes)
+│   │   ├── agency-clients.ts   # Client management (7 routes)
+│   │   ├── agency-settings.ts  # Agency settings (5 routes)
+│   │   ├── agency-tasks.ts     # Task management (13 routes)
+│   │   ├── agency-users.ts     # User management (5 routes)
 │   │   ├── staff.ts            # Staff portal (3 routes)
 │   │   ├── crm.ts              # CRM (34 routes)
 │   │   ├── settings.ts         # Settings (2 routes)
 │   │   ├── superadmin.ts       # SuperAdmin governance (24 routes)
+│   │   ├── superadmin-health.ts # Health checks (3 routes)
 │   │   ├── invoices.ts         # Invoice management (6 routes)
 │   │   ├── tasks.ts            # Task CRUD, subtasks (9 routes)
-│   │   ├── intelligence.ts     # Duration intelligence, optimization (21 routes)
+│   │   ├── intelligence.ts     # Duration intelligence (21 routes)
+│   │   ├── intelligence-extended.ts # Extended intelligence (27 routes)
 │   │   ├── knowledge.ts        # Knowledge ingestion/retrieval (12 routes)
+│   │   ├── knowledge-documents.ts # Document management (12 routes)
 │   │   ├── workflows.ts        # Workflow CRUD, execution (9 routes)
 │   │   ├── workflow-executions.ts # Execution events (2 routes)
-│   │   └── lineage.ts          # Lineage tracing (2 routes)
-│   ├── storage.ts              # Database operations (DbStorage - legacy, being decomposed)
+│   │   ├── lineage.ts          # Lineage tracing (2 routes)
+│   │   ├── rule-engine.ts      # Workflow rules (12 routes)
+│   │   ├── signals.ts          # Signal ingestion (11 routes)
+│   │   ├── ai-execution.ts     # AI execution (5 routes)
+│   │   ├── ai-chat.ts          # AI chat (2 routes)
+│   │   ├── integrations.ts     # Integration management (19 routes)
+│   │   ├── oauth.ts            # OAuth flows (2 routes)
+│   │   ├── analytics.ts        # Analytics (6 routes)
+│   │   ├── initiatives.ts      # Initiatives (9 routes)
+│   │   ├── notifications.ts    # Notifications (5 routes)
+│   │   ├── messages.ts         # Messaging (7 routes)
+│   │   ├── objectives.ts       # Objectives (4 routes)
+│   │   ├── proposals.ts        # Proposals (2 routes)
+│   │   ├── retention-policies.ts # Retention policies (4 routes)
+│   │   └── public.ts           # Public endpoints (2 routes)
+│   ├── storage.ts              # DbStorage facade (3,245 lines - decomposition in progress)
+│   ├── storage/
+│   │   ├── index.ts            # Storage module exports
+│   │   ├── contracts/          # Domain interfaces
+│   │   │   ├── identity.ts     # Identity domain (12 methods)
+│   │   │   ├── agency.ts       # Agency domain (4 methods)
+│   │   │   └── task.ts         # Task domain (27 methods)
+│   │   └── domains/            # Domain implementations
+│   │       ├── identity.storage.ts  # User, profile, session
+│   │       ├── agency.storage.ts    # Agency CRUD
+│   │       └── task.storage.ts      # Tasks, lists, assignments
 │   ├── auth.ts                 # Authentication middleware
 │   ├── index.ts                # Server entry point
 │   ├── vite.ts                 # Vite dev server integration
@@ -870,7 +901,8 @@ npx tsc --noEmit
 | `server/workflow/rule-engine.ts` | RuleEngine with 16 operators |
 | `shared/schema.ts` | All database schemas including workflow tables |
 | `server/storage.ts` | Database operations (legacy - new features should use domain storage modules) |
-| `server/routes.ts` | All API endpoints including workflow/rule endpoints |
+| `server/routes.ts` | Legacy shim (~300 lines, 3 routes) - routes decomposed to server/routes/ |
+| `server/routes/` | Domain routers (37 registrations, ~325 routes) |
 | `scripts/test-workflow.ts` | Workflow regression test suite |
 
 ---
@@ -1477,8 +1509,10 @@ class KnowledgeRetrievalService {
 | File | Purpose |
 |------|---------|
 | `shared/schema.ts` | All database schemas (3,235 lines) |
-| `server/storage.ts` | Database operations - legacy DbStorage (3,713 lines, decomposition in progress) |
-| `server/routes.ts` | All API endpoints (9,638 lines) |
+| `server/storage.ts` | Database operations - legacy DbStorage (3,245 lines, decomposition in progress) |
+| `server/routes.ts` | Legacy shim (~300 lines, 3 routes) |
+| `server/routes/` | Domain routers (37 registrations, ~325 routes) - decomposition ✅ complete |
+| `server/storage/` | Domain storage modules (43 methods extracted) |
 
 ### Workflow Engine
 | File | Purpose |
@@ -1545,9 +1579,34 @@ class KnowledgeRetrievalService {
 |----------|---------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, technical debt |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*
+
+## Guardrails & Phase 0 Tests (AI/Gates)
+
+### How to run the enforcement checks
+
+- `npm run check` runs guardrails + full Vitest suite.
+- `npm run guardrails` runs only the direct-LLM-call guardrail.
+- `npm run check:fast` runs guardrails + the Phase 0 enforcement subset.
+
+### What the guardrail enforces
+
+- Direct model/LLM provider calls (OpenAI/Gemini patterns) are only allowed in `server/ai/**`.
+- Allowlist entries are restricted to `docs/**`, `tests/**`, and `scripts/**` only.
+- Legacy runtime violations (outside `server/ai/**`) are tracked as CRITICAL migration debt in `documentation/PRIORITY_LIST.md`.
+
+### Phase 0 vs Phase 1
+
+- Phase 0 surfaces violations via guardrails + tests without changing runtime behavior.
+- Phase 1 migrates legacy direct calls into `server/ai/hardened-executor.ts` and removes the CRITICAL debt list.
+
+### Where to add future gate tests
+
+- Add Opportunity Gate, SKU freeze, and Acceptance Gate tests under `tests/` using a `*.gate.test.ts` naming convention.
+- Keep gate tests contract-focused (schema + policy checks) and avoid runtime behavior changes in Phase 0.

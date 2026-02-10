@@ -2,26 +2,34 @@
 
 ## Executive Summary
 
-This document outlines the **18-phase roadmap** for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
+This document outlines the **20-phase roadmap** for evolving the Agency Client Portal from a task management platform into a **full Workflow Engine** capable of deterministic automation, AI orchestration, and multi-agent operations.
 
 Each priority is ordered by dependency—completing earlier phases unlocks capabilities required by later phases.
 
-### Phase Summary (December 2024)
+### Phase Summary (December 2025)
 
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1-14 | Core Engine, Rules, Signals, AI, Lineage, Vectors, SLA, Agents, CRM, Analytics, Tasks, Templates, WebSocket, SuperAdmin | ✅ Complete |
 | 15 | Visual Workflow Builder UI | 🟡 In Progress |
 | 16-18 | Duration Intelligence, Closed Feedback Loop, Brand Knowledge Layer | ✅ Complete |
+| 19 | Stability Testing Framework | ✅ Complete |
+| 20 | Storage Layer Decomposition | 🟡 In Progress |
+
+---
+
+## CRITICAL: Direct LLM calls bypass hardened executor
+
+Status: cleared on 2026-02-10. All previously identified direct LLM call sites were migrated to `server/ai/hardened-executor.ts`.
 
 ---
 
 ## Priority 1: Workflow Engine (Core Orchestration)
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** None (foundational)  
-**Estimated Duration:** 3-4 weeks
+**Tokens Needed:** High
 
 ### Description
 Build the deterministic workflow orchestration core that processes signals, executes rules, invokes AI, and produces atomic outputs (projects, tasks, invoices).
@@ -59,10 +67,10 @@ class WorkflowEngine {
 
 ## Priority 2: Rule Engine (Versioned Rule System)
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Implement a versioned rule engine with advanced operators for threshold detection, anomaly detection, and lifecycle triggers that integrates with the workflow engine.
@@ -121,10 +129,10 @@ interface WorkflowRuleVersion {
 
 ## Priority 3: Signal Processing & Ingestion
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 2  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Create a normalized signal format that ingests events from GA4, GSC, HubSpot, LinkedIn, and internal application events into the workflow engine.
@@ -207,10 +215,10 @@ async function processSignal(signal: WorkflowSignal) {
 
 ## Priority 4: Hardened AI Execution Layer
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Strengthen the AI invocation layer with schema validation, retry logic, idempotency guarantees, and output hashing for reproducibility.
@@ -252,10 +260,10 @@ server/workflow/engine.ts (AI step handler uses HardenedAIExecutor)
 
 ## Priority 5: Workflow Lineage & Event Logging
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 4  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Implement comprehensive event logging that captures every workflow execution, enabling full replay and debugging.
@@ -303,10 +311,10 @@ server/routes.ts (lineage query, replay, retention policy APIs)
 
 ## Priority 6: Tenant-Isolated Vector Stores
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** High  
 **Dependencies:** None (can parallel with 1-5)  
-**Estimated Duration:** 3-4 weeks
+**Tokens Needed:** High
 
 ### Description
 Create per-agency vector stores for SOPs, brand assets, analytics embeddings, and knowledge bases for "Chat with Your Data" features.
@@ -359,10 +367,10 @@ POST /api/embedding-index/prune (Admin only)
 
 ## Priority 7: SLA & Escalation Engine
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 3  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add deadline monitoring, SLA breach detection, and automatic escalation to fallback owners.
@@ -413,10 +421,10 @@ shared/schema.ts (slaDefinitions, slaBreaches, slaBreachEvents, escalationChains
 
 ## Priority 8: Multi-Agent Architecture
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Very High  
 **Dependencies:** Priority 1, 4, 6  
-**Estimated Duration:** 4-6 weeks
+**Tokens Needed:** Very High
 
 ### Description
 Implement specialized AI agents for different domains (SEO, PPC, CRM, Reporting) that can be orchestrated by the workflow engine.
@@ -500,10 +508,10 @@ abstract class BaseAgent {
 
 ## Priority 9: Expanded CRM Integration Triggers
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 2, 3  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add lifecycle-based triggers from CRM events that feed into the workflow engine.
@@ -554,10 +562,10 @@ POST /api/crm/sync/:agencyId    - Trigger manual CRM sync
 
 ## Priority 10: Enhanced Analytics Ingestion
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 2  
-**Estimated Duration:** 2 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add anomaly detection to analytics pipelines that automatically generates signals for significant changes.
@@ -614,10 +622,10 @@ type AnomalyType =
 
 ## Priority 11: Optimized Task System for Workflow Output
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1  
-**Estimated Duration:** 1-2 weeks
+**Tokens Needed:** Low
 
 ### Description
 Make task/project creation idempotent so workflows can safely retry without creating duplicates.
@@ -664,10 +672,10 @@ server/tasks/task-routes.ts
 
 ## Priority 12: Template System
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 1, 11  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Create reusable templates for projects, task lists, workflows, and AI prompts.
@@ -734,10 +742,10 @@ Create reusable templates for projects, task lists, workflows, and AI prompts.
 
 ## Priority 13: Real-Time Layer Improvements
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** None (can parallel)  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Migrate messaging and presence from polling to WebSocket/SSE for true real-time updates.
@@ -812,10 +820,10 @@ function useRealtimeChannel(channel, onMessage): { send, isConnected }
 
 ## Priority 14: SuperAdmin Governance Enhancements
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 4, 8  
-**Estimated Duration:** 2-3 weeks
+**Tokens Needed:** Medium
 
 ### Description
 Add comprehensive governance controls for AI quotas, token caps, and integration health monitoring.
@@ -891,7 +899,7 @@ interface IntegrationHealth {
 **Status:** 🔴 Not Started  
 **Complexity:** Very High  
 **Dependencies:** Priority 1, 3, 12  
-**Estimated Duration:** 4-6 weeks
+**Tokens Needed:** Very High
 
 ### Description
 Create a visual DAG (Directed Acyclic Graph) editor for building and modifying workflows without code.
@@ -934,48 +942,61 @@ Create a visual DAG (Directed Acyclic Graph) editor for building and modifying w
 
 ---
 
-## Dependency Graph
+## Dependency Graph (December 2025)
 
 ```
-Priority 1 (Workflow Engine) ✅ COMPLETED
+Priority 1 (Workflow Engine) ✅
     │
-    ├──▶ Priority 2 (Rule Engine) ✅ COMPLETED
+    ├──▶ Priority 2 (Rule Engine) ✅
     │        │
-    │        └──▶ Priority 3 (Signal Processing) ← NEXT
+    │        └──▶ Priority 3 (Signal Processing) ✅
     │                 │
-    │                 └──▶ Priority 7 (SLA Engine)
-    │                 └──▶ Priority 9 (CRM Triggers)
-    │                 └──▶ Priority 10 (Analytics Ingestion)
+    │                 └──▶ Priority 7 (SLA Engine) ✅
+    │                 └──▶ Priority 9 (CRM Triggers) ✅
+    │                 └──▶ Priority 10 (Analytics Ingestion) ✅
     │
-    ├──▶ Priority 4 (AI Execution Layer)
+    ├──▶ Priority 4 (AI Execution Layer) ✅
     │        │
-    │        └──▶ Priority 5 (Lineage & Logging)
-    │        └──▶ Priority 8 (Multi-Agent)
-    │        └──▶ Priority 14 (SuperAdmin Governance)
+    │        └──▶ Priority 5 (Lineage & Logging) ✅
+    │        └──▶ Priority 8 (Multi-Agent) ✅
+    │        └──▶ Priority 14 (SuperAdmin Governance) ✅
     │
-    ├──▶ Priority 11 (Task System Optimization)
+    ├──▶ Priority 11 (Task System Optimization) ✅
     │        │
-    │        └──▶ Priority 12 (Template System)
+    │        └──▶ Priority 12 (Template System) ✅
     │                 │
-    │                 └──▶ Priority 15 (Workflow Builder UI)
+    │                 └──▶ Priority 15 (Workflow Builder UI) 🟡 IN PROGRESS
     │
-    └──▶ Priority 6 (Vector Stores) [parallel]
-    └──▶ Priority 13 (Real-Time Layer) [parallel]
+    ├──▶ Priority 6 (Vector Stores) ✅
+    │
+    ├──▶ Priority 13 (Real-Time Layer) ✅
+    │
+    ├──▶ Priority 16 (Duration Intelligence) ✅
+    │        │
+    │        └──▶ Priority 17 (Closed Feedback Loop) ✅
+    │                 │
+    │                 └──▶ Priority 18 (Brand Knowledge Layer) ✅
+    │
+    ├──▶ Priority 19 (Stability Testing Framework) ✅
+    │
+    └──▶ Priority 20 (Storage Layer Decomposition) 🟡 IN PROGRESS
 ```
 
 ---
 
-## Implementation Timeline (Estimated)
+## Implementation Timeline
 
-| Phase | Priorities | Duration | Team Size |
-|-------|------------|----------|-----------|
-| Foundation | 1, 2, 4 | 6-8 weeks | 2 engineers |
-| Rules & Signals | 3, 10, 9 | 4-6 weeks | 2 engineers |
-| AI & Lineage | 5, 6, 8 | 6-8 weeks | 2-3 engineers |
-| Automation | 7, 11, 12 | 4-6 weeks | 2 engineers |
-| Polish | 13, 14, 15 | 6-8 weeks | 2-3 engineers |
+| Phase | Priorities | Tokens Needed | Status |
+|-------|------------|---------------|--------|
+| Foundation | 1, 2, 4 | High | ✅ Complete |
+| Rules & Signals | 3, 10, 9 | High | ✅ Complete |
+| AI & Lineage | 5, 6, 8 | Very High | ✅ Complete |
+| Automation | 7, 11, 12 | High | ✅ Complete |
+| Polish | 13, 14, 15 | Very High | 🟡 In Progress |
+| Intelligence | 16, 17, 18 | Very High | ✅ Complete |
+| Stability | 19, 20 | High | 🟡 In Progress |
 
-**Total Estimated Duration:** 26-36 weeks
+**Total Progress:** 18/20 priorities complete (90%)
 
 ---
 
@@ -1008,32 +1029,74 @@ Priority 1 (Workflow Engine) ✅ COMPLETED
 
 | Priority | Status | Completed |
 |----------|--------|-----------|
-| Priority 1: Workflow Engine | ✅ Complete | December 2024 |
-| Priority 2: Rule Engine | ✅ Complete | December 2024 |
-| Priority 3: Signal Processing | ✅ Complete | December 2024 |
-| Priority 4: Hardened AI Execution | ✅ Complete | December 2024 |
-| Priority 5: Workflow Lineage | ✅ Complete | December 2024 |
-| Priority 6: Tenant-Isolated Vector Stores | ✅ Complete | December 2024 |
-| Priority 7: SLA & Escalation Engine | ✅ Complete | December 2024 |
-| Priority 8: Multi-Agent Architecture | ✅ Complete | December 2024 |
-| Priority 9: CRM Integration Triggers | ✅ Complete | December 2024 |
-| Priority 10: Enhanced Analytics Ingestion | ✅ Complete | December 2024 |
-| Priority 11: Task System Optimization | ✅ Complete | December 2024 |
-| Priority 12: Template System | ✅ Complete | December 2024 |
-| Priority 13: Real-Time WebSocket/SSE Layer | ✅ Complete | December 2024 |
-| Priority 14: SuperAdmin Governance | ✅ Complete | December 2024 |
-| Priority 15: Visual Workflow Builder UI | 🟡 In Progress | December 2024 |
-| Priority 16: Duration Intelligence | ✅ Complete | December 2024 |
-| Priority 17: Closed Feedback Loop | ✅ Complete | December 2024 |
-| Priority 18: Brand Knowledge Layer | ✅ Complete | December 2024 |
-| **Priority 19: Stability Testing Framework** | ✅ Complete | December 2024 |
+| Priority 1: Workflow Engine | ✅ Complete | December 2025 |
+| Priority 2: Rule Engine | ✅ Complete | December 2025 |
+| Priority 3: Signal Processing | ✅ Complete | December 2025 |
+| Priority 4: Hardened AI Execution | ✅ Complete | December 2025 |
+| Priority 5: Workflow Lineage | ✅ Complete | December 2025 |
+| Priority 6: Tenant-Isolated Vector Stores | ✅ Complete | December 2025 |
+| Priority 7: SLA & Escalation Engine | ✅ Complete | December 2025 |
+| Priority 8: Multi-Agent Architecture | ✅ Complete | December 2025 |
+| Priority 9: CRM Integration Triggers | ✅ Complete | December 2025 |
+| Priority 10: Enhanced Analytics Ingestion | ✅ Complete | December 2025 |
+| Priority 11: Task System Optimization | ✅ Complete | December 2025 |
+| Priority 12: Template System | ✅ Complete | December 2025 |
+| Priority 13: Real-Time WebSocket/SSE Layer | ✅ Complete | December 2025 |
+| Priority 14: SuperAdmin Governance | ✅ Complete | December 2025 |
+| Priority 15: Visual Workflow Builder UI | 🟡 In Progress | December 2025 |
+| Priority 16: Duration Intelligence | ✅ Complete | December 2025 |
+| Priority 17: Closed Feedback Loop | ✅ Complete | December 2025 |
+| Priority 18: Brand Knowledge Layer | ✅ Complete | December 2025 |
+| **Priority 19: Stability Testing Framework** | ✅ Complete | December 2025 |
+| **Priority 20: Storage Layer Decomposition** | 🟡 In Progress | December 2025 |
+
+### Priority 20: Storage Layer Decomposition 🟡
+
+**Status:** 🟡 IN PROGRESS (December 2025)  
+**Complexity:** High  
+**Dependencies:** None  
+**Tokens Needed:** High
+
+#### Description
+Decompose the monolithic `server/storage.ts` (originally 3,713 lines) into domain-specific modules using bounded context approach aligned with existing router boundaries.
+
+#### Progress
+- ✅ **Phase 1 - Identity Domain** (12 methods): Users, profiles, sessions, password reset
+- ✅ **Phase 2 - Task Domain** (27 methods): Task lists, tasks, assignments, activities, relationships, messages
+- ⏳ **Phase 3** - Project/Client Domain (planned)
+- ⏳ **Phase 4** - Invoice/Initiative Domain (planned)
+
+#### Architecture Pattern
+```
+server/storage/
+├── contracts/           # Domain interfaces
+│   ├── identity.ts      # IdentityStorage interface
+│   ├── agency.ts        # AgencyStorage interface
+│   └── task.ts          # TaskStorage interface
+└── domains/             # Function-based implementations
+    ├── identity.storage.ts   # identityStorage(ctx)
+    ├── agency.storage.ts     # agencyStorage(ctx)
+    └── task.storage.ts       # taskStorage(ctx, getProjectById)
+```
+
+#### Metrics
+- **Original:** 3,713 lines, ~150 methods
+- **Current:** 3,245 lines (12.6% reduction)
+- **Extracted:** 43 methods across 3 domains
+
+#### Validation Gates (per phase)
+1. Behavior parity check vs pre-refactor signatures
+2. Storage-only compile gate (tsc)
+3. Authenticated E2E verification
+
+---
 
 ### Priority 19: Stability Testing Framework ✅
 
-**Status:** ✅ COMPLETED (December 2024)  
+**Status:** ✅ COMPLETED (December 2025)  
 **Complexity:** Medium  
 **Dependencies:** Priority 7, 14  
-**Duration:** 1 week
+**Tokens Needed:** Medium
 
 #### Deliverables ✅
 - ✅ Vitest test infrastructure with configuration
@@ -1087,37 +1150,63 @@ npx vitest --coverage                      # Coverage report
 
 ### Critical (🔴 Must Address)
 
-| Item | File | Lines | Issue | Effort |
+| Item | File | Lines | Issue | Status |
 |------|------|-------|-------|--------|
-| Monolithic routes.ts | `server/routes.ts` | ~3,000 | Decomposition ~85% complete (~25 routes remaining) | 3 hrs remaining |
-| Monolithic storage.ts | `server/storage.ts` | 3,713 | God object anti-pattern | 12 hrs |
+| ~~Monolithic routes.ts~~ | ~~`server/routes.ts`~~ | ~~300~~ | ~~Decomposition complete~~ | ✅ DONE |
+| Monolithic storage.ts | `server/storage.ts` | 3,245 | God object — decomposition in progress | 🟡 Phase 1-2 done |
 
-### Routes Decomposition Progress (December 2024)
+### Routes Decomposition Progress (December 2025) — ✅ COMPLETE
 
-**15 Domain Routers Mounted (156 routes total):**
+**Summary:**
+- **Before:** 4,832 lines in routes.ts with ~270 routes
+- **After:** 300 lines in routes.ts with 3 routes (37 domain router registrations, ~325 routes)
+- **Reduction:** 94% file size reduction
+
+**37 Domain Router Registrations (~325 routes total):**
 
 | Router | Routes | Description |
 |--------|--------|-------------|
 | `auth.ts` | 3 | Login, logout, session |
 | `user.ts` | 2 | Profile get/update |
 | `client.ts` | 10 | Client portal endpoints |
-| `agency.ts` | 17 | Clients, projects, metrics, staff, messages |
+| `agency.ts` | 17 | Projects, metrics, staff |
+| `agency-clients.ts` | 7 | Client management, sync |
+| `agency-settings.ts` | 5 | Agency configuration |
+| `agency-tasks.ts` | 13 | Task CRUD, bulk ops |
+| `agency-users.ts` | 5 | User management |
 | `staff.ts` | 3 | Tasks, notifications |
-| `crm.ts` | 34 | Companies, contacts, deals, proposals, forms |
+| `crm.ts` | 34 | Companies, contacts, deals |
 | `settings.ts` | 2 | Rate limit settings |
-| `superadmin.ts` | 24 | Platform governance, agencies, users, audit logs |
-| `invoices.ts` | 6 | Invoice CRUD, PDF generation, scheduling |
-| `tasks.ts` | 9 | Task CRUD, subtasks, relationships |
-| `intelligence.ts` | 21 | Duration model, resource optimization, commercial impact |
-| `knowledge.ts` | 12 | Knowledge ingestion, retrieval, context assembly |
-| `workflows.ts` | 9 | Workflow CRUD, execution, validation, duplication |
-| `workflow-executions.ts` | 2 | Execution events and lineage queries |
-| `lineage.ts` | 2 | Task and project lineage tracing |
+| `superadmin.ts` | 24 | Governance, agencies, users |
+| `superadmin-health.ts` | 3 | Health checks |
+| `invoices.ts` | 6 | Invoice CRUD, PDF |
+| `tasks.ts` | 9 | Task CRUD, subtasks |
+| `intelligence.ts` | 21 | Duration, optimization |
+| `intelligence-extended.ts` | 27 | Predictions, feedback |
+| `knowledge.ts` | 12 | Ingestion, retrieval |
+| `knowledge-documents.ts` | 12 | Document management |
+| `workflows.ts` | 9 | Workflow CRUD |
+| `workflow-executions.ts` | 2 | Execution events |
+| `lineage.ts` | 2 | Lineage tracing |
+| `rule-engine.ts` | 12 | Workflow rules |
+| `signals.ts` | 11 | Signal ingestion |
+| `ai-execution.ts` | 5 | AI execution |
+| `ai-chat.ts` | 2 | AI chat |
+| `integrations.ts` | 19 | Integration management |
+| `oauth.ts` | 2 | OAuth flows |
+| `analytics.ts` | 6 | Analytics data |
+| `initiatives.ts` | 9 | Initiative management |
+| `notifications.ts` | 5 | Notifications |
+| `messages.ts` | 7 | Messaging |
+| `objectives.ts` | 4 | Objectives |
+| `proposals.ts` | 2 | Proposals |
+| `retention-policies.ts` | 4 | Retention policies |
+| `public.ts` | 2 | Public endpoints |
 
-**Remaining in routes.ts (~25 routes):**
-- 🔴 Rule engine routes (workflow rules CRUD)
-- 🔴 Miscellaneous duration intelligence routes
-- 🔴 SuperAdmin health routes (mounted separately in routes.ts)
+**Remaining in routes.ts (3 routes - intentional):**
+- ✅ `POST /api/metrics` — Create metric
+- ✅ `POST /api/agency/initiatives/mark-viewed` — Mark initiatives viewed  
+- ✅ `POST /api/test/create-user` — Development test endpoint
 
 **Security Guarantees Maintained:**
 - Zod validation on POST/PATCH request bodies
@@ -1128,30 +1217,31 @@ npx vitest --coverage                      # Coverage report
 
 ### High Priority (🟠 Should Address Soon)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | 1 hr |
-| Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | 2 hrs |
-| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | 4 hrs |
-| ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | Done |
-| Console.log statements | Various | Should use structured logging | 3 hrs |
+| Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | Low |
+| Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | Low |
+| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | Medium |
+| ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | ✅ Done |
+| Console.log statements | Various | Should use structured logging | Medium |
 
 ### Medium Priority (🟡 Schedule for Cleanup)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Agent system evaluation | `server/agents/` | Limited active usage | 4 hrs |
-| Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | 2 hrs |
-| Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | 1 hr |
+| Empty email in users table | `client/src/pages/agency/users.tsx` | Shows blank email - `getAllUsersWithProfiles` returns empty email/password (Supabase Auth is source of truth). Fix: fetch email from Supabase Auth or add to profiles table | Medium |
+| Agent system evaluation | `server/agents/` | Limited active usage | Medium |
+| Redundant auth helpers | `auth.ts` | Multiple `verifyXAccess` functions | Low |
+| Hardcoded dev fallbacks | `oauthState.ts` | Development secrets in code | Low |
 | WebSocket URL bug | Vite HMR | `wss://localhost:undefined` - requires vite.config.ts change (protected) | N/A |
 
 ### Low Priority (📝 Document for Later)
 
-| Item | File | Issue | Effort |
+| Item | File | Issue | Tokens |
 |------|------|-------|--------|
-| Split schema.ts | `shared/schema.ts` | 3,235 lines - consider domain splits | 8 hrs |
-| Test coverage gaps | Various | Intelligence services need tests | 20 hrs |
-| Forms page cleanup | `pages/forms/` | Only embed.tsx used | 1 hr |
+| Split schema.ts | `shared/schema.ts` | 3,235 lines - consider domain splits | High |
+| Test coverage gaps | Various | Intelligence services need tests | Very High |
+| Forms page cleanup | `pages/forms/` | Only embed.tsx used | Low |
 
 ---
 
@@ -1159,7 +1249,7 @@ npx vitest --coverage                      # Coverage report
 
 ### Migration Files to Clean
 
-✅ **Completed December 2024:**
+✅ **Completed December 2025:**
 - Deleted `0001_enable_rls_policies_fixed.sql` (duplicate)
 - Deleted `add_task_lists_rls.sql` (duplicate of 0009)
 - Deleted `apply_admin_delete_permissions.sql` (duplicate of 0004)
@@ -1184,10 +1274,10 @@ npx vitest --coverage                      # Coverage report
 - Clean migration files
 - Replace console.log with logger
 
-**Phase 2: Major Refactors (Q2 2025)** — Routes ~85% Complete!
-- ✅ Split routes.ts into domain modules (15 routers, 156 routes)
-- 🔴 Extract remaining ~25 routes (rule engine, superadmin-health, misc)
-- 🔴 Extract storage into domain services
+**Phase 2: Major Refactors (Q1-Q2 2025)** — Routes ✅ COMPLETE!
+- ✅ Split routes.ts into domain modules (37 registrations, ~325 routes) — December 2025
+- ✅ All routes extracted (only 3 intentional routes remain in routes.ts)
+- 🟡 storage.ts decomposition in progress (Phase 1-2 complete, 43 methods extracted)
 - Add comprehensive test coverage
 
 **Phase 3: Architecture (Q3 2025)**
@@ -1199,9 +1289,9 @@ npx vitest --coverage                      # Coverage report
 
 ## Maintenance Scoring
 
-See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-module health scores.
+See [maintenance-matrix.md](./maintenance-matrix.md) for detailed per-module health scores.
 
-### Summary (December 2024)
+### Summary (December 2025)
 
 | Category | Modules | Avg Score | Status |
 |----------|---------|-----------|--------|
@@ -1222,29 +1312,29 @@ See [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) for detailed per-
 
 With the stability testing framework in place, the following features are now unblocked:
 
-### P1 — Critical Path (Q1 2025)
+### P1 — Critical Path
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| Complete routes.ts decomposition | Stability tests | 8 hrs | Register remaining routers (crm, settings, superadmin) |
-| Storage layer domain split | Routes complete | 12 hrs | Extract agency, client, project storage services |
-| Workflow engine integration tests | Stability tests | 6 hrs | Full workflow execution path validation |
+| ~~Complete routes.ts decomposition~~ | ~~Stability tests~~ | ~~High~~ | ~~Register remaining routers~~ ✅ DONE Dec 2025 |
+| Storage layer domain split | Routes complete | High | 🟡 In progress — Phase 1-2 complete (43 methods extracted) |
+| Workflow engine integration tests | Stability tests | High | Full workflow execution path validation |
 
-### P2 — Foundation Improvements (Q2 2025)
+### P2 — Foundation Improvements
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| SuperAdmin observability dashboard | Maintenance mode | 8 hrs | Real-time metrics, health checks UI |
-| AI-assisted task recommendations | Intelligence layer | 10 hrs | Proactive task suggestions based on patterns |
-| Advanced SLA reporting | SLA tests | 6 hrs | Breach analytics, trend visualization |
+| SuperAdmin observability dashboard | Maintenance mode | High | Real-time metrics, health checks UI |
+| AI-assisted task recommendations | Intelligence layer | High | Proactive task suggestions based on patterns |
+| Advanced SLA reporting | SLA tests | High | Breach analytics, trend visualization |
 
-### P3 — Feature Expansion (Q3 2025)
+### P3 — Feature Expansion
 
-| Item | Dependencies | Effort | Description |
+| Item | Dependencies | Tokens | Description |
 |------|--------------|--------|-------------|
-| Cross-client pattern learning | Knowledge layer | 12 hrs | Agency-wide insights with governance |
-| Workflow version comparison UI | Workflow builder | 8 hrs | Visual diff between workflow versions |
-| Mobile-responsive staff portal | Staff router | 6 hrs | Task management on mobile devices |
+| Cross-client pattern learning | Knowledge layer | High | Agency-wide insights with governance |
+| Workflow version comparison UI | Workflow builder | High | Visual diff between workflow versions |
+| Mobile-responsive staff portal | Staff router | High | Task management on mobile devices |
 
 ---
 
@@ -1254,9 +1344,10 @@ With the stability testing framework in place, the following features are now un
 |----------|---------|
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System architecture, diagrams |
 | [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration map |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration map |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

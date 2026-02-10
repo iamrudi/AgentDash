@@ -3,7 +3,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, type AuthRequest } from "../middleware/supabase-auth";
 import { z } from "zod";
 import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormSchema, insertFormFieldSchema, insertProposalTemplateSchema, insertProposalSchema, insertProposalSectionSchema } from "@shared/schema";
-import { GoogleGenAI } from "@google/genai";
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
@@ -1221,9 +1221,6 @@ crmRouter.post("/proposals/:proposalId/ai-generate", requireAuth, requireRole("A
     const validatedData = aiRequestSchema.parse(req.body);
     const { action, dealContext, contentToRefine, customPrompt } = validatedData;
 
-    // Initialize Gemini AI
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
     let finalPrompt = "";
 
     // Construct prompts based on action
@@ -1291,17 +1288,27 @@ Add relevant details, benefits, and context to make it more comprehensive and pe
       return res.status(400).json({ message: "No valid prompt generated" });
     }
 
-    // Generate content using Gemini
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: finalPrompt,
-    });
+    const model = "gemini-2.5-flash";
+    const result = await hardenedAIExecutor.executeWithSchema(
+      {
+        agencyId,
+        operation: "crmProposalGenerate",
+        provider: "gemini",
+        model,
+      },
+      {
+        prompt: finalPrompt,
+        model,
+        temperature: 0.2,
+      },
+      z.string()
+    );
 
-    const generatedText = response.text;
-
-    if (!generatedText) {
-      return res.status(500).json({ message: "AI failed to generate content" });
+    if (!result.success || !result.data) {
+      return res.status(500).json({ message: result.error || "AI failed to generate content" });
     }
+
+    const generatedText = result.data;
 
     res.json({ generatedContent: generatedText });
   } catch (error: any) {

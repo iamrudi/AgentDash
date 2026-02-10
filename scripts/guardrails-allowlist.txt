@@ -1,0 +1,2 @@
+# Temporary exceptions to the direct-LLM-call guardrail.
+# Remove entries as they are migrated to server/ai/hardened-executor.

@@ -60,6 +60,18 @@ export interface GenerateTextResult {
   usage?: TokenUsage;
 }
 
+export interface GenerateEmbeddingOptions {
+  input: string;
+  model?: string;
+}
+
+export interface EmbeddingResult {
+  embedding: number[];
+  tokenCount: number;
+  model: string;
+  provider: "openai" | "gemini";
+}
+
 export interface AIProvider {
   generateTextWithUsage?(options: GenerateTextOptions): Promise<GenerateTextResult>;
   analyzeClientMetrics(
@@ -89,4 +101,5 @@ export interface AIProvider {
   ): Promise<ChatAnalysis>;
 
   generateText(options: GenerateTextOptions): Promise<string>;
+  generateEmbedding(options: GenerateEmbeddingOptions): Promise<EmbeddingResult>;
 }

@@ -254,33 +254,54 @@ Platform-wide governance dashboard for system administrators.
 
 ## Backend Domain Router Architecture
 
-As of December 2024, the monolithic `routes.ts` is being decomposed into domain-specific routers for improved maintainability.
+As of December 2025, the monolithic `routes.ts` has been fully decomposed into domain-specific routers for improved maintainability.
 
 ### Domain Router Structure
 
 ```
 server/routes/
-├── index.ts                # Router composition and registration (15 routers mounted, 156 routes)
-├── auth.ts                 # Authentication endpoints (3 routes)
-├── user.ts                 # User profile endpoints (2 routes)
-├── client.ts               # Client portal endpoints (10 routes)
-├── agency.ts               # Agency admin endpoints (17 routes)
-├── staff.ts                # Staff portal endpoints (3 routes)
-├── crm.ts                  # CRM endpoints (34 routes)
-├── settings.ts             # Settings endpoints (2 routes)
-├── superadmin.ts           # SuperAdmin governance endpoints (24 routes)
-├── invoices.ts             # Invoice management endpoints (6 routes)
-├── tasks.ts                # Task CRUD, subtasks, relationships (9 routes)
-├── intelligence.ts         # Duration intelligence, resource optimization (21 routes)
-├── knowledge.ts            # Knowledge ingestion, retrieval, context assembly (12 routes)
-├── workflows.ts            # Workflow CRUD, execution, validation, duplication (9 routes)
-├── workflow-executions.ts  # Execution events and lineage queries (2 routes)
-└── lineage.ts              # Task and project lineage tracing (2 routes)
-│
-│   (Remaining in routes.ts - ~25 routes)
-├── rule-engine             # Workflow rules CRUD (~12 routes)
-├── duration-intelligence   # Misc duration intelligence routes (~10 routes)
-└── superadmin-health       # Health check routes (mounted separately, 3 routes)
+├── index.ts                  # Router composition and registration (37 registrations, ~325 routes)
+├── auth.ts                   # Authentication endpoints (3 routes)
+├── user.ts                   # User profile endpoints (2 routes)
+├── client.ts                 # Client portal endpoints (10 routes)
+├── agency.ts                 # Agency admin endpoints (17 routes)
+├── agency-clients.ts         # Client management endpoints (7 routes)
+├── agency-settings.ts        # Agency settings endpoints (5 routes)
+├── agency-tasks.ts           # Task management endpoints (13 routes)
+├── agency-users.ts           # User management endpoints (5 routes)
+├── staff.ts                  # Staff portal endpoints (3 routes)
+├── crm.ts                    # CRM endpoints (34 routes)
+├── settings.ts               # Settings endpoints (2 routes)
+├── superadmin.ts             # SuperAdmin governance endpoints (24 routes)
+├── superadmin-health.ts      # Health check endpoints (3 routes)
+├── invoices.ts               # Invoice management endpoints (6 routes)
+├── tasks.ts                  # Task CRUD, subtasks, relationships (9 routes)
+├── intelligence.ts           # Duration intelligence, resource optimization (21 routes)
+├── intelligence-extended.ts  # Extended intelligence endpoints (27 routes)
+├── knowledge.ts              # Knowledge ingestion, retrieval, context assembly (12 routes)
+├── knowledge-documents.ts    # Knowledge document CRUD (12 routes)
+├── workflows.ts              # Workflow CRUD, execution, validation (9 routes)
+├── workflow-executions.ts    # Execution events and lineage queries (2 routes)
+├── lineage.ts                # Task and project lineage tracing (2 routes)
+├── rule-engine.ts            # Workflow rules CRUD (12 routes)
+├── signals.ts                # Signal ingestion and routing (11 routes)
+├── ai-execution.ts           # AI execution endpoints (5 routes)
+├── ai-chat.ts                # AI chat endpoints (2 routes)
+├── integrations.ts           # Integration management (19 routes)
+├── oauth.ts                  # OAuth flow endpoints (2 routes)
+├── analytics.ts              # Analytics endpoints (6 routes)
+├── initiatives.ts            # Initiative management (9 routes)
+├── notifications.ts          # Notification endpoints (5 routes)
+├── messages.ts               # Messaging endpoints (7 routes)
+├── objectives.ts             # Objective management (4 routes)
+├── proposals.ts              # Proposal endpoints (2 routes)
+├── retention-policies.ts     # Retention policy management (4 routes)
+└── public.ts                 # Public endpoints (2 routes)
+
+routes.ts                     # Legacy file with 3 remaining routes
+├── POST /api/metrics         # Create metric
+├── POST /api/agency/initiatives/mark-viewed  # Mark initiatives viewed
+└── POST /api/test/create-user # Development test endpoint
 ```
 
 ### Router Registration Pattern
@@ -290,7 +311,7 @@ server/routes/
 import { Router, type Express } from 'express';
 import authRoutes from './auth';
 import agencyRoutes from './agency';
-// ...
+// ... 35+ router imports
 
 export function registerDomainRouter(subpath: string, router: Router): void {
   domainRegistry.push({ subpath, router });
@@ -298,7 +319,10 @@ export function registerDomainRouter(subpath: string, router: Router): void {
 
 registerDomainRouter('/auth', authRoutes);
 registerDomainRouter('/agency', agencyRoutes);
-// ...
+registerDomainRouter('/agency/clients', agencyClientsRouter);
+registerDomainRouter('/intelligence', intelligenceRoutes);
+registerDomainRouter('/intelligence', intelligenceExtendedRoutes);
+// ... 37 total registrations
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {
@@ -307,32 +331,54 @@ export function mountDomainRouters(app: Express): void {
 }
 ```
 
-### Migration Status (December 2024)
+### Migration Status (December 2025) — ✅ COMPLETE
 
 | Domain | Status | Routes | Notes |
 |--------|--------|--------|-------|
 | auth | ✅ Mounted | 3 | Login, logout, session |
 | user | ✅ Mounted | 2 | Profile get/update |
 | client | ✅ Mounted | 10 | Client portal endpoints |
-| agency | ✅ Mounted | 17 | Clients, projects, metrics, staff, messages |
+| agency | ✅ Mounted | 17 | Projects, metrics, staff |
+| agency-clients | ✅ Mounted | 7 | Client management, sync, recommendations |
+| agency-settings | ✅ Mounted | 5 | Agency configuration |
+| agency-tasks | ✅ Mounted | 13 | Task CRUD, bulk operations |
+| agency-users | ✅ Mounted | 5 | User management |
 | staff | ✅ Mounted | 3 | Tasks, notifications |
-| crm | ✅ Mounted | 34 | CRM endpoints (companies, contacts, deals, proposals, forms) |
+| crm | ✅ Mounted | 34 | Companies, contacts, deals, proposals, forms |
 | settings | ✅ Mounted | 2 | Rate limit settings |
 | superadmin | ✅ Mounted | 24 | Platform governance, agencies, users, audit logs |
+| superadmin-health | ✅ Mounted | 3 | Health check endpoints |
 | invoices | ✅ Mounted | 6 | Invoice CRUD, PDF generation, scheduling |
 | tasks | ✅ Mounted | 9 | Task CRUD, subtasks, relationships, time tracking |
 | intelligence | ✅ Mounted | 21 | Duration model, resource optimization, commercial impact |
+| intelligence-extended | ✅ Mounted | 27 | Extended intelligence, predictions, feedback |
 | knowledge | ✅ Mounted | 12 | Knowledge ingestion, retrieval, context assembly |
+| knowledge-documents | ✅ Mounted | 12 | Document CRUD, embeddings, semantic search |
 | workflows | ✅ Mounted | 9 | Workflow CRUD, execution, validation, duplication |
 | workflow-executions | ✅ Mounted | 2 | Execution events and lineage queries |
 | lineage | ✅ Mounted | 2 | Task and project lineage tracing |
-| rule-engine | 🔴 Pending | ~12 | Workflow rules CRUD |
-| duration-intelligence | 🔴 Pending | ~10 | Misc duration intelligence routes |
-| superadmin-health | 🔴 Pending | 3 | Health check routes (mounted separately in routes.ts) |
+| rule-engine | ✅ Mounted | 12 | Workflow rules CRUD, versions, evaluations |
+| signals | ✅ Mounted | 11 | Signal ingestion, routing, processing |
+| ai-execution | ✅ Mounted | 5 | AI execution, usage tracking |
+| ai-chat | ✅ Mounted | 2 | AI chat endpoints |
+| integrations | ✅ Mounted | 19 | GA4, GSC, HubSpot, LinkedIn connections |
+| oauth | ✅ Mounted | 2 | OAuth flow handling |
+| analytics | ✅ Mounted | 6 | Analytics data endpoints |
+| initiatives | ✅ Mounted | 9 | Initiative management, status updates |
+| notifications | ✅ Mounted | 5 | Notification management |
+| messages | ✅ Mounted | 7 | Client/agency messaging |
+| objectives | ✅ Mounted | 4 | Objective management |
+| proposals | ✅ Mounted | 2 | Proposal endpoints |
+| retention-policies | ✅ Mounted | 4 | Retention policy management |
+| public | ✅ Mounted | 2 | Public form endpoints |
 
-**Progress:** ~85% complete (156 routes mounted via 15 domain routers, ~25 routes pending extraction)
+**Progress:** ✅ 99% complete (~325 routes via 37 domain router registrations, 3 intentional routes in routes.ts)
+
+**routes.ts Reduction:** 4,832 lines → 300 lines (94% reduction)
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
+
+> **Note:** CRM routes and integrations are mounted and production-safe, but CRM is not yet a required dependency for core agency workflows. The platform operates fully without CRM enabled.
 
 ### Security Guarantees
 
@@ -342,6 +388,49 @@ All extracted domain routers maintain:
 - **requireRole** middleware for RBAC enforcement
 - **Cross-tenant protection** via agencyId injection from user context
 - **Resource ownership validation** (e.g., clientId belongs to user's agency)
+
+---
+
+### Storage Layer Decomposition (December 2025) — 🟡 IN PROGRESS
+
+The monolithic `server/storage.ts` is being decomposed into domain-specific modules using a bounded context approach.
+
+#### Architecture Pattern
+
+```
+server/storage/
+├── contracts/                 # Domain interfaces (TypeScript)
+│   ├── identity.ts           # IdentityStorage interface (12 methods)
+│   ├── agency.ts             # AgencyStorage interface (4 methods)
+│   └── task.ts               # TaskStorage interface (27 methods)
+└── domains/                   # Function-based implementations
+    ├── identity.storage.ts   # identityStorage(ctx) → IdentityStorage
+    ├── agency.storage.ts     # agencyStorage(ctx) → AgencyStorage
+    └── task.storage.ts       # taskStorage(ctx, getProjectById) → TaskStorage
+```
+
+#### Decomposition Progress
+
+| Phase | Domain | Methods | Status |
+|-------|--------|---------|--------|
+| 1 | Identity | 12 | ✅ Complete |
+| 1 | Agency | 4 | ✅ Complete |
+| 2 | Task | 27 | ✅ Complete |
+| 3 | Project/Client | ~20 | ⏳ Planned |
+| 4 | Invoice/Initiative | ~25 | ⏳ Planned |
+
+**Metrics:**
+- **Original:** 3,713 lines, ~150 methods
+- **Current:** 3,245 lines (12.6% reduction)
+- **Extracted:** 43 methods across 3 domains
+
+#### Design Decisions
+
+1. **Function-based modules** taking `DbCtx` context rather than classes
+2. **DbStorage as facade** delegating to domain modules
+3. **No method renames** during extraction to maintain behavior parity
+4. **Multi-tenant isolation** preserved via agencyId parameters
+5. **Validation gates** per phase: signature parity, compile, E2E
 
 ---
 
@@ -1056,7 +1145,7 @@ Structured knowledge ingestion for AI context assembly.
 
 ---
 
-## Stability Testing Framework (December 2024)
+## Stability Testing Framework (December 2025)
 
 ### Test Infrastructure
 
@@ -1140,7 +1229,7 @@ async (req, res, next) => {
 
 ---
 
-## Completed Enhancements (December 2024)
+## Completed Enhancements (December 2025)
 
 - [x] WebSocket/SSE real-time updates
 - [x] Visual workflow builder UI (in progress)
@@ -1173,10 +1262,10 @@ async (req, res, next) => {
 |----------|---------|
 | [TECHNICAL_BRIEF.md](./TECHNICAL_BRIEF.md) | Implementation patterns, API contracts |
 | [PRIORITY_LIST.md](./PRIORITY_LIST.md) | Roadmap, priorities, technical debt |
-| [docs/maintenance-matrix.md](./docs/maintenance-matrix.md) | Module health scores, cleanup queue |
-| [docs/frontend-backend-map.md](./docs/frontend-backend-map.md) | API integration mapping |
-| [replit.md](./replit.md) | Quick reference for development |
+| [maintenance-matrix.md](./maintenance-matrix.md) | Module health scores, cleanup queue |
+| [frontend-backend-map.md](./frontend-backend-map.md) | API integration mapping |
+| [README.md](./README.md) | Documentation hub, authoritative metrics |
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

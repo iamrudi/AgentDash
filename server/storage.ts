@@ -182,6 +182,12 @@ import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { encryptToken, decryptToken } from "./lib/encryption";
+import { identityStorage } from "./storage/domains/identity.storage";
+import { agencyStorage } from "./storage/domains/agency.storage";
+import { taskStorage } from "./storage/domains/task.storage";
+import type { IdentityStorage } from "./storage/contracts/identity";
+import type { AgencyStorage } from "./storage/contracts/agency";
+import type { TaskStorage } from "./storage/contracts/task";
 
 export interface IStorage {
   // Users
@@ -196,7 +202,7 @@ export interface IStorage {
   getProfileByUserId(userId: string): Promise<Profile | undefined>;
   getProfileById(id: string): Promise<Profile | undefined>;
   getStaffProfileById(id: string): Promise<Profile | undefined>;
-  getAllStaff(): Promise<Profile[]>;
+  getAllStaff(agencyId?: string): Promise<Profile[]>;
   createProfile(profile: InsertProfile): Promise<Profile>;
   updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined>;
   
@@ -238,7 +244,7 @@ export interface IStorage {
   getTasksByListId(listId: string): Promise<Task[]>;
   getTasksByStaffId(staffProfileId: string): Promise<Task[]>;
   getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>>;
-  getAllTasks(): Promise<Task[]>;
+  getAllTasks(agencyId?: string): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task>;
   deleteTask(id: string): Promise<void>;
@@ -393,6 +399,9 @@ export interface IStorage {
   // Super Admin - User Management
   getAllUsersForSuperAdmin(): Promise<Array<Profile & { agencyName?: string; clientName?: string }>>;
   
+  // Agency
+  getDefaultAgency(): Promise<Agency | undefined>;
+  
   // Super Admin - Agency Management
   getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>>;
   getAgencyById(id: string): Promise<Agency | undefined>;
@@ -538,159 +547,35 @@ export interface IStorage {
 }
 
 export class DbStorage implements IStorage {
-  // Users
-  async getUserById(id: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
+  private identity: IdentityStorage;
+  private agency: AgencyStorage;
+  private task: TaskStorage;
+
+  constructor() {
+    this.identity = identityStorage(db);
+    this.agency = agencyStorage(db);
+    this.task = taskStorage(db, this.getProjectById.bind(this));
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    return result[0];
-  }
+  // === IDENTITY DOMAIN (delegated) ===
+  getUserById = (id: string) => this.identity.getUserById(id);
+  getUserByEmail = (email: string) => this.identity.getUserByEmail(email);
+  createUser = (user: InsertUser) => this.identity.createUser(user);
+  getAllUsersWithProfiles = (agencyId?: string) => this.identity.getAllUsersWithProfiles(agencyId);
+  updateUserRole = (userId: string, role: string) => this.identity.updateUserRole(userId, role);
+  deleteUser = (userId: string) => this.identity.deleteUser(userId);
+  getProfileByUserId = (userId: string) => this.identity.getProfileByUserId(userId);
+  getProfileById = (id: string) => this.identity.getProfileById(id);
+  getStaffProfileById = (id: string) => this.identity.getStaffProfileById(id);
+  getAllStaff = (agencyId?: string) => this.identity.getAllStaff(agencyId);
+  createProfile = (profile: InsertProfile) => this.identity.createProfile(profile);
+  updateUserProfile = (userId: string, data: { fullName?: string; skills?: string[] }) => this.identity.updateUserProfile(userId, data);
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
-    const result = await db.insert(users).values({
-      ...insertUser,
-      password: hashedPassword,
-    }).returning();
-    return result[0];
-  }
-
-  async getAllUsersWithProfiles(agencyId?: string): Promise<Array<User & { profile: Profile | null; client?: Client | null }>> {
-    if (agencyId) {
-      // Get all profiles and clients for this agency
-      const [agencyProfiles, agencyClients] = await Promise.all([
-        db.select().from(profiles).where(eq(profiles.agencyId, agencyId)),
-        db.select().from(clients).where(eq(clients.agencyId, agencyId))
-      ]);
-      
-      // Build client map for efficiency
-      const clientMap = new Map(agencyClients.map(c => [c.profileId, c]));
-      
-      // Build user objects from profiles (profile.id IS the Supabase Auth user ID)
-      const usersWithProfiles = agencyProfiles.map((profile) => {
-        let client = null;
-        if (profile.role === "Client") {
-          client = clientMap.get(profile.id) || null;
-        }
-        // Create a compatible User object from profile data
-        return {
-          id: profile.id, // Supabase Auth user ID
-          email: '', // Will be fetched from Supabase Auth if needed
-          password: '', // Not stored locally anymore
-          createdAt: profile.createdAt,
-          profile,
-          client,
-        };
-      });
-      
-      return usersWithProfiles.sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    }
-    
-    // Original implementation without agency filtering
-    const allProfiles = await db.select().from(profiles).orderBy(desc(profiles.createdAt));
-    
-    const usersWithProfiles = await Promise.all(
-      allProfiles.map(async (profile) => {
-        let client = null;
-        if (profile.role === "Client") {
-          client = await this.getClientByProfileId(profile.id);
-        }
-        return {
-          id: profile.id, // Supabase Auth user ID
-          email: '', // Will be fetched from Supabase Auth if needed
-          password: '', // Not stored locally anymore
-          createdAt: profile.createdAt,
-          profile,
-          client: client || null,
-        };
-      })
-    );
-    
-    return usersWithProfiles;
-  }
-
-  async updateUserRole(userId: string, role: string): Promise<void> {
-    const profile = await this.getProfileByUserId(userId);
-    if (!profile) {
-      throw new Error("Profile not found");
-    }
-    
-    await db.update(profiles)
-      .set({ role })
-      .where(eq(profiles.id, userId)); // profile.id IS the user ID
-  }
-
-  async deleteUser(userId: string): Promise<void> {
-    // Delete user will cascade to related records (profile, client, etc.) due to foreign key constraints
-    await db.delete(users).where(eq(users.id, userId));
-  }
-
-  // Profiles
-  async getProfileByUserId(userId: string): Promise<Profile | undefined> {
-    // With Supabase Auth, profile.id IS the user ID
-    const result = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
-    return result[0];
-  }
-
-  async getProfileById(id: string): Promise<Profile | undefined> {
-    const result = await db.select().from(profiles).where(eq(profiles.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getStaffProfileById(id: string): Promise<Profile | undefined> {
-    const result = await db.select().from(profiles)
-      .where(and(eq(profiles.id, id), eq(profiles.role, "Staff")))
-      .limit(1);
-    return result[0];
-  }
-
-  async createProfile(profile: InsertProfile): Promise<Profile> {
-    const result = await db.insert(profiles).values(profile).returning();
-    return result[0];
-  }
-
-  async updateUserProfile(userId: string, data: { fullName?: string; skills?: string[] }): Promise<Profile | undefined> {
-    // Only update provided fields
-    const updateFields: Record<string, unknown> = {};
-    if (data.fullName !== undefined) {
-      updateFields.fullName = data.fullName;
-    }
-    if (data.skills !== undefined) {
-      updateFields.skills = data.skills;
-    }
-    
-    // Return early if no fields to update
-    if (Object.keys(updateFields).length === 0) {
-      return this.getProfileByUserId(userId);
-    }
-    
-    const result = await db.update(profiles)
-      .set(updateFields)
-      .where(eq(profiles.id, userId))
-      .returning();
-    
-    return result[0];
-  }
-
-  // Agencies
-  async getDefaultAgency(): Promise<Agency | undefined> {
-    const result = await db.select().from(agencies).orderBy(agencies.createdAt).limit(1);
-    return result[0];
-  }
-
-  async getAllStaff(agencyId?: string): Promise<Profile[]> {
-    if (agencyId) {
-      return await db.select().from(profiles)
-        .where(and(eq(profiles.role, "Staff"), eq(profiles.agencyId, agencyId)))
-        .orderBy(desc(profiles.createdAt));
-    }
-    return await db.select().from(profiles).where(eq(profiles.role, "Staff")).orderBy(desc(profiles.createdAt));
-  }
+  // === AGENCY DOMAIN (delegated) ===
+  getDefaultAgency = () => this.agency.getDefaultAgency();
+  getAgencyById = (id: string) => this.agency.getAgencyById(id);
+  deleteAgency = (id: string) => this.agency.deleteAgency(id);
+  getAllAgenciesForSuperAdmin = () => this.agency.getAllAgenciesForSuperAdmin();
 
   // Clients
   async getClientById(id: string): Promise<Client | undefined> {
@@ -903,324 +788,34 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  // Task Lists
-  async getTaskListById(id: string, agencyId?: string): Promise<TaskList | undefined> {
-    if (agencyId) {
-      // Enforce tenant isolation: verify list belongs to agency
-      const result = await db.select().from(taskLists)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .limit(1);
-      return result[0];
-    }
-    // SuperAdmin path (no agencyId) - access any list
-    const result = await db.select().from(taskLists).where(eq(taskLists.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getTaskListsByProjectId(projectId: string, agencyId?: string): Promise<TaskList[]> {
-    if (agencyId) {
-      // Enforce tenant isolation: verify lists belong to agency's project
-      return await db.select().from(taskLists)
-        .where(and(eq(taskLists.projectId, projectId), eq(taskLists.agencyId, agencyId)))
-        .orderBy(desc(taskLists.createdAt));
-    }
-    // SuperAdmin path - get all lists for project
-    return await db.select().from(taskLists)
-      .where(eq(taskLists.projectId, projectId))
-      .orderBy(desc(taskLists.createdAt));
-  }
-
-  async createTaskList(taskList: InsertTaskList): Promise<TaskList> {
-    const result = await db.insert(taskLists).values(taskList).returning();
-    return result[0];
-  }
-
-  async updateTaskList(id: string, data: Partial<TaskList>, agencyId?: string): Promise<TaskList> {
-    // SECURITY: Sanitize update payload - prevent tampering with immutable/audit fields
-    const { id: _id, agencyId: _agencyId, projectId: _projectId, createdAt: _createdAt, updatedAt: _updatedAt, ...sanitizedData } = data as any;
-    
-    if (agencyId) {
-      // Enforce tenant isolation: update only if list belongs to agency
-      const result = await db.update(taskLists)
-        .set(sanitizedData)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .returning();
-      
-      // Throw if no rows affected (list not found or wrong agency)
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found or access denied`);
-      }
-      
-      return result[0];
-    }
-    
-    // SuperAdmin path - update any list
-    const result = await db.update(taskLists)
-      .set(sanitizedData)
-      .where(eq(taskLists.id, id))
-      .returning();
-    
-    if (!result || result.length === 0) {
-      throw new Error(`Task list ${id} not found`);
-    }
-    
-    return result[0];
-  }
-
-  async deleteTaskList(id: string, agencyId?: string): Promise<void> {
-    if (agencyId) {
-      // Enforce tenant isolation: delete only if list belongs to agency
-      // CASCADE will handle task deletion via foreign key constraint
-      const result = await db.delete(taskLists)
-        .where(and(eq(taskLists.id, id), eq(taskLists.agencyId, agencyId)))
-        .returning();
-      
-      // Throw if no rows affected (list not found or wrong agency)
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found or access denied`);
-      }
-    } else {
-      // SuperAdmin path - delete any list
-      const result = await db.delete(taskLists)
-        .where(eq(taskLists.id, id))
-        .returning();
-      
-      if (!result || result.length === 0) {
-        throw new Error(`Task list ${id} not found`);
-      }
-    }
-  }
-
-  // Tasks
-  async getTaskById(id: string): Promise<Task | undefined> {
-    const result = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getTasksByProjectId(projectId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.projectId, projectId)).orderBy(desc(tasks.createdAt));
-  }
-
-  async getTasksByListId(listId: string): Promise<Task[]> {
-    return await db.select().from(tasks).where(eq(tasks.listId, listId)).orderBy(desc(tasks.createdAt));
-  }
-
-  async getTasksByStaffId(staffProfileId: string): Promise<Task[]> {
-    const assignments = await db.select().from(staffAssignments).where(eq(staffAssignments.staffProfileId, staffProfileId));
-    const taskIds = assignments.map(a => a.taskId);
-    
-    if (taskIds.length === 0) return [];
-    
-    return await db.select().from(tasks).where(eq(tasks.id, taskIds[0])).orderBy(desc(tasks.createdAt));
-  }
-
-  async getSubtasksByParentId(parentId: string): Promise<Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>> {
-    // Fetch all subtasks for the parent task
-    const subtasks = await db.select().from(tasks).where(eq(tasks.parentId, parentId));
-    
-    // Fetch assignments and staff profiles for each subtask
-    const subtasksWithAssignments = await Promise.all(
-      subtasks.map(async (subtask) => {
-        const assignments = await db
-          .select({
-            id: staffAssignments.id,
-            taskId: staffAssignments.taskId,
-            staffProfileId: staffAssignments.staffProfileId,
-            createdAt: staffAssignments.createdAt,
-            staffProfile: profiles,
-          })
-          .from(staffAssignments)
-          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
-          .where(eq(staffAssignments.taskId, subtask.id));
-
-        return {
-          ...subtask,
-          assignments: assignments
-            .filter((a) => a.staffProfile !== null)
-            .map((a) => ({
-              id: a.id,
-              taskId: a.taskId,
-              staffProfileId: a.staffProfileId,
-              createdAt: a.createdAt,
-              staffProfile: a.staffProfile as Profile,
-            })),
-        };
-      })
-    );
-
-    return subtasksWithAssignments;
-  }
-
-  async getAllTasks(agencyId?: string): Promise<Task[]> {
-    if (agencyId) {
-      // Join through projects -> clients to filter by agencyId
-      const results = await db
-        .select({
-          id: tasks.id,
-          description: tasks.description,
-          status: tasks.status,
-          dueDate: tasks.dueDate,
-          priority: tasks.priority,
-          projectId: tasks.projectId,
-          initiativeId: tasks.initiativeId,
-          createdAt: tasks.createdAt,
-          startDate: tasks.startDate,
-          listId: tasks.listId,
-          parentId: tasks.parentId,
-          timeEstimate: tasks.timeEstimate,
-          timeTracked: tasks.timeTracked,
-        })
-        .from(tasks)
-        .innerJoin(projects, eq(tasks.projectId, projects.id))
-        .innerJoin(clients, eq(projects.clientId, clients.id))
-        .where(eq(clients.agencyId, agencyId))
-        .orderBy(desc(tasks.createdAt));
-      return results;
-    }
-    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
-  }
-
-  async createTask(task: InsertTask): Promise<Task> {
-    const result = await db.insert(tasks).values(task).returning();
-    return result[0];
-  }
-
-  async updateTask(id: string, data: Partial<Task>): Promise<Task> {
-    const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
-    return result[0];
-  }
-
-  async deleteTask(id: string): Promise<void> {
-    // First delete all staff assignments for this task
-    await db.delete(staffAssignments).where(eq(staffAssignments.taskId, id));
-    // Then delete the task
-    await db.delete(tasks).where(eq(tasks.id, id));
-  }
-
-  // Staff Assignments
-  async createStaffAssignment(assignment: InsertStaffAssignment): Promise<StaffAssignment> {
-    const result = await db.insert(staffAssignments).values(assignment).returning();
-    return result[0];
-  }
-
-  async getAssignmentsByTaskId(taskId: string): Promise<StaffAssignment[]> {
-    return await db.select().from(staffAssignments).where(eq(staffAssignments.taskId, taskId));
-  }
-
-  async getAllTaskAssignments(agencyId?: string): Promise<StaffAssignment[]> {
-    if (agencyId) {
-      // Filter by agency through the task -> project -> client -> agency relationship
-      const results = await db
-        .select({
-          id: staffAssignments.id,
-          taskId: staffAssignments.taskId,
-          staffProfileId: staffAssignments.staffProfileId,
-          createdAt: staffAssignments.createdAt,
-        })
-        .from(staffAssignments)
-        .innerJoin(tasks, eq(staffAssignments.taskId, tasks.id))
-        .innerJoin(projects, eq(tasks.projectId, projects.id))
-        .innerJoin(clients, eq(projects.clientId, clients.id))
-        .where(eq(clients.agencyId, agencyId));
-      return results;
-    }
-    return await db.select().from(staffAssignments);
-  }
-
-  async deleteStaffAssignment(taskId: string, staffProfileId: string): Promise<void> {
-    await db.delete(staffAssignments)
-      .where(
-        and(
-          eq(staffAssignments.taskId, taskId),
-          eq(staffAssignments.staffProfileId, staffProfileId)
-        )
-      );
-  }
-
-  // Task Activities
-  async createTaskActivity(activity: InsertTaskActivity): Promise<TaskActivity> {
-    const result = await db.insert(taskActivities).values(activity).returning();
-    return result[0];
-  }
-
-  async getTaskActivities(taskId: string): Promise<TaskActivityWithUser[]> {
-    const activities = await db
-      .select()
-      .from(taskActivities)
-      .leftJoin(profiles, eq(taskActivities.userId, profiles.id))
-      .where(eq(taskActivities.taskId, taskId))
-      .orderBy(desc(taskActivities.createdAt));
-
-    // Filter out activities with null users (shouldn't happen, but defensive)
-    return activities
-      .filter(a => a.profiles !== null)
-      .map(a => ({
-        ...a.task_activities,
-        user: a.profiles as Profile
-      }));
-  }
-
-  async createTaskRelationship(relationship: InsertTaskRelationship): Promise<TaskRelationship> {
-    const result = await db.insert(taskRelationships).values(relationship).returning();
-    return result[0];
-  }
-
-  async getTaskRelationships(taskId: string): Promise<TaskRelationshipWithTask[]> {
-    const relationships = await db
-      .select()
-      .from(taskRelationships)
-      .leftJoin(tasks, eq(taskRelationships.relatedTaskId, tasks.id))
-      .where(eq(taskRelationships.taskId, taskId))
-      .orderBy(desc(taskRelationships.createdAt));
-
-    return relationships
-      .filter(r => r.tasks !== null)
-      .map(r => ({
-        ...r.task_relationships,
-        relatedTask: r.tasks as Task
-      }));
-  }
-
-  async deleteTaskRelationship(id: string): Promise<void> {
-    await db.delete(taskRelationships).where(eq(taskRelationships.id, id));
-  }
-
-  // Project with Tasks
-  async getProjectWithTasks(projectId: string): Promise<{
-    project: Project;
-    tasks: Array<Task & { assignments: Array<StaffAssignment & { staffProfile: Profile }> }>;
-  } | undefined> {
-    // Get the project
-    const project = await this.getProjectById(projectId);
-    if (!project) return undefined;
-
-    // Get all tasks for this project
-    const projectTasks = await db.select().from(tasks).where(eq(tasks.projectId, projectId));
-
-    // For each task, get staff assignments with profile details
-    const tasksWithAssignments = await Promise.all(
-      projectTasks.map(async (task) => {
-        const assignments = await db
-          .select()
-          .from(staffAssignments)
-          .leftJoin(profiles, eq(staffAssignments.staffProfileId, profiles.id))
-          .where(eq(staffAssignments.taskId, task.id));
-
-        return {
-          ...task,
-          assignments: assignments.map(a => ({
-            ...a.staff_assignments,
-            staffProfile: a.profiles!
-          }))
-        };
-      })
-    );
-
-    return {
-      project,
-      tasks: tasksWithAssignments
-    };
-  }
+  // === TASK DOMAIN (delegated) ===
+  getTaskListById = (id: string, agencyId?: string) => this.task.getTaskListById(id, agencyId);
+  getTaskListsByProjectId = (projectId: string, agencyId?: string) => this.task.getTaskListsByProjectId(projectId, agencyId);
+  createTaskList = (taskList: InsertTaskList) => this.task.createTaskList(taskList);
+  updateTaskList = (id: string, data: Partial<TaskList>, agencyId?: string) => this.task.updateTaskList(id, data, agencyId);
+  deleteTaskList = (id: string, agencyId?: string) => this.task.deleteTaskList(id, agencyId);
+  getTaskById = (id: string) => this.task.getTaskById(id);
+  getTasksByProjectId = (projectId: string) => this.task.getTasksByProjectId(projectId);
+  getTasksByListId = (listId: string) => this.task.getTasksByListId(listId);
+  getTasksByStaffId = (staffProfileId: string) => this.task.getTasksByStaffId(staffProfileId);
+  getSubtasksByParentId = (parentId: string) => this.task.getSubtasksByParentId(parentId);
+  getAllTasks = (agencyId?: string) => this.task.getAllTasks(agencyId);
+  createTask = (task: InsertTask) => this.task.createTask(task);
+  updateTask = (id: string, data: Partial<Task>) => this.task.updateTask(id, data);
+  deleteTask = (id: string) => this.task.deleteTask(id);
+  createStaffAssignment = (assignment: InsertStaffAssignment) => this.task.createStaffAssignment(assignment);
+  getAssignmentsByTaskId = (taskId: string) => this.task.getAssignmentsByTaskId(taskId);
+  getAllTaskAssignments = (agencyId?: string) => this.task.getAllTaskAssignments(agencyId);
+  deleteStaffAssignment = (taskId: string, staffProfileId: string) => this.task.deleteStaffAssignment(taskId, staffProfileId);
+  createTaskActivity = (activity: InsertTaskActivity) => this.task.createTaskActivity(activity);
+  getTaskActivities = (taskId: string) => this.task.getTaskActivities(taskId);
+  createTaskRelationship = (relationship: InsertTaskRelationship) => this.task.createTaskRelationship(relationship);
+  getTaskRelationships = (taskId: string) => this.task.getTaskRelationships(taskId);
+  deleteTaskRelationship = (id: string) => this.task.deleteTaskRelationship(id);
+  getTaskMessagesByTaskId = (taskId: string) => this.task.getTaskMessagesByTaskId(taskId);
+  createTaskMessage = (message: InsertTaskMessage) => this.task.createTaskMessage(message);
+  markTaskMessageAsRead = (messageId: string) => this.task.markTaskMessageAsRead(messageId);
+  getProjectWithTasks = (projectId: string) => this.task.getProjectWithTasks(projectId);
 
   // Invoices
   async getInvoiceById(id: string): Promise<Invoice | undefined> {
@@ -1823,44 +1418,6 @@ export class DbStorage implements IStorage {
       .where(eq(clientMessages.id, id));
   }
 
-  // Task Messages
-  async getTaskMessagesByTaskId(taskId: string): Promise<TaskMessageWithSender[]> {
-    const messages = await db.select({
-      id: taskMessages.id,
-      taskId: taskMessages.taskId,
-      senderId: taskMessages.senderId,
-      message: taskMessages.message,
-      isRead: taskMessages.isRead,
-      createdAt: taskMessages.createdAt,
-      sender: profiles,
-    })
-      .from(taskMessages)
-      .leftJoin(profiles, eq(taskMessages.senderId, profiles.id))
-      .where(eq(taskMessages.taskId, taskId))
-      .orderBy(taskMessages.createdAt);
-
-    return messages.map(row => ({
-      id: row.id,
-      taskId: row.taskId,
-      senderId: row.senderId,
-      message: row.message,
-      isRead: row.isRead,
-      createdAt: row.createdAt,
-      sender: row.sender || undefined,
-    }));
-  }
-
-  async createTaskMessage(message: InsertTaskMessage): Promise<TaskMessage> {
-    const result = await db.insert(taskMessages).values(message).returning();
-    return result[0];
-  }
-
-  async markTaskMessageAsRead(messageId: string): Promise<void> {
-    await db.update(taskMessages)
-      .set({ isRead: "true" })
-      .where(eq(taskMessages.id, messageId));
-  }
-
   // Notifications
   async getNotificationCounts(agencyId?: string): Promise<{ unreadMessages: number; unviewedResponses: number }> {
     if (agencyId) {
@@ -2343,31 +1900,6 @@ export class DbStorage implements IStorage {
       agencyName: row.agencyName ?? undefined,
       clientName: row.clientName ?? undefined,
     }));
-  }
-
-  // Super Admin - Agency Management
-  async getAllAgenciesForSuperAdmin(): Promise<Array<Agency & { userCount: number; clientCount: number }>> {
-    const result = await db
-      .select({
-        id: agencies.id,
-        name: agencies.name,
-        createdAt: agencies.createdAt,
-        userCount: sql<number>`(SELECT COUNT(*) FROM ${profiles} WHERE ${profiles.agencyId} = ${agencies.id})`,
-        clientCount: sql<number>`(SELECT COUNT(*) FROM ${clients} WHERE ${clients.agencyId} = ${agencies.id})`,
-      })
-      .from(agencies)
-      .orderBy(desc(agencies.createdAt));
-
-    return result;
-  }
-
-  async getAgencyById(id: string): Promise<Agency | undefined> {
-    const result = await db.select().from(agencies).where(eq(agencies.id, id)).limit(1);
-    return result[0];
-  }
-
-  async deleteAgency(id: string): Promise<void> {
-    await db.delete(agencies).where(eq(agencies.id, id));
   }
 
   // Super Admin - Client Management

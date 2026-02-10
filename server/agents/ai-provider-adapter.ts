@@ -1,71 +1,36 @@
 import { AIProvider } from "./base-agent";
+import { z } from "zod";
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 
 export function createAIProvider(): AIProvider {
   return {
     async generateText(prompt: string, systemPrompt?: string): Promise<string> {
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      const openaiApiKey = process.env.OPENAI_API_KEY;
+      const provider = process.env.AI_PROVIDER?.toLowerCase() || "gemini";
+      const model = provider === "openai" ? "gpt-4o" : "gemini-2.0-flash";
+      const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
-      if (geminiApiKey) {
-        return generateWithGemini(prompt, systemPrompt, geminiApiKey);
-      } else if (openaiApiKey) {
-        return generateWithOpenAI(prompt, systemPrompt, openaiApiKey);
-      } else {
-        throw new Error("No AI provider configured. Set GEMINI_API_KEY or OPENAI_API_KEY.");
+      const result = await hardenedAIExecutor.executeWithSchema(
+        {
+          agencyId: "legacy",
+          operation: "agentGenerateText",
+          provider,
+          model,
+        },
+        {
+          prompt: fullPrompt,
+          model,
+          temperature: 0.7,
+        },
+        z.string()
+      );
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "AI generation failed");
       }
+
+      return cleanJsonResponse(result.data);
     }
   };
-}
-
-async function generateWithGemini(
-  prompt: string,
-  systemPrompt: string | undefined,
-  apiKey: string
-): Promise<string> {
-  const { GoogleGenAI } = await import("@google/genai");
-  const genAI = new GoogleGenAI({ apiKey });
-
-  const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
-
-  const response = await genAI.models.generateContent({
-    model: "gemini-2.0-flash",
-    contents: fullPrompt,
-  });
-
-  const text = response.text;
-  if (!text) {
-    throw new Error("Empty response from Gemini");
-  }
-
-  return cleanJsonResponse(text);
-}
-
-async function generateWithOpenAI(
-  prompt: string,
-  systemPrompt: string | undefined,
-  apiKey: string
-): Promise<string> {
-  const OpenAI = (await import("openai")).default;
-  const openai = new OpenAI({ apiKey });
-
-  const messages: Array<{ role: "system" | "user"; content: string }> = [];
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
-  messages.push({ role: "user", content: prompt });
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages,
-    temperature: 0.7,
-  });
-
-  const text = response.choices[0]?.message?.content;
-  if (!text) {
-    throw new Error("Empty response from OpenAI");
-  }
-
-  return cleanJsonResponse(text);
 }
 
 function cleanJsonResponse(text: string): string {

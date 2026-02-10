@@ -1,11 +1,15 @@
-import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
+import { z } from "zod";
 import { db } from "../db";
 import { knowledgeDocuments, documentEmbeddings, embeddingIndexStats, semanticSearchLogs, type EmbeddingIndexStats } from "@shared/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const embeddingSchema = z.object({
+  embedding: z.array(z.number()),
+  tokenCount: z.number(),
+  model: z.string(),
+  provider: z.enum(["openai", "gemini"]),
+});
 
 export interface ChunkOptions {
   maxTokens?: number;
@@ -64,33 +68,43 @@ export class EmbeddingService {
   }
 
   private async generateOpenAIEmbedding(text: string): Promise<EmbeddingResult> {
-    const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: text,
-      encoding_format: "float",
-    });
+    const model = "text-embedding-3-small";
+    const result = await hardenedAIExecutor.executeEmbeddingWithSchema(
+      {
+        agencyId: "legacy",
+        operation: "generateOpenAIEmbedding",
+        provider: "openai",
+        model,
+      },
+      { input: text, model },
+      embeddingSchema
+    );
 
-    return {
-      embedding: response.data[0].embedding,
-      tokenCount: response.usage?.total_tokens || Math.ceil(text.length / 4),
-      model: "text-embedding-3-small",
-      provider: "openai",
-    };
+    if (!result.success || !result.data) {
+      throw new Error(result.error || "Failed to generate OpenAI embedding");
+    }
+
+    return result.data as EmbeddingResult;
   }
 
   private async generateGeminiEmbedding(text: string): Promise<EmbeddingResult> {
-    const result = await genAI.models.embedContent({
-      model: "text-embedding-004",
-      contents: text,
-    });
-    const embedding = result.embeddings?.[0]?.values || [];
+    const model = "text-embedding-004";
+    const result = await hardenedAIExecutor.executeEmbeddingWithSchema(
+      {
+        agencyId: "legacy",
+        operation: "generateGeminiEmbedding",
+        provider: "gemini",
+        model,
+      },
+      { input: text, model },
+      embeddingSchema
+    );
 
-    return {
-      embedding: embedding,
-      tokenCount: Math.ceil(text.length / 4),
-      model: "text-embedding-004",
-      provider: "gemini",
-    };
+    if (!result.success || !result.data) {
+      throw new Error(result.error || "Failed to generate Gemini embedding");
+    }
+
+    return result.data as EmbeddingResult;
   }
 
   chunkText(

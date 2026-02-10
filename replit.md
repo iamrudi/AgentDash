@@ -140,7 +140,7 @@ Used for:
 - brand knowledge modeling  
 - improved recommendation quality  
 
-### 4.4 Duration Intelligence (Completed December 2024)
+### 4.4 Duration Intelligence (Completed December 2025)
 
 Predictive duration modeling and resource optimization:
 
@@ -384,7 +384,7 @@ The platform runs on Replit using:
 
 ---
 
-# 13. Recent Changes (December 2024)
+# 13. Recent Changes (December 2025)
 
 - Workflow builder UI (Priority 15)  
 - Enhanced analytics ingestion  
@@ -396,7 +396,7 @@ The platform runs on Replit using:
 - **Closed Feedback Loop** ✅ - Outcome tracking, quality metrics, AI calibration
 - **Brand Knowledge Layer** ✅ - Structured knowledge ingestion pipeline with UI
 - **Platform Audit** ✅ - Maintenance scoring, technical debt register, documentation updates
-- **Routes Decomposition** 🔄 - Phase 2 in progress: 13 routers mounted (151 routes), ~15 routes pending extraction, cross-tenant protection enforced
+- **Routes Decomposition** ✅ - COMPLETE: 37 router registrations (~325 routes), 94% file size reduction (4,832→300 lines)
 - **Stability Testing Framework** ✅ - 44 Vitest tests (auth: 18, SLA: 18, maintenance: 8)
 
 ---
@@ -411,7 +411,8 @@ The platform runs on Replit using:
 - AI task-type model selection
 - Knowledge graph visualization
 - Cross-client pattern learning (with governance)
-- ~~Routes.ts/storage.ts refactoring~~ → In progress via domain router pattern
+- ~~Routes.ts refactoring~~ → ✅ COMPLETE (December 2025)
+- storage.ts decomposition → 🟡 IN PROGRESS (Phase 1-2 complete, 43 methods extracted)
 
 ---
 
@@ -419,11 +420,11 @@ The platform runs on Replit using:
 
 | Document | Purpose | Location |
 |----------|---------|----------|
-| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | Root |
-| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | Root |
-| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | Root |
-| **docs/maintenance-matrix.md** | Module health scores, cleanup queue | docs/ |
-| **docs/frontend-backend-map.md** | React → API → Storage mapping | docs/ |
+| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | documentation/ |
+| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | documentation/ |
+| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | documentation/ |
+| **maintenance-matrix.md** | Module health scores, cleanup queue | documentation/ |
+| **frontend-backend-map.md** | React → API → Storage mapping | documentation/ |
 
 ### Maintenance Scoring Quick Reference
 
@@ -433,13 +434,15 @@ MaintenanceScore = 100 - (5×Complexity + 10×TechDebt + 15×Incidents + 5×Test
 🟢 ≥80: Healthy    🟡 60-79: Needs attention    🔴 <60: Critical
 ```
 
-Current Status (December 2024):
+Current Status (December 2025):
 - Intelligence Layer: 82 🟢
 - AI Providers: 84 🟢
 - Real-time: 81 🟢 ← Health checks & metrics added
-- Domain Routers (mounted): 82 🟢 ← auth, user, client, agency, staff, crm, settings, superadmin, invoices, tasks, intelligence, knowledge, workflows, workflow-executions, lineage (156 routes)
+- Domain Routers: 85 🟢 ← 37 registrations, ~325 routes, decomposition COMPLETE
 - Workflow Engine: 79 🟡
-- Core Backend (routes.ts, storage.ts): 58 🔴 ← Decomposition in progress (~85% complete)
+- routes.ts: 85 🟢 ← Decomposition complete (300 lines, 3 routes)
+- storage.ts: 65 🟡 ← Decomposition in progress (3,245 lines, Phase 1-2 complete)
+- Storage Domains: 85 🟢 ← identity, agency, task domains extracted (43 methods)
 
 ---
 
@@ -453,4 +456,4 @@ Current Status (December 2024):
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 2025*

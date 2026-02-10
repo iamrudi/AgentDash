@@ -8,6 +8,8 @@ import type {
   LighthouseSummary,
   ChatAnalysis,
   GenerateTextOptions,
+  GenerateEmbeddingOptions,
+  EmbeddingResult,
 } from "./types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -459,5 +461,24 @@ Focus on messages from the "Client" role - these are the most important for unde
       console.error("Gemini AI generateText error:", error);
       throw new Error(`Failed to generate text: ${error}`);
     }
+  }
+
+  async generateEmbedding(options: GenerateEmbeddingOptions): Promise<EmbeddingResult> {
+    const model = options.model || "text-embedding-004";
+    const result = await callGeminiWithRetry(
+      () => ai.models.embedContent({
+        model,
+        contents: options.input,
+      }),
+      "generateEmbedding"
+    );
+    const embedding = result.embeddings?.[0]?.values || [];
+
+    return {
+      embedding,
+      tokenCount: Math.ceil(options.input.length / 4),
+      model,
+      provider: "gemini",
+    };
   }
 }
