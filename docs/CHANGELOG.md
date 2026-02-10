@@ -7,6 +7,24 @@ Tracks refactoring and modernization work with dates, completion status, and pla
 Format: each item includes what changed, why it was done, and why it matters.
 
 ### Completed
+- [x] Added SkuCompositionService and migrated SKU composition endpoints: `server/application/sku/sku-composition-service.ts`, `server/domain/sku/schemas.ts`, `server/routes/sku-compositions.ts`.
+  Why: Centralize SKU validation and audit emission in an application service.
+  Matters: Keeps scope-freeze artifacts governed and consistent.
+- [x] Added SKU composition route tests (delegation + invalid payload): `tests/sku-compositions-route.test.ts`.
+  Why: Ensure route delegates and fails closed on schema violations.
+  Matters: Prevents regressions in scope freeze handling.
+- [x] Added InitiativeIntentService and migrated intent endpoint: `server/application/initiatives/initiative-intent-service.ts`, `server/domain/initiatives/schemas.ts`, `server/routes/initiative-intents.ts`.
+  Why: Move intent creation validation and audit emission into an application service.
+  Matters: Keeps control-plane intent artifacts governed and consistent.
+- [x] Added initiative intent route tests (delegation + invalid payload): `tests/initiative-intents-route.test.ts`.
+  Why: Ensure route delegates and fails closed on schema violations.
+  Matters: Prevents regressions in intent capture.
+- [x] Added GateDecisionService and migrated gate decision endpoint: `server/application/gates/gate-decision-service.ts`, `server/domain/gates/schemas.ts`, `server/routes/opportunities.ts`.
+  Why: Move gate decision validation, tenancy checks, and audit emission into an application service.
+  Matters: Keeps control-plane artifacts governed and consistent across routes.
+- [x] Added gate decision route tests (delegation, tenant 403, invalid payload 400): `tests/gate-decisions-route.test.ts`.
+  Why: Ensure non-breaking behavior and fail-closed validation.
+  Matters: Prevents regressions in gate enforcement.
 - [x] Added application service layer pattern for Opportunity Artifacts: `server/application/opportunities/opportunity-service.ts`, `server/domain/opportunities/schemas.ts`.
   Why: Separate orchestration from routes and make AI generation explicit and testable.
   Matters: Enforces Control Centre boundaries and consistent AI gating for Opportunity Artifacts.
