@@ -7,6 +7,36 @@ Tracks refactoring and modernization work with dates, completion status, and pla
 Format: each item includes what changed, why it was done, and why it matters.
 
 ### Completed
+- [x] Added ops summary and policy bundle listing endpoints: `server/governance/governance-routes.ts`.
+  Why: Provide minimal Phase 3 visibility hooks without altering runtime behavior.
+  Matters: Enables operator insight into rule publishes, workflow failures, and AI usage.
+- [x] Added ops trends endpoint (rule publishes + workflow failures): `server/governance/governance-routes.ts`.
+  Why: Provide time-series visibility for control-plane rule changes and workflow failures.
+  Matters: Helps operators detect regressions and incident patterns over time.
+- [x] Added policy bundle versions endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide read-only access to bundle history for operational review.
+  Matters: Enables safe inspection of policy changes without execution coupling.
+- [x] Expanded retention job plan to include archive/delete intent: `server/jobs/retention-job.ts`.
+  Why: Surface whether retention policies imply archive or delete without performing actions.
+  Matters: Prepares safe rollout of archival workflows and clarifies cleanup intent.
+- [x] Added retention cleanup plan preview endpoint: `server/routes/retention-policies.ts`.
+  Why: Provide operators a safe, read-only view of retention actions.
+  Matters: Enables validation before destructive cleanup runs.
+- [x] Added AI usage summary endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide coarse visibility into AI usage by provider/model.
+  Matters: Supports Phase 3 ops reporting without altering execution behavior.
+- [x] Added workflow failure summary endpoint: `server/governance/governance-routes.ts`.
+  Why: Surface top workflows with failures in a time window.
+  Matters: Helps triage instability without touching execution logic.
+- [x] Added policy bundle/versioning schema + migration: `shared/schema.ts`, `migrations/0012_add_policy_bundles.sql`.
+  Why: Establish data model for policy bundles without execution coupling.
+  Matters: Enables safe versioning and rollout in later phases.
+- [x] Added retention cleanup scaffolding (dry-run plan): `server/jobs/retention-job.ts`.
+  Why: Prepare for retention jobs without destructive side effects.
+  Matters: Supports P8 operational recovery and compliance planning.
+- [x] Added retention job test: `tests/retention-job.test.ts`.
+  Why: Validate retention plan generation deterministically.
+  Matters: Prevents regressions in cleanup scheduling logic.
 - [x] Added SkuCompositionService and migrated SKU composition endpoints: `server/application/sku/sku-composition-service.ts`, `server/domain/sku/schemas.ts`, `server/routes/sku-compositions.ts`.
   Why: Centralize SKU validation and audit emission in an application service.
   Matters: Keeps scope-freeze artifacts governed and consistent.

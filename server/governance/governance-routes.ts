@@ -2,8 +2,8 @@ import { Router, Response } from "express";
 import { quotaService } from "./quota-service";
 import { integrationHealthService } from "./integration-health-service";
 import { db } from "../db";
-import { governanceAuditLogs, agencyQuotas, agencies, profiles } from "@shared/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { governanceAuditLogs, agencyQuotas, agencies, profiles, policyBundles, policyBundleVersions, workflowRuleAudits, workflowEvents, aiExecutions } from "@shared/schema";
+import { eq, desc, and, gte, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import logger from "../middleware/logger";
 import { requireAuth, requireSuperAdmin, type AuthRequest } from "../middleware/supabase-auth";
@@ -371,6 +371,231 @@ router.get(
     } catch (error) {
       logger.error("[Governance] Failed to fetch dashboard:", error);
       res.status(500).json({ error: "Failed to fetch dashboard" });
+    }
+  }
+);
+
+router.get(
+  "/ops/summary",
+  requireSuperAdmin,
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+      const [rulePublishes] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(workflowRuleAudits)
+        .where(and(eq(workflowRuleAudits.changeType, "published"), gte(workflowRuleAudits.createdAt, since)));
+
+      const [failedWorkflows] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(workflowEvents)
+        .where(and(eq(workflowEvents.eventType, "failed"), gte(workflowEvents.timestamp, since)));
+
+      const [aiExecutionsCount] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(aiExecutions)
+        .where(gte(aiExecutions.createdAt, since));
+
+      res.json({
+        windowDays: 7,
+        rulePublishes: rulePublishes?.count || 0,
+        failedWorkflows: failedWorkflows?.count || 0,
+        aiExecutions: aiExecutionsCount?.count || 0,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch ops summary:", error);
+      res.status(500).json({ error: "Failed to fetch ops summary" });
+    }
+  }
+);
+
+router.get(
+  "/ops/trends",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const rulePublishTrend = await db
+        .select({
+          day: sql<Date>`date_trunc('day', ${workflowRuleAudits.createdAt})`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(workflowRuleAudits)
+        .where(and(eq(workflowRuleAudits.changeType, "published"), gte(workflowRuleAudits.createdAt, since)))
+        .groupBy(sql`date_trunc('day', ${workflowRuleAudits.createdAt})`)
+        .orderBy(sql`date_trunc('day', ${workflowRuleAudits.createdAt})`);
+
+      const workflowFailureTrend = await db
+        .select({
+          day: sql<Date>`date_trunc('day', ${workflowEvents.timestamp})`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(workflowEvents)
+        .where(and(eq(workflowEvents.eventType, "failed"), gte(workflowEvents.timestamp, since)))
+        .groupBy(sql`date_trunc('day', ${workflowEvents.timestamp})`)
+        .orderBy(sql`date_trunc('day', ${workflowEvents.timestamp})`);
+
+      const formatTrend = (rows: Array<{ day: Date | string | null; count: number | null }>) =>
+        rows.map((row) => ({
+          day: row.day ? new Date(row.day).toISOString().slice(0, 10) : null,
+          count: row.count ?? 0,
+        }));
+
+      res.json({
+        windowDays: safeWindowDays,
+        rulePublishes: formatTrend(rulePublishTrend),
+        workflowFailures: formatTrend(workflowFailureTrend),
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch ops trends:", error);
+      res.status(500).json({ error: "Failed to fetch ops trends" });
+    }
+  }
+);
+
+router.get(
+  "/ops/ai-usage",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const usage = await db
+        .select({
+          provider: aiExecutions.provider,
+          model: aiExecutions.model,
+          totalRequests: sql<number>`count(*)::int`,
+          totalPromptTokens: sql<number>`coalesce(sum(${aiExecutions.promptTokens}), 0)::int`,
+          totalCompletionTokens: sql<number>`coalesce(sum(${aiExecutions.completionTokens}), 0)::int`,
+          totalTokens: sql<number>`coalesce(sum(${aiExecutions.totalTokens}), 0)::int`,
+        })
+        .from(aiExecutions)
+        .where(gte(aiExecutions.createdAt, since))
+        .groupBy(aiExecutions.provider, aiExecutions.model)
+        .orderBy(desc(sql`count(*)`));
+
+      res.json({
+        windowDays: safeWindowDays,
+        usage,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch AI usage summary:", error);
+      res.status(500).json({ error: "Failed to fetch AI usage summary" });
+    }
+  }
+);
+
+router.get(
+  "/ops/workflow-failures",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const failures = await db
+        .select({
+          workflowId: workflowEvents.workflowId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(workflowEvents)
+        .where(and(eq(workflowEvents.eventType, "failed"), gte(workflowEvents.timestamp, since)))
+        .groupBy(workflowEvents.workflowId)
+        .orderBy(desc(sql`count(*)`))
+        .limit(50);
+
+      res.json({
+        windowDays: safeWindowDays,
+        failures,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch workflow failures summary:", error);
+      res.status(500).json({ error: "Failed to fetch workflow failures summary" });
+    }
+  }
+);
+
+router.get(
+  "/policy-bundles",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { agencyId } = req.query;
+      if (!agencyId || typeof agencyId !== "string") {
+        return res.status(400).json({ error: "agencyId is required" });
+      }
+
+      const bundles = await db
+        .select()
+        .from(policyBundles)
+        .where(eq(policyBundles.agencyId, agencyId))
+        .orderBy(desc(policyBundles.createdAt));
+
+      const bundleIds = bundles.map((b) => b.id);
+      const versions = bundleIds.length
+        ? await db
+            .select()
+            .from(policyBundleVersions)
+            .where(inArray(policyBundleVersions.bundleId, bundleIds))
+            .orderBy(desc(policyBundleVersions.version))
+        : [];
+
+      const latestByBundle = new Map<string, number>();
+      for (const version of versions) {
+        if (!latestByBundle.has(version.bundleId)) {
+          latestByBundle.set(version.bundleId, version.version);
+        }
+      }
+
+      res.json(
+        bundles.map((bundle) => ({
+          ...bundle,
+          latestVersion: latestByBundle.get(bundle.id) ?? null,
+        }))
+      );
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch policy bundles:", error);
+      res.status(500).json({ error: "Failed to fetch policy bundles" });
+    }
+  }
+);
+
+router.get(
+  "/policy-bundles/:bundleId/versions",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { bundleId } = req.params;
+      const [bundle] = await db
+        .select()
+        .from(policyBundles)
+        .where(eq(policyBundles.id, bundleId))
+        .limit(1);
+
+      if (!bundle) {
+        return res.status(404).json({ error: "Policy bundle not found" });
+      }
+
+      const versions = await db
+        .select()
+        .from(policyBundleVersions)
+        .where(eq(policyBundleVersions.bundleId, bundleId))
+        .orderBy(desc(policyBundleVersions.version));
+
+      res.json({
+        bundle,
+        versions,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch policy bundle versions:", error);
+      res.status(500).json({ error: "Failed to fetch policy bundle versions" });
     }
   }
 );

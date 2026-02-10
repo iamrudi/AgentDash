@@ -10,6 +10,7 @@ import { Router } from 'express';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { db } from '../db';
+import { buildRetentionPlan } from '../jobs/retention-job';
 import { 
   workflowRetentionPolicies, 
   workflowExecutions, 
@@ -125,6 +126,34 @@ router.delete("/:id", requireAuth, requireRole("Admin"), async (req: AuthRequest
   } catch (error: any) {
     console.error("Error deleting retention policy:", error);
     res.status(500).json({ message: "Failed to delete retention policy" });
+  }
+});
+
+// Preview retention cleanup plan (admin only, non-destructive)
+router.get("/cleanup/plan", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
+  try {
+    const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+    if (!agencyId) {
+      return res.status(400).json({ message: "Agency context required" });
+    }
+
+    const policies = await db.select()
+      .from(workflowRetentionPolicies)
+      .where(eq(workflowRetentionPolicies.agencyId, agencyId));
+
+    const plan = buildRetentionPlan(
+      policies.map((policy) => ({
+        resourceType: policy.resourceType,
+        retentionDays: policy.retentionDays,
+        enabled: policy.enabled ?? true,
+        archiveBeforeDelete: policy.archiveBeforeDelete ?? false,
+      }))
+    );
+
+    res.json({ plan });
+  } catch (error: any) {
+    console.error("Error building retention plan:", error);
+    res.status(500).json({ message: "Failed to build retention plan" });
   }
 });
 

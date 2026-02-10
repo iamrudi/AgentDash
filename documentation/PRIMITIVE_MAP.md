@@ -25,6 +25,10 @@ This document maps the Phase 1 increment changes to core primitives. It is inten
 
 - **Control-Plane Artifacts**
   - Gate Decisions are persisted via `server/application/gates/gate-decision-service.ts` and exposed through `server/routes/opportunities.ts`.
+  - Policy Bundles and versions are stored in `shared/schema.ts` and exposed via `server/governance/governance-routes.ts`.
+
+- **P8 — Operational Recovery**
+  - `server/jobs/retention-job.ts` provides retention cleanup scaffolding with dry-run planning.
 
 ## Notes
 
