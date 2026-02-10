@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateClientRecordUpdate } from "../server/clients/client-record-service";
+import { validateClientRecordUpdate, validateClientRecordUpdateWithContext } from "../server/clients/client-record-service";
 
 describe("Client record validation", () => {
   it("accepts valid numeric updates for cataloged fields", () => {
@@ -19,6 +19,21 @@ describe("Client record validation", () => {
     const result = validateClientRecordUpdate({ companyName: null });
     expect(result.ok).toBe(false);
     expect(result.errors[0]?.field).toBe("client.companyName");
+  });
+
+  it("rejects signal-only fields for manual updates", () => {
+    const result = validateClientRecordUpdate({ leadEvents: ["signup"] });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]?.reason).toBe("signal_only");
+  });
+
+  it("requires matching signal source for signal updates", () => {
+    const result = validateClientRecordUpdateWithContext(
+      { leadEvents: ["signup"] },
+      { source: "signal", signalSource: "gsc" }
+    );
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]?.reason).toBe("signal_source_mismatch");
   });
 
   it("ignores non-catalog fields", () => {

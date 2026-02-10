@@ -12,6 +12,13 @@ export interface ClientRecordValidationResult {
   validatedFields: string[];
 }
 
+export type ClientRecordUpdateSource = "manual" | "signal" | "derived";
+
+export interface ClientRecordUpdateContext {
+  source: ClientRecordUpdateSource;
+  signalSource?: string;
+}
+
 function parseAllowedValues(entry: FieldCatalogEntry): string[] {
   if (!entry.allowed_values) return [];
   return entry.allowed_values
@@ -92,8 +99,45 @@ function validateValue(entry: FieldCatalogEntry, value: unknown): ClientRecordVa
   }
 }
 
+function validateUpdateMode(
+  entry: FieldCatalogEntry,
+  context: ClientRecordUpdateContext
+): ClientRecordValidationError | null {
+  if (!entry.update_mode) return null;
+
+  if (entry.update_mode === "manual" && context.source !== "manual") {
+    return { field: entry.field_key, reason: "manual_only" };
+  }
+
+  if (entry.update_mode === "signal" && context.source !== "signal") {
+    return { field: entry.field_key, reason: "signal_only" };
+  }
+
+  if (entry.update_mode === "derived" && context.source !== "derived") {
+    return { field: entry.field_key, reason: "derived_only" };
+  }
+
+  if (context.source === "signal" && entry.update_mode === "signal") {
+    if (entry.signal_source && !context.signalSource) {
+      return { field: entry.field_key, reason: "signal_source_required" };
+    }
+    if (entry.signal_source && context.signalSource && entry.signal_source !== context.signalSource) {
+      return { field: entry.field_key, reason: "signal_source_mismatch" };
+    }
+  }
+
+  return null;
+}
+
 export function validateClientRecordUpdate(
   updates: Record<string, unknown>
+): ClientRecordValidationResult {
+  return validateClientRecordUpdateWithContext(updates, { source: "manual" });
+}
+
+export function validateClientRecordUpdateWithContext(
+  updates: Record<string, unknown>,
+  context: ClientRecordUpdateContext
 ): ClientRecordValidationResult {
   const catalog = getClientRecordCatalog();
   const clientEntries = catalog.filter((entry) => entry.field_key.startsWith("client."));
@@ -109,6 +153,11 @@ export function validateClientRecordUpdate(
   for (const [field, value] of Object.entries(updates)) {
     const entry = entryMap.get(field);
     if (!entry) continue;
+    const modeError = validateUpdateMode(entry, context);
+    if (modeError) {
+      errors.push(modeError);
+      continue;
+    }
     const error = validateValue(entry, value);
     if (error) {
       errors.push(error);

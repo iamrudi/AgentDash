@@ -21,6 +21,7 @@ This document maps the Phase 1 increment changes to core primitives. It is inten
   - `server/application/gates/gate-decision-service.ts` emits audit logs for gate decisions when available.
   - `server/application/initiatives/initiative-intent-service.ts` emits audit logs for initiative intents when available.
   - `server/application/sku/sku-composition-service.ts` emits audit logs for SKU composition create/freeze when available.
+  - `server/clients/client-record-accessor.ts` emits audit logs for client record updates and routes update signals.
   - Focused tests verify hardened executor usage for legacy Gemini analysis paths.
 
 - **Control-Plane Artifacts**

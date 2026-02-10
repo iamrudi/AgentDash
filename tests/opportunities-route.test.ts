@@ -7,6 +7,15 @@ vi.mock("../server/middleware/request-context", () => ({
   }),
 }));
 
+vi.mock("../server/clients/client-record-signal", () => ({
+  emitClientRecordUpdatedSignal: vi.fn().mockResolvedValue({
+    signalId: "signal-1",
+    isDuplicate: false,
+    workflowsTriggered: [],
+    executions: [],
+  }),
+}));
+
 vi.mock("../server/middleware/supabase-auth", async () => {
   const actual = await vi.importActual("../server/middleware/supabase-auth");
   return {
@@ -46,5 +55,31 @@ describe("Opportunities route", () => {
 
     expect(persistOpportunityArtifact).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  it("routes ai_generate to the workflow engine", async () => {
+    const service = {
+      generateOpportunityArtifactFromAI: vi.fn(),
+      persistOpportunityArtifact: vi.fn(),
+    } as any;
+
+    const req = {
+      body: {
+        mode: "ai_generate",
+        clientId: "9f3e2a1e-1111-4a2d-9f3e-222222222222",
+      },
+      user: { id: "user-1", role: "Admin", agencyId: "agency-1" },
+    } as any;
+
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    const handler = createOpportunityHandler(service);
+    await handler(req, res);
+
+    expect(service.generateOpportunityArtifactFromAI).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(202);
   });
 });

@@ -19,6 +19,18 @@ Docs:
 - Route inventory updated for new governance/retention endpoints
 
 ### Completed
+- [x] Added typed Client Record accessor with update_mode enforcement: `server/clients/client-record-accessor.ts`, `server/clients/client-record-service.ts`, `server/routes/agency.ts`, `server/routes/integrations.ts`.
+  Why: Centralize client record updates with validation, audit, and signal emission rules.
+  Matters: Enforces the decision-input contract and prevents unauthorized update paths.
+- [x] Routed AI recommendation requests through workflow engine for Opportunity Artifacts: `server/routes/opportunities.ts`, `tests/opportunities-route.test.ts`.
+  Why: Remove direct AI recommendation execution from route handlers.
+  Matters: Keeps recommendations governed by workflow policies and signals.
+- [x] Added retention cleanup application service layer: `server/application/retention/retention-service.ts`, `server/routes/retention-policies.ts`.
+  Why: Move multi-step cleanup orchestration out of route handlers.
+  Matters: Improves testability and keeps route logic thin.
+- [x] Added execution/output/learning application services: `server/application/execution/execution-output-service.ts`, `server/application/outcomes/outcome-review-service.ts`, `server/application/learning/learning-artifact-service.ts`.
+  Why: Move gate-sensitive orchestration out of route handlers.
+  Matters: Keeps control-plane validation centralized and testable.
 - [x] Added ops summary and policy bundle listing endpoints: `server/governance/governance-routes.ts`.
   Why: Provide minimal Phase 3 visibility hooks without altering runtime behavior.
   Matters: Enables operator insight into rule publishes, workflow failures, and AI usage.
@@ -200,21 +212,12 @@ Docs:
   Matters: Ensures idempotent workflows and durable traceability.
 
 ### Planned (Open)
-- [ ] Client Record: typed accessor with schema validation + audit emission (Phase 1 of workstream).
-- Why: Enforce `data_type/allowed_values/nullable` and audit rules on writes.
-- Matters: Moves Client Record from best-effort to contract-enforced.
 - [ ] Client Record: recommendation flow routed through workflow engine via signals (Phase 2 of workstream).
 - Why: Remove direct AI recommendation path.
 - Matters: Keeps execution governed by workflow policies and gates.
-- [ ] Request context object to reduce implicit request mutation (Phase 1).
-- Why: Normalize authenticated request state.
-- Matters: Minimizes hidden coupling and clarifies invariants.
 - [ ] Application service layer for multi-step operations (Phase 2).
 - Why: Move complex orchestration out of route handlers.
 - Matters: Strengthens primitive boundaries and testability.
-- [ ] Phase 3 ops dashboards, retention/archival jobs, policy bundles/versioning.
-- Why: Provide operator visibility and lifecycle control.
-- Matters: Sustains platform governance at scale.
 - [ ] Backfill changelog entries for work prior to 2026-02-10.
 - Why: Establish historical audit trail.
 - Matters: Improves traceability for future audits.

@@ -6,6 +6,7 @@ import { OpportunityArtifactRequestSchema } from "../domain/opportunities/schema
 import { OpportunityService } from "../application/opportunities/opportunity-service";
 import { getRequestContext } from "../middleware/request-context";
 import { GateDecisionService } from "../application/gates/gate-decision-service";
+import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 
 const router = Router();
 
@@ -32,17 +33,23 @@ export function createOpportunityHandler(service: OpportunityService) {
       }
 
       if (data.mode === "ai_generate") {
-        const aiResult = await service.generateOpportunityArtifactFromAI(data.clientId, ctx);
-        if (!aiResult.ok || !aiResult.data) {
-          return res.status(400).json({ message: aiResult.error || "AI generation failed" });
-        }
+        const signalResult = await emitClientRecordUpdatedSignal(storage, {
+          agencyId: ctx.agencyId!,
+          clientId: data.clientId,
+          updates: {},
+          actorId: ctx.userId,
+          origin: "opportunities.ai_generate",
+          reason: "manual_recommendations",
+        });
 
-        const saved = await service.persistOpportunityArtifact(data.clientId, aiResult.data, ctx);
-        if (!saved.ok || !saved.data) {
-          return res.status(500).json({ message: saved.error || "Failed to persist opportunity artifact" });
-        }
-
-        return res.status(201).json(saved.data);
+        return res.status(202).json({
+          success: true,
+          message: "Recommendation request routed to workflow engine",
+          signalId: signalResult.signalId,
+          isDuplicate: signalResult.isDuplicate,
+          workflowsTriggered: signalResult.workflowsTriggered,
+          executions: signalResult.executions,
+        });
       }
 
       const saved = await service.persistOpportunityArtifact(data.clientId, data, ctx);
