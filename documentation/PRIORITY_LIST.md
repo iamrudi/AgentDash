@@ -24,6 +24,17 @@ Status: cleared on 2026-02-10. All previously identified direct LLM call sites w
 
 ---
 
+## Phase 2: Embedding Guardrails & Telemetry (Draft)
+
+- Add explicit embedding token usage tracking (model/provider granularity).
+- Enforce embedding input schema (length/tokens) and per-tenant size caps.
+- Add optional embedding cache keyed by input hash + model + provider.
+- Standardize embedding error codes (quota/schema/provider).
+- Add embedding audit events (or extend `ai_executions` fields).
+- Add embedding usage policy (tenant limits/cost ceilings).
+- Tests: embedding schema rejection + quota failure paths.
+- Docs: update `TECHNICAL_BRIEF.md` with embedding guardrails and limits.
+
 ## Priority 1: Workflow Engine (Core Orchestration)
 
 **Status:** ✅ COMPLETED (December 2025)  
