@@ -11,6 +11,7 @@ import { refreshAccessToken, fetchGA4Data, fetchGA4KeyEvents, fetchGSCData, fetc
 import { hardenedAIExecutor } from "../ai/hardened-executor";
 import { cache, CACHE_TTL } from "../lib/cache";
 import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
+import { getRequestContext } from "../middleware/request-context";
 
 export const agencyClientsRouter = Router();
 export const clientsRouter = Router();
@@ -135,11 +136,12 @@ agencyClientsRouter.post("/:clientId/generate-recommendations", requireAuth, req
     });
     
     const validatedData = generateRecommendationsSchema.parse(req.body);
+    const ctx = getRequestContext(req);
     const signalResult = await emitClientRecordUpdatedSignal(storage, {
-      agencyId: req.user!.agencyId!,
+      agencyId: ctx.agencyId!,
       clientId,
       updates: {},
-      actorId: req.user!.id,
+      actorId: ctx.userId,
       origin: "agency.recommendations.request",
       reason: "manual_recommendations",
       preset: validatedData.preset,

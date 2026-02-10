@@ -13,6 +13,7 @@ import { agencySettings } from '@shared/schema';
 import { db } from '../db';
 import { eq } from 'drizzle-orm';
 import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
+import { getRequestContext } from "../middleware/request-context";
 
 const router = Router();
 
@@ -109,18 +110,19 @@ router.post("/ga4/:clientId/property", requireAuth, requireRole("Admin"), requir
         return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
       }
       await storage.updateClient(clientId, updates);
+      const ctx = getRequestContext(req);
       await auditClientRecordUpdate(storage, {
-        userId: req.user!.id,
+        userId: ctx.userId,
         clientId,
         updates,
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
       });
       await emitClientRecordUpdatedSignal(storage, {
-        agencyId: req.user!.agencyId!,
+        agencyId: ctx.agencyId!,
         clientId,
         updates,
-        actorId: req.user!.id,
+        actorId: ctx.userId,
         origin: "integration.ga4.property",
         reason: "ga4_lead_events_sync",
       });
@@ -132,18 +134,19 @@ router.post("/ga4/:clientId/property", requireAuth, requireRole("Admin"), requir
         return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
       }
       await storage.updateClient(clientId, updates);
+      const ctx = getRequestContext(req);
       await auditClientRecordUpdate(storage, {
-        userId: req.user!.id,
+        userId: ctx.userId,
         clientId,
         updates,
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
       });
       await emitClientRecordUpdatedSignal(storage, {
-        agencyId: req.user!.agencyId!,
+        agencyId: ctx.agencyId!,
         clientId,
         updates,
-        actorId: req.user!.id,
+        actorId: ctx.userId,
         origin: "integration.ga4.property",
         reason: "ga4_lead_events_sync",
       });
@@ -190,18 +193,19 @@ router.patch("/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), req
         return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
       }
       await storage.updateClient(clientId, updates);
+      const ctx = getRequestContext(req);
       await auditClientRecordUpdate(storage, {
-        userId: req.user!.id,
+        userId: ctx.userId,
         clientId,
         updates,
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
       });
       await emitClientRecordUpdatedSignal(storage, {
-        agencyId: req.user!.agencyId!,
+        agencyId: ctx.agencyId!,
         clientId,
         updates,
-        actorId: req.user!.id,
+        actorId: ctx.userId,
         origin: "integration.ga4.lead_event_patch",
         reason: "ga4_lead_events_patch",
       });
@@ -213,18 +217,19 @@ router.patch("/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), req
         return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
       }
       await storage.updateClient(clientId, updates);
+      const ctx = getRequestContext(req);
       await auditClientRecordUpdate(storage, {
-        userId: req.user!.id,
+        userId: ctx.userId,
         clientId,
         updates,
-        ipAddress: req.ip,
-        userAgent: req.get("user-agent") ?? undefined,
+        ipAddress: ctx.ip,
+        userAgent: ctx.userAgent,
       });
       await emitClientRecordUpdatedSignal(storage, {
-        agencyId: req.user!.agencyId!,
+        agencyId: ctx.agencyId!,
         clientId,
         updates,
-        actorId: req.user!.id,
+        actorId: ctx.userId,
         origin: "integration.ga4.lead_event_patch",
         reason: "ga4_lead_events_patch",
       });
@@ -674,18 +679,19 @@ router.post("/clients/:clientId/lead-events", requireAuth, requireRole("Admin"),
       return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
     }
     const updated = await storage.updateClient(clientId, updates);
+    const ctx = getRequestContext(req);
     await auditClientRecordUpdate(storage, {
-      userId: req.user!.id,
+      userId: ctx.userId,
       clientId,
       updates,
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent") ?? undefined,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
     });
     await emitClientRecordUpdatedSignal(storage, {
-      agencyId: req.user!.agencyId!,
+      agencyId: ctx.agencyId!,
       clientId,
       updates,
-      actorId: req.user!.id,
+      actorId: ctx.userId,
       origin: "integration.lead_events",
       reason: "manual_lead_events",
     });

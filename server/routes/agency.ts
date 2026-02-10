@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { storage } from '../storage';
 import { requireAuth, requireRole, requireClientAccess, requireProjectAccess, requireTaskAccess, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
+import { getRequestContext } from "../middleware/request-context";
 import { insertProjectSchema } from '@shared/schema';
 import { auditClientRecordUpdate } from "../clients/client-record-audit";
 import { validateClientRecordUpdate } from "../clients/client-record-service";
@@ -60,18 +61,19 @@ router.patch('/clients/:clientId', requireAuth, requireRole('Admin'), requireCli
     }
     
     const updatedClient = await storage.updateClient(clientId, updates);
+    const ctx = getRequestContext(req);
     await auditClientRecordUpdate(storage, {
-      userId: req.user!.id,
+      userId: ctx.userId,
       clientId,
       updates,
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent") ?? undefined,
+      ipAddress: ctx.ip,
+      userAgent: ctx.userAgent,
     });
     await emitClientRecordUpdatedSignal(storage, {
-      agencyId: req.user!.agencyId!,
+      agencyId: ctx.agencyId!,
       clientId,
       updates,
-      actorId: req.user!.id,
+      actorId: ctx.userId,
       origin: "agency.client.update",
     });
     res.json(updatedClient);

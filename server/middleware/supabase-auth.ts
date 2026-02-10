@@ -15,6 +15,8 @@ export interface AuthRequest extends Request {
     agencyId?: string; // Agency ID for tenant isolation (Admin/Staff roles)
     isSuperAdmin?: boolean; // Platform-wide super admin flag
   };
+  context?: import("./request-context").RequestContext;
+  ctx?: import("./request-context").RequestContext;
 }
 
 // Supabase Auth middleware
@@ -91,6 +93,13 @@ export async function getAuthUserFromToken(token: string): Promise<AuthRequest["
 
 export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   if (req.user) {
+    if (!req.context) {
+      const { buildRequestContext } = await import("./request-context");
+      req.context = buildRequestContext(req, req.user);
+    }
+    if (!req.ctx) {
+      req.ctx = req.context;
+    }
     return next();
   }
 
@@ -108,6 +117,9 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 
   req.user = user;
+  const { buildRequestContext } = await import("./request-context");
+  req.context = buildRequestContext(req, user);
+  req.ctx = req.context;
 
   logger.info('User authenticated', {
     requestId: (req as any).requestId,

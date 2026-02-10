@@ -1,20 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from "../middleware/supabase-auth";
+import { requireAuth, requireRole, requireClientAccess, verifyClientAccess, type AuthRequest } from "../middleware/supabase-auth";
 import { storage } from "../storage";
+import { OpportunityArtifactRequestSchema } from "../domain/opportunities/schemas";
+import { OpportunityService } from "../application/opportunities/opportunity-service";
+import { getRequestContext } from "../middleware/request-context";
 
 const router = Router();
 
-const opportunitySchema = z.object({
-  clientId: z.string().uuid(),
-  opportunityStatement: z.string().min(1),
-  reasoning: z.string().optional(),
-  assumptions: z.array(z.string()).optional(),
-  confidence: z.string().optional(),
-  evidenceRefs: z.array(z.string()).optional(),
-  risks: z.array(z.string()).optional(),
-  suggestedSuccessCriteria: z.array(z.string()).optional(),
-});
+const opportunitySchema = OpportunityArtifactRequestSchema;
 
 const gateDecisionSchema = z.object({
   gateType: z.enum(["opportunity", "initiative", "acceptance", "outcome", "learning"]),
@@ -24,32 +18,51 @@ const gateDecisionSchema = z.object({
   targetId: z.string().uuid(),
 });
 
-router.post(
-  "/opportunities",
-  requireAuth,
-  requireRole("Admin"),
-  async (req: AuthRequest, res) => {
+export function createOpportunityHandler(service: OpportunityService) {
+  return async (req: AuthRequest, res: any) => {
     try {
       const data = opportunitySchema.parse(req.body);
-      const record = await storage.createOpportunityArtifact({
-        agencyId: req.user!.agencyId!,
-        clientId: data.clientId,
-        opportunityStatement: data.opportunityStatement,
-        reasoning: data.reasoning,
-        assumptions: data.assumptions,
-        confidence: data.confidence,
-        evidenceRefs: data.evidenceRefs,
-        risks: data.risks,
-        suggestedSuccessCriteria: data.suggestedSuccessCriteria,
-      } as any);
-      res.status(201).json(record);
+      const ctx = getRequestContext(req);
+
+      const allowed = await verifyClientAccess(req, data.clientId, storage);
+      if (!allowed) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (data.mode === "ai_generate") {
+        const aiResult = await service.generateOpportunityArtifactFromAI(data.clientId, ctx);
+        if (!aiResult.ok || !aiResult.data) {
+          return res.status(400).json({ message: aiResult.error || "AI generation failed" });
+        }
+
+        const saved = await service.persistOpportunityArtifact(data.clientId, aiResult.data, ctx);
+        if (!saved.ok || !saved.data) {
+          return res.status(500).json({ message: saved.error || "Failed to persist opportunity artifact" });
+        }
+
+        return res.status(201).json(saved.data);
+      }
+
+      const saved = await service.persistOpportunityArtifact(data.clientId, data, ctx);
+      if (!saved.ok || !saved.data) {
+        return res.status(500).json({ message: saved.error || "Failed to persist opportunity artifact" });
+      }
+
+      return res.status(201).json(saved.data);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid payload", errors: error.errors });
       }
       res.status(500).json({ message: error.message });
     }
-  }
+  };
+}
+
+router.post(
+  "/opportunities",
+  requireAuth,
+  requireRole("Admin"),
+  createOpportunityHandler(new OpportunityService(storage))
 );
 
 router.get(
