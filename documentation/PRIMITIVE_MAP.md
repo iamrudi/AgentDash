@@ -18,7 +18,13 @@ This document maps the Phase 1 increment changes to core primitives. It is inten
   - `server/application/opportunities/opportunity-service.ts` generates Opportunity Artifacts via hardened executor with output schema.
 - **P7 — Audit/Event Ledger**
   - `server/application/opportunities/opportunity-service.ts` emits audit logs for Opportunity Artifact creation when available.
+  - `server/application/gates/gate-decision-service.ts` emits audit logs for gate decisions when available.
+  - `server/application/initiatives/initiative-intent-service.ts` emits audit logs for initiative intents when available.
+  - `server/application/sku/sku-composition-service.ts` emits audit logs for SKU composition create/freeze when available.
   - Focused tests verify hardened executor usage for legacy Gemini analysis paths.
+
+- **Control-Plane Artifacts**
+  - Gate Decisions are persisted via `server/application/gates/gate-decision-service.ts` and exposed through `server/routes/opportunities.ts`.
 
 ## Notes
 

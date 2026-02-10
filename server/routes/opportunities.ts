@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { OpportunityArtifactRequestSchema } from "../domain/opportunities/schemas";
 import { OpportunityService } from "../application/opportunities/opportunity-service";
 import { getRequestContext } from "../middleware/request-context";
+import { GateDecisionService } from "../application/gates/gate-decision-service";
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const gateDecisionSchema = z.object({
   rationale: z.string().optional(),
   targetType: z.string().min(1),
   targetId: z.string().uuid(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export function createOpportunityHandler(service: OpportunityService) {
@@ -85,26 +87,26 @@ router.post(
   "/gate-decisions",
   requireAuth,
   requireRole("Admin"),
-  async (req: AuthRequest, res) => {
+  createGateDecisionHandler(new GateDecisionService(storage))
+);
+
+export function createGateDecisionHandler(service: GateDecisionService) {
+  return async (req: AuthRequest, res: any) => {
     try {
       const data = gateDecisionSchema.parse(req.body);
-      const record = await storage.createGateDecision({
-        agencyId: req.user!.agencyId!,
-        gateType: data.gateType,
-        decision: data.decision,
-        rationale: data.rationale,
-        targetType: data.targetType,
-        targetId: data.targetId,
-        actorId: req.user!.id,
-      } as any);
-      res.status(201).json(record);
+      const ctx = getRequestContext(req);
+      const result = await service.recordDecision(ctx, data as any);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid payload", errors: error.errors });
       }
-      res.status(500).json({ message: error.message });
+      return res.status(500).json({ message: error.message });
     }
-  }
-);
+  };
+}
 
 export default router;

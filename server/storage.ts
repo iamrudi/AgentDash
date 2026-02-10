@@ -311,6 +311,9 @@ export interface IStorage {
   // Opportunity artifacts + gate decisions
   createOpportunityArtifact(rec: InsertOpportunityArtifact): Promise<OpportunityArtifact>;
   getOpportunityArtifactById(id: string): Promise<OpportunityArtifact | undefined>;
+  getExecutionOutputById(id: string): Promise<ExecutionOutput | undefined>;
+  getOutcomeReviewById(id: string): Promise<OutcomeReview | undefined>;
+  getLearningArtifactById(id: string): Promise<LearningArtifact | undefined>;
   getOpportunityArtifactsByClientId(clientId: string): Promise<OpportunityArtifact[]>;
   createGateDecision(rec: InsertGateDecision): Promise<GateDecision>;
   getLatestGateDecisionForTarget(targetType: string, targetId: string, gateType?: string): Promise<GateDecision | undefined>;
@@ -1540,6 +1543,21 @@ export class DbStorage implements IStorage {
 
   async getOpportunityArtifactById(id: string): Promise<OpportunityArtifact | undefined> {
     const result = await db.select().from(opportunityArtifacts).where(eq(opportunityArtifacts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getExecutionOutputById(id: string): Promise<ExecutionOutput | undefined> {
+    const result = await db.select().from(executionOutputs).where(eq(executionOutputs.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getOutcomeReviewById(id: string): Promise<OutcomeReview | undefined> {
+    const result = await db.select().from(outcomeReviews).where(eq(outcomeReviews.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getLearningArtifactById(id: string): Promise<LearningArtifact | undefined> {
+    const result = await db.select().from(learningArtifacts).where(eq(learningArtifacts.id, id)).limit(1);
     return result[0];
   }
 
