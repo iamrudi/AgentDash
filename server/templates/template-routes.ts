@@ -1,8 +1,10 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { z } from "zod";
 import { templateService } from "./template-service";
+import { requireAuth, requireRole, type AuthRequest } from "../middleware/supabase-auth";
 
 export const templateRouter = Router();
+templateRouter.use(requireAuth, requireRole("Admin", "SuperAdmin"));
 
 const templateVariableSchema = z.object({
   name: z.string().min(1),
@@ -49,9 +51,9 @@ const instantiateSchema = z.object({
   workflowExecutionId: z.string().uuid().optional(),
 });
 
-templateRouter.get("/", async (req: Request, res: Response) => {
+templateRouter.get("/", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -69,9 +71,9 @@ templateRouter.get("/", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.get("/:id", async (req: Request, res: Response) => {
+templateRouter.get("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -92,9 +94,9 @@ templateRouter.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.post("/", async (req: Request, res: Response) => {
+templateRouter.post("/", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     const userId = (req as any).userId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -118,9 +120,9 @@ templateRouter.post("/", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.patch("/:id", async (req: Request, res: Response) => {
+templateRouter.patch("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     const userId = (req as any).userId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -151,9 +153,9 @@ templateRouter.patch("/:id", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.delete("/:id", async (req: Request, res: Response) => {
+templateRouter.delete("/:id", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -173,9 +175,9 @@ templateRouter.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.get("/:id/versions", async (req: Request, res: Response) => {
+templateRouter.get("/:id/versions", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -197,9 +199,9 @@ templateRouter.get("/:id/versions", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.get("/:id/versions/:versionId", async (req: Request, res: Response) => {
+templateRouter.get("/:id/versions/:versionId", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -216,9 +218,9 @@ templateRouter.get("/:id/versions/:versionId", async (req: Request, res: Respons
   }
 });
 
-templateRouter.post("/:id/instantiate", async (req: Request, res: Response) => {
+templateRouter.post("/:id/instantiate", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     const userId = (req as any).userId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -276,9 +278,9 @@ templateRouter.post("/:id/instantiate", async (req: Request, res: Response) => {
   }
 });
 
-templateRouter.post("/:id/clone", async (req: Request, res: Response) => {
+templateRouter.post("/:id/clone", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }

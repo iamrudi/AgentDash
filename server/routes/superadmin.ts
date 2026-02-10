@@ -19,6 +19,7 @@ import { db } from '../db';
 import { agencySettings, updateAgencySettingSchema } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { invalidateAIProviderCache } from '../ai/provider';
+import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 
 const superadminRouter = Router();
 
@@ -491,36 +492,40 @@ superadminRouter.post("/clients/:clientId/generate-recommendations", requireAuth
     });
     
     const validatedData = generateRecommendationsSchema.parse(req.body);
-    const { generateAIRecommendations } = await import("../ai-analyzer");
-    
-    const result = await generateAIRecommendations(storage, clientId, {
+    const signalResult = await emitClientRecordUpdatedSignal(storage, {
+      agencyId: client.agencyId,
+      clientId,
+      updates: {},
+      actorId: req.user!.id,
+      origin: "superadmin.recommendations.request",
+      reason: "manual_recommendations",
       preset: validatedData.preset,
       includeCompetitors: validatedData.includeCompetitors,
-      competitorDomains: validatedData.competitorDomains
+      competitorDomains: validatedData.competitorDomains,
     });
-    
-    if (!result.success) {
-      return res.status(400).json({ message: result.error });
-    }
 
     await logAuditEvent(
       req.user!.id,
       'recommendations.generate',
       'client',
       clientId,
-      { 
-        preset: validatedData.preset, 
+      {
+        preset: validatedData.preset,
         clientName: client.companyName,
-        recommendationsCreated: result.recommendationsCreated 
+        signalId: signalResult.signalId,
+        workflowsTriggered: signalResult.workflowsTriggered.length,
       },
       req.ip,
       req.get('user-agent')
     );
     
-    res.json({ 
-      success: true, 
-      message: `Successfully generated ${result.recommendationsCreated} AI-powered recommendations`,
-      count: result.recommendationsCreated 
+    res.status(202).json({
+      success: true,
+      message: "Recommendation request routed to workflow engine",
+      signalId: signalResult.signalId,
+      isDuplicate: signalResult.isDuplicate,
+      workflowsTriggered: signalResult.workflowsTriggered,
+      executions: signalResult.executions,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

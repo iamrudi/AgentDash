@@ -6,8 +6,10 @@ import { insertCompanySchema, insertContactSchema, insertDealSchema, insertFormS
 import { hardenedAIExecutor } from "../ai/hardened-executor";
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
+import { crmRouter as crmIntegrationRouter } from "../crm/crm-routes";
 
 const crmRouter = Router();
+crmRouter.use(crmIntegrationRouter);
 
 // ============================================================================
 // COMPANIES

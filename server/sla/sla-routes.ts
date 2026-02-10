@@ -5,6 +5,7 @@ import { runManualScan } from "./sla-cron";
 import { db } from "../db";
 import { slaDefinitions, slaBreaches, slaBreachEvents, escalationChains, clients, projects } from "@shared/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
+import { requireAuth, type AuthRequest } from "../middleware/supabase-auth";
 
 async function validateResourceOwnership(
   agencyId: string,
@@ -36,6 +37,7 @@ async function validateResourceOwnership(
 }
 
 export const slaRouter = Router();
+slaRouter.use(requireAuth);
 
 const createSlaSchema = z.object({
   name: z.string().min(1),
@@ -60,9 +62,9 @@ const createEscalationSchema = z.object({
   reassignTask: z.boolean().optional(),
 });
 
-slaRouter.get("/definitions", async (req, res) => {
+slaRouter.get("/definitions", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -79,10 +81,10 @@ slaRouter.get("/definitions", async (req, res) => {
   }
 });
 
-slaRouter.post("/definitions", async (req, res) => {
+slaRouter.post("/definitions", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
-    const userId = (req as any).userId;
+    const agencyId = req.user?.agencyId;
+    const userId = req.user?.id;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -127,9 +129,9 @@ slaRouter.post("/definitions", async (req, res) => {
   }
 });
 
-slaRouter.get("/definitions/:id", async (req, res) => {
+slaRouter.get("/definitions/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -167,9 +169,9 @@ const updateSlaSchema = z.object({
   timezone: z.string().optional(),
 });
 
-slaRouter.patch("/definitions/:id", async (req, res) => {
+slaRouter.patch("/definitions/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -209,9 +211,9 @@ slaRouter.patch("/definitions/:id", async (req, res) => {
   }
 });
 
-slaRouter.delete("/definitions/:id", async (req, res) => {
+slaRouter.delete("/definitions/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -238,9 +240,9 @@ slaRouter.delete("/definitions/:id", async (req, res) => {
   }
 });
 
-slaRouter.get("/breaches", async (req, res) => {
+slaRouter.get("/breaches", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -268,9 +270,9 @@ slaRouter.get("/breaches", async (req, res) => {
   }
 });
 
-slaRouter.get("/breaches/:id", async (req, res) => {
+slaRouter.get("/breaches/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -304,10 +306,10 @@ slaRouter.get("/breaches/:id", async (req, res) => {
   }
 });
 
-slaRouter.post("/breaches/:id/acknowledge", async (req, res) => {
+slaRouter.post("/breaches/:id/acknowledge", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
-    const userId = (req as any).userId;
+    const agencyId = req.user?.agencyId;
+    const userId = req.user?.id;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -334,10 +336,10 @@ slaRouter.post("/breaches/:id/acknowledge", async (req, res) => {
   }
 });
 
-slaRouter.post("/breaches/:id/resolve", async (req, res) => {
+slaRouter.post("/breaches/:id/resolve", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
-    const userId = (req as any).userId;
+    const agencyId = req.user?.agencyId;
+    const userId = req.user?.id;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -364,9 +366,9 @@ slaRouter.post("/breaches/:id/resolve", async (req, res) => {
   }
 });
 
-slaRouter.get("/definitions/:id/escalations", async (req, res) => {
+slaRouter.get("/definitions/:id/escalations", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -395,9 +397,9 @@ slaRouter.get("/definitions/:id/escalations", async (req, res) => {
   }
 });
 
-slaRouter.post("/definitions/:id/escalations", async (req, res) => {
+slaRouter.post("/definitions/:id/escalations", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -438,9 +440,9 @@ slaRouter.post("/definitions/:id/escalations", async (req, res) => {
   }
 });
 
-slaRouter.post("/scan", async (req, res) => {
+slaRouter.post("/scan", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -454,9 +456,9 @@ slaRouter.post("/scan", async (req, res) => {
   }
 });
 
-slaRouter.get("/check/:resourceType/:resourceId", async (req, res) => {
+slaRouter.get("/check/:resourceType/:resourceId", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }

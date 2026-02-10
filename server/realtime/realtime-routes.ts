@@ -1,10 +1,6 @@
 import { Router, Response } from "express";
-import { requireAuth, AuthRequest, requireRole } from "../middleware/auth";
+import { requireAuth, AuthRequest, requireRole, getAuthUserFromToken } from "../middleware/supabase-auth";
 import { realtimeService } from "./realtime-service";
-import { verifyToken } from "../lib/jwt";
-import { db } from "../db";
-import { profiles, clients } from "@shared/schema";
-import { eq } from "drizzle-orm";
 import logger from "../middleware/logger";
 
 const router = Router();
@@ -19,46 +15,19 @@ interface SSEUser {
 }
 
 async function authenticateSSE(token: string): Promise<SSEUser | null> {
-  try {
-    const payload = verifyToken(token);
-    if (!payload) return null;
-
-    const [profile] = await db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.id, payload.userId))
-      .limit(1);
-
-    if (!profile) return null;
-
-    let clientId: string | null = null;
-    let agencyId: string | null = payload.agencyId || null;
-
-    if (profile.role === "Client") {
-      const [client] = await db
-        .select()
-        .from(clients)
-        .where(eq(clients.profileId, profile.id))
-        .limit(1);
-      
-      clientId = client?.id || null;
-      agencyId = client?.agencyId || null;
-    } else if (profile.role === "Admin" || profile.role === "Staff") {
-      agencyId = payload.agencyId || profile.agencyId || null;
-    }
-
-    return {
-      id: payload.userId,
-      email: payload.email,
-      role: profile.role || payload.role,
-      agencyId,
-      clientId,
-      isSuperAdmin: profile.isSuperAdmin || false,
-    };
-  } catch (error) {
-    logger.error("[SSE] Authentication error:", error);
+  const user = await getAuthUserFromToken(token);
+  if (!user) {
     return null;
   }
+
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+    agencyId: user.agencyId ?? null,
+    clientId: user.clientId ?? null,
+    isSuperAdmin: user.isSuperAdmin ?? false,
+  };
 }
 
 function canAccessChannel(user: SSEUser, channel: string): boolean {
@@ -90,7 +59,13 @@ router.get("/stream", async (req, res: Response) => {
     return res.status(401).json({ message: "Authentication token required" });
   }
 
-  const user = await authenticateSSE(token);
+  let user: SSEUser | null = null;
+  try {
+    user = await authenticateSSE(token);
+  } catch (error) {
+    logger.error("[SSE] Authentication error:", error);
+  }
+
   if (!user) {
     return res.status(401).json({ message: "Invalid or expired token" });
   }

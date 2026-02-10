@@ -8,8 +8,9 @@ import {
 } from "../middleware/supabase-auth";
 import { z } from "zod";
 import { refreshAccessToken, fetchGA4Data, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from "../lib/googleOAuth";
-import { getAIProvider } from "../ai/provider";
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 import { cache, CACHE_TTL } from "../lib/cache";
+import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 
 export const agencyClientsRouter = Router();
 export const clientsRouter = Router();
@@ -134,22 +135,25 @@ agencyClientsRouter.post("/:clientId/generate-recommendations", requireAuth, req
     });
     
     const validatedData = generateRecommendationsSchema.parse(req.body);
-    const { generateAIRecommendations } = await import("../ai-analyzer");
-    
-    const result = await generateAIRecommendations(storage, clientId, {
+    const signalResult = await emitClientRecordUpdatedSignal(storage, {
+      agencyId: req.user!.agencyId!,
+      clientId,
+      updates: {},
+      actorId: req.user!.id,
+      origin: "agency.recommendations.request",
+      reason: "manual_recommendations",
       preset: validatedData.preset,
       includeCompetitors: validatedData.includeCompetitors,
-      competitorDomains: validatedData.competitorDomains
+      competitorDomains: validatedData.competitorDomains,
     });
-    
-    if (!result.success) {
-      return res.status(400).json({ message: result.error });
-    }
-    
-    res.json({ 
-      success: true, 
-      message: `Successfully generated ${result.recommendationsCreated} AI-powered recommendations`,
-      count: result.recommendationsCreated 
+
+    res.status(202).json({
+      success: true,
+      message: "Recommendation request routed to workflow engine",
+      signalId: signalResult.signalId,
+      isDuplicate: signalResult.isDuplicate,
+      workflowsTriggered: signalResult.workflowsTriggered,
+      executions: signalResult.executions,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -185,14 +189,34 @@ agencyClientsRouter.get("/:clientId/strategy-card", requireAuth, requireRole("Ad
       ? recentMessages.map(msg => `${msg.senderRole}: ${msg.message}`).join('\n')
       : "No recent conversations.";
     
-    const aiProvider = await getAIProvider(client.agencyId);
-    const chatAnalysis = await aiProvider.analyzeChatHistory(chatHistoryText);
+    const systemPrompt = `You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights.\n\nFocus on messages from the \"Client\" role and extract:\n- painPoints: Problems, frustrations, concerns, or improvement requests\n- recentWins: Positive feedback or satisfaction\n- activeQuestions: Unanswered questions or requests needing follow-up\n\nIf the conversation is only greetings/small talk, return empty arrays.\nRespond with a JSON object with keys painPoints, recentWins, activeQuestions.`;
+
+    const prompt = `${systemPrompt}\n\nCHAT HISTORY:\n${chatHistoryText}`;
+
+    const outputSchema = z.object({
+      painPoints: z.array(z.string()),
+      recentWins: z.array(z.string()),
+      activeQuestions: z.array(z.string()),
+    });
+
+    const chatAnalysisResult = await hardenedAIExecutor.executeWithSchema(
+      {
+        agencyId: client.agencyId,
+        operation: "ai_chat_analysis",
+      },
+      { prompt },
+      outputSchema
+    );
+
+    if (!chatAnalysisResult.success) {
+      return res.status(500).json({ message: chatAnalysisResult.error || "Failed to analyze chat history" });
+    }
 
     const strategyCardData = {
       businessContext: client.businessContext,
       clientObjectives: objectives,
       summaryKpis,
-      chatAnalysis,
+      chatAnalysis: chatAnalysisResult.data,
     };
 
     res.json(strategyCardData);

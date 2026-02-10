@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { storage } from '../storage';
+import { auditClientRecordUpdate } from "../clients/client-record-audit";
+import { validateClientRecordUpdate } from "../clients/client-record-service";
 import { 
   requireAuth, 
   requireRole, 
@@ -10,6 +12,7 @@ import { refreshAccessToken, fetchGA4Properties, fetchGSCSites, fetchGA4Availabl
 import { agencySettings } from '@shared/schema';
 import { db } from '../db';
 import { eq } from 'drizzle-orm';
+import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 
 const router = Router();
 
@@ -100,13 +103,49 @@ router.post("/ga4/:clientId/property", requireAuth, requireRole("Admin"), requir
 
     if (ga4LeadEventName) {
       const leadEventsArray = ga4LeadEventName.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0);
-      await storage.updateClient(clientId, {
-        leadEvents: leadEventsArray,
+      const updates = { leadEvents: leadEventsArray };
+      const validation = validateClientRecordUpdate(updates);
+      if (!validation.ok) {
+        return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+      }
+      await storage.updateClient(clientId, updates);
+      await auditClientRecordUpdate(storage, {
+        userId: req.user!.id,
+        clientId,
+        updates,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+      });
+      await emitClientRecordUpdatedSignal(storage, {
+        agencyId: req.user!.agencyId!,
+        clientId,
+        updates,
+        actorId: req.user!.id,
+        origin: "integration.ga4.property",
+        reason: "ga4_lead_events_sync",
       });
       console.log(`[Lead Events Sync] Updated client ${clientId} leadEvents from GA4 property save: ${leadEventsArray.join(',')}`);
     } else {
-      await storage.updateClient(clientId, {
-        leadEvents: [],
+      const updates = { leadEvents: [] as string[] };
+      const validation = validateClientRecordUpdate(updates);
+      if (!validation.ok) {
+        return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+      }
+      await storage.updateClient(clientId, updates);
+      await auditClientRecordUpdate(storage, {
+        userId: req.user!.id,
+        clientId,
+        updates,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+      });
+      await emitClientRecordUpdatedSignal(storage, {
+        agencyId: req.user!.agencyId!,
+        clientId,
+        updates,
+        actorId: req.user!.id,
+        origin: "integration.ga4.property",
+        reason: "ga4_lead_events_sync",
       });
       console.log(`[Lead Events Sync] Cleared client ${clientId} leadEvents (GA4 lead event name was null)`);
     }
@@ -145,13 +184,49 @@ router.patch("/ga4/:clientId/lead-event", requireAuth, requireRole("Admin"), req
 
     if (ga4LeadEventName) {
       const leadEventsArray = ga4LeadEventName.split(',').map((e: string) => e.trim()).filter((e: string) => e.length > 0);
-      await storage.updateClient(clientId, {
-        leadEvents: leadEventsArray,
+      const updates = { leadEvents: leadEventsArray };
+      const validation = validateClientRecordUpdate(updates);
+      if (!validation.ok) {
+        return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+      }
+      await storage.updateClient(clientId, updates);
+      await auditClientRecordUpdate(storage, {
+        userId: req.user!.id,
+        clientId,
+        updates,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+      });
+      await emitClientRecordUpdatedSignal(storage, {
+        agencyId: req.user!.agencyId!,
+        clientId,
+        updates,
+        actorId: req.user!.id,
+        origin: "integration.ga4.lead_event_patch",
+        reason: "ga4_lead_events_patch",
       });
       console.log(`[Lead Events Sync] Updated client ${clientId} leadEvents from lead event PATCH: ${leadEventsArray.join(',')}`);
     } else {
-      await storage.updateClient(clientId, {
-        leadEvents: [],
+      const updates = { leadEvents: [] as string[] };
+      const validation = validateClientRecordUpdate(updates);
+      if (!validation.ok) {
+        return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+      }
+      await storage.updateClient(clientId, updates);
+      await auditClientRecordUpdate(storage, {
+        userId: req.user!.id,
+        clientId,
+        updates,
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") ?? undefined,
+      });
+      await emitClientRecordUpdatedSignal(storage, {
+        agencyId: req.user!.agencyId!,
+        clientId,
+        updates,
+        actorId: req.user!.id,
+        origin: "integration.ga4.lead_event_patch",
+        reason: "ga4_lead_events_patch",
       });
       console.log(`[Lead Events Sync] Cleared client ${clientId} leadEvents (lead event name was cleared via PATCH)`);
     }
@@ -593,8 +668,26 @@ router.post("/clients/:clientId/lead-events", requireAuth, requireRole("Admin"),
       return res.status(404).json({ message: "Client not found" });
     }
 
-    const updated = await storage.updateClient(clientId, {
-      leadEvents,
+    const updates = { leadEvents };
+    const validation = validateClientRecordUpdate(updates);
+    if (!validation.ok) {
+      return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+    }
+    const updated = await storage.updateClient(clientId, updates);
+    await auditClientRecordUpdate(storage, {
+      userId: req.user!.id,
+      clientId,
+      updates,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
+    });
+    await emitClientRecordUpdatedSignal(storage, {
+      agencyId: req.user!.agencyId!,
+      clientId,
+      updates,
+      actorId: req.user!.id,
+      origin: "integration.lead_events",
+      reason: "manual_lead_events",
     });
 
     const ga4Integration = await storage.getIntegrationByClientId(clientId, 'GA4');

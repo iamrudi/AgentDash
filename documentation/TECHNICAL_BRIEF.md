@@ -1601,6 +1601,14 @@ class KnowledgeRetrievalService {
 - Allowlist entries are restricted to `docs/**`, `tests/**`, and `scripts/**` only.
 - Legacy runtime violations (outside `server/ai/**`) are tracked as CRITICAL migration debt in `documentation/PRIORITY_LIST.md`.
 
+### Embedding guardrails & limits
+
+- Embedding inputs are schema-validated and capped per tenant (`agency_settings.embedding_max_tokens`).
+- Embedding usage is quota-enforced with request + token limits (`agency_quotas.embedding_request_limit` / `embedding_token_limit`).
+- Embedding executions emit usage tracking with `requestType=embedding` and audit records via `ai_executions.request_type`.
+- Embedding errors use explicit codes (input invalid/too large, quota exceeded, schema invalid, provider error).
+- Optional embedding cache is keyed by input hash + model + provider (TTL 6 hours).
+
 ### Phase 0 vs Phase 1
 
 - Phase 0 surfaces violations via guardrails + tests without changing runtime behavior.

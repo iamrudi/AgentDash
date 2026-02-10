@@ -34,6 +34,20 @@ import objectivesRoutes from './objectives';
 import aiChatRoutes from './ai-chat';
 import proposalsRoutes from './proposals';
 import { agencyClientsRouter, clientsRouter as agencyClientsClientRouter } from './agency-clients';
+import metricsRoutes from "./metrics";
+import { slaRouter } from "../sla/sla-routes";
+import { agentRouter } from "../agents/agent-routes";
+import { taskRouter } from "../tasks/task-routes";
+import { templateRouter } from "../templates/template-routes";
+import governanceRoutes from "../governance/governance-routes";
+import superadminHealthRoutes from "./superadmin-health";
+import testRoutes from "./test";
+import opportunityRoutes from "./opportunities";
+import initiativeIntentsRoutes from "./initiative-intents";
+import skuCompositionsRoutes from "./sku-compositions";
+import executionOutputsRoutes from "./execution-outputs";
+import outcomeReviewsRoutes from "./outcome-reviews";
+import learningArtifactsRoutes from "./learning-artifacts";
 
 export interface DomainRouter {
   subpath: string;
@@ -85,6 +99,20 @@ registerDomainRouter('/ai', aiChatRoutes);
 registerDomainRouter('/proposals', proposalsRoutes);
 registerDomainRouter('/agency/clients', agencyClientsRouter);
 registerDomainRouter('/clients', agencyClientsClientRouter);
+registerDomainRouter('/', metricsRoutes);
+registerDomainRouter('/sla', slaRouter);
+registerDomainRouter('/agents', agentRouter);
+registerDomainRouter('/tasks/workflow', taskRouter);
+registerDomainRouter('/templates', templateRouter);
+registerDomainRouter('/governance', governanceRoutes);
+registerDomainRouter('/superadmin', superadminHealthRoutes);
+registerDomainRouter('/test', testRoutes);
+registerDomainRouter('/', opportunityRoutes);
+registerDomainRouter('/', initiativeIntentsRoutes);
+registerDomainRouter('/', skuCompositionsRoutes);
+registerDomainRouter('/', executionOutputsRoutes);
+registerDomainRouter('/', outcomeReviewsRoutes);
+registerDomainRouter('/', learningArtifactsRoutes);
 
 export function mountDomainRouters(app: Express): void {
   for (const { subpath, router } of domainRegistry) {

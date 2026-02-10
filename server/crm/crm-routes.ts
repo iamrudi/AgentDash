@@ -4,6 +4,7 @@ import { crmWebhookHandler, CRMWebhookPayload } from "./crm-webhook-handler";
 import { db } from "../db";
 import { workflowSignals } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAuth, type AuthRequest } from "../middleware/supabase-auth";
 
 export const crmRouter = Router();
 
@@ -61,12 +62,12 @@ crmRouter.post("/webhooks/hubspot", async (req: Request, res: Response) => {
   }
 });
 
-crmRouter.get("/status/:agencyId", async (req: Request, res: Response) => {
+crmRouter.get("/status/:agencyId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { agencyId } = req.params;
-    const userAgencyId = (req as any).agencyId;
+    const userAgencyId = req.user?.agencyId;
     
-    if (agencyId !== userAgencyId && !(req as any).user?.isSuperAdmin) {
+    if (agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -80,9 +81,9 @@ crmRouter.get("/status/:agencyId", async (req: Request, res: Response) => {
   }
 });
 
-crmRouter.get("/events", async (req: Request, res: Response) => {
+crmRouter.get("/events", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -111,12 +112,12 @@ crmRouter.get("/events", async (req: Request, res: Response) => {
   }
 });
 
-crmRouter.post("/sync/:agencyId", async (req: Request, res: Response) => {
+crmRouter.post("/sync/:agencyId", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { agencyId } = req.params;
-    const userAgencyId = (req as any).agencyId;
+    const userAgencyId = req.user?.agencyId;
     
-    if (agencyId !== userAgencyId && !(req as any).user?.isSuperAdmin) {
+    if (agencyId !== userAgencyId && !req.user?.isSuperAdmin) {
       return res.status(403).json({ error: "Access denied" });
     }
 
