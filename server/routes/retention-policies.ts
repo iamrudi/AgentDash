@@ -10,7 +10,7 @@ import { Router } from 'express';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { db } from '../db';
-import { buildRetentionPlan } from '../jobs/retention-job';
+import { buildRetentionPlan, estimateRetentionCounts, runRetentionExecution } from '../jobs/retention-job';
 import { 
   workflowRetentionPolicies, 
   workflowExecutions, 
@@ -137,11 +137,13 @@ router.get("/cleanup/plan", requireAuth, requireRole("Admin"), async (req: AuthR
       return res.status(400).json({ message: "Agency context required" });
     }
 
+    const includeCounts = String(req.query.includeCounts ?? "false") === "true";
+
     const policies = await db.select()
       .from(workflowRetentionPolicies)
       .where(eq(workflowRetentionPolicies.agencyId, agencyId));
 
-    const plan = buildRetentionPlan(
+    let plan = buildRetentionPlan(
       policies.map((policy) => ({
         resourceType: policy.resourceType,
         retentionDays: policy.retentionDays,
@@ -149,6 +151,10 @@ router.get("/cleanup/plan", requireAuth, requireRole("Admin"), async (req: AuthR
         archiveBeforeDelete: policy.archiveBeforeDelete ?? false,
       }))
     );
+
+    if (includeCounts) {
+      plan = await estimateRetentionCounts({ agencyId, plan });
+    }
 
     res.json({ plan });
   } catch (error: any) {
@@ -164,6 +170,8 @@ router.post("/cleanup", requireAuth, requireRole("Admin"), async (req: AuthReque
     if (!agencyId) {
       return res.status(400).json({ message: "Agency context required" });
     }
+
+    const dryRun = req.body?.dryRun !== false;
     
     const policies = await db.select()
       .from(workflowRetentionPolicies)
@@ -172,94 +180,40 @@ router.post("/cleanup", requireAuth, requireRole("Admin"), async (req: AuthReque
         eq(workflowRetentionPolicies.enabled, true)
       ));
     
-    const results: any[] = [];
-    
-    for (const policy of policies) {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - policy.retentionDays);
-      
-      let deletedCount = 0;
-      
-      switch (policy.resourceType) {
-        case 'workflow_executions':
-          const execResult = await db.delete(workflowExecutions)
-            .where(and(
-              eq(workflowExecutions.agencyId, agencyId),
-              lt(workflowExecutions.createdAt, cutoffDate)
-            ));
-          deletedCount = (execResult as any).rowCount || 0;
-          break;
-          
-        case 'workflow_events':
-          const eventsResult = await db.delete(workflowEvents)
-            .where(and(
-              eq(workflowEvents.agencyId, agencyId),
-              lt(workflowEvents.timestamp, cutoffDate)
-            ));
-          deletedCount = (eventsResult as any).rowCount || 0;
-          break;
-          
-        case 'signals':
-          const signalsResult = await db.delete(workflowSignals)
-            .where(and(
-              eq(workflowSignals.agencyId, agencyId),
-              lt(workflowSignals.ingestedAt, cutoffDate)
-            ));
-          deletedCount = (signalsResult as any).rowCount || 0;
-          break;
-          
-        case 'ai_executions':
-          const aiResult = await db.delete(aiExecutionsTable)
-            .where(and(
-              eq(aiExecutionsTable.agencyId, agencyId),
-              lt(aiExecutionsTable.createdAt, cutoffDate)
-            ));
-          deletedCount = (aiResult as any).rowCount || 0;
-          break;
-          
-        case 'rule_evaluations':
-          // Rule evaluations don't have agencyId directly, so we need to join through workflowRules
-          // First get rule IDs for this agency, then delete evaluations for those rules
-          const agencyRules = await db.select({ id: workflowRules.id })
-            .from(workflowRules)
-            .where(eq(workflowRules.agencyId, agencyId));
-          const agencyRuleIds = agencyRules.map(r => r.id);
-          
-          if (agencyRuleIds.length > 0) {
-            let evalDeletedCount = 0;
-            for (const ruleId of agencyRuleIds) {
-              const evalResult = await db.delete(workflowRuleEvaluations)
-                .where(and(
-                  eq(workflowRuleEvaluations.ruleId, ruleId),
-                  lt(workflowRuleEvaluations.createdAt, cutoffDate)
-                ));
-              evalDeletedCount += (evalResult as any).rowCount || 0;
-            }
-            deletedCount = evalDeletedCount;
-          }
-          break;
-      }
-      
-      // Update policy with cleanup stats
-      await db.update(workflowRetentionPolicies)
-        .set({
-          lastCleanupAt: new Date(),
-          recordsDeleted: sql`${workflowRetentionPolicies.recordsDeleted} + ${deletedCount}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(workflowRetentionPolicies.id, policy.id));
-      
-      results.push({
+    const plan = buildRetentionPlan(
+      policies.map((policy) => ({
         resourceType: policy.resourceType,
         retentionDays: policy.retentionDays,
-        deletedCount,
-        cutoffDate,
-      });
+        enabled: policy.enabled ?? true,
+        archiveBeforeDelete: policy.archiveBeforeDelete ?? false,
+      }))
+    );
+
+    const results = await runRetentionExecution({
+      agencyId,
+      plan,
+      dryRun,
+    });
+
+    const updatedAt = new Date();
+    for (const policy of policies) {
+      const result = results.find((row) => row.resourceType === policy.resourceType);
+      if (!result) continue;
+      const deletedCount = result.deletedCount ?? 0;
+
+      await db.update(workflowRetentionPolicies)
+        .set({
+          lastCleanupAt: updatedAt,
+          recordsDeleted: sql`${workflowRetentionPolicies.recordsDeleted} + ${deletedCount}`,
+          updatedAt,
+        })
+        .where(eq(workflowRetentionPolicies.id, policy.id));
     }
     
     res.json({ 
-      message: "Retention cleanup completed",
-      results 
+      message: dryRun ? "Retention cleanup dry-run completed" : "Retention cleanup completed",
+      dryRun,
+      results,
     });
   } catch (error: any) {
     console.error("Error running retention cleanup:", error);

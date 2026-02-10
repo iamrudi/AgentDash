@@ -29,6 +29,7 @@ This document maps the Phase 1 increment changes to core primitives. It is inten
 
 - **P8 — Operational Recovery**
   - `server/jobs/retention-job.ts` provides retention cleanup scaffolding with dry-run planning.
+  - `server/jobs/retention-cleanup.ts` schedules retention checks (dry-run) using cron heartbeat tracking.
 
 ## Notes
 

@@ -2,7 +2,20 @@ import { Router, Response } from "express";
 import { quotaService } from "./quota-service";
 import { integrationHealthService } from "./integration-health-service";
 import { db } from "../db";
-import { governanceAuditLogs, agencyQuotas, agencies, profiles, policyBundles, policyBundleVersions, workflowRuleAudits, workflowEvents, aiExecutions } from "@shared/schema";
+import {
+  governanceAuditLogs,
+  agencyQuotas,
+  agencies,
+  profiles,
+  policyBundles,
+  policyBundleVersions,
+  workflowRuleAudits,
+  workflowEvents,
+  aiExecutions,
+  aiUsageTracking,
+  workflowRetentionPolicies,
+  integrationHealth,
+} from "@shared/schema";
 import { eq, desc, and, gte, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import logger from "../middleware/logger";
@@ -87,6 +100,19 @@ const updateQuotaSchema = z.object({
   monthlyPriceUsd: z.string().optional(),
   warningThreshold: z.number().min(0).max(100).optional(),
   resetDay: z.number().min(1).max(28).optional(),
+  reason: z.string().optional(),
+});
+
+const createPolicyBundleSchema = z.object({
+  agencyId: z.string().uuid(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  status: z.string().optional(),
+});
+
+const createPolicyBundleVersionSchema = z.object({
+  status: z.string().optional(),
+  config: z.record(z.unknown()).default({}),
   reason: z.string().optional(),
 });
 
@@ -492,6 +518,45 @@ router.get(
 );
 
 router.get(
+  "/ops/ai-usage-trends",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const usage = await db
+        .select({
+          day: sql<Date>`date_trunc('day', ${aiExecutions.createdAt})`,
+          totalRequests: sql<number>`count(*)::int`,
+          totalPromptTokens: sql<number>`coalesce(sum(${aiExecutions.promptTokens}), 0)::int`,
+          totalCompletionTokens: sql<number>`coalesce(sum(${aiExecutions.completionTokens}), 0)::int`,
+          totalTokens: sql<number>`coalesce(sum(${aiExecutions.totalTokens}), 0)::int`,
+        })
+        .from(aiExecutions)
+        .where(gte(aiExecutions.createdAt, since))
+        .groupBy(sql`date_trunc('day', ${aiExecutions.createdAt})`)
+        .orderBy(sql`date_trunc('day', ${aiExecutions.createdAt})`);
+
+      res.json({
+        windowDays: safeWindowDays,
+        usage: usage.map((row) => ({
+          day: row.day ? new Date(row.day).toISOString().slice(0, 10) : null,
+          totalRequests: row.totalRequests ?? 0,
+          totalPromptTokens: row.totalPromptTokens ?? 0,
+          totalCompletionTokens: row.totalCompletionTokens ?? 0,
+          totalTokens: row.totalTokens ?? 0,
+        })),
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch AI usage trends:", error);
+      res.status(500).json({ error: "Failed to fetch AI usage trends" });
+    }
+  }
+);
+
+router.get(
   "/ops/workflow-failures",
   requireSuperAdmin,
   async (req: AuthRequest, res: Response) => {
@@ -518,6 +583,157 @@ router.get(
     } catch (error) {
       logger.error("[Governance] Failed to fetch workflow failures summary:", error);
       res.status(500).json({ error: "Failed to fetch workflow failures summary" });
+    }
+  }
+);
+
+router.get(
+  "/ops/rule-publishes",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const publishes = await db
+        .select({
+          ruleId: workflowRuleAudits.ruleId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(workflowRuleAudits)
+        .where(and(eq(workflowRuleAudits.changeType, "published"), gte(workflowRuleAudits.createdAt, since)))
+        .groupBy(workflowRuleAudits.ruleId)
+        .orderBy(desc(sql`count(*)`))
+        .limit(50);
+
+      res.json({
+        windowDays: safeWindowDays,
+        publishes,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch rule publish summary:", error);
+      res.status(500).json({ error: "Failed to fetch rule publish summary" });
+    }
+  }
+);
+
+router.get(
+  "/ops/retention-policies",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { agencyId } = req.query;
+      if (!agencyId || typeof agencyId !== "string") {
+        return res.status(400).json({ error: "agencyId is required" });
+      }
+
+      const policies = await db
+        .select()
+        .from(workflowRetentionPolicies)
+        .where(eq(workflowRetentionPolicies.agencyId, agencyId))
+        .orderBy(desc(workflowRetentionPolicies.updatedAt));
+
+      res.json({ policies });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch retention policies summary:", error);
+      res.status(500).json({ error: "Failed to fetch retention policies summary" });
+    }
+  }
+);
+
+router.get(
+  "/ops/quota-warnings",
+  requireSuperAdmin,
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const warnings = await db
+        .select({
+          agencyId: agencyQuotas.agencyId,
+          agencyName: agencies.name,
+          aiTokenUsed: agencyQuotas.aiTokenUsed,
+          aiTokenLimit: agencyQuotas.aiTokenLimit,
+          aiRequestUsed: agencyQuotas.aiRequestUsed,
+          aiRequestLimit: agencyQuotas.aiRequestLimit,
+          warningThreshold: agencyQuotas.warningThreshold,
+          aiTokenPercent: sql<number>`round((${agencyQuotas.aiTokenUsed}::float / nullif(${agencyQuotas.aiTokenLimit}, 0)) * 100, 2)`,
+          aiRequestPercent: sql<number>`round((${agencyQuotas.aiRequestUsed}::float / nullif(${agencyQuotas.aiRequestLimit}, 0)) * 100, 2)`,
+        })
+        .from(agencyQuotas)
+        .innerJoin(agencies, eq(agencyQuotas.agencyId, agencies.id))
+        .where(sql`(
+          (${agencyQuotas.aiTokenUsed}::float / nullif(${agencyQuotas.aiTokenLimit}, 0)) * 100 >= ${agencyQuotas.warningThreshold}
+          OR
+          (${agencyQuotas.aiRequestUsed}::float / nullif(${agencyQuotas.aiRequestLimit}, 0)) * 100 >= ${agencyQuotas.warningThreshold}
+        )`)
+        .orderBy(desc(agencyQuotas.updatedAt));
+
+      res.json({ warnings });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch quota warnings:", error);
+      res.status(500).json({ error: "Failed to fetch quota warnings" });
+    }
+  }
+);
+
+router.get(
+  "/ops/quota-burndown",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const windowDays = Number(req.query.windowDays ?? 30);
+      const safeWindowDays = Number.isFinite(windowDays) && windowDays > 0 ? Math.min(windowDays, 180) : 30;
+      const since = new Date(Date.now() - safeWindowDays * 24 * 60 * 60 * 1000);
+
+      const usage = await db
+        .select({
+          day: sql<Date>`date_trunc('day', ${aiUsageTracking.periodStart})`,
+          totalTokens: sql<number>`coalesce(sum(${aiUsageTracking.totalTokens}), 0)::int`,
+          totalRequests: sql<number>`coalesce(sum(${aiUsageTracking.totalRequests}), 0)::int`,
+        })
+        .from(aiUsageTracking)
+        .where(gte(aiUsageTracking.periodStart, since))
+        .groupBy(sql`date_trunc('day', ${aiUsageTracking.periodStart})`)
+        .orderBy(sql`date_trunc('day', ${aiUsageTracking.periodStart})`);
+
+      res.json({
+        windowDays: safeWindowDays,
+        usage: usage.map((row) => ({
+          day: row.day ? new Date(row.day).toISOString().slice(0, 10) : null,
+          totalTokens: row.totalTokens ?? 0,
+          totalRequests: row.totalRequests ?? 0,
+        })),
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch quota burndown:", error);
+      res.status(500).json({ error: "Failed to fetch quota burndown" });
+    }
+  }
+);
+
+router.get(
+  "/ops/integration-health",
+  requireSuperAdmin,
+  async (_req: AuthRequest, res: Response) => {
+    try {
+      const byStatus = await db
+        .select({
+          status: integrationHealth.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(integrationHealth)
+        .groupBy(integrationHealth.status)
+        .orderBy(desc(sql`count(*)`));
+
+      const expiringTokens = await integrationHealthService.getExpiringTokens(7);
+
+      res.json({
+        byStatus,
+        expiringTokens,
+      });
+    } catch (error) {
+      logger.error("[Governance] Failed to fetch integration health summary:", error);
+      res.status(500).json({ error: "Failed to fetch integration health summary" });
     }
   }
 );
@@ -567,6 +783,47 @@ router.get(
   }
 );
 
+router.post(
+  "/policy-bundles",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const validation = createPolicyBundleSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+
+      const { agencyId, name, description, status } = validation.data;
+      const [bundle] = await db
+        .insert(policyBundles)
+        .values({
+          agencyId,
+          name,
+          description,
+          status: status ?? "draft",
+        })
+        .returning();
+
+      await logGovernanceAction(
+        req.user!.id,
+        "CREATE_POLICY_BUNDLE",
+        "policy_bundle",
+        bundle.id,
+        agencyId,
+        undefined,
+        bundle as unknown as Record<string, unknown>,
+        undefined,
+        req
+      );
+
+      res.status(201).json(bundle);
+    } catch (error) {
+      logger.error("[Governance] Failed to create policy bundle:", error);
+      res.status(500).json({ error: "Failed to create policy bundle" });
+    }
+  }
+);
+
 router.get(
   "/policy-bundles/:bundleId/versions",
   requireSuperAdmin,
@@ -596,6 +853,67 @@ router.get(
     } catch (error) {
       logger.error("[Governance] Failed to fetch policy bundle versions:", error);
       res.status(500).json({ error: "Failed to fetch policy bundle versions" });
+    }
+  }
+);
+
+router.post(
+  "/policy-bundles/:bundleId/versions",
+  requireSuperAdmin,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { bundleId } = req.params;
+      const validation = createPolicyBundleVersionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: validation.error.message });
+      }
+
+      const [bundle] = await db
+        .select()
+        .from(policyBundles)
+        .where(eq(policyBundles.id, bundleId))
+        .limit(1);
+
+      if (!bundle) {
+        return res.status(404).json({ error: "Policy bundle not found" });
+      }
+
+      const [latest] = await db
+        .select({ version: policyBundleVersions.version })
+        .from(policyBundleVersions)
+        .where(eq(policyBundleVersions.bundleId, bundleId))
+        .orderBy(desc(policyBundleVersions.version))
+        .limit(1);
+
+      const nextVersion = (latest?.version ?? 0) + 1;
+      const { status, config, reason } = validation.data;
+
+      const [version] = await db
+        .insert(policyBundleVersions)
+        .values({
+          bundleId,
+          version: nextVersion,
+          status: status ?? "draft",
+          config,
+        })
+        .returning();
+
+      await logGovernanceAction(
+        req.user!.id,
+        "CREATE_POLICY_BUNDLE_VERSION",
+        "policy_bundle_version",
+        version.id,
+        bundle.agencyId,
+        undefined,
+        { bundleId, version: version.version, status: version.status } as Record<string, unknown>,
+        reason,
+        req
+      );
+
+      res.status(201).json(version);
+    } catch (error) {
+      logger.error("[Governance] Failed to create policy bundle version:", error);
+      res.status(500).json({ error: "Failed to create policy bundle version" });
     }
   }
 );
