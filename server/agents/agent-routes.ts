@@ -5,8 +5,10 @@ import { agents, agentCapabilities, agentExecutions, agentRoutingRules } from "@
 import { eq, and, desc, asc } from "drizzle-orm";
 import { getAgentOrchestrator } from "./orchestrator";
 import { createAIProvider } from "./ai-provider-adapter";
+import { requireAuth, type AuthRequest } from "../middleware/supabase-auth";
 
 export const agentRouter = Router();
+agentRouter.use(requireAuth);
 
 const createAgentSchema = z.object({
   name: z.string().min(1),
@@ -56,9 +58,9 @@ const executeAgentSchema = z.object({
   }),
 });
 
-agentRouter.get("/", async (req, res) => {
+agentRouter.get("/", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -98,9 +100,9 @@ agentRouter.get("/", async (req, res) => {
   }
 });
 
-agentRouter.post("/", async (req, res) => {
+agentRouter.post("/", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     const userId = (req as any).userId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
@@ -136,9 +138,9 @@ agentRouter.post("/", async (req, res) => {
   }
 });
 
-agentRouter.get("/:id", async (req, res) => {
+agentRouter.get("/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -163,9 +165,9 @@ agentRouter.get("/:id", async (req, res) => {
   }
 });
 
-agentRouter.patch("/:id", async (req, res) => {
+agentRouter.patch("/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -212,9 +214,9 @@ agentRouter.patch("/:id", async (req, res) => {
   }
 });
 
-agentRouter.delete("/:id", async (req, res) => {
+agentRouter.delete("/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -241,9 +243,9 @@ agentRouter.delete("/:id", async (req, res) => {
   }
 });
 
-agentRouter.post("/:id/execute", async (req, res) => {
+agentRouter.post("/:id/execute", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -295,9 +297,9 @@ agentRouter.post("/:id/execute", async (req, res) => {
   }
 });
 
-agentRouter.get("/:id/capabilities", async (req, res) => {
+agentRouter.get("/:id/capabilities", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -322,9 +324,9 @@ agentRouter.get("/:id/capabilities", async (req, res) => {
   }
 });
 
-agentRouter.post("/:id/capabilities", async (req, res) => {
+agentRouter.post("/:id/capabilities", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -365,9 +367,9 @@ agentRouter.post("/:id/capabilities", async (req, res) => {
   }
 });
 
-agentRouter.get("/executions", async (req, res) => {
+agentRouter.get("/executions", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -397,9 +399,9 @@ agentRouter.get("/executions", async (req, res) => {
   }
 });
 
-agentRouter.get("/routing-rules", async (req, res) => {
+agentRouter.get("/routing-rules", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -416,9 +418,9 @@ agentRouter.get("/routing-rules", async (req, res) => {
   }
 });
 
-agentRouter.post("/routing-rules", async (req, res) => {
+agentRouter.post("/routing-rules", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }
@@ -458,9 +460,9 @@ agentRouter.post("/routing-rules", async (req, res) => {
   }
 });
 
-agentRouter.delete("/routing-rules/:id", async (req, res) => {
+agentRouter.delete("/routing-rules/:id", async (req: AuthRequest, res) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(403).json({ error: "Agency access required" });
     }

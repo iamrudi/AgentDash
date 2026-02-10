@@ -10,12 +10,12 @@ import {
   testAgencyA,
   testAgencyB,
 } from "../utils/test-helpers";
-import type { AuthRequest } from "../../server/middleware/auth";
+import type { AuthRequest } from "../../server/middleware/supabase-auth";
 
 describe("Auth Middleware", () => {
   describe("requireRole", () => {
     it("should allow access when user has required role", async () => {
-      const { requireRole } = await import("../../server/middleware/auth");
+      const { requireRole } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.adminAgencyA }) as AuthRequest;
       const res = createMockResponse();
@@ -29,7 +29,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny access when user lacks required role", async () => {
-      const { requireRole } = await import("../../server/middleware/auth");
+      const { requireRole } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.staffAgencyA }) as AuthRequest;
       const res = createMockResponse();
@@ -44,7 +44,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should allow multiple role options", async () => {
-      const { requireRole } = await import("../../server/middleware/auth");
+      const { requireRole } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.staffAgencyA }) as AuthRequest;
       const res = createMockResponse();
@@ -57,7 +57,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny when no user attached", async () => {
-      const { requireRole } = await import("../../server/middleware/auth");
+      const { requireRole } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({}) as AuthRequest;
       const res = createMockResponse();
@@ -73,7 +73,7 @@ describe("Auth Middleware", () => {
 
   describe("requireSuperAdmin", () => {
     it("should allow SuperAdmin access", async () => {
-      const { requireSuperAdmin } = await import("../../server/middleware/auth");
+      const { requireSuperAdmin } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.superAdmin }) as AuthRequest;
       const res = createMockResponse();
@@ -86,7 +86,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny regular admin access", async () => {
-      const { requireSuperAdmin } = await import("../../server/middleware/auth");
+      const { requireSuperAdmin } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.adminAgencyA }) as AuthRequest;
       const res = createMockResponse();
@@ -100,7 +100,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny staff access", async () => {
-      const { requireSuperAdmin } = await import("../../server/middleware/auth");
+      const { requireSuperAdmin } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.staffAgencyA }) as AuthRequest;
       const res = createMockResponse();
@@ -113,7 +113,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny when no user attached", async () => {
-      const { requireSuperAdmin } = await import("../../server/middleware/auth");
+      const { requireSuperAdmin } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({}) as AuthRequest;
       const res = createMockResponse();
@@ -128,7 +128,7 @@ describe("Auth Middleware", () => {
 
   describe("verifyClientAccess - Agency Isolation", () => {
     it("should allow admin to access clients in their own agency", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.adminAgencyA }) as AuthRequest;
       const storage = createMockStorage();
@@ -141,7 +141,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should DENY admin access to clients in DIFFERENT agency (cross-tenant)", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.adminAgencyA }) as AuthRequest;
       const storage = createMockStorage();
@@ -153,7 +153,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should ALLOW SuperAdmin to access clients across ALL agencies", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.superAdmin }) as AuthRequest;
       const storage = createMockStorage();
@@ -166,7 +166,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should allow client user to access their own client data", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.clientUserA }) as AuthRequest;
       const storage = createMockStorage();
@@ -177,7 +177,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should DENY client user access to other clients", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.clientUserA }) as AuthRequest;
       const storage = createMockStorage();
@@ -188,7 +188,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny access when client not found", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ user: testUsers.adminAgencyA }) as AuthRequest;
       const storage = createMockStorage();
@@ -200,7 +200,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should deny admin access when admin has no agencyId", async () => {
-      const { verifyClientAccess } = await import("../../server/middleware/auth");
+      const { verifyClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const adminWithoutAgency = { ...testUsers.adminAgencyA, agencyId: undefined };
       const req = createMockRequest({ user: adminWithoutAgency }) as AuthRequest;
@@ -214,7 +214,7 @@ describe("Auth Middleware", () => {
 
   describe("requireClientAccess middleware", () => {
     it("should call next when access is verified", async () => {
-      const { requireClientAccess } = await import("../../server/middleware/auth");
+      const { requireClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ 
         user: testUsers.adminAgencyA,
@@ -233,7 +233,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should return 403 when cross-tenant access attempted", async () => {
-      const { requireClientAccess } = await import("../../server/middleware/auth");
+      const { requireClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ 
         user: testUsers.adminAgencyA,
@@ -254,7 +254,7 @@ describe("Auth Middleware", () => {
     });
 
     it("should return 400 when clientId not provided", async () => {
-      const { requireClientAccess } = await import("../../server/middleware/auth");
+      const { requireClientAccess } = await import("../../server/middleware/supabase-auth");
       
       const req = createMockRequest({ 
         user: testUsers.adminAgencyA,

@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Response } from "express";
 import { db } from "../db";
 import { systemSettings } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
@@ -7,29 +7,10 @@ import { realtimeService } from "../realtime/realtime-service";
 import { clearMaintenanceCache } from "../middleware/maintenance";
 import logger from "../middleware/logger";
 import { z } from "zod";
+import { requireAuth, requireSuperAdmin, type AuthRequest } from "../middleware/supabase-auth";
 
 const router = Router();
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    agencyId: string;
-    email: string;
-    role: string;
-    isSuperAdmin?: boolean;
-  };
-}
-
-function requireSuperAdmin(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) {
-  if (!req.user?.isSuperAdmin) {
-    return res.status(403).json({ error: "SuperAdmin access required" });
-  }
-  next();
-}
+router.use(requireAuth);
 
 interface HealthCheck {
   name: string;
@@ -222,7 +203,7 @@ async function getMaintenanceStatus(): Promise<{
 router.get(
   "/health",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const startTime = Date.now();
       
@@ -290,7 +271,7 @@ const maintenanceToggleSchema = z.object({
 router.post(
   "/maintenance",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const validation = maintenanceToggleSchema.safeParse(req.body);
       if (!validation.success) {
@@ -355,7 +336,7 @@ router.post(
 router.get(
   "/maintenance",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const status = await getMaintenanceStatus();
       res.json(status);

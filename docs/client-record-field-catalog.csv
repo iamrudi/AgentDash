@@ -1,0 +1,12 @@
+field_key,plane,primitive_owner,data_type,allowed_values,nullable,scope,read_roles,write_roles,ai_exposed,update_mode,signal_source,freshness_sla_days,confidence_required,audit_required
+client.companyName,data,P1,string,,false,client,Admin;Staff;Client,Admin;Staff,true,manual,,365,low,true
+client.businessContext,data,P6,string,,true,client,Admin;Staff;Client,Admin;Staff,true,manual,,180,med,true
+client.retainerAmount,data,P7,float,,true,client,Admin;Staff,Admin;Staff,false,manual,,30,low,true
+client.monthlyRetainerHours,data,P7,float,,true,client,Admin;Staff,Admin;Staff,false,manual,,30,low,true
+client.leadEvents,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,ga4,30,med,true
+metrics.ga4,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,ga4,30,med,true
+metrics.gsc,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,gsc,30,med,true
+objectives,data,P6,json,,true,client,Admin;Staff,Admin;Staff,true,manual,,90,low,true
+signals.hubspot,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,crm,30,med,true
+signals.linkedin,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,linkedin,30,med,true
+signals.competitors,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,manual,30,med,true

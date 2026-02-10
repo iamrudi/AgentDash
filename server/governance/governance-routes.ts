@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Response } from "express";
 import { quotaService } from "./quota-service";
 import { integrationHealthService } from "./integration-health-service";
 import { db } from "../db";
@@ -6,29 +6,10 @@ import { governanceAuditLogs, agencyQuotas, agencies, profiles } from "@shared/s
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 import logger from "../middleware/logger";
+import { requireAuth, requireSuperAdmin, type AuthRequest } from "../middleware/supabase-auth";
 
 const router = Router();
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    agencyId: string;
-    email: string;
-    role: string;
-    isSuperAdmin?: boolean;
-  };
-}
-
-function requireSuperAdmin(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-) {
-  if (!req.user?.isSuperAdmin) {
-    return res.status(403).json({ error: "SuperAdmin access required" });
-  }
-  next();
-}
+router.use(requireAuth);
 
 async function logGovernanceAction(
   adminId: string,
@@ -39,7 +20,7 @@ async function logGovernanceAction(
   previousValue?: Record<string, unknown>,
   newValue?: Record<string, unknown>,
   reason?: string,
-  req?: Request
+  req?: AuthRequest
 ) {
   try {
     await db.insert(governanceAuditLogs).values({
@@ -62,7 +43,7 @@ async function logGovernanceAction(
 router.get(
   "/quotas",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const quotas = await db
         .select({
@@ -83,7 +64,7 @@ router.get(
 router.get(
   "/quotas/:agencyId",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
       const summary = await quotaService.getUsageSummary(agencyId);
@@ -112,7 +93,7 @@ const updateQuotaSchema = z.object({
 router.patch(
   "/quotas/:agencyId",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
       const validation = updateQuotaSchema.safeParse(req.body);
@@ -151,7 +132,7 @@ router.patch(
 router.post(
   "/quotas/:agencyId/reset",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
       const { reason } = req.body;
@@ -181,7 +162,7 @@ router.post(
 router.post(
   "/quotas/:agencyId/sync",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
 
@@ -200,7 +181,7 @@ router.post(
 router.get(
   "/integrations/health",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const unhealthy = await integrationHealthService.getAllUnhealthyIntegrations();
       const expiring = await integrationHealthService.getExpiringTokens(7);
@@ -219,7 +200,7 @@ router.get(
 router.get(
   "/integrations/health/:agencyId",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
       const summary = await integrationHealthService.getHealthSummary(agencyId);
@@ -234,7 +215,7 @@ router.get(
 router.post(
   "/integrations/health/:agencyId/check",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
       const results = await integrationHealthService.runHealthChecks(agencyId);
@@ -262,7 +243,7 @@ router.post(
 router.get(
   "/agencies",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const agencyList = await db
         .select({
@@ -287,7 +268,7 @@ router.get(
 router.get(
   "/agencies/:agencyId/users",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId } = req.params;
 
@@ -307,7 +288,7 @@ router.get(
 router.get(
   "/audit-logs",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const { agencyId, action, limit = "100", offset = "0" } = req.query;
 
@@ -346,7 +327,7 @@ router.get(
 router.get(
   "/dashboard",
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (req: AuthRequest, res: Response) => {
     try {
       const [agencyCount] = await db
         .select({ count: sql<number>`count(*)::int` })

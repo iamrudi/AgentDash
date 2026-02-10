@@ -1,9 +1,10 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { anomalyDetectionService, MetricType, AnomalyThreshold } from "./anomaly-detection";
 import { db } from "../db";
 import { clientAnomalyThresholds, clients } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
+import { requireAuth, type AuthRequest } from "../middleware/supabase-auth";
 
 async function verifyClientBelongsToAgency(clientId: string, agencyId: string): Promise<boolean> {
   const client = await db
@@ -15,6 +16,7 @@ async function verifyClientBelongsToAgency(clientId: string, agencyId: string): 
 }
 
 export const analyticsRouter = Router();
+analyticsRouter.use(requireAuth);
 
 const thresholdSchema = z.object({
   metricType: z.enum(['sessions', 'conversions', 'clicks', 'impressions', 'organicClicks', 'organicImpressions', 'avgPosition', 'spend']),
@@ -24,10 +26,10 @@ const thresholdSchema = z.object({
   enabled: z.boolean().optional().default(true),
 });
 
-analyticsRouter.get("/anomalies/:clientId", async (req: Request, res: Response) => {
+analyticsRouter.get("/anomalies/:clientId", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -60,10 +62,10 @@ analyticsRouter.get("/anomalies/:clientId", async (req: Request, res: Response) 
   }
 });
 
-analyticsRouter.get("/trends/:clientId", async (req: Request, res: Response) => {
+analyticsRouter.get("/trends/:clientId", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -87,9 +89,9 @@ analyticsRouter.get("/trends/:clientId", async (req: Request, res: Response) => 
   }
 });
 
-analyticsRouter.post("/anomalies/scan", async (req: Request, res: Response) => {
+analyticsRouter.post("/anomalies/scan", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -126,10 +128,10 @@ analyticsRouter.post("/anomalies/scan", async (req: Request, res: Response) => {
   }
 });
 
-analyticsRouter.post("/anomalies/:clientId/convert", async (req: Request, res: Response) => {
+analyticsRouter.post("/anomalies/:clientId/convert", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -168,10 +170,10 @@ analyticsRouter.post("/anomalies/:clientId/convert", async (req: Request, res: R
   }
 });
 
-analyticsRouter.get("/statistics/:clientId", async (req: Request, res: Response) => {
+analyticsRouter.get("/statistics/:clientId", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -237,10 +239,10 @@ analyticsRouter.get("/statistics/:clientId", async (req: Request, res: Response)
   }
 });
 
-analyticsRouter.get("/thresholds/:clientId", async (req: Request, res: Response) => {
+analyticsRouter.get("/thresholds/:clientId", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -273,10 +275,10 @@ analyticsRouter.get("/thresholds/:clientId", async (req: Request, res: Response)
   }
 });
 
-analyticsRouter.post("/thresholds/:clientId", async (req: Request, res: Response) => {
+analyticsRouter.post("/thresholds/:clientId", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
@@ -341,10 +343,10 @@ analyticsRouter.post("/thresholds/:clientId", async (req: Request, res: Response
   }
 });
 
-analyticsRouter.delete("/thresholds/:clientId/:metricType", async (req: Request, res: Response) => {
+analyticsRouter.delete("/thresholds/:clientId/:metricType", async (req: AuthRequest, res: Response) => {
   try {
     const { clientId, metricType } = req.params;
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });

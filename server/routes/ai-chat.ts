@@ -2,7 +2,7 @@ import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { requireAuth, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
-import { getAIProvider } from '../ai/provider';
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 
 const router = Router();
 
@@ -39,15 +39,41 @@ router.post("/analyze-data", requireAuth, async (req: AuthRequest, res: Response
     console.log("[AI Analysis Request] Question:", question);
     console.log("[AI Analysis Request] Context Data:", JSON.stringify(contextData, null, 2));
 
-    const aiProvider = await getAIProvider(client.agencyId);
-    const analysis = await aiProvider.analyzeDataOnDemand(
-      client.companyName,
-      contextData,
-      question
+    const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.\nThe client is asking a question about a specific dataset. Your task is to:\n1. Analyze the provided data in the context of their question.\n2. Provide a clear observation summary (1-2 sentences) that DIRECTLY answers their question.\n3. Provide structured observation insights - key data points as an array of objects with label, value, and optional context.\n4. Provide a proposed action summary (1-2 sentences).\n5. Provide action tasks - a numbered list of 3-5 specific, actionable steps the agency will take.\n6. Estimate the impact and a reasonable one-time cost for this action.\n\nIMPORTANT:\n- Use SPECIFIC numbers and metrics from the data in your observation insights\n- The observationInsights should contain 2-4 key data points\n- The actionTasks should be specific steps\n- If data is sparse, identify data gaps as opportunities\n\nRespond with a single JSON object matching the required schema.`;
+
+    const prompt = `${systemPrompt}\n\nCLIENT: ${client.companyName}\nQUESTION: ${question}\nCONTEXT DATA:\n${JSON.stringify(contextData, null, 2)}`;
+
+    const outputSchema = z.object({
+      title: z.string(),
+      observation: z.string(),
+      observationInsights: z.array(z.object({
+        label: z.string(),
+        value: z.string(),
+        context: z.string().optional(),
+      })),
+      proposedAction: z.string(),
+      actionTasks: z.array(z.string()),
+      impact: z.enum(["High", "Medium", "Low"]),
+      estimatedCost: z.number(),
+      triggerMetric: z.string(),
+      baselineValue: z.number(),
+    });
+
+    const analysis = await hardenedAIExecutor.executeWithSchema(
+      {
+        agencyId: client.agencyId,
+        operation: "ai_analyze_data",
+      },
+      { prompt },
+      outputSchema
     );
 
+    if (!analysis.success) {
+      return res.status(500).json({ message: analysis.error || "Failed to get analysis" });
+    }
+
     console.log("[AI Analysis Response]:", JSON.stringify(analysis, null, 2));
-    res.json(analysis);
+    res.json(analysis.data);
   } catch (error: any) {
     console.error("On-demand AI analysis error:", error);
     res.status(500).json({ message: error.message || "Failed to get analysis" });

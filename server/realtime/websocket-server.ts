@@ -1,6 +1,6 @@
 import { Server } from "http";
 import { WebSocket, WebSocketServer } from "ws";
-import { verifyToken } from "../lib/jwt";
+import { getAuthUserFromToken } from "../middleware/supabase-auth";
 import logger from "../middleware/logger";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
@@ -26,12 +26,12 @@ export interface RealtimeMessage {
   senderId?: string;
 }
 
-interface AuthPayload {
-  userId: string;
+interface RealtimeAuthUser {
+  id: string;
   email: string;
   role: string;
-  agencyId: string | null;
-  clientId: string | null;
+  agencyId?: string;
+  clientId?: string;
   isSuperAdmin?: boolean;
 }
 
@@ -90,13 +90,13 @@ class RealtimeServer extends EventEmitter {
             return;
           }
 
-          const payload = await verifyToken(token) as AuthPayload | null;
-          if (!payload) {
+          const user = await getAuthUserFromToken(token);
+          if (!user) {
             callback(false, 401, "Invalid or expired token");
             return;
           }
 
-          (info.req as any).user = payload;
+          (info.req as any).user = user;
           callback(true);
         } catch (error) {
           logger.error("[WS] Authentication error:", error);
@@ -115,15 +115,15 @@ class RealtimeServer extends EventEmitter {
   }
 
   private handleConnection(ws: WebSocket, req: any): void {
-    const user = req.user as AuthPayload;
+    const user = req.user as RealtimeAuthUser;
     const clientId = nanoid();
 
     const client: WebSocketClient = {
       id: clientId,
       ws,
-      userId: user.userId,
-      agencyId: user.agencyId,
-      clientId: user.clientId,
+      userId: user.id,
+      agencyId: user.agencyId ?? null,
+      clientId: user.clientId ?? null,
       role: user.role,
       channels: new Set(),
       lastPing: Date.now(),
@@ -137,10 +137,10 @@ class RealtimeServer extends EventEmitter {
       this.metricsData.peakConnections = this.clients.size;
     }
 
-    if (!this.userClients.has(user.userId)) {
-      this.userClients.set(user.userId, new Set());
+    if (!this.userClients.has(user.id)) {
+      this.userClients.set(user.id, new Set());
     }
-    this.userClients.get(user.userId)!.add(clientId);
+    this.userClients.get(user.id)!.add(clientId);
 
     if (user.agencyId) {
       this.subscribeToChannel(clientId, `agency:${user.agencyId}`);
@@ -148,14 +148,14 @@ class RealtimeServer extends EventEmitter {
 
     this.sendToClient(clientId, {
       type: "connected",
-      data: { 
+      data: {
         clientId,
-        userId: user.userId,
+        userId: user.id,
         agencyId: user.agencyId
       }
     });
 
-    this.broadcastPresence(user.userId, "online", user.agencyId);
+    this.broadcastPresence(user.id, "online", user.agencyId ?? null);
 
     ws.on("message", (data) => this.handleMessage(clientId, data));
     ws.on("close", () => this.handleDisconnect(clientId));
@@ -166,11 +166,11 @@ class RealtimeServer extends EventEmitter {
       client.lastPing = Date.now();
       if (client.status === "away") {
         client.status = "online";
-        this.broadcastPresence(user.userId, "online", user.agencyId);
+        this.broadcastPresence(user.id, "online", user.agencyId ?? null);
       }
     });
 
-    logger.info(`[WS] Client connected: ${clientId}, user: ${user.userId}`);
+    logger.info(`[WS] Client connected: ${clientId}, user: ${user.id}`);
   }
 
   private handleMessage(clientId: string, data: any): void {

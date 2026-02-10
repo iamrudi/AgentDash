@@ -118,6 +118,27 @@ import {
   type InsertClientKnowledge,
   type KnowledgeIngestionLog,
   type InsertKnowledgeIngestionLog,
+  type OpportunityArtifact,
+  type InsertOpportunityArtifact,
+  type GateDecision,
+  type InsertGateDecision,
+  type InitiativeIntent,
+  type InsertInitiativeIntent,
+  type SkuComposition,
+  type InsertSkuComposition,
+  type ExecutionOutput,
+  type InsertExecutionOutput,
+  type OutcomeReview,
+  type InsertOutcomeReview,
+  type LearningArtifact,
+  type InsertLearningArtifact,
+  opportunityArtifacts,
+  gateDecisions,
+  initiativeIntents,
+  skuCompositions,
+  executionOutputs,
+  outcomeReviews,
+  learningArtifacts,
   users,
   profiles,
   clients,
@@ -287,6 +308,22 @@ export interface IStorage {
   softDeleteInitiative(id: string): Promise<Initiative>;
   restoreInitiative(id: string): Promise<Initiative>;
   permanentlyDeleteInitiative(id: string): Promise<void>;
+  // Opportunity artifacts + gate decisions
+  createOpportunityArtifact(rec: InsertOpportunityArtifact): Promise<OpportunityArtifact>;
+  getOpportunityArtifactById(id: string): Promise<OpportunityArtifact | undefined>;
+  getOpportunityArtifactsByClientId(clientId: string): Promise<OpportunityArtifact[]>;
+  createGateDecision(rec: InsertGateDecision): Promise<GateDecision>;
+  getLatestGateDecisionForTarget(targetType: string, targetId: string, gateType?: string): Promise<GateDecision | undefined>;
+  // Initiative intent + SKU composition + outputs + outcomes + learning
+  createInitiativeIntent(rec: InsertInitiativeIntent): Promise<InitiativeIntent>;
+  getInitiativeIntentByInitiativeId(initiativeId: string): Promise<InitiativeIntent | undefined>;
+  createSkuComposition(rec: InsertSkuComposition): Promise<SkuComposition>;
+  getSkuCompositionByInitiativeId(initiativeId: string): Promise<SkuComposition | undefined>;
+  freezeSkuComposition(initiativeId: string): Promise<SkuComposition | undefined>;
+  createExecutionOutput(rec: InsertExecutionOutput): Promise<ExecutionOutput>;
+  createOutcomeReview(rec: InsertOutcomeReview): Promise<OutcomeReview>;
+  getOutcomeReviewByInitiativeId(initiativeId: string): Promise<OutcomeReview | undefined>;
+  createLearningArtifact(rec: InsertLearningArtifact): Promise<LearningArtifact>;
   
   // Daily Metrics
   getMetricsByClientId(clientId: string, limit?: number): Promise<DailyMetric[]>;
@@ -953,6 +990,16 @@ export class DbStorage implements IStorage {
   }
 
   async createInitiative(rec: InsertInitiative): Promise<Initiative> {
+    if ((rec as any).opportunityArtifactId) {
+      const gate = await this.getLatestGateDecisionForTarget(
+        "opportunity_artifact",
+        (rec as any).opportunityArtifactId,
+        "opportunity"
+      );
+      if (!gate || gate.decision !== "approve") {
+        throw new Error("Opportunity must be approved before initiative creation");
+      }
+    }
     const result = await db.insert(initiatives).values(rec as any).returning();
     return result[0];
   }
@@ -1484,6 +1531,97 @@ export class DbStorage implements IStorage {
         eq(initiatives.sentToClient, "true"),
         eq(initiatives.responseViewedByAdmin, "false")
       ));
+  }
+
+  async createOpportunityArtifact(rec: InsertOpportunityArtifact): Promise<OpportunityArtifact> {
+    const result = await db.insert(opportunityArtifacts).values(rec as any).returning();
+    return result[0];
+  }
+
+  async getOpportunityArtifactById(id: string): Promise<OpportunityArtifact | undefined> {
+    const result = await db.select().from(opportunityArtifacts).where(eq(opportunityArtifacts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getOpportunityArtifactsByClientId(clientId: string): Promise<OpportunityArtifact[]> {
+    return await db
+      .select()
+      .from(opportunityArtifacts)
+      .where(eq(opportunityArtifacts.clientId, clientId))
+      .orderBy(desc(opportunityArtifacts.createdAt));
+  }
+
+  async createGateDecision(rec: InsertGateDecision): Promise<GateDecision> {
+    const result = await db.insert(gateDecisions).values(rec as any).returning();
+    return result[0];
+  }
+
+  async getLatestGateDecisionForTarget(targetType: string, targetId: string, gateType?: string): Promise<GateDecision | undefined> {
+    const conditions = [eq(gateDecisions.targetType, targetType), eq(gateDecisions.targetId, targetId)];
+    if (gateType) {
+      conditions.push(eq(gateDecisions.gateType, gateType));
+    }
+    const result = await db
+      .select()
+      .from(gateDecisions)
+      .where(and(...conditions))
+      .orderBy(desc(gateDecisions.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async createInitiativeIntent(rec: InsertInitiativeIntent): Promise<InitiativeIntent> {
+    const result = await db.insert(initiativeIntents).values(rec as any).returning();
+    return result[0];
+  }
+
+  async getInitiativeIntentByInitiativeId(initiativeId: string): Promise<InitiativeIntent | undefined> {
+    const result = await db.select().from(initiativeIntents).where(eq(initiativeIntents.initiativeId, initiativeId)).limit(1);
+    return result[0];
+  }
+
+  async createSkuComposition(rec: InsertSkuComposition): Promise<SkuComposition> {
+    const result = await db.insert(skuCompositions).values(rec as any).returning();
+    return result[0];
+  }
+
+  async getSkuCompositionByInitiativeId(initiativeId: string): Promise<SkuComposition | undefined> {
+    const result = await db.select().from(skuCompositions).where(eq(skuCompositions.initiativeId, initiativeId)).limit(1);
+    return result[0];
+  }
+
+  async freezeSkuComposition(initiativeId: string): Promise<SkuComposition | undefined> {
+    const result = await db
+      .update(skuCompositions)
+      .set({ frozenAt: new Date() })
+      .where(eq(skuCompositions.initiativeId, initiativeId))
+      .returning();
+    return result[0];
+  }
+
+  async createExecutionOutput(rec: InsertExecutionOutput): Promise<ExecutionOutput> {
+    const result = await db.insert(executionOutputs).values(rec as any).returning();
+    return result[0];
+  }
+
+  async createOutcomeReview(rec: InsertOutcomeReview): Promise<OutcomeReview> {
+    const result = await db.insert(outcomeReviews).values(rec as any).returning();
+    return result[0];
+  }
+
+  async getOutcomeReviewByInitiativeId(initiativeId: string): Promise<OutcomeReview | undefined> {
+    const result = await db
+      .select()
+      .from(outcomeReviews)
+      .where(eq(outcomeReviews.initiativeId, initiativeId))
+      .orderBy(desc(outcomeReviews.createdAt))
+      .limit(1);
+    return result[0];
+  }
+
+  async createLearningArtifact(rec: InsertLearningArtifact): Promise<LearningArtifact> {
+    const result = await db.insert(learningArtifacts).values(rec as any).returning();
+    return result[0];
   }
 
   async getClientNotificationCounts(clientId: string): Promise<{ unreadMessages: number; newRecommendations: number }> {

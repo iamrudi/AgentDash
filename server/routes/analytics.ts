@@ -2,8 +2,11 @@ import { Router } from 'express';
 import { requireAuth, requireRole, requireClientAccess, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
 import { refreshAccessToken, fetchGA4Data, fetchGA4AcquisitionChannels, fetchGA4KeyEvents, fetchGSCData, fetchGSCTopQueries } from '../lib/googleOAuth';
+import { analyticsRouter as anomalyAnalyticsRouter } from "../analytics/analytics-routes";
 
 const router = Router();
+
+router.use(anomalyAnalyticsRouter);
 
 router.get("/ga4/:clientId/conversions", requireAuth, requireRole("Client", "Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
   try {

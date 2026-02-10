@@ -1,7 +1,9 @@
-import { getAIProvider } from "./ai/provider";
 import { IStorage } from "./storage";
 import { InsertInitiative } from "@shared/schema";
 import { subDays, format } from "date-fns";
+import { z } from "zod";
+import { hardenedAIExecutor } from "./ai/hardened-executor";
+import { buildAIInput, defaultFieldCatalogPath, loadFieldCatalog } from "./ai/ai-input-builder";
 
 interface AIRecommendationResult {
   success: boolean;
@@ -166,18 +168,80 @@ export async function generateAIRecommendations(
 Include competitive analysis and opportunities to outperform these competitors.`;
     }
 
-    // 14. Call AI provider to analyze and generate recommendations
-    const aiProvider = await getAIProvider(client.agencyId);
-    const aiRecommendations = await aiProvider.analyzeClientMetrics(
-      client.companyName,
-      formattedGA4,
-      formattedGSC,
-      objectives,
-      options.preset,
-      competitorContext,
-      hubspotData,
-      linkedinData
+    const catalog = loadFieldCatalog(defaultFieldCatalogPath());
+    const inputResult = buildAIInput(catalog, {
+      client: {
+        companyName: client.companyName,
+        businessContext: client.businessContext || null,
+        retainerAmount: client.retainerAmount || null,
+        monthlyRetainerHours: client.monthlyRetainerHours || null,
+        leadEvents: client.leadEvents || null,
+      },
+      metrics: {
+        ga4: formattedGA4,
+        gsc: formattedGSC,
+      },
+      objectives: clientObjectives.filter(o => o.isActive === "true").map(o => o.description),
+      signals: {
+        hubspot: hubspotData,
+        linkedin: linkedinData,
+        competitors: options.competitorDomains || null,
+      },
+    });
+
+    if (!inputResult.ok) {
+      return {
+        success: false,
+        recommendationsCreated: 0,
+        error: `AI input validation failed: ${inputResult.error}`,
+      };
+    }
+
+    const presetConfig = {
+      "quick-wins": { focus: "Quick wins", areas: ["Conversion rate optimization", "Paid search efficiencies", "Landing page improvements"], count: 3, taskComplexity: "Quick, low-lift actions", timeframe: "Immediate to 2 weeks" },
+      "strategic-growth": { focus: "Strategic growth", areas: ["Pipeline growth", "Brand demand", "Retention improvements"], count: 4, taskComplexity: "Mid-term initiatives with clear owners", timeframe: "1-3 months" },
+      "full-audit": { focus: "Full audit", areas: ["Acquisition", "Conversion", "Retention"], count: 5, taskComplexity: "Mix of quick wins and strategic initiatives", timeframe: "Immediate to 3+ months" },
+    } as const;
+
+    const presetMeta = presetConfig[options.preset];
+    const systemPrompt = `You are an expert digital marketing strategist analyzing client performance data.\n\nANALYSIS TYPE: ${options.preset.toUpperCase().replace("-", " ")}\nFOCUS: ${presetMeta.focus}\n\nGenerate strategic recommendations that are:\n- Data-driven and specific\n- Actionable with clear next steps\n- Prioritized by impact\n- Include estimated costs where applicable\n- Aligned with the ${options.preset} preset requirements\n\nFor each recommendation, provide:\n1. A concise title (max 60 characters)\n2. A summary observation (1-2 sentences overview)\n3. Structured observation insights - key data points as an array of objects with:\n   - label: the metric or insight name (e.g., \"Current CTR\", \"Sessions Lost\", \"Opportunity\")\n   - value: the specific value or finding\n   - context (optional): brief explanation if needed\n4. A summary of the proposed action (1-2 sentences)\n5. Action tasks - specific, actionable steps (${presetMeta.taskComplexity})\n6. Impact level (High/Medium/Low)\n7. Estimated cost in USD (or 0 if no cost)\n8. The metric that triggered this recommendation\n9. Baseline value of that metric\n\nThe observationInsights should contain 2-4 key data points that support your recommendation.\n\nPRESET REQUIREMENTS:\n- Focus areas: ${presetMeta.areas.join(", ")}\n- Number of recommendations: ${presetMeta.count}\n- Implementation timeframe: ${presetMeta.timeframe}\n\nRespond with a JSON array of recommendations.`;
+
+    const prompt = `${systemPrompt}\n\nINPUT DATA (schema-validated):\n${JSON.stringify(inputResult.aiInput, null, 2)}`;
+
+    const recommendationSchema = z.array(z.object({
+      title: z.string(),
+      observation: z.string(),
+      observationInsights: z.array(z.object({
+        label: z.string(),
+        value: z.string(),
+        context: z.string().optional(),
+      })),
+      proposedAction: z.string(),
+      actionTasks: z.array(z.string()),
+      impact: z.enum(["High", "Medium", "Low"]),
+      estimatedCost: z.number(),
+      triggerMetric: z.string(),
+      baselineValue: z.number(),
+    }));
+
+    const aiResult = await hardenedAIExecutor.executeWithSchema(
+      {
+        agencyId: client.agencyId,
+        operation: "ai_recommendations",
+      },
+      { prompt },
+      recommendationSchema
     );
+
+    if (!aiResult.success) {
+      return {
+        success: false,
+        recommendationsCreated: 0,
+        error: aiResult.error || "AI recommendation generation failed",
+      };
+    }
+
+    const aiRecommendations = aiResult.data;
 
     // 12. Create initiative records from AI recommendations
     let createdCount = 0;

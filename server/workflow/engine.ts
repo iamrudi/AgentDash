@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { IStorage } from "../storage";
 import { getAIProvider } from "../ai/provider";
+import { generateAIRecommendations } from "../ai-analyzer";
 import { hardenedAIExecutor, type AIExecutionContext } from "../ai/hardened-executor";
 import { createRuleEngine, RuleEngine, RuleEvaluationContext } from "./rule-engine";
 import {
@@ -510,6 +511,8 @@ export class WorkflowEngine {
           return await this.actionUpdateInitiative(config.config, context);
         case "create_invoice":
           return await this.actionCreateInvoice(config.config, context);
+        case "generate_recommendations":
+          return await this.actionGenerateRecommendations(config.config, context);
         case "log":
           return this.actionLog(config.config, context);
         default:
@@ -679,6 +682,47 @@ export class WorkflowEngine {
     }
 
     return { success: true, output: { invoiceStub: true, clientId } };
+  }
+
+  private async actionGenerateRecommendations(
+    config: Record<string, unknown>,
+    context: WorkflowContext
+  ): Promise<StepResult> {
+    const clientId = String(config.clientId || context.clientId || context.data.clientId);
+
+    if (!clientId || clientId === "undefined") {
+      return { success: false, error: "clientId is required for generate_recommendations" };
+    }
+
+    const presetValue = config.preset || this.getNestedValue(context.data, String(config.presetPath || "preset"));
+    const preset = typeof presetValue === "string"
+      && ["quick-wins", "strategic-growth", "full-audit"].includes(presetValue)
+      ? presetValue
+      : "full-audit";
+
+    const includeCompetitorsValue = config.includeCompetitors ??
+      this.getNestedValue(context.data, String(config.includeCompetitorsPath || "includeCompetitors"));
+    const includeCompetitors = Boolean(includeCompetitorsValue);
+
+    const competitorDomainsValue = config.competitorDomains ??
+      this.getNestedValue(context.data, String(config.competitorDomainsPath || "competitorDomains"));
+    const competitorDomains = Array.isArray(competitorDomainsValue)
+      ? competitorDomainsValue.filter((item) => typeof item === "string")
+      : undefined;
+
+    const result = await generateAIRecommendations(this.storage, clientId, {
+      preset: preset as "quick-wins" | "strategic-growth" | "full-audit",
+      includeCompetitors,
+      competitorDomains,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || "Recommendation generation failed" };
+    }
+
+    context.data.recommendationsCreated = result.recommendationsCreated;
+
+    return { success: true, output: { recommendationsCreated: result.recommendationsCreated } };
   }
 
   private actionLog(

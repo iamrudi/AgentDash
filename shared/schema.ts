@@ -393,6 +393,7 @@ export type ObservationInsight = {
 // INITIATIVES (Strategic AI-powered recommendations with task breakdown)
 export const initiatives = pgTable("initiatives", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  opportunityArtifactId: uuid("opportunity_artifact_id"),
   title: text("title").notNull(),
   observation: text("observation").notNull(),
   observationInsights: jsonb("observation_insights").$type<ObservationInsight[]>(), // Structured data: [{label, value, context}]
@@ -3104,6 +3105,101 @@ export const knowledgeIngestionLog = pgTable("knowledge_ingestion_log", {
   performedAtIdx: index("knowledge_ingestion_log_performed_at_idx").on(table.performedAt),
 }));
 
+// ============================================
+// GOVERNED CONTROL-PLANE ARTIFACTS
+// ============================================
+
+export const gateTypeEnum = ["opportunity", "initiative", "acceptance", "outcome", "learning"] as const;
+export const gateDecisionEnum = ["approve", "reject", "defer"] as const;
+
+export const opportunityArtifacts = pgTable("opportunity_artifacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  clientId: uuid("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  opportunityStatement: text("opportunity_statement").notNull(),
+  reasoning: text("reasoning"),
+  assumptions: jsonb("assumptions"),
+  confidence: text("confidence"),
+  evidenceRefs: jsonb("evidence_refs"),
+  risks: jsonb("risks"),
+  suggestedSuccessCriteria: jsonb("suggested_success_criteria"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("opportunity_artifacts_agency_id_idx").on(table.agencyId),
+  clientIdIdx: index("opportunity_artifacts_client_id_idx").on(table.clientId),
+}));
+
+export const gateDecisions = pgTable("gate_decisions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  gateType: text("gate_type").notNull(),
+  decision: text("decision").notNull(),
+  rationale: text("rationale"),
+  targetType: text("target_type").notNull(),
+  targetId: uuid("target_id").notNull(),
+  actorId: uuid("actor_id").references(() => profiles.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("gate_decisions_agency_id_idx").on(table.agencyId),
+  targetIdx: index("gate_decisions_target_idx").on(table.targetType, table.targetId),
+}));
+
+export const initiativeIntents = pgTable("initiative_intents", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  intentStatement: text("intent_statement").notNull(),
+  constraints: jsonb("constraints"),
+  successCriteria: jsonb("success_criteria"),
+  boundaryConditions: jsonb("boundary_conditions"),
+  evaluationHorizon: text("evaluation_horizon"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  initiativeIdIdx: index("initiative_intents_initiative_id_idx").on(table.initiativeId),
+}));
+
+export const skuCompositions = pgTable("sku_compositions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  productSku: text("product_sku").notNull(),
+  executionSkus: jsonb("execution_skus"),
+  frozenAt: timestamp("frozen_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  initiativeIdIdx: index("sku_compositions_initiative_id_idx").on(table.initiativeId),
+}));
+
+export const executionOutputs = pgTable("execution_outputs", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  output: jsonb("output"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  initiativeIdIdx: index("execution_outputs_initiative_id_idx").on(table.initiativeId),
+}));
+
+export const outcomeReviews = pgTable("outcome_reviews", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  outcomeSummary: text("outcome_summary"),
+  kpiDelta: jsonb("kpi_delta"),
+  qualitativeFeedback: jsonb("qualitative_feedback"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  initiativeIdIdx: index("outcome_reviews_initiative_id_idx").on(table.initiativeId),
+}));
+
+export const learningArtifacts = pgTable("learning_artifacts", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  initiativeId: uuid("initiative_id").notNull().references(() => initiatives.id, { onDelete: "cascade" }),
+  learning: text("learning").notNull(),
+  invalidatedAssumptions: jsonb("invalidated_assumptions"),
+  confidence: text("confidence"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  initiativeIdIdx: index("learning_artifacts_initiative_id_idx").on(table.initiativeId),
+}));
+
 // Insert schemas for Duration Intelligence
 export const insertTaskExecutionHistorySchema = createInsertSchema(taskExecutionHistory).omit({
   id: true,
@@ -3171,6 +3267,41 @@ export type AllocationStatus = typeof allocationStatusEnum[number];
 // INSERT SCHEMAS FOR CLOSED FEEDBACK LOOP
 // ============================================
 
+export const insertOpportunityArtifactSchema = createInsertSchema(opportunityArtifacts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertGateDecisionSchema = createInsertSchema(gateDecisions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertInitiativeIntentSchema = createInsertSchema(initiativeIntents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSkuCompositionSchema = createInsertSchema(skuCompositions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertExecutionOutputSchema = createInsertSchema(executionOutputs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertOutcomeReviewSchema = createInsertSchema(outcomeReviews).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLearningArtifactSchema = createInsertSchema(learningArtifacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertRecommendationOutcomeSchema = createInsertSchema(recommendationOutcomes).omit({
   id: true,
   createdAt: true,
@@ -3213,6 +3344,27 @@ export const insertKnowledgeIngestionLogSchema = createInsertSchema(knowledgeIng
 // ============================================
 // TYPE EXPORTS FOR CLOSED FEEDBACK LOOP
 // ============================================
+
+export type OpportunityArtifact = typeof opportunityArtifacts.$inferSelect;
+export type InsertOpportunityArtifact = z.infer<typeof insertOpportunityArtifactSchema>;
+
+export type GateDecision = typeof gateDecisions.$inferSelect;
+export type InsertGateDecision = z.infer<typeof insertGateDecisionSchema>;
+
+export type InitiativeIntent = typeof initiativeIntents.$inferSelect;
+export type InsertInitiativeIntent = z.infer<typeof insertInitiativeIntentSchema>;
+
+export type SkuComposition = typeof skuCompositions.$inferSelect;
+export type InsertSkuComposition = z.infer<typeof insertSkuCompositionSchema>;
+
+export type ExecutionOutput = typeof executionOutputs.$inferSelect;
+export type InsertExecutionOutput = z.infer<typeof insertExecutionOutputSchema>;
+
+export type OutcomeReview = typeof outcomeReviews.$inferSelect;
+export type InsertOutcomeReview = z.infer<typeof insertOutcomeReviewSchema>;
+
+export type LearningArtifact = typeof learningArtifacts.$inferSelect;
+export type InsertLearningArtifact = z.infer<typeof insertLearningArtifactSchema>;
 
 export type RecommendationOutcome = typeof recommendationOutcomes.$inferSelect;
 export type InsertRecommendationOutcome = z.infer<typeof insertRecommendationOutcomeSchema>;

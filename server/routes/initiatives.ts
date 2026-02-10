@@ -53,6 +53,9 @@ router.post("/", requireAuth, requireRole("Admin"), async (req: AuthRequest, res
     const initiative = await storage.createInitiative(initiativeData);
     res.status(201).json(initiative);
   } catch (error: any) {
+    if (error.message?.includes("Opportunity must be approved")) {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: error.message });
   }
 });

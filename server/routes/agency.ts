@@ -4,6 +4,9 @@ import { storage } from '../storage';
 import { requireAuth, requireRole, requireClientAccess, requireProjectAccess, requireTaskAccess, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { insertProjectSchema } from '@shared/schema';
+import { auditClientRecordUpdate } from "../clients/client-record-audit";
+import { validateClientRecordUpdate } from "../clients/client-record-service";
+import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 
 const router = Router();
 
@@ -50,8 +53,27 @@ router.patch('/clients/:clientId', requireAuth, requireRole('Admin'), requireCli
     if (retainerAmount !== undefined) updates.retainerAmount = retainerAmount;
     if (billingDay !== undefined) updates.billingDay = billingDay;
     if (monthlyRetainerHours !== undefined) updates.monthlyRetainerHours = monthlyRetainerHours;
+
+    const validation = validateClientRecordUpdate(updates);
+    if (!validation.ok) {
+      return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
+    }
     
     const updatedClient = await storage.updateClient(clientId, updates);
+    await auditClientRecordUpdate(storage, {
+      userId: req.user!.id,
+      clientId,
+      updates,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent") ?? undefined,
+    });
+    await emitClientRecordUpdatedSignal(storage, {
+      agencyId: req.user!.agencyId!,
+      clientId,
+      updates,
+      actorId: req.user!.id,
+      origin: "agency.client.update",
+    });
     res.json(updatedClient);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
@@ -73,6 +95,15 @@ router.post('/clients/:clientId/reset-retainer-hours', requireAuth, requireRole(
     const { clientId } = req.params;
     const updatedClient = await storage.resetRetainerHours(clientId);
     res.json(updatedClient);
+  } catch (error: any) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/initiatives/mark-viewed', requireAuth, requireRole('Admin'), async (_req: AuthRequest, res) => {
+  try {
+    await storage.markInitiativeResponsesViewed();
+    res.status(204).send();
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

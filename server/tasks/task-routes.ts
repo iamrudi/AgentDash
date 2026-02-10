@@ -1,11 +1,13 @@
-import { Router, Request, Response } from "express";
+import { Router, Response } from "express";
 import { z } from "zod";
 import { idempotentTaskService } from "./idempotent-task-service";
 import { db } from "../db";
 import { tasks, taskLists, projects, clients } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { requireAuth, requireRole, type AuthRequest } from "../middleware/supabase-auth";
 
 export const taskRouter = Router();
+taskRouter.use(requireAuth, requireRole("Admin", "SuperAdmin"));
 
 const idempotentTaskSchema = z.object({
   description: z.string().min(1),
@@ -59,9 +61,9 @@ async function verifyListBelongsToAgency(listId: string, agencyId: string): Prom
   return result.length > 0;
 }
 
-taskRouter.post("/idempotent", async (req: Request, res: Response) => {
+taskRouter.post("/idempotent", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -105,9 +107,9 @@ taskRouter.post("/idempotent", async (req: Request, res: Response) => {
   }
 });
 
-taskRouter.post("/batch", async (req: Request, res: Response) => {
+taskRouter.post("/batch", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -155,9 +157,9 @@ taskRouter.post("/batch", async (req: Request, res: Response) => {
   }
 });
 
-taskRouter.put("/upsert", async (req: Request, res: Response) => {
+taskRouter.put("/upsert", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -201,9 +203,9 @@ taskRouter.put("/upsert", async (req: Request, res: Response) => {
   }
 });
 
-taskRouter.post("/deduplicate", async (req: Request, res: Response) => {
+taskRouter.post("/deduplicate", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }
@@ -232,9 +234,9 @@ taskRouter.post("/deduplicate", async (req: Request, res: Response) => {
   }
 });
 
-taskRouter.get("/:taskId/lineage", async (req: Request, res: Response) => {
+taskRouter.get("/:taskId/lineage", async (req: AuthRequest, res: Response) => {
   try {
-    const agencyId = (req as any).agencyId;
+    const agencyId = req.user?.agencyId;
     if (!agencyId) {
       return res.status(400).json({ error: "Agency context required" });
     }

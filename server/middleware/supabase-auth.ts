@@ -18,36 +18,21 @@ export interface AuthRequest extends Request {
 }
 
 // Supabase Auth middleware
-export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Authentication required" });
-  }
-
-  const token = authHeader.replace("Bearer ", "");
-  
+export async function getAuthUserFromToken(token: string): Promise<AuthRequest["user"] | null> {
   try {
-    // Verify Supabase token
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    
     if (error || !user) {
-      return res.status(401).json({ message: "Invalid or expired token" });
+      return null;
     }
 
-    // Extract role and agencyId from app_metadata (stateless, no DB query needed)
-    // Fallback to user_metadata for backward compatibility with existing users
     const role = (user.app_metadata?.['role'] || user.user_metadata?.['role']) as string;
     let agencyId: string | undefined = user.app_metadata?.['agency_id'] || undefined;
     let clientId: string | undefined;
 
-    // Validate role exists
     if (!role) {
-      return res.status(401).json({ message: "User role not found in token" });
+      return null;
     }
 
-    // Query profiles table to get isSuperAdmin flag
-    // This is done for all users to ensure Super Admins are always identified
     let isSuperAdmin = false;
     const [profile] = await db
       .select({ isSuperAdmin: profiles.isSuperAdmin, agencyId: profiles.agencyId })
@@ -59,9 +44,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
       isSuperAdmin = profile.isSuperAdmin || false;
     }
 
-    // Handle different user roles
     if (role === "Client") {
-      // Client users: query database to get their clientId and agencyId
       const [client] = await db
         .select()
         .from(clients)
@@ -69,61 +52,73 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
         .limit(1);
       
       if (!client) {
-        return res.status(401).json({ message: "Client profile not found" });
+        return null;
       }
       
       if (!client.agencyId) {
         logger.warn('Client user has no agencyId in client record', { userId: user.id });
-        return res.status(401).json({ message: "Agency association not found for client" });
+        return null;
       }
       
       clientId = client.id;
       agencyId = client.agencyId;
     } else if ((role === "Admin" || role === "Staff") && !agencyId && !isSuperAdmin) {
-      // Admin/Staff without agencyId in app_metadata: fallback to profile table
-      // This ensures backward compatibility with existing users
-      // Skip this check for Super Admins as they don't need agency association
-      
       if (!profile) {
-        return res.status(401).json({ message: "User profile not found" });
+        return null;
       }
       
       agencyId = profile.agencyId ?? undefined;
       
       if (!agencyId) {
         logger.warn('Admin/Staff user has no agencyId in profile or app_metadata', { userId: user.id });
-        return res.status(401).json({ message: "Agency association not found" });
+        return null;
       }
     }
-    // For Admin/Staff with agencyId in app_metadata - no DB query needed (optimal path)
-    // Super Admins don't require agency association
-    
-    req.user = {
-      id: user.id, // Supabase Auth user ID
+
+    return {
+      id: user.id,
       email: user.email || '',
       role,
       clientId,
       agencyId,
       isSuperAdmin,
     };
-
-    logger.info('User authenticated', {
-      requestId: (req as any).requestId,
-      email: user.email,
-      role,
-      agencyId,
-      clientId,
-      isSuperAdmin,
-    });
-    
-    next();
   } catch (error) {
-    logger.error('Auth error', { 
-      requestId: (req as any).requestId,
-      error: (error as Error).message 
-    });
-    res.status(401).json({ message: "Invalid or expired token" });
+    logger.error('Auth error', { error: (error as Error).message });
+    return null;
   }
+}
+
+export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const user = await getAuthUserFromToken(token);
+
+  if (!user) {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  req.user = user;
+
+  logger.info('User authenticated', {
+    requestId: (req as any).requestId,
+    email: user.email,
+    role: user.role,
+    agencyId: user.agencyId,
+    clientId: user.clientId,
+    isSuperAdmin: user.isSuperAdmin,
+  });
+  
+  next();
 }
 
 // Role-based authorization middleware
