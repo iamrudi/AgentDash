@@ -130,6 +130,59 @@ export class QuotaService {
     };
   }
 
+  async checkEmbeddingTokenQuota(
+    agencyId: string,
+    requestedTokens: number
+  ): Promise<QuotaCheckResult> {
+    const quota = await this.getOrCreateQuota(agencyId);
+    const newUsage = quota.embeddingTokenUsed + requestedTokens;
+    const percentUsed = (newUsage / quota.embeddingTokenLimit) * 100;
+
+    if (newUsage > quota.embeddingTokenLimit) {
+      return {
+        allowed: false,
+        quotaType: "embedding_tokens",
+        currentUsage: quota.embeddingTokenUsed,
+        limit: quota.embeddingTokenLimit,
+        percentUsed,
+        message: `Embedding token quota exceeded. Used: ${quota.embeddingTokenUsed}, Limit: ${quota.embeddingTokenLimit}`,
+      };
+    }
+
+    return {
+      allowed: true,
+      quotaType: "embedding_tokens",
+      currentUsage: quota.embeddingTokenUsed,
+      limit: quota.embeddingTokenLimit,
+      percentUsed,
+    };
+  }
+
+  async checkEmbeddingRequestQuota(agencyId: string): Promise<QuotaCheckResult> {
+    const quota = await this.getOrCreateQuota(agencyId);
+    const newUsage = quota.embeddingRequestUsed + 1;
+    const percentUsed = (newUsage / quota.embeddingRequestLimit) * 100;
+
+    if (newUsage > quota.embeddingRequestLimit) {
+      return {
+        allowed: false,
+        quotaType: "embedding_requests",
+        currentUsage: quota.embeddingRequestUsed,
+        limit: quota.embeddingRequestLimit,
+        percentUsed,
+        message: `Embedding request quota exceeded. Used: ${quota.embeddingRequestUsed}, Limit: ${quota.embeddingRequestLimit}`,
+      };
+    }
+
+    return {
+      allowed: true,
+      quotaType: "embedding_requests",
+      currentUsage: quota.embeddingRequestUsed,
+      limit: quota.embeddingRequestLimit,
+      percentUsed,
+    };
+  }
+
   async incrementAIUsage(
     agencyId: string,
     tokensUsed: number
@@ -139,6 +192,20 @@ export class QuotaService {
       .set({
         aiTokenUsed: sql`${agencyQuotas.aiTokenUsed} + ${tokensUsed}`,
         aiRequestUsed: sql`${agencyQuotas.aiRequestUsed} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(agencyQuotas.agencyId, agencyId));
+  }
+
+  async incrementEmbeddingUsage(
+    agencyId: string,
+    tokensUsed: number
+  ): Promise<void> {
+    await db
+      .update(agencyQuotas)
+      .set({
+        embeddingTokenUsed: sql`${agencyQuotas.embeddingTokenUsed} + ${tokensUsed}`,
+        embeddingRequestUsed: sql`${agencyQuotas.embeddingRequestUsed} + 1`,
         updatedAt: new Date(),
       })
       .where(eq(agencyQuotas.agencyId, agencyId));

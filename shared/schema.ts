@@ -18,6 +18,7 @@ export const agencySettings = pgTable("agency_settings", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }).unique(),
   aiProvider: text("ai_provider").notNull().default("gemini"), // 'gemini' or 'openai'
+  embeddingMaxTokens: integer("embedding_max_tokens").default(8192),
   // Branding / White-labeling logos
   agencyLogo: text("agency_logo"), // URL/path for internal agency portal header
   clientLogo: text("client_logo"), // URL/path for external client portal header
@@ -1070,6 +1071,7 @@ export const aiExecutions = pgTable("ai_executions", {
   provider: text("provider").notNull(), // 'gemini', 'openai', etc.
   model: text("model").notNull(), // 'gemini-1.5-flash', 'gpt-4', etc.
   operation: text("operation").notNull(), // 'generateText', 'analyzeMetrics', etc.
+  requestType: text("request_type").notNull().default("text"), // 'text' | 'embedding'
   inputHash: text("input_hash").notNull(), // SHA-256 of normalized input for caching
   outputHash: text("output_hash"), // SHA-256 of output for verification
   prompt: text("prompt").notNull(),
@@ -1105,6 +1107,7 @@ export const aiUsageTracking = pgTable("ai_usage_tracking", {
   periodEnd: timestamp("period_end").notNull(), // End of tracking period
   provider: text("provider").notNull(), // 'gemini', 'openai', etc.
   model: text("model"), // Optional: track per model
+  requestType: text("request_type").notNull().default("text"), // 'text' | 'embedding'
   totalRequests: integer("total_requests").notNull().default(0),
   successfulRequests: integer("successful_requests").notNull().default(0),
   failedRequests: integer("failed_requests").notNull().default(0),
@@ -1119,7 +1122,7 @@ export const aiUsageTracking = pgTable("ai_usage_tracking", {
   agencyPeriodIdx: index("ai_usage_tracking_agency_period_idx").on(table.agencyId, table.periodStart),
   providerIdx: index("ai_usage_tracking_provider_idx").on(table.provider),
   periodStartIdx: index("ai_usage_tracking_period_start_idx").on(table.periodStart),
-  uniqueAgencyPeriodProvider: index("ai_usage_tracking_unique_idx").on(table.agencyId, table.periodStart, table.provider, table.model),
+  uniqueAgencyPeriodProvider: index("ai_usage_tracking_unique_idx").on(table.agencyId, table.periodStart, table.provider, table.model, table.requestType),
 }));
 
 // AI execution types
@@ -1138,6 +1141,10 @@ export const agencyQuotas = pgTable("agency_quotas", {
   aiTokenUsed: integer("ai_token_used").notNull().default(0),
   aiRequestLimit: integer("ai_request_limit").notNull().default(10000),
   aiRequestUsed: integer("ai_request_used").notNull().default(0),
+  embeddingTokenLimit: integer("embedding_token_limit").notNull().default(2000000),
+  embeddingTokenUsed: integer("embedding_token_used").notNull().default(0),
+  embeddingRequestLimit: integer("embedding_request_limit").notNull().default(50000),
+  embeddingRequestUsed: integer("embedding_request_used").notNull().default(0),
   storageLimit: integer("storage_limit").notNull().default(5368709120),
   storageUsed: integer("storage_used").notNull().default(0),
   seatLimit: integer("seat_limit").notNull().default(10),

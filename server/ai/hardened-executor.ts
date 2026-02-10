@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { z } from "zod";
 import { db } from "../db";
-import { aiExecutions, aiUsageTracking, type InsertAIExecution } from "@shared/schema";
+import { aiExecutions, aiUsageTracking, agencySettings, type InsertAIExecution } from "@shared/schema";
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { getAIProvider } from "./provider";
 import type { AIProvider, GenerateTextOptions, TokenUsage, GenerateEmbeddingOptions, EmbeddingResult } from "./types";
@@ -20,6 +20,7 @@ export interface HardenedExecutionResult<T> {
   success: boolean;
   data?: T;
   error?: string;
+  errorCode?: string;
   cached: boolean;
   executionId: string;
   tokens?: {
@@ -38,6 +39,8 @@ interface CacheEntry {
 
 const responseCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour default
+const EMBEDDING_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
+const DEFAULT_EMBEDDING_MAX_TOKENS = 8192;
 
 export class HardenedAIExecutor {
   private static instance: HardenedAIExecutor;
@@ -95,6 +98,14 @@ export class HardenedAIExecutor {
     });
   }
 
+  private setCacheWithTtl(cacheKey: string, output: unknown, outputHash: string, ttlMs: number): void {
+    responseCache.set(cacheKey, {
+      output,
+      outputHash,
+      expiresAt: Date.now() + ttlMs,
+    });
+  }
+
   private estimateTokens(text: string): number {
     return Math.ceil(text.length / 4);
   }
@@ -107,6 +118,17 @@ export class HardenedAIExecutor {
       completionTokens,
       totalTokens: promptTokens + completionTokens,
     };
+  }
+
+  private async getEmbeddingLimits(agencyId: string): Promise<{ maxTokens: number }> {
+    const [settings] = await db
+      .select({ embeddingMaxTokens: agencySettings.embeddingMaxTokens })
+      .from(agencySettings)
+      .where(eq(agencySettings.agencyId, agencyId))
+      .limit(1);
+
+    const maxTokens = settings?.embeddingMaxTokens || DEFAULT_EMBEDDING_MAX_TOKENS;
+    return { maxTokens };
   }
 
   async executeWithSchema<T>(
@@ -134,6 +156,7 @@ export class HardenedAIExecutor {
             provider: providerName,
             model: modelName,
             operation: context.operation,
+            requestType: "text",
             inputHash,
             outputHash: cached.outputHash,
             prompt: options.prompt,
@@ -146,7 +169,7 @@ export class HardenedAIExecutor {
             durationMs: Date.now() - startTime,
           });
 
-          await this.updateUsageTracking(context.agencyId, providerName, modelName, true, true);
+          await this.updateUsageTracking(context.agencyId, providerName, modelName, "text", true, true);
 
           return {
             success: true,
@@ -159,7 +182,7 @@ export class HardenedAIExecutor {
       }
 
       // Check AI request quota before execution
-      const requestQuotaCheck = await quotaService.checkAIRequestQuota(context.agencyId);
+      const requestQuotaCheck = await quotaService.checkEmbeddingRequestQuota(context.agencyId);
       if (!requestQuotaCheck.allowed) {
         return {
           success: false,
@@ -172,7 +195,7 @@ export class HardenedAIExecutor {
 
       // Estimate tokens and check token quota
       const estimatedTokens = this.estimateTokens(options.prompt) * 2; // Rough estimate of prompt + response
-      const tokenQuotaCheck = await quotaService.checkAITokenQuota(context.agencyId, estimatedTokens);
+      const tokenQuotaCheck = await quotaService.checkEmbeddingTokenQuota(context.agencyId, estimatedTokens);
       if (!tokenQuotaCheck.allowed) {
         return {
           success: false,
@@ -190,6 +213,7 @@ export class HardenedAIExecutor {
         provider: providerName,
         model: modelName,
         operation: context.operation,
+        requestType: "text",
         inputHash,
         prompt: options.prompt,
         input: options,
@@ -236,7 +260,7 @@ export class HardenedAIExecutor {
           totalTokens: tokenUsage.totalTokens,
         });
 
-        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, {
+        await this.updateUsageTracking(context.agencyId, providerName, modelName, "text", false, false, {
           prompt: tokenUsage.promptTokens,
           completion: tokenUsage.completionTokens,
           total: tokenUsage.totalTokens
@@ -273,7 +297,7 @@ export class HardenedAIExecutor {
         totalTokens: tokenUsage.totalTokens,
       });
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, {
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, "text", true, false, {
         prompt: tokenUsage.promptTokens,
         completion: tokenUsage.completionTokens,
         total: tokenUsage.totalTokens
@@ -305,7 +329,7 @@ export class HardenedAIExecutor {
         });
       }
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false);
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, "text", false, false);
 
       return {
         success: false,
@@ -320,20 +344,90 @@ export class HardenedAIExecutor {
   async executeEmbeddingWithSchema<T>(
     context: AIExecutionContext,
     options: GenerateEmbeddingOptions,
-    outputSchema: z.ZodSchema<T>
+    outputSchema: z.ZodSchema<T>,
+    useCache: boolean = true
   ): Promise<HardenedExecutionResult<T>> {
     const startTime = Date.now();
+    const cacheKey = this.getCacheKey(
+      context.agencyId,
+      `${context.operation}:embedding`,
+      this.computeInputHash({ ...options })
+    );
+    const limits = await this.getEmbeddingLimits(context.agencyId);
+    const inputSchema = z.object({
+      input: z.string().min(1),
+      model: z.string().optional(),
+    });
+    const inputValidation = inputSchema.safeParse(options);
+    if (!inputValidation.success) {
+      return {
+        success: false,
+        error: `Embedding input validation failed: ${inputValidation.error.errors.map(e => e.message).join(", ")}`,
+        errorCode: "embedding_input_invalid",
+        cached: false,
+        executionId: "",
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    const estimatedTokens = this.estimateTokens(options.input);
+    if (estimatedTokens > limits.maxTokens) {
+      return {
+        success: false,
+        error: `Embedding input exceeds max token limit (${limits.maxTokens})`,
+        errorCode: "embedding_input_too_large",
+        cached: false,
+        executionId: "",
+        durationMs: Date.now() - startTime,
+      };
+    }
     const inputHash = this.computeInputHash({ ...options });
     const providerName = context.provider || "gemini";
     const modelName = context.model || options.model || "default";
     let executionId = "";
 
     try {
-      const requestQuotaCheck = await quotaService.checkAIRequestQuota(context.agencyId);
+      if (useCache) {
+        const cached = this.getFromCache(cacheKey);
+        if (cached) {
+          executionId = await this.logExecution({
+            agencyId: context.agencyId,
+            workflowExecutionId: context.workflowExecutionId,
+            stepId: context.stepId,
+            provider: providerName,
+            model: modelName,
+            operation: context.operation,
+            requestType: "embedding",
+            inputHash,
+            outputHash: cached.outputHash,
+            prompt: options.input,
+            input: options,
+            output: cached.output,
+            outputValidated: true,
+            cached: true,
+            cacheKey,
+            status: "cached",
+            durationMs: Date.now() - startTime,
+          });
+
+          await this.updateUsageTracking(context.agencyId, providerName, modelName, "embedding", true, true);
+
+          return {
+            success: true,
+            data: cached.output as T,
+            cached: true,
+            executionId,
+            durationMs: Date.now() - startTime,
+          };
+        }
+      }
+
+      const requestQuotaCheck = await quotaService.checkEmbeddingRequestQuota(context.agencyId);
       if (!requestQuotaCheck.allowed) {
         return {
           success: false,
           error: requestQuotaCheck.message || "AI request quota exceeded",
+          errorCode: "embedding_quota_requests_exceeded",
           cached: false,
           executionId: "",
           durationMs: Date.now() - startTime,
@@ -341,11 +435,12 @@ export class HardenedAIExecutor {
       }
 
       const estimatedTokens = this.estimateTokens(options.input) * 2;
-      const tokenQuotaCheck = await quotaService.checkAITokenQuota(context.agencyId, estimatedTokens);
+      const tokenQuotaCheck = await quotaService.checkEmbeddingTokenQuota(context.agencyId, estimatedTokens);
       if (!tokenQuotaCheck.allowed) {
         return {
           success: false,
           error: tokenQuotaCheck.message || "AI token quota exceeded",
+          errorCode: "embedding_quota_tokens_exceeded",
           cached: false,
           executionId: "",
           durationMs: Date.now() - startTime,
@@ -359,6 +454,7 @@ export class HardenedAIExecutor {
         provider: providerName,
         model: modelName,
         operation: context.operation,
+        requestType: "embedding",
         inputHash,
         prompt: options.input,
         input: options,
@@ -383,7 +479,7 @@ export class HardenedAIExecutor {
           totalTokens: embeddingResult.tokenCount,
         });
 
-        await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false, {
+        await this.updateUsageTracking(context.agencyId, providerName, modelName, "embedding", false, false, {
           prompt: embeddingResult.tokenCount,
           completion: 0,
           total: embeddingResult.tokenCount,
@@ -392,6 +488,7 @@ export class HardenedAIExecutor {
         return {
           success: false,
           error: `Schema validation failed: ${validationErrors.map(e => e.message).join(", ")}`,
+          errorCode: "embedding_output_schema_invalid",
           cached: false,
           executionId,
           tokens: {
@@ -405,6 +502,10 @@ export class HardenedAIExecutor {
 
       const outputHash = this.computeOutputHash(validationResult.data);
 
+      if (useCache) {
+        this.setCacheWithTtl(cacheKey, validationResult.data, outputHash, EMBEDDING_CACHE_TTL_MS);
+      }
+
       await this.updateExecution(executionId, {
         status: "success",
         output: validationResult.data,
@@ -416,13 +517,13 @@ export class HardenedAIExecutor {
         totalTokens: embeddingResult.tokenCount,
       });
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, true, false, {
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, "embedding", true, false, {
         prompt: embeddingResult.tokenCount,
         completion: 0,
         total: embeddingResult.tokenCount,
       });
 
-      await quotaService.incrementAIUsage(context.agencyId, embeddingResult.tokenCount);
+      await quotaService.incrementEmbeddingUsage(context.agencyId, embeddingResult.tokenCount);
 
       return {
         success: true,
@@ -446,11 +547,12 @@ export class HardenedAIExecutor {
         });
       }
 
-      await this.updateUsageTracking(context.agencyId, providerName, modelName, false, false);
+      await this.updateUsageTracking(context.agencyId, providerName, modelName, "embedding", false, false);
 
       return {
         success: false,
         error: error.message,
+        errorCode: "embedding_provider_error",
         cached: false,
         executionId: executionId || "unknown",
         durationMs,
@@ -467,7 +569,7 @@ export class HardenedAIExecutor {
     return this.executeWithSchema(context, options, stringSchema, useCache);
   }
 
-  private async logExecution(data: Partial<InsertAIExecution> & { agencyId: string; provider: string; model: string; operation: string; inputHash: string; prompt: string }): Promise<string> {
+  private async logExecution(data: Partial<InsertAIExecution> & { agencyId: string; provider: string; model: string; operation: string; inputHash: string; prompt: string; requestType?: "text" | "embedding" }): Promise<string> {
     const [execution] = await db.insert(aiExecutions).values({
       agencyId: data.agencyId,
       workflowExecutionId: data.workflowExecutionId || null,
@@ -475,6 +577,7 @@ export class HardenedAIExecutor {
       provider: data.provider,
       model: data.model,
       operation: data.operation,
+      requestType: data.requestType || "text",
       inputHash: data.inputHash,
       outputHash: data.outputHash || null,
       prompt: data.prompt,
@@ -509,6 +612,7 @@ export class HardenedAIExecutor {
     agencyId: string,
     provider: string,
     model: string,
+    requestType: "text" | "embedding",
     success: boolean,
     cached: boolean,
     tokens?: { prompt: number; completion: number; total: number }
@@ -523,6 +627,7 @@ export class HardenedAIExecutor {
         and(
           eq(aiUsageTracking.agencyId, agencyId),
           eq(aiUsageTracking.provider, provider),
+          eq(aiUsageTracking.requestType, requestType),
           gte(aiUsageTracking.periodStart, periodStart),
           lte(aiUsageTracking.periodEnd, periodEnd)
         )
@@ -547,6 +652,7 @@ export class HardenedAIExecutor {
         agencyId,
         provider,
         model,
+        requestType,
         periodStart,
         periodEnd,
         totalRequests: 1,
