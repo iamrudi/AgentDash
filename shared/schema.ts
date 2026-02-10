@@ -3200,6 +3200,30 @@ export const learningArtifacts = pgTable("learning_artifacts", {
   initiativeIdIdx: index("learning_artifacts_initiative_id_idx").on(table.initiativeId),
 }));
 
+// POLICY BUNDLES (Control-plane policy bundles and versions)
+export const policyBundles = pgTable("policy_bundles", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("draft"), // draft, active, archived
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  agencyIdIdx: index("policy_bundles_agency_id_idx").on(table.agencyId),
+}));
+
+export const policyBundleVersions = pgTable("policy_bundle_versions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  bundleId: uuid("bundle_id").notNull().references(() => policyBundles.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  status: text("status").notNull().default("draft"), // draft, active, archived
+  config: jsonb("config"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  bundleIdIdx: index("policy_bundle_versions_bundle_id_idx").on(table.bundleId),
+  versionIdx: index("policy_bundle_versions_version_idx").on(table.bundleId, table.version),
+}));
+
 // Insert schemas for Duration Intelligence
 export const insertTaskExecutionHistorySchema = createInsertSchema(taskExecutionHistory).omit({
   id: true,

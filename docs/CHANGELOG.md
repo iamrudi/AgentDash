@@ -6,7 +6,88 @@ Tracks refactoring and modernization work with dates, completion status, and pla
 
 Format: each item includes what changed, why it was done, and why it matters.
 
+### Phase 3 Summary
+Ops dashboards:
+- Ops summary + trends, AI usage + trends, workflow failure + rule publish summaries
+- Quota warnings + burndown, integration health summary
+Retention:
+- Plan/preview with count estimates, dry-run execution, scheduled dry-run job
+- Archive handler hook for future storage integration
+Policy bundles:
+- Schema, read endpoints, and write endpoints for bundles + versions
+Docs:
+- Route inventory updated for new governance/retention endpoints
+
 ### Completed
+- [x] Added ops summary and policy bundle listing endpoints: `server/governance/governance-routes.ts`.
+  Why: Provide minimal Phase 3 visibility hooks without altering runtime behavior.
+  Matters: Enables operator insight into rule publishes, workflow failures, and AI usage.
+- [x] Added ops trends endpoint (rule publishes + workflow failures): `server/governance/governance-routes.ts`.
+  Why: Provide time-series visibility for control-plane rule changes and workflow failures.
+  Matters: Helps operators detect regressions and incident patterns over time.
+- [x] Added policy bundle versions endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide read-only access to bundle history for operational review.
+  Matters: Enables safe inspection of policy changes without execution coupling.
+- [x] Expanded retention job plan to include archive/delete intent: `server/jobs/retention-job.ts`.
+  Why: Surface whether retention policies imply archive or delete without performing actions.
+  Matters: Prepares safe rollout of archival workflows and clarifies cleanup intent.
+- [x] Added retention cleanup plan preview endpoint: `server/routes/retention-policies.ts`.
+  Why: Provide operators a safe, read-only view of retention actions.
+  Matters: Enables validation before destructive cleanup runs.
+- [x] Added AI usage summary endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide coarse visibility into AI usage by provider/model.
+  Matters: Supports Phase 3 ops reporting without altering execution behavior.
+- [x] Added workflow failure summary endpoint: `server/governance/governance-routes.ts`.
+  Why: Surface top workflows with failures in a time window.
+  Matters: Helps triage instability without touching execution logic.
+- [x] Added optional retention plan count estimates: `server/jobs/retention-job.ts`, `server/routes/retention-policies.ts`.
+  Why: Allow operators to preview impact before any cleanup.
+  Matters: Reduces risk for future archival/deletion steps.
+- [x] Added rule publish summary endpoint: `server/governance/governance-routes.ts`.
+  Why: Surface the most frequently published workflow rules in a window.
+  Matters: Helps operators track churn in control-plane policies.
+- [x] Added AI usage trends endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide time-series AI usage to help spot spikes.
+  Matters: Supports operational monitoring without changing execution behavior.
+- [x] Added retention policies ops endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide superadmin visibility into per-agency retention settings.
+  Matters: Supports governance oversight before cleanup or archival changes.
+- [x] Added quota warnings ops endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide a focused list of agencies nearing AI quota limits.
+  Matters: Enables proactive governance without altering quota enforcement.
+- [x] Added quota burndown endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide time-series quota consumption visibility from usage tracking.
+  Matters: Supports trend analysis for operator planning and budget enforcement.
+- [x] Added integration health ops endpoint: `server/governance/governance-routes.ts`.
+  Why: Provide a summarized view of integration health statuses and expiring tokens.
+  Matters: Improves operator visibility into reliability risks.
+- [x] Added policy bundle write endpoints: `server/governance/governance-routes.ts`.
+  Why: Enable controlled creation of policy bundles and versions.
+  Matters: Supports governed rollout of policy changes without execution coupling.
+- [x] Added dry-run retention cleanup execution path: `server/jobs/retention-job.ts`, `server/routes/retention-policies.ts`.
+  Why: Centralize cleanup execution logic with explicit dry-run support.
+  Matters: Enables safe rollout of retention deletion logic behind a dry-run flag.
+- [x] Added scheduled retention cleanup job (dry-run): `server/jobs/retention-cleanup.ts`, `server/index.ts`.
+  Why: Provide a scheduled validation loop for retention policies without deletion.
+  Matters: Establishes operational cadence while keeping execution non-destructive.
+- [x] Added archive handler hook for retention execution: `server/jobs/retention-job.ts`.
+  Why: Allow future archival integration without changing route behavior.
+  Matters: Enables safe rollout of archival storage when ready.
+- [x] Documented retention plan preview endpoint: `docs/ROUTE_ENDPOINTS.md`.
+  Why: Keep route inventory current as ops endpoints are added.
+  Matters: Ensures refactor scope and endpoints remain auditable.
+- [x] Documented governance ops + policy bundle endpoints: `docs/ROUTE_ENDPOINTS.md`.
+  Why: Keep control-plane ops surface auditable as endpoints expand.
+  Matters: Supports traceability for Phase 3 governance tooling.
+- [x] Added policy bundle/versioning schema + migration: `shared/schema.ts`, `migrations/0012_add_policy_bundles.sql`.
+  Why: Establish data model for policy bundles without execution coupling.
+  Matters: Enables safe versioning and rollout in later phases.
+- [x] Added retention cleanup scaffolding (dry-run plan): `server/jobs/retention-job.ts`.
+  Why: Prepare for retention jobs without destructive side effects.
+  Matters: Supports P8 operational recovery and compliance planning.
+- [x] Added retention job test: `tests/retention-job.test.ts`.
+  Why: Validate retention plan generation deterministically.
+  Matters: Prevents regressions in cleanup scheduling logic.
 - [x] Added SkuCompositionService and migrated SKU composition endpoints: `server/application/sku/sku-composition-service.ts`, `server/domain/sku/schemas.ts`, `server/routes/sku-compositions.ts`.
   Why: Centralize SKU validation and audit emission in an application service.
   Matters: Keeps scope-freeze artifacts governed and consistent.

@@ -133,6 +133,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   scheduleOrphanCleanup();
   log('✅ Orphan user cleanup scheduler started (runs nightly at 2:00 AM)');
 
+  // Start retention cleanup scheduler (dry-run until explicitly enabled)
+  const { scheduleRetentionCleanup } = await import("./jobs/retention-cleanup");
+  scheduleRetentionCleanup();
+  log('✅ Retention cleanup scheduler started (dry-run nightly at 3:00 AM)');
+
   // Start SLA monitoring for breach detection and escalation
   const { startSlaMonitoring } = await import("./sla/sla-cron");
   await startSlaMonitoring();
