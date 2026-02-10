@@ -6,6 +6,18 @@ Tracks refactoring and modernization work with dates, completion status, and pla
 
 Format: each item includes what changed, why it was done, and why it matters.
 
+### Phase 3 Summary
+Ops dashboards:
+- Ops summary + trends, AI usage + trends, workflow failure + rule publish summaries
+- Quota warnings + burndown, integration health summary
+Retention:
+- Plan/preview with count estimates, dry-run execution, scheduled dry-run job
+- Archive handler hook for future storage integration
+Policy bundles:
+- Schema, read endpoints, and write endpoints for bundles + versions
+Docs:
+- Route inventory updated for new governance/retention endpoints
+
 ### Completed
 - [x] Added ops summary and policy bundle listing endpoints: `server/governance/governance-routes.ts`.
   Why: Provide minimal Phase 3 visibility hooks without altering runtime behavior.
