@@ -20,6 +20,7 @@ import { agencySettings, updateAgencySettingSchema } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { invalidateAIProviderCache } from '../ai/provider';
 import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
+import { getRequestContext } from "../middleware/request-context";
 
 const superadminRouter = Router();
 
@@ -492,11 +493,12 @@ superadminRouter.post("/clients/:clientId/generate-recommendations", requireAuth
     });
     
     const validatedData = generateRecommendationsSchema.parse(req.body);
+    const ctx = getRequestContext(req);
     const signalResult = await emitClientRecordUpdatedSignal(storage, {
       agencyId: client.agencyId,
       clientId,
       updates: {},
-      actorId: req.user!.id,
+      actorId: ctx.userId,
       origin: "superadmin.recommendations.request",
       reason: "manual_recommendations",
       preset: validatedData.preset,
@@ -505,7 +507,7 @@ superadminRouter.post("/clients/:clientId/generate-recommendations", requireAuth
     });
 
     await logAuditEvent(
-      req.user!.id,
+      ctx.userId,
       'recommendations.generate',
       'client',
       clientId,
@@ -515,8 +517,8 @@ superadminRouter.post("/clients/:clientId/generate-recommendations", requireAuth
         signalId: signalResult.signalId,
         workflowsTriggered: signalResult.workflowsTriggered.length,
       },
-      req.ip,
-      req.get('user-agent')
+      ctx.ip,
+      ctx.userAgent
     );
     
     res.status(202).json({

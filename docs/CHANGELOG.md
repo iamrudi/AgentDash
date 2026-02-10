@@ -7,6 +7,21 @@ Tracks refactoring and modernization work with dates, completion status, and pla
 Format: each item includes what changed, why it was done, and why it matters.
 
 ### Completed
+- [x] Added application service layer pattern for Opportunity Artifacts: `server/application/opportunities/opportunity-service.ts`, `server/domain/opportunities/schemas.ts`.
+  Why: Separate orchestration from routes and make AI generation explicit and testable.
+  Matters: Enforces Control Centre boundaries and consistent AI gating for Opportunity Artifacts.
+- [x] Migrated `/api/opportunities` to use the service layer (manual + AI modes): `server/routes/opportunities.ts`.
+  Why: Remove inline persistence and route-local AI logic.
+  Matters: Centralizes validation, AI gating, and audit emission.
+- [x] Added tests for service and route delegation: `tests/opportunity-service.test.ts`, `tests/opportunities-route.test.ts`.
+  Why: Prove route-to-service delegation and fail-closed AI schema handling.
+  Matters: Prevents regressions in the Control Centre intelligence loop.
+- [x] Added standardized request context object and wired it into auth middleware: `server/middleware/request-context.ts`, `server/middleware/supabase-auth.ts`.
+  Why: Reduce implicit request mutation and normalize access to principal metadata.
+  Matters: Simplifies route logic and supports consistent auditing.
+- [x] Adopted request context in key routes touching Client Record and recommendation flows: `server/routes/agency.ts`, `server/routes/integrations.ts`, `server/routes/agency-clients.ts`, `server/routes/superadmin.ts`.
+  Why: Prove context usage without a breaking refactor.
+  Matters: Creates a migration path for wider adoption.
 - [x] Added default recommendation workflow + signal route bootstrapping: `server/workflow/defaults.ts`, `server/clients/client-record-signal.ts`.
   Why: Ensure fresh environments have a working path for client record recommendation signals.
   Matters: Prevents recommendation requests from no-oping due to missing routes.
