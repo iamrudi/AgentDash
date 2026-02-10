@@ -7,10 +7,13 @@ import {
   type AuthRequest 
 } from '../middleware/supabase-auth';
 import { EventEmitter } from 'events';
+import { z } from "zod";
+import { hardenedAIExecutor } from "../ai/hardened-executor";
 
 const router = Router();
 
 const messageEmitter = new EventEmitter();
+const analysisSchema = z.string();
 
 export { messageEmitter };
 
@@ -183,9 +186,6 @@ router.post("/analyze/:clientId", requireAuth, requireRole("Admin"), requireClie
       .map(m => `${m.senderRole === "Client" ? "Client" : "Agency"}: ${m.message}`)
       .join("\n");
 
-    const { GoogleGenAI } = await import("@google/genai");
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-    
     const prompt = `Analyze this conversation between an agency and their client (${client.companyName}).
 
 Conversation:
@@ -199,11 +199,27 @@ Provide a brief analysis covering:
 
 Keep the analysis concise and actionable (2-3 paragraphs).`;
 
-    const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: prompt,
-    });
-    const analysis = result.text;
+    const model = "gemini-2.0-flash-exp";
+    const result = await hardenedAIExecutor.executeWithSchema(
+      {
+        agencyId: client.agencyId || "legacy",
+        operation: "analyzeClientConversation",
+        provider: "gemini",
+        model,
+      },
+      {
+        prompt,
+        model,
+        temperature: 0.2,
+      },
+      analysisSchema
+    );
+
+    if (!result.success) {
+      throw new Error(result.error || "AI analysis failed");
+    }
+
+    const analysis = result.data;
 
     res.json({ analysis, suggestions: [] });
   } catch (error: any) {

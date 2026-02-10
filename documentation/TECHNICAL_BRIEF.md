@@ -1586,3 +1586,27 @@ class KnowledgeRetrievalService {
 ---
 
 *Last Updated: December 2025*
+
+## Guardrails & Phase 0 Tests (AI/Gates)
+
+### How to run the enforcement checks
+
+- `npm run check` runs guardrails + full Vitest suite.
+- `npm run guardrails` runs only the direct-LLM-call guardrail.
+- `npm run check:fast` runs guardrails + the Phase 0 enforcement subset.
+
+### What the guardrail enforces
+
+- Direct model/LLM provider calls (OpenAI/Gemini patterns) are only allowed in `server/ai/**`.
+- Allowlist entries are restricted to `docs/**`, `tests/**`, and `scripts/**` only.
+- Legacy runtime violations (outside `server/ai/**`) are tracked as CRITICAL migration debt in `documentation/PRIORITY_LIST.md`.
+
+### Phase 0 vs Phase 1
+
+- Phase 0 surfaces violations via guardrails + tests without changing runtime behavior.
+- Phase 1 migrates legacy direct calls into `server/ai/hardened-executor.ts` and removes the CRITICAL debt list.
+
+### Where to add future gate tests
+
+- Add Opportunity Gate, SKU freeze, and Acceptance Gate tests under `tests/` using a `*.gate.test.ts` naming convention.
+- Keep gate tests contract-focused (schema + policy checks) and avoid runtime behavior changes in Phase 0.

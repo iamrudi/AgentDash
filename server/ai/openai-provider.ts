@@ -7,6 +7,8 @@ import type {
   LighthouseSummary,
   ChatAnalysis,
   GenerateTextOptions,
+  GenerateEmbeddingOptions,
+  EmbeddingResult,
 } from "./types";
 
 const openai = new OpenAI({
@@ -362,5 +364,21 @@ If the conversation contains only greetings/small talk with no substantive conte
       console.error("OpenAI generateText error:", error);
       throw new Error(`Failed to generate text: ${error}`);
     }
+  }
+
+  async generateEmbedding(options: GenerateEmbeddingOptions): Promise<EmbeddingResult> {
+    const model = options.model || "text-embedding-3-small";
+    const response = await openai.embeddings.create({
+      model,
+      input: options.input,
+      encoding_format: "float",
+    });
+
+    return {
+      embedding: response.data[0].embedding,
+      tokenCount: response.usage?.total_tokens || Math.ceil(options.input.length / 4),
+      model,
+      provider: "openai",
+    };
   }
 }

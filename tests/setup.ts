@@ -1,4 +1,6 @@
-import { beforeAll, afterAll, afterEach } from 'vitest';
+import { beforeAll, afterAll, afterEach, vi } from 'vitest';
+
+vi.mock('../server/db', () => ({ db: {} }));
 
 // Setup test environment
 beforeAll(() => {

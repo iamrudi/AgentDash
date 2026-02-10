@@ -18,6 +18,12 @@ Each priority is ordered by dependency—completing earlier phases unlocks capab
 
 ---
 
+## CRITICAL: Direct LLM calls bypass hardened executor
+
+Status: cleared on 2026-02-10. All previously identified direct LLM call sites were migrated to `server/ai/hardened-executor.ts`.
+
+---
+
 ## Priority 1: Workflow Engine (Core Orchestration)
 
 **Status:** ✅ COMPLETED (December 2025)  

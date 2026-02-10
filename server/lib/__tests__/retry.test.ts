@@ -1,10 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { retry, isRetryableError, retryOnRetryableError } from '../retry';
 
 describe('retry utility', () => {
   beforeEach(() => {
     vi.clearAllTimers();
     vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('retry()', () => {
@@ -46,9 +50,9 @@ describe('retry utility', () => {
         initialDelay: 100,
       });
       
+      const rejection = expect(promise).rejects.toThrow('persistent failure');
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow('persistent failure');
+      await rejection;
       expect(operation).toHaveBeenCalledTimes(3);
     });
 
@@ -222,9 +226,9 @@ describe('retry utility', () => {
         initialDelay: 100,
       });
 
+      const rejection = expect(promise).rejects.toThrow('Invalid credentials');
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow('Invalid credentials');
+      await rejection;
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
@@ -310,9 +314,9 @@ describe('retry utility', () => {
         initialDelay: 1000,
       });
 
+      const rejection = expect(promise).rejects.toThrow('401 Unauthorized');
       await vi.runAllTimersAsync();
-
-      await expect(promise).rejects.toThrow('401 Unauthorized');
+      await rejection;
     });
   });
 });

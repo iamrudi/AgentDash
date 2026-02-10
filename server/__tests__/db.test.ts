@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.unmock('../db');
+
 // Mock the retry module before importing db
 vi.mock('../lib/retry', () => ({
   retry: vi.fn(),
@@ -30,13 +32,12 @@ describe('Database Connection', () => {
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
     consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    processExitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
-      throw new Error(`Process exit called with code ${code}`);
-    });
+    processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     
     originalEnv = { ...process.env };
     process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
@@ -206,14 +207,10 @@ describe('Database Connection', () => {
     }
   });
 
-  it('should handle database URL validation', () => {
+  it('should handle database URL validation', async () => {
     delete process.env.DATABASE_URL;
 
-    expect(() => {
-      // Clear module cache to reimport
-      vi.resetModules();
-      require('../db');
-    }).toThrow('DATABASE_URL must be set');
+    await expect(import('../db')).rejects.toThrow('DATABASE_URL must be set');
   });
 
   it('should reuse connection in development (hot reload)', async () => {
