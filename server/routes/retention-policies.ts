@@ -10,7 +10,7 @@ import { Router } from 'express';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { db } from '../db';
-import { buildRetentionPlan, estimateRetentionCounts, runRetentionExecution } from '../jobs/retention-job';
+import { RetentionService } from '../application/retention/retention-service';
 import { 
   workflowRetentionPolicies, 
   workflowExecutions, 
@@ -23,6 +23,7 @@ import {
 import { eq, and, lt, sql } from 'drizzle-orm';
 
 const router = Router();
+const retentionService = new RetentionService();
 
 // Get retention policies for agency
 router.get("/", requireAuth, async (req: AuthRequest, res) => {
@@ -139,22 +140,9 @@ router.get("/cleanup/plan", requireAuth, requireRole("Admin"), async (req: AuthR
 
     const includeCounts = String(req.query.includeCounts ?? "false") === "true";
 
-    const policies = await db.select()
-      .from(workflowRetentionPolicies)
-      .where(eq(workflowRetentionPolicies.agencyId, agencyId));
-
-    let plan = buildRetentionPlan(
-      policies.map((policy) => ({
-        resourceType: policy.resourceType,
-        retentionDays: policy.retentionDays,
-        enabled: policy.enabled ?? true,
-        archiveBeforeDelete: policy.archiveBeforeDelete ?? false,
-      }))
-    );
-
-    if (includeCounts) {
-      plan = await estimateRetentionCounts({ agencyId, plan });
-    }
+    const plan = includeCounts
+      ? await retentionService.buildPlanWithCounts(agencyId)
+      : await retentionService.buildPlan(agencyId);
 
     res.json({ plan });
   } catch (error: any) {
@@ -173,42 +161,7 @@ router.post("/cleanup", requireAuth, requireRole("Admin"), async (req: AuthReque
 
     const dryRun = req.body?.dryRun !== false;
     
-    const policies = await db.select()
-      .from(workflowRetentionPolicies)
-      .where(and(
-        eq(workflowRetentionPolicies.agencyId, agencyId),
-        eq(workflowRetentionPolicies.enabled, true)
-      ));
-    
-    const plan = buildRetentionPlan(
-      policies.map((policy) => ({
-        resourceType: policy.resourceType,
-        retentionDays: policy.retentionDays,
-        enabled: policy.enabled ?? true,
-        archiveBeforeDelete: policy.archiveBeforeDelete ?? false,
-      }))
-    );
-
-    const results = await runRetentionExecution({
-      agencyId,
-      plan,
-      dryRun,
-    });
-
-    const updatedAt = new Date();
-    for (const policy of policies) {
-      const result = results.find((row) => row.resourceType === policy.resourceType);
-      if (!result) continue;
-      const deletedCount = result.deletedCount ?? 0;
-
-      await db.update(workflowRetentionPolicies)
-        .set({
-          lastCleanupAt: updatedAt,
-          recordsDeleted: sql`${workflowRetentionPolicies.recordsDeleted} + ${deletedCount}`,
-          updatedAt,
-        })
-        .where(eq(workflowRetentionPolicies.id, policy.id));
-    }
+    const results = await retentionService.runCleanup(agencyId, dryRun);
     
     res.json({ 
       message: dryRun ? "Retention cleanup dry-run completed" : "Retention cleanup completed",

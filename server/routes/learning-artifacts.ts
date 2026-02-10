@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole, requireInitiativeAccess, type AuthRequest } from "../middleware/supabase-auth";
 import { storage } from "../storage";
-import { canCaptureLearning } from "../control/gate-service";
+import { LearningArtifactService } from "../application/learning/learning-artifact-service";
 
 const router = Router();
 
@@ -12,55 +12,31 @@ const learningSchema = z.object({
   confidence: z.string().optional(),
 });
 
+export function createLearningArtifactHandler(service: LearningArtifactService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const data = learningSchema.parse(req.body);
+      const { initiativeId } = req.params;
+      const result = await service.createLearning(initiativeId, data);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(201).json(result.data);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid payload", errors: error.errors });
+      }
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
 router.post(
   "/learning-artifacts/:initiativeId",
   requireAuth,
   requireRole("Admin"),
   requireInitiativeAccess(storage),
-  async (req: AuthRequest, res) => {
-    try {
-      const data = learningSchema.parse(req.body);
-      const { initiativeId } = req.params;
-      const initiative = await storage.getInitiativeById(initiativeId);
-      if (!initiative) {
-        return res.status(404).json({ message: "Initiative not found" });
-      }
-
-      if (!initiative.opportunityArtifactId) {
-        return res.status(400).json({ message: "Initiative is missing opportunity artifact link" });
-      }
-
-      const opportunityGate = await storage.getLatestGateDecisionForTarget(
-        "opportunity_artifact",
-        initiative.opportunityArtifactId,
-        "opportunity"
-      );
-      const sku = await storage.getSkuCompositionByInitiativeId(initiativeId);
-      const outcome = await storage.getOutcomeReviewByInitiativeId(initiativeId);
-
-      const canWrite = canCaptureLearning({
-        opportunityApproved: Boolean(opportunityGate && opportunityGate.decision === "approve"),
-        skuFrozen: Boolean(sku?.frozenAt),
-        outcomeReviewed: Boolean(outcome?.outcomeSummary),
-      });
-
-      if (!canWrite) {
-        return res.status(400).json({ message: "Learning can only be captured after opportunity approval, SKU freeze, and outcome review" });
-      }
-      const record = await storage.createLearningArtifact({
-        initiativeId,
-        learning: data.learning,
-        invalidatedAssumptions: data.invalidatedAssumptions,
-        confidence: data.confidence,
-      } as any);
-      res.status(201).json(record);
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid payload", errors: error.errors });
-      }
-      res.status(500).json({ message: error.message });
-    }
-  }
+  createLearningArtifactHandler(new LearningArtifactService(storage))
 );
 
 export default router;

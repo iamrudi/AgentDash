@@ -5,9 +5,7 @@ import { requireAuth, requireRole, requireClientAccess, requireProjectAccess, re
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { getRequestContext } from "../middleware/request-context";
 import { insertProjectSchema } from '@shared/schema';
-import { auditClientRecordUpdate } from "../clients/client-record-audit";
-import { validateClientRecordUpdate } from "../clients/client-record-service";
-import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
+import { updateClientRecord } from "../clients/client-record-accessor";
 
 const router = Router();
 
@@ -55,28 +53,20 @@ router.patch('/clients/:clientId', requireAuth, requireRole('Admin'), requireCli
     if (billingDay !== undefined) updates.billingDay = billingDay;
     if (monthlyRetainerHours !== undefined) updates.monthlyRetainerHours = monthlyRetainerHours;
 
-    const validation = validateClientRecordUpdate(updates);
-    if (!validation.ok) {
-      return res.status(400).json({ message: "Invalid client record update", errors: validation.errors });
-    }
-    
-    const updatedClient = await storage.updateClient(clientId, updates);
     const ctx = getRequestContext(req);
-    await auditClientRecordUpdate(storage, {
-      userId: ctx.userId,
+    const result = await updateClientRecord(storage, {
       clientId,
       updates,
-      ipAddress: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
-    await emitClientRecordUpdatedSignal(storage, {
-      agencyId: ctx.agencyId!,
-      clientId,
-      updates,
-      actorId: ctx.userId,
+      context: ctx,
+      source: "manual",
       origin: "agency.client.update",
     });
-    res.json(updatedClient);
+
+    if (!result.ok) {
+      return res.status(400).json({ message: "Invalid client record update", errors: result.errors });
+    }
+
+    res.json(result.client);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
   }

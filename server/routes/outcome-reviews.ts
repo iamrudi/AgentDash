@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole, requireInitiativeAccess, type AuthRequest } from "../middleware/supabase-auth";
 import { storage } from "../storage";
+import { OutcomeReviewService } from "../application/outcomes/outcome-review-service";
 
 const router = Router();
 
@@ -11,33 +12,31 @@ const outcomeSchema = z.object({
   qualitativeFeedback: z.record(z.unknown()).optional(),
 });
 
+export function createOutcomeReviewHandler(service: OutcomeReviewService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const data = outcomeSchema.parse(req.body);
+      const { initiativeId } = req.params;
+      const result = await service.createOutcome(initiativeId, data);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(201).json(result.data);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid payload", errors: error.errors });
+      }
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
 router.post(
   "/outcome-reviews/:initiativeId",
   requireAuth,
   requireRole("Admin"),
   requireInitiativeAccess(storage),
-  async (req: AuthRequest, res) => {
-    try {
-      const data = outcomeSchema.parse(req.body);
-      const { initiativeId } = req.params;
-      const acceptance = await storage.getLatestGateDecisionForTarget("initiative", initiativeId, "acceptance");
-      if (!acceptance || acceptance.decision !== "approve") {
-        return res.status(400).json({ message: "Acceptance must be approved before outcome review" });
-      }
-      const record = await storage.createOutcomeReview({
-        initiativeId,
-        outcomeSummary: data.outcomeSummary,
-        kpiDelta: data.kpiDelta,
-        qualitativeFeedback: data.qualitativeFeedback,
-      } as any);
-      res.status(201).json(record);
-    } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid payload", errors: error.errors });
-      }
-      res.status(500).json({ message: error.message });
-    }
-  }
+  createOutcomeReviewHandler(new OutcomeReviewService(storage))
 );
 
 export default router;
