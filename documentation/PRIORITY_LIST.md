@@ -10,7 +10,7 @@ Each priority is ordered by dependency—completing earlier phases unlocks capab
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1-14 | Core Engine, Rules, Signals, AI, Lineage, Vectors, SLA, Agents, CRM, Analytics, Tasks, Templates, WebSocket, SuperAdmin | ✅ Complete |
+| 1-14 | Core Engine, Rules, Signals, AI, Lineage, Vectors, SLA, Agents, Analytics, Tasks, Templates, WebSocket, SuperAdmin | ✅ Complete |
 | 15 | Visual Workflow Builder UI | 🟡 In Progress |
 | 16-18 | Duration Intelligence, Closed Feedback Loop, Brand Knowledge Layer | ✅ Complete |
 | 19 | Stability Testing Framework | ✅ Complete |
@@ -438,13 +438,12 @@ shared/schema.ts (slaDefinitions, slaBreaches, slaBreachEvents, escalationChains
 **Tokens Needed:** Very High
 
 ### Description
-Implement specialized AI agents for different domains (SEO, PPC, CRM, Reporting) that can be orchestrated by the workflow engine.
+Implement specialized AI agents for different domains (SEO, PPC, Reporting) that can be orchestrated by the workflow engine.
 
 ### Deliverables ✅
 - ✅ Agent interface definition (`BaseAgent` abstract class)
 - ✅ SEO Agent (keyword analysis, content optimization, technical SEO audits)
 - ✅ PPC Agent (campaign analysis, bid optimization, budget allocation)
-- ✅ CRM Agent (lead scoring, pipeline analysis, customer segmentation)
 - ✅ Reporting Agent (report generation, data visualization, trend analysis)
 - ✅ Agent routing via `AgentOrchestrator` (domain matching, capability routing)
 - ✅ Agent collaboration protocol with shared context
@@ -457,7 +456,7 @@ Implement specialized AI agents for different domains (SEO, PPC, CRM, Reporting)
 server/agents/base-agent.ts
 
 // 4 domain-specific agents
-server/agents/domain-agents.ts (SEOAgent, PPCAgent, CRMAgent, ReportingAgent)
+server/agents/domain-agents.ts (SEOAgent, PPCAgent, ReportingAgent)
 
 // Orchestrator for routing and collaboration
 server/agents/orchestrator.ts
@@ -514,60 +513,6 @@ abstract class BaseAgent {
 - ✅ Workflow engine routes to correct agent via orchestrator
 - ✅ Agent outputs logged with lineage tracking
 - ✅ Multi-agent collaboration with shared context
-
----
-
-## Priority 9: Expanded CRM Integration Triggers
-
-**Status:** ✅ COMPLETED (December 2025)  
-**Complexity:** Medium  
-**Dependencies:** Priority 2, 3  
-**Tokens Needed:** Medium
-
-### Description
-Add lifecycle-based triggers from CRM events that feed into the workflow engine.
-
-### Deliverables ✅
-- ✅ Deal stage change → Signal (`deal_created`, `deal_updated`, `deal_deleted`, `deal_propertyChange`)
-- ✅ Contact property change → Signal (`contact_created`, `contact_updated`, `contact_deleted`, `contact_propertyChange`)
-- ✅ Company association → Signal (`company_created`, `company_updated`, `company_deleted`, `company_propertyChange`)
-- ✅ Meeting events → Signal (`meeting_created`, `meeting_updated`, `meeting_deleted`)
-- ✅ Form submission → Signal (`form_submitted`)
-- ✅ CRM webhook handler with HubSpot v3 signature validation (SHA-256, constant-time comparison)
-- ✅ Full integration with SignalRouter for workflow triggering
-- ✅ Agency-isolated webhook routing via `hubspotPortalId` mapping
-
-### Trigger Examples
-| CRM Event | Signal Type | Workflow |
-|-----------|-------------|----------|
-| Deal moved to "Proposal" | `deal_stage_changed` | Generate proposal tasks |
-| Contact marked "Champion" | `contact_property_changed` | Increase engagement |
-| New company created | `company_created` | Client onboarding workflow |
-| Meeting scheduled | `meeting_scheduled` | Prep checklist |
-
-### Implementation Details
-```typescript
-// server/crm/crm-webhook-handler.ts
-class CRMWebhookHandler {
-  verifyHubSpotSignature(requestBody: string, signature: string, clientSecret: string): Promise<boolean>
-  findAgencyByPortalId(portalId: string): Promise<string | null>
-  normalizeHubSpotEvent(payload: CRMWebhookPayload): NormalizedCRMEvent
-  processWebhookBatch(payloads: CRMWebhookPayload[]): Promise<ProcessResult>
-  processAndRouteCRMEvent(agencyId: string, event: NormalizedCRMEvent): Promise<RoutingResult>
-}
-
-// server/crm/crm-routes.ts - REST API Endpoints
-POST /api/crm/webhooks/hubspot - Public webhook endpoint for HubSpot events
-GET  /api/crm/status/:agencyId  - Check HubSpot integration status
-GET  /api/crm/events            - List CRM signals for agency
-POST /api/crm/sync/:agencyId    - Trigger manual CRM sync
-```
-
-### Success Criteria ✅
-- ✅ CRM events trigger workflows via SignalRouter.ingestSignal()
-- ✅ All major lifecycle events covered (16 event types)
-- ✅ No duplicate signals from webhook retries (SHA256 dedup hash)
-- ✅ Agency isolation via portal ID to agency mapping
 
 ---
 
@@ -963,7 +908,6 @@ Priority 1 (Workflow Engine) ✅
     │        └──▶ Priority 3 (Signal Processing) ✅
     │                 │
     │                 └──▶ Priority 7 (SLA Engine) ✅
-    │                 └──▶ Priority 9 (CRM Triggers) ✅
     │                 └──▶ Priority 10 (Analytics Ingestion) ✅
     │
     ├──▶ Priority 4 (AI Execution Layer) ✅
@@ -1000,7 +944,7 @@ Priority 1 (Workflow Engine) ✅
 | Phase | Priorities | Tokens Needed | Status |
 |-------|------------|---------------|--------|
 | Foundation | 1, 2, 4 | High | ✅ Complete |
-| Rules & Signals | 3, 10, 9 | High | ✅ Complete |
+| Rules & Signals | 3, 10 | High | ✅ Complete |
 | AI & Lineage | 5, 6, 8 | Very High | ✅ Complete |
 | Automation | 7, 11, 12 | High | ✅ Complete |
 | Polish | 13, 14, 15 | Very High | 🟡 In Progress |
@@ -1048,7 +992,6 @@ Priority 1 (Workflow Engine) ✅
 | Priority 6: Tenant-Isolated Vector Stores | ✅ Complete | December 2025 |
 | Priority 7: SLA & Escalation Engine | ✅ Complete | December 2025 |
 | Priority 8: Multi-Agent Architecture | ✅ Complete | December 2025 |
-| Priority 9: CRM Integration Triggers | ✅ Complete | December 2025 |
 | Priority 10: Enhanced Analytics Ingestion | ✅ Complete | December 2025 |
 | Priority 11: Task System Optimization | ✅ Complete | December 2025 |
 | Priority 12: Template System | ✅ Complete | December 2025 |
@@ -1186,7 +1129,6 @@ npx vitest --coverage                      # Coverage report
 | `agency-tasks.ts` | 13 | Task CRUD, bulk ops |
 | `agency-users.ts` | 5 | User management |
 | `staff.ts` | 3 | Tasks, notifications |
-| `crm.ts` | 34 | Companies, contacts, deals |
 | `settings.ts` | 2 | Rate limit settings |
 | `superadmin.ts` | 24 | Governance, agencies, users |
 | `superadmin-health.ts` | 3 | Health checks |
@@ -1232,7 +1174,6 @@ npx vitest --coverage                      # Coverage report
 |------|------|-------|--------|
 | Deprecated rate limit methods | `googleApiRateLimiter.ts` | `checkRateLimit`, `recordRequest` deprecated | Low |
 | Legacy logging | `logger.ts` | Dual logging system (legacy + Winston) | Low |
-| Redundant CRM routes | `routes/crm.ts` + `crm/crm-routes.ts` | Duplicated route definitions | Medium |
 | ~~Duplicate migrations~~ | `migrations/` | ✅ Cleaned - duplicates deleted, utilities moved to scripts/ | ✅ Done |
 | Console.log statements | Various | Should use structured logging | Medium |
 
@@ -1274,14 +1215,12 @@ npx vitest --coverage                      # Coverage report
 |--------|----------|--------|
 | Remove | `checkRateLimit()` in googleApiRateLimiter.ts | Deprecated, use `reserveRequest()` |
 | Remove | `recordRequest()` in googleApiRateLimiter.ts | Deprecated, use `reserveRequest()` |
-| Consolidate | `server/routes/crm.ts` | Merge into `server/crm/crm-routes.ts` |
 | Evaluate | `server/agents/` | Determine if actively used |
 
 ### Refactoring Roadmap
 
 **Phase 1: Quick Wins (Q1 2025)**
 - Remove deprecated methods
-- Consolidate CRM routes
 - Clean migration files
 - Replace console.log with logger
 

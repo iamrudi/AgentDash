@@ -35,7 +35,6 @@ This README serves as the **single source of truth** for key metrics. All other 
 | **schema.ts Lines** | ~3,235 | All database schemas |
 | **Test Cases** | 44 | 18 auth + 8 maintenance + 18 SLA |
 
-> **Note:** CRM routes and integrations are mounted and production-safe, but CRM is not yet a required dependency for core agency workflows. The platform operates fully without CRM enabled.
 
 ### Documentation Status
 
@@ -86,7 +85,7 @@ This README serves as the **single source of truth** for key metrics. All other 
 - **Deterministic Workflow Engine** - Atomic transactions with idempotency guarantees
 - **Rule Engine** - 16 operators for threshold, anomaly, and lifecycle triggers
 - **Signal Processing** - Ingest events from GA4, GSC, HubSpot, LinkedIn
-- **Multi-Agent Architecture** - Specialized AI agents for SEO, PPC, CRM, and Reporting
+- **Multi-Agent Architecture** - Specialized AI agents for SEO, PPC, and Reporting
 - **SLA & Escalation Engine** - Deadline monitoring with automatic escalation chains
 
 ### Security & Performance

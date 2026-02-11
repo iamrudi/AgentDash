@@ -7,225 +7,177 @@ import {
   type AuthRequest 
 } from '../middleware/supabase-auth';
 import { EventEmitter } from 'events';
-import { z } from "zod";
-import { hardenedAIExecutor } from "../ai/hardened-executor";
+import { MessageService } from "../application/messages/message-service";
+import { MessageStreamService } from "../application/messages/message-stream-service";
 
 const router = Router();
+const messageService = new MessageService(storage);
+const messageStreamService = new MessageStreamService(storage);
 
 const messageEmitter = new EventEmitter();
-const analysisSchema = z.string();
 
 export { messageEmitter };
 
-router.get("/stream", async (req, res) => {
-  try {
-    const token = req.query.token as string;
-    
-    if (!token) {
-      res.status(401).json({ message: "Authentication token required" });
-      return;
-    }
-
-    const { supabaseAdmin } = await import("../lib/supabase");
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    
-    if (error || !user) {
-      res.status(401).json({ message: "Invalid or expired token" });
-      return;
-    }
-
-    const profile = await storage.getProfileByUserId(user.id);
-    
-    if (!profile || profile.role !== "Admin") {
-      res.status(403).json({ message: "Admin access required" });
-      return;
-    }
-
-    const agencyId = profile.agencyId;
-    
-    if (!agencyId) {
-      res.status(403).json({ message: "Agency association required" });
-      return;
-    }
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-
-    res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
-
-    const messageHandler = (message: any) => {
-      if (message.agencyId === agencyId) {
-        res.write(`data: ${JSON.stringify({ type: 'message', data: message })}\n\n`);
+export function createMessageStreamHandler(
+  service: MessageStreamService = messageStreamService,
+  emitter: EventEmitter = messageEmitter,
+  timers: { setInterval: typeof setInterval; clearInterval: typeof clearInterval } = {
+    setInterval,
+    clearInterval,
+  }
+) {
+  return async (req: any, res: any) => {
+    try {
+      const result = await service.authenticateStream(req.query.token as string | undefined);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
       }
-    };
 
-    messageEmitter.on('new-message', messageHandler);
+      const agencyId = result.data!.agencyId;
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.write(`data: ${JSON.stringify({ type: 'connected' })}\n\n`);
 
-    const heartbeat = setInterval(() => {
-      res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
-    }, 30000);
+      const messageHandler = (message: any) => {
+        if (message.agencyId === agencyId) {
+          res.write(`data: ${JSON.stringify({ type: 'message', data: message })}\n\n`);
+        }
+      };
 
-    req.on('close', () => {
-      clearInterval(heartbeat);
-      messageEmitter.off('new-message', messageHandler);
-    });
-  } catch (error: any) {
-    console.error('[SSE] Error:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
+      emitter.on('new-message', messageHandler);
+      const heartbeat = timers.setInterval(() => {
+        res.write(`data: ${JSON.stringify({ type: 'heartbeat' })}\n\n`);
+      }, 30000);
 
-router.patch("/:id/read", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    await storage.markMessageAsRead(id);
-    res.status(204).send();
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post("/", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { clientId, message, senderRole } = req.body;
-    
-    if (!message || !message.trim()) {
-      return res.status(400).json({ message: "Message is required" });
+      req.on('close', () => {
+        timers.clearInterval(heartbeat);
+        emitter.off('new-message', messageHandler);
+      });
+      return undefined;
+    } catch (error: any) {
+      console.error('[SSE] Error:', error);
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    if (!clientId) {
-      return res.status(400).json({ message: "Client ID is required" });
+router.get("/stream", createMessageStreamHandler());
+
+export function createMessageMarkReadHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.markRead(req.params.id);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).send();
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    const newMessage = await storage.createMessage({
-      clientId,
-      message: message.trim(),
-      senderRole: senderRole || "Admin",
-    });
+router.patch("/:id/read", requireAuth, requireRole("Admin"), createMessageMarkReadHandler());
 
-    const client = await storage.getClientById(clientId);
-    if (client) {
-      messageEmitter.emit('new-message', { ...newMessage, agencyId: client.agencyId });
+export function createMessageCreateHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.createMessage({
+        clientId: req.body?.clientId,
+        message: req.body?.message,
+        senderRole: req.body?.senderRole,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+
+      if (result.data?.agencyId) {
+        messageEmitter.emit('new-message', { ...(result.data.message as object), agencyId: result.data.agencyId });
+      }
+
+      return res.status(result.status).json(result.data?.message);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    res.status(201).json(newMessage);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post("/", requireAuth, requireRole("Admin"), createMessageCreateHandler());
 
-router.post("/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const { message } = req.body;
-    
-    if (!message || !message.trim()) {
-      return res.status(400).json({ message: "Message is required" });
+export function createMessageCreateForClientHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.createMessage({
+        clientId: req.params.clientId,
+        message: req.body?.message,
+        senderRole: "Admin",
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+
+      if (result.data?.agencyId) {
+        messageEmitter.emit('new-message', { ...(result.data.message as object), agencyId: result.data.agencyId });
+      }
+
+      return res.status(result.status).json(result.data?.message);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    const newMessage = await storage.createMessage({
-      clientId,
-      message: message.trim(),
-      senderRole: "Admin",
-    });
+router.post("/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), createMessageCreateForClientHandler());
 
-    const client = await storage.getClientById(clientId);
-    if (client) {
-      messageEmitter.emit('new-message', { ...newMessage, agencyId: client.agencyId });
+export function createMessageMarkReadPostHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.markRead(req.params.messageId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).send();
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    res.status(201).json(newMessage);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post("/:messageId/mark-read", requireAuth, requireRole("Admin"), createMessageMarkReadPostHandler());
 
-router.post("/:messageId/mark-read", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { messageId } = req.params;
-    await storage.markMessageAsRead(messageId);
-    res.status(204).send();
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post("/client/:clientId/mark-all-read", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const messages = await storage.getMessagesByClientId(clientId);
-    await Promise.all(
-      messages
-        .filter(m => m.isRead === "false" && m.senderRole === "Client")
-        .map(m => storage.markMessageAsRead(m.id))
-    );
-    res.status(204).send();
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post("/analyze/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    
-    const client = await storage.getClientById(clientId);
-    const messages = await storage.getMessagesByClientId(clientId);
-    
-    if (!client) {
-      return res.status(404).json({ message: "Client not found" });
+export function createMessageMarkAllReadHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.markAllReadForClient(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).send();
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    if (messages.length === 0) {
-      return res.status(400).json({ message: "No messages to analyze" });
+router.post("/client/:clientId/mark-all-read", requireAuth, requireRole("Admin"), requireClientAccess(storage), createMessageMarkAllReadHandler());
+
+export function createMessageAnalyzeHandler(service: MessageService = messageService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.analyzeConversation(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error analyzing conversation:", error);
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    const conversationText = messages
-      .map(m => `${m.senderRole === "Client" ? "Client" : "Agency"}: ${m.message}`)
-      .join("\n");
-
-    const prompt = `Analyze this conversation between an agency and their client (${client.companyName}).
-
-Conversation:
-${conversationText}
-
-Provide a brief analysis covering:
-1. Main topics and concerns discussed
-2. Client sentiment and engagement level
-3. Action items or follow-ups needed
-4. Potential opportunities for strategic initiatives or recommendations
-
-Keep the analysis concise and actionable (2-3 paragraphs).`;
-
-    const model = "gemini-2.0-flash-exp";
-    const result = await hardenedAIExecutor.executeWithSchema(
-      {
-        agencyId: client.agencyId || "legacy",
-        operation: "analyzeClientConversation",
-        provider: "gemini",
-        model,
-      },
-      {
-        prompt,
-        model,
-        temperature: 0.2,
-      },
-      analysisSchema
-    );
-
-    if (!result.success) {
-      throw new Error(result.error || "AI analysis failed");
-    }
-
-    const analysis = result.data;
-
-    res.json({ analysis, suggestions: [] });
-  } catch (error: any) {
-    console.error("Error analyzing conversation:", error);
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post("/analyze/:clientId", requireAuth, requireRole("Admin"), requireClientAccess(storage), createMessageAnalyzeHandler());
 
 export default router;

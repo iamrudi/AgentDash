@@ -1,145 +1,44 @@
 import { Router, type Response } from 'express';
-import { z } from 'zod';
 import { requireAuth, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
 import { hardenedAIExecutor } from "../ai/hardened-executor";
+import { AiChatService } from "../application/ai/ai-chat-service";
 
 const router = Router();
+const aiChatService = new AiChatService(storage, hardenedAIExecutor);
 
-router.post("/analyze-data", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const analyzeDataSchema = z.object({
-      contextData: z.any(),
-      question: z.string().min(1, "Question is required"),
-    });
-
-    const validationResult = analyzeDataSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({ message: "Invalid request data", errors: validationResult.error.errors });
-    }
-
-    const { contextData, question } = validationResult.data;
-    const profile = await storage.getProfileByUserId(req.user!.id);
-    let client;
-
-    if (profile?.role === "Admin" || profile?.role === "Staff") {
-      if (!contextData?.clientId) {
-        return res.status(400).json({ message: "Client ID required for Admin/Staff users" });
+export function createAnalyzeDataHandler(service: AiChatService = aiChatService) {
+  return async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await service.analyzeData(req.user!.id, req.body);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
       }
-      client = await storage.getClientById(contextData.clientId);
-    } else {
-      client = await storage.getClientByProfileId(profile!.id);
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("On-demand AI analysis error:", error);
+      return res.status(500).json({ message: error.message || "Failed to get analysis" });
     }
+  };
+}
 
-    if (!client) {
-      return res.status(404).json({ message: "Client not found" });
-    }
+router.post("/analyze-data", requireAuth, createAnalyzeDataHandler());
 
-    console.log("[AI Analysis Request] Client:", client.companyName);
-    console.log("[AI Analysis Request] Question:", question);
-    console.log("[AI Analysis Request] Context Data:", JSON.stringify(contextData, null, 2));
-
-    const systemPrompt = `You are an expert digital marketing analyst providing on-demand insights for a client.\nThe client is asking a question about a specific dataset. Your task is to:\n1. Analyze the provided data in the context of their question.\n2. Provide a clear observation summary (1-2 sentences) that DIRECTLY answers their question.\n3. Provide structured observation insights - key data points as an array of objects with label, value, and optional context.\n4. Provide a proposed action summary (1-2 sentences).\n5. Provide action tasks - a numbered list of 3-5 specific, actionable steps the agency will take.\n6. Estimate the impact and a reasonable one-time cost for this action.\n\nIMPORTANT:\n- Use SPECIFIC numbers and metrics from the data in your observation insights\n- The observationInsights should contain 2-4 key data points\n- The actionTasks should be specific steps\n- If data is sparse, identify data gaps as opportunities\n\nRespond with a single JSON object matching the required schema.`;
-
-    const prompt = `${systemPrompt}\n\nCLIENT: ${client.companyName}\nQUESTION: ${question}\nCONTEXT DATA:\n${JSON.stringify(contextData, null, 2)}`;
-
-    const outputSchema = z.object({
-      title: z.string(),
-      observation: z.string(),
-      observationInsights: z.array(z.object({
-        label: z.string(),
-        value: z.string(),
-        context: z.string().optional(),
-      })),
-      proposedAction: z.string(),
-      actionTasks: z.array(z.string()),
-      impact: z.enum(["High", "Medium", "Low"]),
-      estimatedCost: z.number(),
-      triggerMetric: z.string(),
-      baselineValue: z.number(),
-    });
-
-    const analysis = await hardenedAIExecutor.executeWithSchema(
-      {
-        agencyId: client.agencyId,
-        operation: "ai_analyze_data",
-      },
-      { prompt },
-      outputSchema
-    );
-
-    if (!analysis.success) {
-      return res.status(500).json({ message: analysis.error || "Failed to get analysis" });
-    }
-
-    console.log("[AI Analysis Response]:", JSON.stringify(analysis, null, 2));
-    res.json(analysis.data);
-  } catch (error: any) {
-    console.error("On-demand AI analysis error:", error);
-    res.status(500).json({ message: error.message || "Failed to get analysis" });
-  }
-});
-
-router.post("/request-action", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const recommendationSchema = z.object({
-      title: z.string().min(1),
-      observation: z.string().min(1),
-      proposedAction: z.string().min(1),
-      impact: z.enum(["High", "Medium", "Low"]),
-      estimatedCost: z.number().min(0),
-      triggerMetric: z.string().min(1),
-      baselineValue: z.number(),
-      clientId: z.string().optional(),
-    });
-
-    const validationResult = recommendationSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({ message: "Invalid recommendation data", errors: validationResult.error.errors });
-    }
-
-    const recommendation = validationResult.data;
-    const profile = await storage.getProfileByUserId(req.user!.id);
-    let client;
-
-    if (profile?.role === "Admin" || profile?.role === "Staff") {
-      if (!recommendation.clientId) {
-        return res.status(400).json({ message: "Client ID required for Admin/Staff users" });
+export function createRequestActionHandler(service: AiChatService = aiChatService) {
+  return async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await service.requestAction(req.user!.id, req.body);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
       }
-      client = await storage.getClientById(recommendation.clientId);
-    } else {
-      client = await storage.getClientByProfileId(profile!.id);
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("AI request action error:", error);
+      return res.status(500).json({ message: error.message || "Failed to submit recommendation" });
     }
+  };
+}
 
-    if (!client) {
-      return res.status(404).json({ message: "Client not found" });
-    }
-
-    const status = (profile?.role === "Admin" || profile?.role === "Staff") ? "Draft" : "Needs Review";
-    const sentToClient = (profile?.role === "Admin" || profile?.role === "Staff") ? "false" : "true";
-    
-    const initiative = await storage.createInitiative({
-      clientId: client.id,
-      title: recommendation.title,
-      observation: recommendation.observation,
-      proposedAction: recommendation.proposedAction,
-      cost: recommendation.estimatedCost?.toString() || "0",
-      impact: recommendation.impact,
-      status: status,
-      triggerMetric: recommendation.triggerMetric || "",
-      baselineValue: recommendation.baselineValue?.toString() || "0",
-      sentToClient: sentToClient,
-    });
-
-    const message = (profile?.role === "Admin" || profile?.role === "Staff") 
-      ? "Recommendation saved as draft. You can edit and send it from the AI Recommendations page."
-      : "Recommendation submitted for review.";
-    
-    res.status(201).json({ initiativeId: initiative.id, message });
-  } catch (error: any) {
-    console.error("AI request action error:", error);
-    res.status(500).json({ message: error.message || "Failed to submit recommendation" });
-  }
-});
+router.post("/request-action", requireAuth, createRequestActionHandler());
 
 export default router;

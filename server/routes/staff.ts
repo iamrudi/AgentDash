@@ -1,82 +1,61 @@
 import { Router } from 'express';
 import { storage } from '../storage';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
+import { StaffReadService } from '../application/staff/staff-read-service';
 
 const router = Router();
+const staffReadService = new StaffReadService(storage);
 
-router.get('/tasks', requireAuth, requireRole('Staff', 'Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+export function createStaffTasksHandler(service: StaffReadService = staffReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.listTasks(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    const allTasks = await storage.getAllTasks(req.user!.agencyId);
-    const tasksWithProjects = await Promise.all(
-      allTasks.map(async (task) => {
-        const project = task.projectId ? await storage.getProjectById(task.projectId) : undefined;
-        return { ...task, project };
-      })
-    );
-    res.json(tasksWithProjects);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.get('/tasks/full', requireAuth, requireRole('Staff', 'Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+router.get('/tasks', requireAuth, requireRole('Staff', 'Admin'), createStaffTasksHandler());
+
+export function createStaffFullTasksHandler(service: StaffReadService = staffReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.listFullTasks({
+        agencyId: req.user?.agencyId,
+        userId: req.user!.id,
+        role: req.user!.role,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    const profile = await storage.getProfileByUserId(req.user!.id);
-    if (!profile) {
-      return res.status(403).json({ message: 'Profile not found' });
+router.get('/tasks/full', requireAuth, requireRole('Staff', 'Admin'), createStaffFullTasksHandler());
+
+export function createStaffNotificationCountsHandler(service: StaffReadService = staffReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.notificationCounts(req.user!.id);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    const allTasks = await storage.getAllTasks(req.user!.agencyId);
-    
-    const tasksToReturn = req.user!.role === 'Staff' 
-      ? await Promise.all(
-          allTasks.map(async (task) => {
-            const assignments = await storage.getAssignmentsByTaskId(task.id);
-            const isAssigned = assignments.some(a => a.staffProfileId === profile.id);
-            return isAssigned ? task : null;
-          })
-        ).then(tasks => tasks.filter((t): t is typeof allTasks[number] => t !== null))
-      : allTasks;
-
-    const tasksWithAssignments = await Promise.all(
-      tasksToReturn.map(async (task) => {
-        const assignments = await storage.getAssignmentsByTaskId(task.id);
-        const assignmentsWithProfiles = await Promise.all(
-          assignments.map(async (assignment) => {
-            const assigneeProfile = await storage.getProfileById(assignment.staffProfileId);
-            return { ...assignment, staffProfile: assigneeProfile };
-          })
-        );
-        return { ...task, assignments: assignmentsWithProfiles };
-      })
-    );
-    
-    res.json(tasksWithAssignments);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.get('/notifications/counts', requireAuth, requireRole('Staff'), async (req: AuthRequest, res) => {
-  try {
-    const profile = await storage.getProfileByUserId(req.user!.id);
-    
-    if (!profile) {
-      return res.json({ newTasks: 0, highPriorityTasks: 0 });
-    }
-
-    const counts = await storage.getStaffNotificationCounts(profile.id);
-    res.json(counts);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get('/notifications/counts', requireAuth, requireRole('Staff'), createStaffNotificationCountsHandler());
 
 export default router;

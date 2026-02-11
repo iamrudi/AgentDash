@@ -7,250 +7,234 @@
  */
 
 import { Router } from 'express';
-import { requireAuth, type AuthRequest } from '../middleware/supabase-auth';
+import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
-import { signalRouter } from '../workflow/signal-router';
-import { SignalAdapterFactory } from '../workflow/signal-adapters';
-import { insertWorkflowSignalRouteSchema, updateWorkflowSignalRouteSchema } from '@shared/schema';
+import { SignalService } from '../application/signals/signal-service';
 
 const router = Router();
+const signalService = new SignalService(storage);
+router.use(requireAuth, requireRole("Admin", "SuperAdmin"));
 
 // ============================================
 // SIGNAL INGESTION ROUTES
 // ============================================
 
 // Ingest signal from specific source
-router.post("/signals/:source/ingest", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { source } = req.params;
-    const agencyId = req.user?.agencyId;
-    
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
-    }
-
-    if (!SignalAdapterFactory.hasAdapter(source)) {
-      return res.status(400).json({ 
-        message: `Invalid source: ${source}. Valid sources: ${SignalAdapterFactory.getSupportedSources().join(", ")}` 
+export function createSignalIngestHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.ingest({
+        agencyId: req.user?.agencyId,
+        source: req.params.source,
+        data: req.body?.data,
+        clientId: req.body?.clientId,
       });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error ingesting signal:", error);
+      return res.status(500).json({ message: error.message || "Failed to ingest signal" });
     }
+  };
+}
 
-    const { data, clientId } = req.body;
-    if (!data || typeof data !== "object") {
-      return res.status(400).json({ message: "Signal data is required" });
-    }
-
-    const result = await signalRouter.ingestSignal(agencyId, source, data, clientId);
-    
-    res.status(result.isDuplicate ? 200 : 201).json({
-      signal: result.signal,
-      isDuplicate: result.isDuplicate,
-      matchingRoutes: result.matchingRoutes.length,
-      workflowsTriggered: result.workflowsTriggered,
-    });
-  } catch (error: any) {
-    console.error("Error ingesting signal:", error);
-    res.status(500).json({ message: error.message || "Failed to ingest signal" });
-  }
-});
+router.post("/signals/:source/ingest", requireAuth, createSignalIngestHandler());
 
 // Get supported signal sources (must be before :id route)
-router.get("/signals/sources", requireAuth, async (_req: AuthRequest, res) => {
-  res.json({
-    sources: SignalAdapterFactory.getSupportedSources(),
-  });
-});
+export function createSignalSourcesHandler(service: SignalService = signalService) {
+  return async (_req: AuthRequest, res: any) => {
+    const result = service.supportedSources();
+    return res.status(result.status).json(result.data);
+  };
+}
+
+router.get("/signals/sources", requireAuth, createSignalSourcesHandler());
 
 // Get unprocessed signals
-router.get("/signals/pending", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const agencyId = req.user?.agencyId;
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
+export function createSignalPendingHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.pendingSignals(req.user?.agencyId, req.query.limit);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error fetching pending signals:", error);
+      return res.status(500).json({ message: "Failed to fetch pending signals" });
     }
+  };
+}
 
-    const limit = parseInt(req.query.limit as string) || 100;
-    const signals = await signalRouter.getPendingSignals(agencyId, limit);
-    res.json(signals);
-  } catch (error: any) {
-    console.error("Error fetching pending signals:", error);
-    res.status(500).json({ message: "Failed to fetch pending signals" });
-  }
-});
+router.get("/signals/pending", requireAuth, createSignalPendingHandler());
 
 // Get failed signals
-router.get("/signals/failed", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const agencyId = req.user?.agencyId;
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
+export function createSignalFailedHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.failedSignals(req.user?.agencyId, req.query.limit);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error fetching failed signals:", error);
+      return res.status(500).json({ message: "Failed to fetch failed signals" });
     }
+  };
+}
 
-    const limit = parseInt(req.query.limit as string) || 100;
-    const signals = await signalRouter.getFailedSignals(agencyId, limit);
-    res.json(signals);
-  } catch (error: any) {
-    console.error("Error fetching failed signals:", error);
-    res.status(500).json({ message: "Failed to fetch failed signals" });
-  }
-});
+router.get("/signals/failed", requireAuth, createSignalFailedHandler());
 
 // Retry failed signal
-router.post("/signals/:id/retry", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const signal = await storage.getWorkflowSignalById(id);
-    
-    if (!signal) {
-      return res.status(404).json({ message: "Signal not found" });
+export function createSignalRetryHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.retrySignal(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error retrying signal:", error);
+      return res.status(500).json({ message: error.message || "Failed to retry signal" });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (signal.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const updatedSignal = await signalRouter.retrySignal(id);
-    res.json(updatedSignal);
-  } catch (error: any) {
-    console.error("Error retrying signal:", error);
-    res.status(500).json({ message: error.message || "Failed to retry signal" });
-  }
-});
+router.post("/signals/:id/retry", requireAuth, createSignalRetryHandler());
 
 // Get signal by ID
-router.get("/signals/:id", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const signal = await storage.getWorkflowSignalById(id);
-    
-    if (!signal) {
-      return res.status(404).json({ message: "Signal not found" });
+export function createSignalGetHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getSignal(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error fetching signal:", error);
+      return res.status(500).json({ message: "Failed to fetch signal" });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (signal.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    res.json(signal);
-  } catch (error: any) {
-    console.error("Error fetching signal:", error);
-    res.status(500).json({ message: "Failed to fetch signal" });
-  }
-});
+router.get("/signals/:id", requireAuth, createSignalGetHandler());
 
 // ============================================
 // SIGNAL ROUTES MANAGEMENT
 // ============================================
 
 // Get all signal routes for agency
-router.get("/signal-routes", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const agencyId = req.user?.agencyId;
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
+export function createSignalRoutesListHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.listRoutes(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error fetching signal routes:", error);
+      return res.status(500).json({ message: "Failed to fetch signal routes" });
     }
+  };
+}
 
-    const routes = await storage.getSignalRoutesByAgencyId(agencyId);
-    res.json(routes);
-  } catch (error: any) {
-    console.error("Error fetching signal routes:", error);
-    res.status(500).json({ message: "Failed to fetch signal routes" });
-  }
-});
+router.get("/signal-routes", requireAuth, createSignalRoutesListHandler());
 
 // Get signal route by ID
-router.get("/signal-routes/:id", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const route = await storage.getSignalRouteById(id);
-    
-    if (!route) {
-      return res.status(404).json({ message: "Signal route not found" });
+export function createSignalRouteGetHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getRoute(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error fetching signal route:", error);
+      return res.status(500).json({ message: "Failed to fetch signal route" });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (route.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    res.json(route);
-  } catch (error: any) {
-    console.error("Error fetching signal route:", error);
-    res.status(500).json({ message: "Failed to fetch signal route" });
-  }
-});
+router.get("/signal-routes/:id", requireAuth, createSignalRouteGetHandler());
 
 // Create signal route
-router.post("/signal-routes", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const agencyId = req.user?.agencyId;
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
+export function createSignalRouteCreateHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.createRoute(req.user?.agencyId, req.body ?? {});
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error creating signal route:", error);
+      return res.status(500).json({ message: "Failed to create signal route" });
     }
+  };
+}
 
-    const routeData = { ...req.body, agencyId };
-    const validatedData = insertWorkflowSignalRouteSchema.parse(routeData);
-    const route = await storage.createSignalRoute(validatedData);
-    res.status(201).json(route);
-  } catch (error: any) {
-    if (error.name === "ZodError") {
-      return res.status(400).json({ message: "Validation failed", errors: error.errors });
-    }
-    console.error("Error creating signal route:", error);
-    res.status(500).json({ message: "Failed to create signal route" });
-  }
-});
+router.post("/signal-routes", requireAuth, createSignalRouteCreateHandler());
 
 // Update signal route
-router.patch("/signal-routes/:id", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const route = await storage.getSignalRouteById(id);
-    
-    if (!route) {
-      return res.status(404).json({ message: "Signal route not found" });
+export function createSignalRouteUpdateHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateRoute(
+        req.params.id,
+        {
+          agencyId: req.user?.agencyId,
+          isSuperAdmin: req.user?.isSuperAdmin,
+        },
+        req.body ?? {}
+      );
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Error updating signal route:", error);
+      return res.status(500).json({ message: "Failed to update signal route" });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (route.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const validatedData = updateWorkflowSignalRouteSchema.parse(req.body);
-    const updatedRoute = await storage.updateSignalRoute(id, validatedData);
-    res.json(updatedRoute);
-  } catch (error: any) {
-    if (error.name === "ZodError") {
-      return res.status(400).json({ message: "Validation failed", errors: error.errors });
-    }
-    console.error("Error updating signal route:", error);
-    res.status(500).json({ message: "Failed to update signal route" });
-  }
-});
+router.patch("/signal-routes/:id", requireAuth, createSignalRouteUpdateHandler());
 
 // Delete signal route
-router.delete("/signal-routes/:id", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const route = await storage.getSignalRouteById(id);
-    
-    if (!route) {
-      return res.status(404).json({ message: "Signal route not found" });
+export function createSignalRouteDeleteHandler(service: SignalService = signalService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.deleteRoute(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).send();
+    } catch (error: any) {
+      console.error("Error deleting signal route:", error);
+      return res.status(500).json({ message: "Failed to delete signal route" });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (route.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    await storage.deleteSignalRoute(id);
-    res.status(204).send();
-  } catch (error: any) {
-    console.error("Error deleting signal route:", error);
-    res.status(500).json({ message: "Failed to delete signal route" });
-  }
-});
+router.delete("/signal-routes/:id", requireAuth, createSignalRouteDeleteHandler());
 
 export default router;

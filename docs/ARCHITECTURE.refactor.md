@@ -7,9 +7,9 @@ AgentDash is a single deployable web app with:
 - An Express server (`server/index.ts`) hosting API, realtime, and schedulers.
 - Shared schema contracts in Drizzle (`shared/schema.ts`) used by runtime and persistence.
 
-The runtime currently uses a **hybrid routing model**:
+The runtime now uses a modular routing model with a thin compatibility shim:
 - Modular domain routers mounted by registry (`server/routes/index.ts`).
-- A large legacy aggregator (`server/routes.ts`) still owning major behavior, including governance and many side-effecting routes.
+- `server/routes.ts` primarily sets policy boundaries and mounts modular routers.
 
 ### Control Plane vs Data Plane
 
@@ -45,7 +45,7 @@ flowchart LR
 
 ## Enforcement Boundaries (Where Claims Are Enforced)
 
-- **Process boundary / middleware stack**: `server/index.ts` (`helmet`, CORS, request id, metrics, rate limiter, maintenance).
+- **Process boundary / middleware stack**: `server/index.ts` (`helmet`, request id, metrics, rate limiter, maintenance).
 - **Principal + tenant resolution**: `requireAuth`, `requireRole`, `require*Access` in `server/middleware/supabase-auth.ts`.
 - **Agency scope resolution for mixed admin/superadmin calls**: `resolveAgencyContext` in `server/middleware/agency-context.ts`.
 - **Signal input normalization + dedup**: `SignalNormalizer.normalize` (`server/workflow/signal-normalizer.ts`) and `createWorkflowSignalWithDedup` (`server/storage.ts`).
@@ -122,7 +122,7 @@ Evidence:
 - No full byzantine tamper-evidence chain across all events; logs are append-style tables but not cryptographically chained.
 - No global exactly-once guarantee across all side effects; idempotency is strong for workflow execution hash and signal dedup, not universal across every route.
 - Realtime auth stack is split (`supabase-auth` for API vs local JWT verifier in `server/realtime/*`), which is an architectural inconsistency to be removed in rebuild phases.
-- CORS in server bootstrap is permissive (`origin: true` in `server/index.ts`), suitable for flexibility but not strict origin pinning.
+- Browser cross-origin requests are not a supported API feature in the current server bootstrap.
 
 ## How To Extend Safely
 
@@ -158,7 +158,7 @@ The Client Record field catalog (CSV) must be self-describing so it can be enfor
 - `scope` (agency/client)
 - `read_roles` / `write_roles`
 - `update_mode` (manual | signal | derived)
-- `signal_source` (ga4/gsc/crm/manual_note/etc.)
+- `signal_source` (ga4/gsc/hubspot/manual_note/etc.)
 - `freshness_sla_days`
 - `confidence_required` (high/med/low)
 - `ai_exposed` (true/false)  **← gate for AI input**

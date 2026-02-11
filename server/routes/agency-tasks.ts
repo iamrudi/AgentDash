@@ -5,12 +5,14 @@ import { TaskListService } from '../application/tasks/task-list-service';
 import { TaskQueryService } from '../application/tasks/task-query-service';
 import { TaskAssignmentService } from '../application/tasks/task-assignment-service';
 import { TaskMutationService } from '../application/tasks/task-mutation-service';
+import { TaskReadService } from '../application/tasks/task-read-service';
 
 const router = Router();
 const taskListService = new TaskListService(storage);
 const taskQueryService = new TaskQueryService(storage);
 const taskAssignmentService = new TaskAssignmentService(storage);
 const taskMutationService = new TaskMutationService(storage);
+const taskReadService = new TaskReadService(storage);
 
 function sendTaskListResult(
   res: any,
@@ -57,6 +59,16 @@ function sendTaskMutationResult(
   }
   if (result.status === 204) {
     return res.status(204).send();
+  }
+  return res.status(result.status).json(result.data);
+}
+
+function sendTaskReadResult(
+  res: any,
+  result: { ok: boolean; status: number; data?: unknown; error?: string }
+) {
+  if (!result.ok) {
+    return res.status(result.status).json({ message: result.error });
   }
   return res.status(result.status).json(result.data);
 }
@@ -114,32 +126,39 @@ router.post('/task-lists', requireAuth, requireRole('Admin', 'SuperAdmin'), crea
 router.patch('/task-lists/:id', requireAuth, requireRole('Admin', 'SuperAdmin'), createTaskListUpdateHandler());
 router.delete('/task-lists/:id', requireAuth, requireRole('Admin', 'SuperAdmin'), createTaskListDeleteHandler());
 
-router.get('/task-lists/:listId/tasks', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), async (req: AuthRequest, res) => {
-  try {
-    const tasks = await storage.getTasksByListId(req.params.listId);
-    res.json(tasks);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+export function createTaskListTasksHandler(service: TaskReadService = taskReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      return sendTaskReadResult(res, await service.listTasksByListId(req.params.listId));
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
 
-router.get('/tasks/:taskId/subtasks', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), requireTaskAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const subtasks = await storage.getSubtasksByParentId(req.params.taskId);
-    res.json(subtasks);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+export function createTaskSubtasksHandler(service: TaskReadService = taskReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      return sendTaskReadResult(res, await service.listSubtasks(req.params.taskId));
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
 
-router.get('/tasks/:taskId/activities', requireAuth, requireRole('Admin', 'Staff', 'Client', 'SuperAdmin'), requireTaskAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const activities = await storage.getTaskActivities(req.params.taskId);
-    res.json(activities);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+export function createTaskActivitiesHandler(service: TaskReadService = taskReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      return sendTaskReadResult(res, await service.listTaskActivities(req.params.taskId));
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/task-lists/:listId/tasks', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), createTaskListTasksHandler());
+router.get('/tasks/:taskId/subtasks', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), requireTaskAccess(storage), createTaskSubtasksHandler());
+router.get('/tasks/:taskId/activities', requireAuth, requireRole('Admin', 'Staff', 'Client', 'SuperAdmin'), requireTaskAccess(storage), createTaskActivitiesHandler());
 
 export function createTasksListHandler(service: TaskQueryService = taskQueryService) {
   return async (req: AuthRequest, res: any) => {

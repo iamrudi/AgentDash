@@ -12,17 +12,20 @@
  */
 
 import { Router } from 'express';
-import { z } from 'zod';
 import { requireAuth, requireSuperAdmin, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
-import { db } from '../db';
-import { agencySettings, updateAgencySettingSchema } from '@shared/schema';
-import { eq, sql } from 'drizzle-orm';
-import { invalidateAIProviderCache } from '../ai/provider';
 import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
 import { getRequestContext } from "../middleware/request-context";
+import { SuperadminReadService } from '../application/superadmin/superadmin-read-service';
+import { SuperadminUserService } from '../application/superadmin/superadmin-user-service';
+import { SuperadminAgencyService } from '../application/superadmin/superadmin-agency-service';
+import { SuperadminRecommendationService } from '../application/superadmin/superadmin-recommendation-service';
 
 const superadminRouter = Router();
+const superadminReadService = new SuperadminReadService(storage);
+const superadminUserService = new SuperadminUserService(storage);
+const superadminAgencyService = new SuperadminAgencyService(storage);
+const superadminRecommendationService = new SuperadminRecommendationService(storage, emitClientRecordUpdatedSignal);
 
 const logAuditEvent = async (
   userId: string,
@@ -48,505 +51,272 @@ const logAuditEvent = async (
   }
 };
 
-superadminRouter.get("/users", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const users = await storage.getAllUsersForSuperAdmin();
-    res.json(users);
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching users:', error);
-    res.status(500).json({ message: "Failed to fetch users" });
+function sendSuperadminReadResult(
+  res: any,
+  result: { ok: boolean; status: number; data?: unknown; error?: string }
+) {
+  if (!result.ok) {
+    return res.status(result.status).json({ message: result.error });
   }
-});
+  return res.status(result.status).json(result.data);
+}
 
-superadminRouter.patch("/users/:userId/email", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { updateUserEmail } = await import("../lib/supabase-auth");
-    const { updateUserEmailSchema } = await import("@shared/schema");
-    const { userId } = req.params;
-
-    const validation = updateUserEmailSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ 
-        message: "Invalid email address", 
-        errors: validation.error.errors 
-      });
+export function createSuperadminUsersListHandler(service: SuperadminReadService = superadminReadService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      return sendSuperadminReadResult(res, await service.listUsers());
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching users:', error);
+      return res.status(500).json({ message: "Failed to fetch users" });
     }
+  };
+}
 
-    const { email } = validation.data;
+superadminRouter.get("/users", requireAuth, requireSuperAdmin, createSuperadminUsersListHandler());
 
-    const oldUser = await storage.getUserById(userId);
-    if (!oldUser) {
-      return res.status(404).json({ message: "User not found" });
+function sendSuperadminUserResult(
+  res: any,
+  result: { ok: boolean; status: number; data?: unknown; error?: string; errors?: unknown }
+) {
+  if (!result.ok) {
+    if (result.errors !== undefined) {
+      return res.status(result.status).json({ message: result.error, errors: result.errors });
     }
-
-    const { supabaseAdmin } = await import("../lib/supabase");
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-    const oldEmail = authUser?.user?.email || 'unknown';
-
-    await updateUserEmail(userId, email);
-
-    await logAuditEvent(
-      req.user!.id,
-      'user.update_email',
-      'user',
-      userId,
-      { oldEmail, newEmail: email },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ message: "User email updated successfully" });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error updating user email:', error);
-    res.status(500).json({ message: error.message || "Failed to update user email" });
+    return res.status(result.status).json({ message: result.error });
   }
-});
+  return res.status(result.status).json(result.data);
+}
 
-superadminRouter.patch("/users/:userId/password", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { updateUserPassword } = await import("../lib/supabase-auth");
-    const { updateUserPasswordSchema } = await import("@shared/schema");
-    const { userId } = req.params;
-
-    const validation = updateUserPasswordSchema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({ 
-        message: "Invalid password", 
-        errors: validation.error.errors 
-      });
-    }
-
-    const { password } = validation.data;
-
-    const user = await storage.getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    await updateUserPassword(userId, password);
-
-    await logAuditEvent(
-      req.user!.id,
-      'user.update_password',
-      'user',
-      userId,
-      { passwordChanged: true },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ message: "User password updated successfully" });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error updating user password:', error);
-    res.status(500).json({ message: error.message || "Failed to update user password" });
+async function emitSuperadminAudit(
+  req: AuthRequest,
+  result: { auditEvent?: { action: string; resourceType: string; resourceId: string | null; details: Record<string, unknown> } }
+) {
+  if (!result.auditEvent) {
+    return;
   }
-});
+  await logAuditEvent(
+    req.user!.id,
+    result.auditEvent.action,
+    result.auditEvent.resourceType,
+    result.auditEvent.resourceId,
+    result.auditEvent.details,
+    req.ip,
+    req.get('user-agent')
+  );
+}
 
-superadminRouter.patch("/users/:userId/promote-superadmin", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { promoteUserToSuperAdmin } = await import("../lib/supabase-auth");
-    const { userId } = req.params;
-
-    const profile = await storage.getProfileById(userId);
-    if (!profile) {
-      return res.status(404).json({ message: "User not found" });
+export function createSuperadminUserEmailHandler(service: SuperadminUserService = superadminUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateEmail(req.params.userId, req.body);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user email:', error);
+      return res.status(500).json({ message: error.message || "Failed to update user email" });
     }
+  };
+}
 
-    const oldState = {
-      role: profile.role,
-      isSuperAdmin: profile.isSuperAdmin,
-      agencyId: profile.agencyId
-    };
-
-    const updatedProfile = await promoteUserToSuperAdmin(userId);
-
-    await logAuditEvent(
-      req.user!.id,
-      'user.promote_superadmin',
-      'user',
-      userId,
-      { 
-        oldRole: oldState.role,
-        newRole: 'SuperAdmin',
-        oldAgencyId: oldState.agencyId,
-        newAgencyId: null,
-        oldIsSuperAdmin: oldState.isSuperAdmin,
-        newIsSuperAdmin: true
-      },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ 
-      message: "User promoted to SuperAdmin successfully",
-      profile: updatedProfile
-    });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error promoting user to SuperAdmin:', error);
-    res.status(500).json({ message: error.message || "Failed to promote user" });
-  }
-});
-
-superadminRouter.patch("/users/:userId/role", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { updateUserRole } = await import("../lib/supabase-auth");
-    const { userId } = req.params;
-    const { role, agencyId } = req.body;
-
-    if (!role || !['Client', 'Staff', 'Admin', 'SuperAdmin'].includes(role)) {
-      return res.status(400).json({ message: "Invalid role specified" });
+export function createSuperadminUserPasswordHandler(service: SuperadminUserService = superadminUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updatePassword(req.params.userId, req.body);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user password:', error);
+      return res.status(500).json({ message: error.message || "Failed to update user password" });
     }
+  };
+}
 
-    const profile = await storage.getProfileById(userId);
-    if (!profile) {
-      return res.status(404).json({ message: "User not found" });
+export function createSuperadminUserPromoteHandler(service: SuperadminUserService = superadminUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.promoteToSuperadmin(req.params.userId);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error promoting user to SuperAdmin:', error);
+      return res.status(500).json({ message: error.message || "Failed to promote user" });
     }
+  };
+}
 
-    const oldState = {
-      role: profile.role,
-      isSuperAdmin: profile.isSuperAdmin,
-      agencyId: profile.agencyId
-    };
-
-    const updatedProfile = await updateUserRole(userId, role, agencyId);
-
-    await logAuditEvent(
-      req.user!.id,
-      'user.role_update',
-      'user',
-      userId,
-      { 
-        oldRole: oldState.role,
-        newRole: role,
-        oldAgencyId: oldState.agencyId,
-        newAgencyId: updatedProfile.agencyId,
-        oldIsSuperAdmin: oldState.isSuperAdmin,
-        newIsSuperAdmin: updatedProfile.isSuperAdmin
-      },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ 
-      message: "User role updated successfully",
-      profile: updatedProfile
-    });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error updating user role:', error);
-    res.status(500).json({ message: error.message || "Failed to update user role" });
-  }
-});
-
-superadminRouter.delete("/users/:userId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { userId } = req.params;
-
-    const user = await storage.getUserById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+export function createSuperadminUserRoleHandler(service: SuperadminUserService = superadminUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateRole(req.params.userId, req.body ?? {});
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating user role:', error);
+      return res.status(500).json({ message: error.message || "Failed to update user role" });
     }
+  };
+}
 
-    const { deleteUser } = await import("../lib/supabase-auth");
-    await deleteUser(userId);
-
-    await logAuditEvent(
-      req.user!.id,
-      'user.delete',
-      'user',
-      userId,
-      { deletedUser: user },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ message: "User deleted successfully" });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error deleting user:', error);
-    res.status(500).json({ message: "Failed to delete user" });
-  }
-});
-
-superadminRouter.get("/agencies", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const agencies = await storage.getAllAgenciesForSuperAdmin();
-    res.json(agencies);
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching agencies:', error);
-    res.status(500).json({ message: "Failed to fetch agencies" });
-  }
-});
-
-superadminRouter.delete("/agencies/:agencyId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { agencyId } = req.params;
-
-    const agency = await storage.getAgencyById(agencyId);
-    if (!agency) {
-      return res.status(404).json({ message: "Agency not found" });
+export function createSuperadminUserDeleteHandler(service: SuperadminUserService = superadminUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.deleteUser(req.params.userId);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting user:', error);
+      return res.status(500).json({ message: "Failed to delete user" });
     }
+  };
+}
 
-    await storage.deleteAgency(agencyId);
+superadminRouter.patch("/users/:userId/email", requireAuth, requireSuperAdmin, createSuperadminUserEmailHandler());
+superadminRouter.patch("/users/:userId/password", requireAuth, requireSuperAdmin, createSuperadminUserPasswordHandler());
+superadminRouter.patch("/users/:userId/promote-superadmin", requireAuth, requireSuperAdmin, createSuperadminUserPromoteHandler());
+superadminRouter.patch("/users/:userId/role", requireAuth, requireSuperAdmin, createSuperadminUserRoleHandler());
+superadminRouter.delete("/users/:userId", requireAuth, requireSuperAdmin, createSuperadminUserDeleteHandler());
 
-    await logAuditEvent(
-      req.user!.id,
-      'agency.delete',
-      'agency',
-      agencyId,
-      { deletedAgency: agency },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ message: "Agency deleted successfully" });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error deleting agency:', error);
-    res.status(500).json({ message: "Failed to delete agency" });
-  }
-});
-
-superadminRouter.get("/clients", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const clients = await storage.getAllClientsForSuperAdmin();
-    res.json(clients);
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching clients:', error);
-    res.status(500).json({ message: "Failed to fetch clients" });
-  }
-});
-
-superadminRouter.delete("/clients/:clientId", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-
-    const allClients = await storage.getAllClientsForSuperAdmin();
-    const client = allClients.find(c => c.id === clientId);
-    
-    if (!client) {
-      return res.status(404).json({ message: "Client not found" });
+export function createSuperadminAgenciesListHandler(service: SuperadminReadService = superadminReadService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      return sendSuperadminReadResult(res, await service.listAgencies());
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching agencies:', error);
+      return res.status(500).json({ message: "Failed to fetch agencies" });
     }
+  };
+}
 
-    await storage.deleteClient(clientId);
+superadminRouter.get("/agencies", requireAuth, requireSuperAdmin, createSuperadminAgenciesListHandler());
 
-    await logAuditEvent(
-      req.user!.id,
-      'client.delete',
-      'client',
-      clientId,
-      { deletedClient: client },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({ message: "Client deleted successfully" });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error deleting client:', error);
-    res.status(500).json({ message: "Failed to delete client" });
-  }
-});
-
-superadminRouter.get("/agencies/:agencyId/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { agencyId } = req.params;
-
-    const agencies = await storage.getAllAgenciesForSuperAdmin();
-    const agency = agencies.find(a => a.id === agencyId);
-    if (!agency) {
-      return res.status(404).json({ message: "Agency not found" });
+export function createSuperadminAgencyDeleteHandler(service: SuperadminAgencyService = superadminAgencyService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.deleteAgency(req.params.agencyId);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting agency:', error);
+      return res.status(500).json({ message: "Failed to delete agency" });
     }
+  };
+}
 
-    const settings = await db
-      .select()
-      .from(agencySettings)
-      .where(eq(agencySettings.agencyId, agencyId))
-      .limit(1);
+superadminRouter.delete("/agencies/:agencyId", requireAuth, requireSuperAdmin, createSuperadminAgencyDeleteHandler());
 
-    if (settings.length === 0) {
-      return res.json({
-        agencyId,
-        agencyName: agency.name,
-        aiProvider: (process.env.AI_PROVIDER?.toLowerCase() || "gemini"),
-        isDefault: true,
-      });
+export function createSuperadminClientsListHandler(service: SuperadminReadService = superadminReadService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      return sendSuperadminReadResult(res, await service.listClients());
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching clients:', error);
+      return res.status(500).json({ message: "Failed to fetch clients" });
     }
+  };
+}
 
-    res.json({
-      agencyId,
-      agencyName: agency.name,
-      aiProvider: settings[0].aiProvider.toLowerCase(),
-      isDefault: false,
-    });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching agency settings:', error);
-    res.status(500).json({ message: "Failed to fetch agency settings" });
-  }
-});
+superadminRouter.get("/clients", requireAuth, requireSuperAdmin, createSuperadminClientsListHandler());
 
-superadminRouter.put("/agencies/:agencyId/settings", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { agencyId } = req.params;
-
-    const validationResult = updateAgencySettingSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({
-        message: "Invalid settings data",
-        errors: validationResult.error.errors,
-      });
+export function createSuperadminClientDeleteHandler(service: SuperadminAgencyService = superadminAgencyService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.deleteClient(req.params.clientId);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error deleting client:', error);
+      return res.status(500).json({ message: "Failed to delete client" });
     }
+  };
+}
 
-    const { aiProvider } = validationResult.data;
+superadminRouter.delete("/clients/:clientId", requireAuth, requireSuperAdmin, createSuperadminClientDeleteHandler());
 
-    const agencies = await storage.getAllAgenciesForSuperAdmin();
-    const agency = agencies.find(a => a.id === agencyId);
-    if (!agency) {
-      return res.status(404).json({ message: "Agency not found" });
+export function createSuperadminAgencySettingsGetHandler(service: SuperadminAgencyService = superadminAgencyService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getAgencySettings(req.params.agencyId);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching agency settings:', error);
+      return res.status(500).json({ message: "Failed to fetch agency settings" });
     }
+  };
+}
 
-    const existingSettings = await db
-      .select()
-      .from(agencySettings)
-      .where(eq(agencySettings.agencyId, agencyId))
-      .limit(1);
+superadminRouter.get(
+  "/agencies/:agencyId/settings",
+  requireAuth,
+  requireSuperAdmin,
+  createSuperadminAgencySettingsGetHandler()
+);
 
-    let result;
-    if (existingSettings.length === 0) {
-      [result] = await db
-        .insert(agencySettings)
-        .values({
-          agencyId,
-          aiProvider,
-        })
-        .returning();
-    } else {
-      [result] = await db
-        .update(agencySettings)
-        .set({
-          aiProvider,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(agencySettings.agencyId, agencyId))
-        .returning();
+export function createSuperadminAgencySettingsUpdateHandler(service: SuperadminAgencyService = superadminAgencyService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateAgencySettings(req.params.agencyId, req.body);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error updating agency settings:', error);
+      return res.status(500).json({ message: "Failed to update agency settings" });
     }
+  };
+}
 
-    invalidateAIProviderCache(agencyId);
+superadminRouter.put(
+  "/agencies/:agencyId/settings",
+  requireAuth,
+  requireSuperAdmin,
+  createSuperadminAgencySettingsUpdateHandler()
+);
 
-    await logAuditEvent(
-      req.user!.id,
-      'agency.settings.update',
-      'agency',
-      agencyId,
-      { aiProvider, agencyName: agency.name },
-      req.ip,
-      req.get('user-agent')
-    );
-
-    res.json({
-      ...result,
-      agencyName: agency.name,
-    });
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error updating agency settings:', error);
-    res.status(500).json({ message: "Failed to update agency settings" });
-  }
-});
-
-superadminRouter.get("/recommendations", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const allInitiatives = await storage.getAllInitiatives();
-    
-    const initiativesWithClients = await Promise.all(
-      allInitiatives.map(async (init) => {
-        const client = await storage.getClientById(init.clientId);
-        let agencyName = undefined;
-        if (client?.agencyId) {
-          const agencies = await storage.getAllAgenciesForSuperAdmin();
-          const agency = agencies.find(a => a.id === client.agencyId);
-          agencyName = agency?.name;
-        }
-        return { 
-          ...init, 
-          client,
-          agencyName
-        };
-      })
-    );
-    
-    res.json(initiativesWithClients);
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching recommendations:', error);
-    res.status(500).json({ message: "Failed to fetch recommendations" });
-  }
-});
-
-superadminRouter.post("/clients/:clientId/generate-recommendations", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    
-    const client = await storage.getClientById(clientId);
-    if (!client) {
-      return res.status(404).json({ message: "Client not found" });
+export function createSuperadminRecommendationsListHandler(service: SuperadminReadService = superadminReadService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      return sendSuperadminReadResult(res, await service.listRecommendations());
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching recommendations:', error);
+      return res.status(500).json({ message: "Failed to fetch recommendations" });
     }
-    
-    const generateRecommendationsSchema = z.object({
-      preset: z.enum(["quick-wins", "strategic-growth", "full-audit"]),
-      includeCompetitors: z.boolean().default(false),
-      competitorDomains: z.array(z.string()).max(5).optional()
-    });
-    
-    const validatedData = generateRecommendationsSchema.parse(req.body);
-    const ctx = getRequestContext(req);
-    const signalResult = await emitClientRecordUpdatedSignal(storage, {
-      agencyId: client.agencyId,
-      clientId,
-      updates: {},
-      actorId: ctx.userId,
-      origin: "superadmin.recommendations.request",
-      reason: "manual_recommendations",
-      preset: validatedData.preset,
-      includeCompetitors: validatedData.includeCompetitors,
-      competitorDomains: validatedData.competitorDomains,
-    });
+  };
+}
 
-    await logAuditEvent(
-      ctx.userId,
-      'recommendations.generate',
-      'client',
-      clientId,
-      {
-        preset: validatedData.preset,
-        clientName: client.companyName,
-        signalId: signalResult.signalId,
-        workflowsTriggered: signalResult.workflowsTriggered.length,
-      },
-      ctx.ip,
-      ctx.userAgent
-    );
-    
-    res.status(202).json({
-      success: true,
-      message: "Recommendation request routed to workflow engine",
-      signalId: signalResult.signalId,
-      isDuplicate: signalResult.isDuplicate,
-      workflowsTriggered: signalResult.workflowsTriggered,
-      executions: signalResult.executions,
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: error.errors[0].message });
+superadminRouter.get("/recommendations", requireAuth, requireSuperAdmin, createSuperadminRecommendationsListHandler());
+
+export function createSuperadminRecommendationRequestHandler(
+  service: SuperadminRecommendationService = superadminRecommendationService
+) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.requestRecommendations(getRequestContext(req), req.params.clientId, req.body);
+      await emitSuperadminAudit(req, result);
+      return sendSuperadminUserResult(res, result);
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error generating recommendations:', error);
+      return res.status(500).json({ message: error.message });
     }
-    console.error('[SUPER ADMIN] Error generating recommendations:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-superadminRouter.get("/audit-logs", requireAuth, requireSuperAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { limit = '100', offset = '0' } = req.query;
-    const auditLogs = await storage.getAuditLogs(parseInt(limit as string), parseInt(offset as string));
-    res.json(auditLogs);
-  } catch (error: any) {
-    console.error('[SUPER ADMIN] Error fetching audit logs:', error);
-    res.status(500).json({ message: "Failed to fetch audit logs" });
-  }
-});
+superadminRouter.post(
+  "/clients/:clientId/generate-recommendations",
+  requireAuth,
+  requireSuperAdmin,
+  createSuperadminRecommendationRequestHandler()
+);
+
+export function createSuperadminAuditLogsHandler(service: SuperadminReadService = superadminReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      return sendSuperadminReadResult(res, await service.listAuditLogs(req.query.limit, req.query.offset));
+    } catch (error: any) {
+      console.error('[SUPER ADMIN] Error fetching audit logs:', error);
+      return res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  };
+}
+
+superadminRouter.get("/audit-logs", requireAuth, requireSuperAdmin, createSuperadminAuditLogsHandler());
 
 export default superadminRouter;

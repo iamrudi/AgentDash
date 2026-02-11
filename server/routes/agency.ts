@@ -1,281 +1,333 @@
 import { Router } from 'express';
-import { z } from 'zod';
 import { storage } from '../storage';
 import { requireAuth, requireRole, requireClientAccess, requireProjectAccess, requireTaskAccess, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
 import { getRequestContext } from "../middleware/request-context";
-import { insertProjectSchema } from '@shared/schema';
-import { updateClientRecord } from "../clients/client-record-accessor";
+import { AgencyReadService } from '../application/agency/agency-read-service';
+import { AgencyClientService } from '../application/agency/agency-client-service';
+import { AgencyProjectService } from '../application/agency/agency-project-service';
+import { AgencyInitiativeService } from '../application/agency/agency-initiative-service';
 
 const router = Router();
+const agencyReadService = new AgencyReadService(storage);
+const agencyClientService = new AgencyClientService(storage);
+const agencyProjectService = new AgencyProjectService(storage);
+const agencyInitiativeService = new AgencyInitiativeService(storage);
 
-router.get('/clients', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
-    const clients = await storage.getAllClientsWithDetails(agencyId);
-    res.json(clients);
-  } catch (error: any) {
-    if (error.status) {
-      return res.status(error.status).json({ message: error.message });
-    }
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.get('/clients/:clientId', requireAuth, requireRole('Admin'), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const client = await storage.getClientById(clientId);
-    
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-    
-    res.json(client);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.patch('/clients/:clientId', requireAuth, requireRole('Admin'), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const { leadValue, retainerAmount, billingDay, monthlyRetainerHours } = req.body;
-    
-    const client = await storage.getClientById(clientId);
-    if (!client) {
-      return res.status(404).json({ message: 'Client not found' });
-    }
-    
-    const updates: any = {};
-    if (leadValue !== undefined) updates.leadValue = leadValue;
-    if (retainerAmount !== undefined) updates.retainerAmount = retainerAmount;
-    if (billingDay !== undefined) updates.billingDay = billingDay;
-    if (monthlyRetainerHours !== undefined) updates.monthlyRetainerHours = monthlyRetainerHours;
-
-    const ctx = getRequestContext(req);
-    const result = await updateClientRecord(storage, {
-      clientId,
-      updates,
-      context: ctx,
-      source: "manual",
-      origin: "agency.client.update",
-    });
-
-    if (!result.ok) {
-      return res.status(400).json({ message: "Invalid client record update", errors: result.errors });
-    }
-
-    res.json(result.client);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.get('/clients/:clientId/retainer-hours', requireAuth, requireRole('Admin'), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const hoursInfo = await storage.checkRetainerHours(clientId);
-    res.json(hoursInfo);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post('/clients/:clientId/reset-retainer-hours', requireAuth, requireRole('Admin'), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const updatedClient = await storage.resetRetainerHours(clientId);
-    res.json(updatedClient);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post('/initiatives/mark-viewed', requireAuth, requireRole('Admin'), async (_req: AuthRequest, res) => {
-  try {
-    await storage.markInitiativeResponsesViewed();
-    res.status(204).send();
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.get('/projects', requireAuth, requireRole('Admin', 'Staff'), async (req: AuthRequest, res) => {
-  try {
-    if (req.user!.isSuperAdmin) {
-      const allProjects = await storage.getAllProjects();
-      return res.json(allProjects);
-    }
-
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
-    }
-
-    const projects = await storage.getAllProjects(req.user!.agencyId);
-    res.json(projects);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.post('/projects', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId && !req.user!.isSuperAdmin) {
-      return res.status(403).json({ message: 'Agency association required' });
-    }
-    
-    const agencyId = req.user!.isSuperAdmin ? req.body.agencyId : req.user!.agencyId;
-    
-    if (req.body.clientId) {
-      const client = await storage.getClientById(req.body.clientId);
-      if (!client) {
-        return res.status(404).json({ message: 'Client not found' });
+export function createAgencyClientsListHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      const result = await service.listClients(agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
       }
-      if (client.agencyId !== agencyId) {
-        return res.status(403).json({ message: 'Client does not belong to your agency' });
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
       }
+      return res.status(500).json({ message: error.message });
     }
-    
-    const projectData = insertProjectSchema.parse({
-      ...req.body,
-      agencyId,
-    });
-    const newProject = await storage.createProject(projectData);
-    res.status(201).json(newProject);
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: error.errors[0].message });
+  };
+}
+
+router.get('/clients', requireAuth, requireRole('Admin'), createAgencyClientsListHandler());
+
+export function createAgencyClientGetHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getClient(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.get('/projects/:id', requireAuth, requireRole('Admin', 'Staff'), requireProjectAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const project = await storage.getProjectWithTasks(id);
-    
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+router.get('/clients/:clientId', requireAuth, requireRole('Admin'), requireClientAccess(storage), createAgencyClientGetHandler());
+
+export function createAgencyClientUpdateHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateClient(req.params.clientId, req.body ?? {}, getRequestContext(req));
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    
-    res.json(project);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.patch('/projects/:id', requireAuth, requireRole('Admin'), requireProjectAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const updates = req.body;
-    
-    const updated = await storage.updateProject(id, updates);
-    res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.patch('/clients/:clientId', requireAuth, requireRole('Admin'), requireClientAccess(storage), createAgencyClientUpdateHandler());
 
-router.get('/projects/:projectId/lists', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), requireProjectAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { projectId } = req.params;
-    const lists = await storage.getTaskListsByProjectId(projectId);
-    res.json(lists);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-router.get('/metrics', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+export function createAgencyClientRetainerHoursHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.retainerHours(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    const metrics = await storage.getAllMetrics(90, req.user!.agencyId);
-    res.json(metrics);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.get('/clients/:clientId/metrics', requireAuth, requireRole('Admin'), requireClientAccess(storage), async (req: AuthRequest, res) => {
-  try {
-    const { clientId } = req.params;
-    const metrics = await storage.getMetricsByClientId(clientId, 90);
-    res.json(metrics);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.get(
+  '/clients/:clientId/retainer-hours',
+  requireAuth,
+  requireRole('Admin'),
+  requireClientAccess(storage),
+  createAgencyClientRetainerHoursHandler()
+);
 
-router.get('/initiatives', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+export function createAgencyClientResetRetainerHoursHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.resetRetainerHours(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    const initiatives = await storage.getAllInitiatives(req.user!.agencyId);
-    res.json(initiatives);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.get('/integrations', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
-    }
-    const integrations = await storage.getAllIntegrations(req.user!.agencyId);
-    const safeIntegrations = integrations.map(({ accessToken, refreshToken, accessTokenIv, refreshTokenIv, accessTokenAuthTag, refreshTokenAuthTag, ...safe }) => safe);
-    res.json(safeIntegrations);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post(
+  '/clients/:clientId/reset-retainer-hours',
+  requireAuth,
+  requireRole('Admin'),
+  requireClientAccess(storage),
+  createAgencyClientResetRetainerHoursHandler()
+);
 
-router.get('/staff', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (req.user!.isSuperAdmin) {
-      const staff = await storage.getAllStaff();
-      const staffList = staff.map(s => ({ id: s.id, name: s.fullName }));
-      return res.json(staffList);
+export function createAgencyInitiativeMarkViewedHandler(service: AgencyInitiativeService = agencyInitiativeService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      const result = await service.markResponsesViewed();
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).send();
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
+  };
+}
 
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
-    }
-    const staff = await storage.getAllStaff(req.user!.agencyId);
-    const staffList = staff.map(s => ({ id: s.id, name: s.fullName }));
-    res.json(staffList);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+router.post('/initiatives/mark-viewed', requireAuth, requireRole('Admin'), createAgencyInitiativeMarkViewedHandler());
 
-router.get('/messages', requireAuth, requireRole('Admin', 'Staff'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+export function createAgencyProjectsListHandler(service: AgencyProjectService = agencyProjectService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.listProjects({
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    const messages = await storage.getAllMessages(req.user!.agencyId);
-    res.json(messages);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
 
-router.get('/notifications/counts', requireAuth, requireRole('Admin'), async (req: AuthRequest, res) => {
-  try {
-    if (!req.user!.agencyId) {
-      return res.status(403).json({ message: 'Agency association required' });
+router.get('/projects', requireAuth, requireRole('Admin', 'Staff'), createAgencyProjectsListHandler());
+
+export function createAgencyProjectCreateHandler(service: AgencyProjectService = agencyProjectService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.createProject(
+        {
+          agencyId: req.user?.agencyId,
+          isSuperAdmin: req.user?.isSuperAdmin,
+        },
+        req.body ?? {}
+      );
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
     }
-    const counts = await storage.getNotificationCounts(req.user!.agencyId);
-    res.json(counts);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
-  }
-});
+  };
+}
+
+router.post('/projects', requireAuth, requireRole('Admin'), createAgencyProjectCreateHandler());
+
+export function createAgencyProjectGetHandler(service: AgencyProjectService = agencyProjectService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getProject(req.params.id);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/projects/:id', requireAuth, requireRole('Admin', 'Staff'), requireProjectAccess(storage), createAgencyProjectGetHandler());
+
+export function createAgencyProjectUpdateHandler(service: AgencyProjectService = agencyProjectService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateProject(req.params.id, req.body ?? {});
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.patch('/projects/:id', requireAuth, requireRole('Admin'), requireProjectAccess(storage), createAgencyProjectUpdateHandler());
+
+export function createAgencyProjectListsHandler(service: AgencyProjectService = agencyProjectService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.listTaskLists(req.params.projectId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/projects/:projectId/lists', requireAuth, requireRole('Admin', 'Staff', 'SuperAdmin'), requireProjectAccess(storage), createAgencyProjectListsHandler());
+
+export function createAgencyMetricsHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.metrics(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/metrics', requireAuth, requireRole('Admin'), createAgencyMetricsHandler());
+
+export function createAgencyClientMetricsHandler(service: AgencyClientService = agencyClientService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.clientMetrics(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/clients/:clientId/metrics', requireAuth, requireRole('Admin'), requireClientAccess(storage), createAgencyClientMetricsHandler());
+
+export function createAgencyInitiativesHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.initiatives(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/initiatives', requireAuth, requireRole('Admin'), createAgencyInitiativesHandler());
+
+export function createAgencyIntegrationsHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.integrations(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/integrations', requireAuth, requireRole('Admin'), createAgencyIntegrationsHandler());
+
+export function createAgencyStaffHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.staff({
+        isSuperAdmin: req.user?.isSuperAdmin,
+        agencyId: req.user?.agencyId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/staff', requireAuth, requireRole('Admin'), createAgencyStaffHandler());
+
+export function createAgencyMessagesHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.messages(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/messages', requireAuth, requireRole('Admin', 'Staff'), createAgencyMessagesHandler());
+
+export function createAgencyNotificationCountsHandler(service: AgencyReadService = agencyReadService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.notificationCounts(req.user?.agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get('/notifications/counts', requireAuth, requireRole('Admin'), createAgencyNotificationCountsHandler());
 
 export default router;

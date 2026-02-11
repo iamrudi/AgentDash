@@ -1,6 +1,6 @@
 # Rebuild / Modernization Plan (Primitive-First, Low-Risk)
 
-Goal: Re-center architecture around primitives in `docs/PRIMITIVES.md` without disruptive big-bang refactors.
+Goal: Re-center architecture around primitives in `docs/PRIMITIVES.refactor.md` without disruptive big-bang refactors.
 
 ## Phase 0 — No Behavior Change (Docs + Tests)
 
@@ -9,7 +9,7 @@ Goal: Re-center architecture around primitives in `docs/PRIMITIVES.md` without d
   - Add/expand targeted tests around invariant boundaries (auth, tenant guards, idempotency, AI gate failure behavior).
   - Add route inventory snapshot (modular vs legacy monolith).
 - **Concrete targets**:
-  - `docs/ARCHITECTURE.md`, `docs/PRIMITIVES.md`, `docs/INVARIANTS.md`
+  - `docs/ARCHITECTURE.refactor.md`, `docs/PRIMITIVES.refactor.md`, `docs/INVARIANTS.refactor.md`
   - `tests/middleware/*`, workflow and signal route tests (new targeted test files)
 - **Exit criteria**:
   - INV1..INV5 have executable tests.
@@ -45,6 +45,19 @@ Goal: Re-center architecture around primitives in `docs/PRIMITIVES.md` without d
   - `server/routes.ts` reduced to compatibility shims or removed.
   - No duplicate endpoint ownership between monolith and modular routers.
   - Primitive boundaries are explicit in imports and tests.
+
+### Phase 2 Status (2026-02-11)
+- `server/routes/**/*.ts` inline async route decomposition is complete and regression-guarded (`tests/route-inline-guard.test.ts`).
+- Route-level multi-step orchestration is migrated to `server/application/**` service boundaries across active modular route modules.
+- `server/routes.ts` duplicate endpoint ownership audit is complete (shim-only ownership confirmed).
+- `server/routes.ts.backup` is removed from the repository.
+- Final Phase 2 completion checklist is recorded in `docs/CHANGELOG.md` (2026-02-11).
+- Deferred decomposition backlog (tracked for later cleanup):
+  1. `server/routes/workflows.ts`
+  2. `server/routes/tasks.ts`
+  3. `server/routes/invoices.ts`
+  4. `server/routes/knowledge.ts`
+  5. `server/routes/knowledge-documents.ts`
 
 ## Phase 3 — Platformization (Control Plane + Ops)
 

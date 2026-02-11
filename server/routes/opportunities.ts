@@ -7,8 +7,15 @@ import { OpportunityService } from "../application/opportunities/opportunity-ser
 import { getRequestContext } from "../middleware/request-context";
 import { GateDecisionService } from "../application/gates/gate-decision-service";
 import { emitClientRecordUpdatedSignal } from "../clients/client-record-signal";
+import { OpportunityRecommendationRequestService } from "../application/opportunities/opportunity-recommendation-request-service";
+import { OpportunityReadService } from "../application/opportunities/opportunity-read-service";
 
 const router = Router();
+const opportunityRecommendationRequestService = new OpportunityRecommendationRequestService(
+  storage,
+  emitClientRecordUpdatedSignal
+);
+const opportunityReadService = new OpportunityReadService(storage);
 
 const opportunitySchema = OpportunityArtifactRequestSchema;
 
@@ -21,7 +28,10 @@ const gateDecisionSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-export function createOpportunityHandler(service: OpportunityService) {
+export function createOpportunityHandler(
+  service: OpportunityService,
+  recommendationService: OpportunityRecommendationRequestService = opportunityRecommendationRequestService
+) {
   return async (req: AuthRequest, res: any) => {
     try {
       const data = opportunitySchema.parse(req.body);
@@ -33,23 +43,11 @@ export function createOpportunityHandler(service: OpportunityService) {
       }
 
       if (data.mode === "ai_generate") {
-        const signalResult = await emitClientRecordUpdatedSignal(storage, {
-          agencyId: ctx.agencyId!,
-          clientId: data.clientId,
-          updates: {},
-          actorId: ctx.userId,
-          origin: "opportunities.ai_generate",
-          reason: "manual_recommendations",
-        });
-
-        return res.status(202).json({
-          success: true,
-          message: "Recommendation request routed to workflow engine",
-          signalId: signalResult.signalId,
-          isDuplicate: signalResult.isDuplicate,
-          workflowsTriggered: signalResult.workflowsTriggered,
-          executions: signalResult.executions,
-        });
+        const signalResult = await recommendationService.requestRecommendations(ctx, data.clientId);
+        if (!signalResult.ok) {
+          return res.status(signalResult.status).json({ message: signalResult.error });
+        }
+        return res.status(signalResult.status).json(signalResult.data);
       }
 
       const saved = await service.persistOpportunityArtifact(data.clientId, data, ctx);
@@ -79,16 +77,22 @@ router.get(
   requireAuth,
   requireRole("Admin"),
   requireClientAccess(storage),
-  async (req: AuthRequest, res) => {
+  createOpportunityListByClientHandler()
+);
+
+export function createOpportunityListByClientHandler(service: OpportunityReadService = opportunityReadService) {
+  return async (req: AuthRequest, res: any) => {
     try {
-      const { clientId } = req.params;
-      const records = await storage.getOpportunityArtifactsByClientId(clientId);
-      res.json(records);
+      const result = await service.listByClientId(req.params.clientId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      return res.status(500).json({ message: error.message });
     }
   }
-);
+}
 
 router.post(
   "/gate-decisions",

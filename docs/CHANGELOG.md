@@ -2,6 +2,161 @@
 
 Tracks refactoring and modernization work with dates, completion status, and planned work.
 
+## 2026-02-11
+
+### Phase 2 Completion Checklist
+- [x] `server/routes.ts` reduced to compatibility shim ownership only.
+- [x] No duplicate endpoint ownership between monolith shim and modular routers (audit completed).
+- [x] `server/routes/**/*.ts` inline async route handlers eliminated and regression-guarded (`tests/route-inline-guard.test.ts`).
+- [x] Route-level multi-step orchestration migrated behind `server/application/**` services across active modular route modules.
+- [x] Legacy monolith backup (`server/routes.ts.backup`) removed.
+
+### Completed
+- [x] Decomposed workflow-executions routes into application service boundary: `server/application/workflows/workflow-executions-service.ts`, `server/routes/workflow-executions.ts`.
+  Why: Remove inline execution events/lineage orchestration from route handlers.
+  Matters: Continues route-layer simplification and centralizes execution lineage logic.
+- [x] Added workflow-executions service/route tests and reduced inline-handler allowlist: `tests/workflow-executions-service.test.ts`, `tests/workflow-executions-route.test.ts`, `tests/route-inline-guard.test.ts`.
+  Why: Lock in delegation behavior and prevent regressions back to inline route orchestration.
+  Matters: Shrinks remaining legacy inline-route surface.
+- [x] Decomposed lineage route handlers into application service boundary: `server/application/lineage/lineage-service.ts`, `server/routes/lineage.ts`.
+  Why: Remove remaining inline lineage orchestration from route layer.
+  Matters: Shrinks legacy inline-handler surface and improves testability.
+- [x] Added lineage service/route tests and tightened inline-handler allowlist: `tests/lineage-service.test.ts`, `tests/lineage-route.test.ts`, `tests/route-inline-guard.test.ts`.
+  Why: Lock in route-to-service delegation and prevent regression to inline lineage handlers.
+  Matters: Continues controlled reduction of legacy inline route debt.
+- [x] Added account-manager backfill migration for existing clients: `migrations/0014_backfill_client_account_manager.sql`.
+  Why: Ensure pre-existing clients get deterministic owner assignment after introducing `accountManagerProfileId`.
+  Matters: Reduces fallback-notification fanout and improves ownership consistency in client messaging.
+- [x] Removed CRM-linked public forms feature end-to-end: `server/routes/public.ts`, `server/application/public/public-form-service.ts`, `client/src/pages/forms/embed.tsx`, `server/routes/index.ts`, `client/src/App.tsx`.
+  Why: Public forms were coupled to CRM enrichment (`createContact`/`createDeal`) and CRM is out of scope.
+  Matters: Eliminates an out-of-scope feature surface and associated unauthenticated mutation endpoints.
+- [x] Removed public-form tests and docs references: `tests/public-route.test.ts`, `tests/public-form-service.test.ts`, `tests/public-inv1-exception.test.ts`, `docs/INVARIANTS.refactor.md`, `docs/ROUTE_INVENTORY.md`, `docs/ROUTE_ENDPOINTS.md`, `docs/PRODUCTION_URLS.md`.
+  Why: Keep test and documentation surface aligned with removed runtime capability.
+  Matters: Prevents stale guidance and false expectations around unavailable endpoints.
+- [x] Enforced Admin/SuperAdmin role gate on signals control-plane routes: `server/routes/signals.ts`.
+  Why: Prevent non-admin authenticated roles from managing signal intake/routing and retries.
+  Matters: Aligns signal-governance endpoints with control-plane authorization boundaries.
+- [x] Added signals guard regression test: `tests/control-plane-role-guard.test.ts`.
+  Why: Prevent accidental removal of privileged-route enforcement.
+  Matters: Reduces RBAC drift risk in control-plane modules.
+- [x] Enforced Admin/SuperAdmin role gate on rule-engine control-plane routes: `server/routes/rule-engine.ts`.
+  Why: Prevent non-admin authenticated roles from mutating workflow-rule configuration.
+  Matters: Aligns rule-governance endpoints with control-plane authorization boundaries.
+- [x] Added rule-engine guard regression test: `tests/control-plane-role-guard.test.ts`.
+  Why: Prevent accidental removal of privileged-route enforcement.
+  Matters: Reduces RBAC drift risk in control-plane modules.
+- [x] Added client account-manager linkage to schema + migration: `shared/schema.ts`, `migrations/0013_add_client_account_manager.sql`.
+  Why: Support explicit ownership of client communications by a single agency admin.
+  Matters: Enables deterministic message routing to the assigned account manager.
+- [x] Added account-manager assignment during client user provisioning: `server/application/agency-users/agency-user-service.ts`, `server/lib/user-provisioning.ts`, `server/routes/agency-users.ts`.
+  Why: Ensure newly created clients are tied to an admin owner by default (creator) or explicit selection.
+  Matters: Prevents ambiguous ownership in client-to-agency messaging flows.
+- [x] Routed client message notifications to assigned account manager with safe fallback: `server/application/client/client-message-service.ts`.
+  Why: Align client messaging behavior with account-manager ownership model.
+  Matters: Reduces noisy admin fanout and improves accountability.
+- [x] Added regression tests for assignment + routing behavior: `tests/agency-user-service.test.ts`, `tests/agency-users-route.test.ts`, `tests/client-message-service.test.ts`.
+  Why: Lock in expected ownership and notification behavior.
+  Matters: Prevents access/notification behavior regressions.
+- [x] Enforced Admin/SuperAdmin role gate across workflows control-plane routes: `server/routes/workflows.ts`.
+  Why: Ensure non-admin team users cannot create/update/delete/execute workflows.
+  Matters: Aligns control-plane route access with INV1 and stated team-role boundaries.
+- [x] Secured test user creation route behind auth + SuperAdmin role: `server/routes/test.ts`.
+  Why: Remove unauthenticated mutation surface from development utility endpoint.
+  Matters: Brings the endpoint into invariant-aligned access control.
+- [x] Improved route inline-handler guard to detect aliased routers and added explicit legacy allowlist: `tests/route-inline-guard.test.ts`.
+  Why: Prevent false-green checks when inline handlers use non-`router` aliases.
+  Matters: Makes decomposition guard behavior explicit and trustworthy while legacy modules are still tracked.
+- [x] Added control-plane role guard regression tests: `tests/control-plane-role-guard.test.ts`.
+  Why: Prevent accidental removal of workflow/test route role guards.
+  Matters: Reduces risk of privileged route access drift.
+- [x] Updated route inventory status checkpoint and snapshot date: `docs/ROUTE_INVENTORY.md`.
+  Why: Reflect current decomposition state and remaining shim/backup surface explicitly.
+  Matters: Keeps modernization progress auditable with a current architecture snapshot.
+- [x] Added explicit Phase 2 status + closure checklist: `docs/REBUILD_PLAN.md`.
+  Why: Make remaining Phase 2 closure work concrete now that inline route decomposition is complete.
+  Matters: Clarifies what is left before full Phase 3 focus.
+- [x] Completed duplicate endpoint ownership audit for compatibility shim: `server/routes.ts`, `server/routes/index.ts`.
+  Why: Verify that the shim route file does not still own route-method endpoints that conflict with modular routers.
+  Matters: Confirms Phase 2 endpoint ownership consolidation is holding; `server/routes.ts` currently contains only middleware boundaries and router mounts.
+- [x] Removed legacy monolith backup file: `server/routes.ts.backup`.
+  Why: Close Phase 2 cleanup decision and eliminate stale monolith reference from the active repository surface.
+  Matters: Reduces confusion around route ownership and makes the modular router architecture explicit.
+- [x] Expanded pre-2026-02-10 historical backfill with dated module-level milestones: `docs/CHANGELOG.md`.
+  Why: Replace generic historical placeholders with concrete development waves and artifact references.
+  Matters: Improves traceability for architecture decisions leading into the rebuild phases.
+
+### Planned (Deferred)
+- [ ] Decompose remaining legacy inline route modules:
+  - `server/routes/workflows.ts`
+  - `server/routes/tasks.ts`
+  - `server/routes/invoices.ts`
+  - `server/routes/knowledge.ts`
+  - `server/routes/knowledge-documents.ts`
+- Why: These modules still rely on inline route orchestration patterns kept on the temporary allowlist.
+- Matters: Completing these removals is the remaining path to full route-layer decomposition consistency.
+
+## 2025-10-15 to 2026-02-09 (Historical Backfill, Initial)
+
+### Completed
+- [x] Established modular route registry and domain router mounting (`server/routes/index.ts`) with progressive extraction away from monolithic routing (`server/routes.ts`) during 2025-12-12.
+  Why: Create explicit ownership boundaries by domain and reduce route-level coupling.
+  Matters: Enabled later Phase 2 service decomposition and endpoint ownership audits.
+- [x] Added workflow/rule/signal primitives across schema + routes + engine integration during 2025-12-11 to 2025-12-12 (`shared/schema.ts`, `server/workflow/engine.ts`, `server/routes/rule-engine.ts`, `server/routes/signals.ts`).
+  Why: Introduce control-plane decisioning and event routing foundation.
+  Matters: Supports governed automation and idempotent signal-driven execution patterns.
+- [x] Added hardened AI execution controls and usage/quota governance during 2025-12-11 and 2026-02-10 (`server/ai/hardened-executor.ts`, AI usage endpoints/tests).
+  Why: Move AI execution behind schema-validated, auditable, policy-constrained boundaries.
+  Matters: Enforces fail-closed behavior and supports INV4-style AI hardening.
+- [x] Added governance/ops visibility surfaces and retention scaffolding during 2025-12-11 and 2026-02-10 (`server/governance/governance-routes.ts`, `server/jobs/retention-job.ts`).
+  Why: Provide operational insight and lifecycle controls over control-plane activity and AI usage.
+  Matters: Establishes Phase 3 observability and retention foundations.
+- [x] Added initiative/opportunity gate-related artifacts and API surfaces during 2025-11-18 through 2026-02-10 (`server/routes/opportunities.ts`, `server/routes/initiative-intents.ts`, `server/routes/sku-compositions.ts`, `server/routes/execution-outputs.ts`, `server/routes/outcome-reviews.ts`, `server/routes/learning-artifacts.ts`).
+  Why: Introduce explicit governed artifacts across recommendation, approval, execution, outcome, and learning loops.
+  Matters: Aligns platform behavior with the full validation loop doctrine.
+- [x] Removed CRM runtime surface from active platform in current rebuild direction (2026-02-11 workspace state) by deleting CRM route/module usage (`server/routes/crm.ts`, `server/crm/*`, CRM UI components).
+  Why: Align implementation with current product scope decision: CRM is not a feature.
+  Matters: Reduces inactive surface area and removes conflicting feature paths.
+
+## 2025-10-15 to 2025-12-12 (Historical Backfill, Expanded)
+
+### 2025-12-12 Modular Router Extraction Wave
+- [x] Broke monolithic route ownership into dedicated modules for auth/user/client/agency/staff/superadmin/invoices/tasks/public/signals/rules/workflows/knowledge/intelligence (`server/routes/*.ts`, `server/routes/index.ts`).
+  Why: Incrementally replace large route file ownership with explicit domain registration.
+  Matters: Established the structural base for later service-layer decomposition and route ownership audits.
+- [x] Added middleware and guard coverage around auth/maintenance boundaries in tests (`tests/middleware/*` additions in this window).
+  Why: Protect ingress behavior while routing structure changed quickly.
+  Matters: Reduced regression risk during large route-surface extraction.
+
+### 2025-12-11 Control Plane + Governance Foundations
+- [x] Introduced workflow rule/signal primitives and workflow engine schema support (`shared/schema.ts`, `server/workflow/engine.ts`, `server/routes/rule-engine.ts`, `server/routes/signals.ts`).
+  Why: Provide governed automation paths for signal intake, evaluation, and execution.
+  Matters: Enabled idempotent, auditable control-plane operation patterns used in the rebuild.
+- [x] Added AI execution tracking/security/usage governance and retention-aligned controls (`server/ai/hardened-executor.ts`, AI execution/usage schema + routes).
+  Why: Constrain AI calls behind explicit execution records and quota-aware controls.
+  Matters: Improved fail-closed behavior and operator visibility for AI workloads.
+- [x] Added governance dashboard and operational primitives (quota visibility, integration health, SLA/templating/agent groundwork).
+  Why: Build operator-facing control-plane observability.
+  Matters: Became the base for Phase 3 ops endpoint expansion in 2026-02.
+
+### 2025-11 Delivery/Access/Integration Hardening
+- [x] Added superadmin account/credential/agency-selection capabilities and audit-oriented admin flows (`server/routes/superadmin.ts`, related schema updates).
+  Why: Formalize platform-level administrative control boundaries.
+  Matters: Improved tenant-safe governance of privileged actions.
+- [x] Added and iterated agency integration surfaces for HubSpot/LinkedIn and AI provider preferences (`server/routes/integrations.ts` + schema/UI integration wiring).
+  Why: Expand client context ingestion and configurable AI provider behavior.
+  Matters: Prepared data-plane inputs used by recommendation and intelligence features.
+- [x] Expanded task lifecycle integrity (task lists, tenant isolation in task-list paths, activity timeline, time tracking/linking refinements).
+  Why: Stabilize execution-plane tracking fidelity and cross-role visibility.
+  Matters: Improved operational reliability of task execution records used downstream.
+
+### 2025-10 Security + Export Foundations
+- [x] Landed early production-hardening work: CI/CD/security posture updates, encryption key handling updates, production URL automation docs.
+  Why: Improve deployment and runtime security baselines during rapid feature expansion.
+  Matters: Reduced operational risk while architecture evolved.
+- [x] Added invoice PDF generation/storage and proposal print/export hardening groundwork (`server/services/pdfStorage.ts`, proposals/invoice export surfaces).
+  Why: Support auditable document output workflows.
+  Matters: Established the static invoice serving path now retained in `server/routes.ts` shim.
+
 ## 2026-02-10
 
 Format: each item includes what changed, why it was done, and why it matters.
@@ -19,6 +174,93 @@ Docs:
 - Route inventory updated for new governance/retention endpoints
 
 ### Completed
+- [x] Added route inline-handler regression guard test: `tests/route-inline-guard.test.ts`.
+  Why: Enforce that `server/routes` remains free of inline async route handlers after decomposition.
+  Matters: Prevents accidental architecture drift back to route-level orchestration.
+- [x] Added TestUserService and migrated test create-user handler: `server/application/test/test-user-service.ts`, `server/routes/test.ts`.
+  Why: Move development-only test user creation orchestration out of route-level inline logic.
+  Matters: Completes route decomposition pattern consistency even for utility endpoints.
+- [x] Added test user service + route delegation tests: `tests/test-user-service.test.ts`, `tests/test-route.test.ts`.
+  Why: Validate environment gating/default-agency behavior and route-to-service delegation.
+  Matters: Prevents regressions in development tooling while keeping architecture consistent.
+- [x] Added MessageStreamService and migrated SSE stream handler: `server/application/messages/message-stream-service.ts`, `server/routes/messages.ts`.
+  Why: Move SSE stream authentication/authorization checks out of route-level inline logic.
+  Matters: Keeps message routes fully service-backed while preserving stream behavior.
+- [x] Added message stream service + route tests: `tests/message-stream-service.test.ts`, `tests/messages-route.test.ts`.
+  Why: Validate stream auth guardrails and route delegation behavior.
+  Matters: Prevents regressions as remaining inline handlers approach zero.
+- [x] Added OAuthService and migrated Google OAuth handlers: `server/application/oauth/oauth-service.ts`, `server/routes/oauth.ts`.
+  Why: Move OAuth initiation/callback orchestration and redirect/html branching out of route handlers.
+  Matters: Centralizes OAuth validation and token/state flow with deterministic, testable behavior.
+- [x] Added OAuth service + route delegation tests: `tests/oauth-service.test.ts`, `tests/oauth-route.test.ts`.
+  Why: Validate OAuth guardrails and route-to-service delegation for initiate/callback flows.
+  Matters: Prevents regressions while closing remaining inline route decomposition.
+- [x] Added AiExecutionService and migrated AI execution handlers: `server/application/ai/ai-execution-service.ts`, `server/routes/ai-execution.ts`.
+  Why: Move AI execution access checks, usage retrieval, and cache operations out of route handlers.
+  Matters: Keeps AI execution routes thin and centralizes fail-closed authorization behavior.
+- [x] Added AI execution service + route delegation tests: `tests/ai-execution-service.test.ts`, `tests/ai-execution-route.test.ts`.
+  Why: Validate authorization guardrails and route-to-service delegation for AI execution endpoints.
+  Matters: Prevents regressions while finishing remaining inline route decomposition.
+- [x] Added RetentionPolicyService and migrated retention policy handlers: `server/application/retention/retention-policy-service.ts`, `server/routes/retention-policies.ts`.
+  Why: Move retention policy CRUD, access checks, and cleanup orchestration selection out of route handlers.
+  Matters: Keeps retention routes thin and centralizes fail-closed governance behavior.
+- [x] Added retention policy service + route delegation tests: `tests/retention-policy-service.test.ts`, `tests/retention-policies-route.test.ts`.
+  Why: Validate tenant/role guardrails and route-to-service delegation for retention endpoints.
+  Matters: Prevents regressions while continuing Phase 2 decomposition.
+- [x] Added MetricService and migrated metrics create handler: `server/application/metrics/metric-service.ts`, `server/routes/metrics.ts`.
+  Why: Move metric creation orchestration out of route handlers into an application service boundary.
+  Matters: Keeps metrics route thin and consistent with Phase 2 decomposition patterns.
+- [x] Added metric service + route delegation tests: `tests/metric-service.test.ts`, `tests/metrics-route.test.ts`.
+  Why: Validate service behavior and route-to-service delegation.
+  Matters: Prevents regressions while continuing route decomposition.
+- [x] Added ProposalPrintService and migrated proposal print handlers: `server/application/proposals/proposal-print-service.ts`, `server/routes/proposals.ts`.
+  Why: Move proposal print token issuance and printable HTML rendering logic out of route handlers.
+  Matters: Keeps proposal routes thin and centralizes permission/token checks for print/export flows.
+- [x] Added proposal print service + route delegation tests: `tests/proposal-print-service.test.ts`, `tests/proposals-route.test.ts`.
+  Why: Validate print token/authorization guardrails and route-to-service delegation.
+  Matters: Prevents regressions while continuing Phase 2 decomposition.
+- [x] Added PublicFormService and migrated public form handlers: `server/application/public/public-form-service.ts`, `server/routes/public.ts`.
+  Why: Move public form metadata/submission orchestration (honeypot, required-field validation, optional contact/deal enrichment) out of route handlers.
+  Matters: Keeps public routes thin and fail-closed while preserving existing behavior.
+- [x] Added public form service + route delegation tests: `tests/public-form-service.test.ts`, `tests/public-route.test.ts`.
+  Why: Validate form submission guardrails and route-to-service delegation.
+  Matters: Prevents regressions during Phase 2 route decomposition.
+- [x] Added AuthService and migrated auth handlers: `server/application/auth/auth-service.ts`, `server/routes/auth.ts`.
+  Why: Move signup/login/refresh orchestration and profile context resolution out of route handlers.
+  Matters: Keeps auth routes thin and enforces fail-closed auth response behavior in a testable service layer.
+- [x] Added auth service + route delegation tests: `tests/auth-service.test.ts`, `tests/auth-route.test.ts`.
+  Why: Validate auth guardrails and route-to-service delegation.
+  Matters: Prevents regressions while continuing Phase 2 route decomposition.
+- [x] Added RuleEngineService and migrated workflow rule endpoints: `server/application/rules/rule-engine-service.ts`, `server/routes/rule-engine.ts`.
+  Why: Move rule CRUD/version/publish/audit evaluation orchestration out of route handlers.
+  Matters: Centralizes validation and tenant access checks for control-plane rule governance.
+- [x] Added rule-engine service + route delegation tests: `tests/rule-engine-service.test.ts`, `tests/rule-engine-route.test.ts`.
+  Why: Validate fail-closed service behavior and route-to-service delegation for all rule endpoints.
+  Matters: Prevents regressions during Phase 2 route decomposition.
+- [x] Added SignalService and migrated signal ingestion/route-management handlers: `server/application/signals/signal-service.ts`, `server/routes/signals.ts`.
+  Why: Move signal validation, tenant checks, and route schema parsing out of route handlers.
+  Matters: Keeps signal routes thin and centralizes fail-closed behavior for workflow signal governance.
+- [x] Added signal service + route delegation tests: `tests/signal-service.test.ts`, `tests/signals-route.test.ts`.
+  Why: Validate service guardrails and route-to-service delegation for signal endpoints.
+  Matters: Prevents regressions while continuing Phase 2 route decomposition.
+- [x] Added AgencySettingsService and migrated agency settings handlers: `server/application/agency/agency-settings-service.ts`, `server/routes/agency-settings.ts`.
+  Why: Move agency settings/branding and logo orchestration out of route handlers into a testable application service.
+  Matters: Keeps route layer thin with fail-closed validation and centralized side-effect handling.
+- [x] Added agency settings service + route delegation tests: `tests/agency-settings-service.test.ts`, `tests/agency-settings-route.test.ts`.
+  Why: Validate settings/branding guardrails and route-to-service delegation behavior.
+  Matters: Prevents regressions during Phase 2 route decomposition.
+- [x] Added MessageService and migrated message mutation/analysis handlers: `server/application/messages/message-service.ts`, `server/routes/messages.ts`.
+  Why: Move message validation, write orchestration, and AI conversation analysis out of route handlers.
+  Matters: Keeps route layer thin and enforces fail-closed behavior in a testable service boundary.
+- [x] Added message service + route delegation tests: `tests/messages-service.test.ts`, `tests/messages-route.test.ts`.
+  Why: Verify service behavior and route-to-service delegation for message endpoints.
+  Matters: Prevents regressions while continuing Phase 2 route decomposition.
+- [x] Added agency initiative/project services and migrated remaining inline agency handlers: `server/application/agency/agency-initiative-service.ts`, `server/application/agency/agency-project-service.ts`, `server/routes/agency.ts`.
+  Why: Complete route-to-service decomposition for initiative mark-viewed and project workflows.
+  Matters: Reduces inline orchestration in routes and keeps validation/authorization behavior centralized and testable.
+- [x] Added agency initiative/project service + route delegation tests: `tests/agency-initiative-service.test.ts`, `tests/agency-project-service.test.ts`, `tests/agency-route.test.ts`.
+  Why: Lock in handler delegation and fail-closed service behavior for project/initiative flows.
+  Matters: Prevents regression while continuing Phase 2 route decomposition.
 - [x] Added typed Client Record accessor with update_mode enforcement: `server/clients/client-record-accessor.ts`, `server/clients/client-record-service.ts`, `server/routes/agency.ts`, `server/routes/integrations.ts`.
   Why: Centralize client record updates with validation, audit, and signal emission rules.
   Matters: Enforces the decision-input contract and prevents unauthorized update paths.
@@ -381,11 +623,123 @@ Docs:
 - [x] Added task mutation route/service tests: `tests/task-mutation-service.test.ts`, `tests/agency-tasks-route.test.ts`.
   Why: Validate fail-closed request checks plus route delegation for task create/update/delete flows.
   Matters: Reduces regression risk for core task lifecycle mutation paths.
-
-### Planned (Open)
-- [ ] Continue migrating remaining multi-step route orchestration into application services (Phase 2).
-- Why: Some complex endpoints still contain orchestration logic in route handlers.
-- Matters: Completes service-layer boundaries across the execution model.
-- [ ] Backfill changelog entries for work prior to 2026-02-10.
-- Why: Establish historical audit trail.
-- Matters: Improves traceability for future audits.
+- [x] Added TaskReadService and migrated remaining direct-read task endpoints: `server/application/tasks/task-read-service.ts`, `server/routes/agency-tasks.ts`.
+  Why: Move task-list tasks/subtasks/activities read orchestration out of inline route handlers.
+  Matters: Completes the main `agency-tasks` service-boundary extraction for Phase 2.
+- [x] Added task read route/service tests: `tests/task-read-service.test.ts`, `tests/agency-tasks-route.test.ts`.
+  Why: Validate route delegation and stable read-path behavior for list/subtask/activity endpoints.
+  Matters: Reduces regression risk across task read views consumed by agency workflows.
+- [x] Added SuperadminReadService and migrated superadmin read endpoints: `server/application/superadmin/superadmin-read-service.ts`, `server/routes/superadmin.ts`.
+  Why: Move superadmin users/agencies/clients/recommendations/audit-log read orchestration into a dedicated service boundary.
+  Matters: Starts decomposing one of the largest remaining route modules with low-risk read-path extraction first.
+- [x] Added superadmin read route/service tests: `tests/superadmin-read-service.test.ts`, `tests/superadmin-route.test.ts`.
+  Why: Validate query parsing, recommendation join behavior, and route delegation for migrated read endpoints.
+  Matters: Reduces regression risk while expanding coverage over platform-level admin visibility endpoints.
+- [x] Added SuperadminUserService and migrated superadmin user mutation endpoints: `server/application/superadmin/superadmin-user-service.ts`, `server/routes/superadmin.ts`.
+  Why: Move superadmin user email/password/role/promotion/delete orchestration behind a dedicated service boundary with structured audit payloads.
+  Matters: Continues decomposition of `superadmin` while preserving platform audit expectations for privileged mutations.
+- [x] Added superadmin user mutation route/service tests: `tests/superadmin-user-service.test.ts`, `tests/superadmin-route.test.ts`.
+  Why: Validate fail-closed validation and route delegation for privileged user mutation operations.
+  Matters: Reduces regression risk on high-impact superadmin account management flows.
+- [x] Added SuperadminAgencyService and migrated agency/client/settings superadmin endpoints: `server/application/superadmin/superadmin-agency-service.ts`, `server/routes/superadmin.ts`.
+  Why: Move agency/client delete and agency settings read/write orchestration behind a dedicated service boundary with structured audit payloads.
+  Matters: Further decomposes `superadmin` route complexity and centralizes privileged agency mutation logic.
+- [x] Added superadmin agency/settings route/service tests: `tests/superadmin-agency-service.test.ts`, `tests/superadmin-route.test.ts`.
+  Why: Validate fail-closed behavior and route delegation for privileged agency/client/settings operations.
+  Matters: Reduces regression risk for superadmin tenant-wide configuration and deletion flows.
+- [x] Added SuperadminRecommendationService and migrated superadmin recommendation-request endpoint: `server/application/superadmin/superadmin-recommendation-service.ts`, `server/routes/superadmin.ts`.
+  Why: Move client lookup, payload validation, workflow signal emission, and structured audit payload creation out of route handlers.
+  Matters: Keeps recommendation-request orchestration aligned with Phase 2 service boundaries and preserves workflow-engine routing discipline.
+- [x] Added superadmin recommendation request route/service tests: `tests/superadmin-recommendation-service.test.ts`, `tests/superadmin-route.test.ts`.
+  Why: Validate fail-closed payload handling and route delegation for superadmin recommendation requests.
+  Matters: Reduces regression risk in platform-level recommendation trigger flow.
+- [x] Added OpportunityRecommendationRequestService and migrated opportunities `ai_generate` orchestration: `server/application/opportunities/opportunity-recommendation-request-service.ts`, `server/routes/opportunities.ts`.
+  Why: Move workflow signal trigger orchestration out of `createOpportunityHandler` and into a dedicated service boundary.
+  Matters: Continues Phase 2 decomposition and keeps recommendation-trigger behavior consistent across route modules.
+- [x] Added opportunities recommendation trigger route/service tests: `tests/opportunities-route.test.ts`, `tests/opportunity-recommendation-request-service.test.ts`.
+  Why: Validate route delegation and fail-closed request context checks for AI recommendation trigger flow.
+  Matters: Reduces regression risk for opportunity recommendation routing into the workflow engine.
+- [x] Added OpportunityReadService and migrated opportunity client-list read endpoint: `server/application/opportunities/opportunity-read-service.ts`, `server/routes/opportunities.ts`.
+  Why: Move inline opportunity artifact read orchestration into a dedicated service boundary.
+  Matters: Keeps opportunities route handlers consistent with Phase 2 service-layer decomposition.
+- [x] Added opportunity read route/service tests: `tests/opportunity-read-service.test.ts`, `tests/opportunities-route.test.ts`.
+  Why: Validate read-path delegation for client-scoped opportunity artifact listing.
+  Matters: Reduces regression risk for strategist opportunity history views.
+- [x] Added initiative intent read service path and migrated GET endpoint: `server/application/initiatives/initiative-intent-service.ts`, `server/routes/initiative-intents.ts`.
+  Why: Move inline initiative intent lookup orchestration into the initiative intent service boundary.
+  Matters: Keeps initiative-intents route fully service-backed under the Phase 2 decomposition pattern.
+- [x] Added initiative intent read route/service tests: `tests/initiative-intent-service.test.ts`, `tests/initiative-intents-route.test.ts`.
+  Why: Validate not-found and delegation behavior for initiative intent retrieval.
+  Matters: Reduces regression risk for strategist intent review workflows.
+- [x] Added NotificationService and migrated notifications route handlers: `server/application/notifications/notification-service.ts`, `server/routes/notifications.ts`.
+  Why: Move notifications list/unread/mark-read/archive/mark-all-read orchestration out of inline route handlers.
+  Matters: Continues Phase 2 decomposition and standardizes read/mutation route delegation in user-notification flows.
+- [x] Added notifications route/service tests: `tests/notification-service.test.ts`, `tests/notifications-route.test.ts`.
+  Why: Validate delegation and response-shape behavior for notification endpoints.
+  Matters: Reduces regression risk for user notification visibility and acknowledgement actions.
+- [x] Added AgencyUserService and migrated agency user list/role/delete endpoints: `server/application/agency-users/agency-user-service.ts`, `server/routes/agency-users.ts`.
+  Why: Move agency user management read/mutation orchestration out of inline route handlers.
+  Matters: Continues Phase 2 decomposition while preserving existing role/self-delete safeguards.
+- [x] Added agency user route/service tests: `tests/agency-user-service.test.ts`, `tests/agency-users-route.test.ts`.
+  Why: Validate fail-closed role validation and route delegation for agency user management handlers.
+  Matters: Reduces regression risk in admin-facing user management operations.
+- [x] Migrated agency user provisioning endpoints to AgencyUserService: `server/application/agency-users/agency-user-service.ts`, `server/routes/agency-users.ts`.
+  Why: Move client/staff/admin provisioning orchestration out of inline route handlers while preserving validation and response contracts.
+  Matters: Completes service-backed decomposition of `agency-users` route operations in Phase 2.
+- [x] Expanded agency user provisioning route/service tests: `tests/agency-user-service.test.ts`, `tests/agency-users-route.test.ts`.
+  Why: Validate fail-closed schema handling and route delegation for user provisioning flows.
+  Matters: Reduces regression risk for privileged user creation paths.
+- [x] Added ObjectiveService and migrated objectives route handlers: `server/application/objectives/objective-service.ts`, `server/routes/objectives.ts`.
+  Why: Move inline objective CRUD orchestration out of route handlers into a dedicated service boundary.
+  Matters: Continues Phase 2 decomposition for client objective management endpoints.
+- [x] Added objectives route/service tests: `tests/objective-service.test.ts`, `tests/objectives-route.test.ts`.
+  Why: Validate fail-closed create validation and route delegation for objective CRUD handlers.
+  Matters: Reduces regression risk for strategist objective lifecycle operations.
+- [x] Added UserProfileService and migrated user profile route handlers: `server/application/user/user-profile-service.ts`, `server/routes/user.ts`.
+  Why: Move profile read/update orchestration out of inline route handlers into a dedicated service boundary.
+  Matters: Continues Phase 2 decomposition and standardizes profile endpoint delegation.
+- [x] Added user profile route/service tests: `tests/user-profile-service.test.ts`, `tests/user-route.test.ts`.
+  Why: Validate fail-closed profile validation and route delegation for user profile operations.
+  Matters: Reduces regression risk for authenticated profile management flows.
+- [x] Added StaffReadService and migrated staff route handlers: `server/application/staff/staff-read-service.ts`, `server/routes/staff.ts`.
+  Why: Move staff task and notification read orchestration out of inline route handlers into a dedicated service boundary.
+  Matters: Continues Phase 2 decomposition and centralizes staff-specific read behavior.
+- [x] Added staff route/service tests: `tests/staff-read-service.test.ts`, `tests/staff-route.test.ts`.
+  Why: Validate fail-closed agency/profile checks and route delegation for staff endpoints.
+  Matters: Reduces regression risk for staff task visibility and notification count flows.
+- [x] Added ClientReadService and migrated client profile/notification-count handlers: `server/application/client/client-read-service.ts`, `server/routes/client.ts`.
+  Why: Move client profile and notification count read orchestration out of inline route handlers.
+  Matters: Continues Phase 2 decomposition in `client` route while preserving response contracts.
+- [x] Added client profile/notification route/service tests: `tests/client-read-service.test.ts`, `tests/client-route.test.ts`.
+  Why: Validate fail-closed client-profile lookup behavior and route delegation for client reads.
+  Matters: Reduces regression risk for client-facing profile and notification counters.
+- [x] Added ClientPortfolioService and migrated client projects/invoices/initiatives handlers: `server/application/client/client-portfolio-service.ts`, `server/routes/client.ts`.
+  Why: Move role-aware portfolio listing orchestration out of inline client route handlers.
+  Matters: Continues Phase 2 decomposition and centralizes shared admin/client list behavior.
+- [x] Added client portfolio route/service tests: `tests/client-portfolio-service.test.ts`, `tests/client-route.test.ts`.
+  Why: Validate fail-closed admin agency checks and route delegation for portfolio endpoints.
+  Matters: Reduces regression risk for client/admin portfolio listing flows.
+- [x] Added ClientWorkspaceService and migrated client workspace read handlers: `server/application/client/client-workspace-service.ts`, `server/routes/client.ts`.
+  Why: Move recent tasks, projects-with-tasks, objectives, and messages read orchestration out of inline handlers.
+  Matters: Continues Phase 2 decomposition in `client` route and centralizes client workspace read logic.
+- [x] Added client workspace route/service tests: `tests/client-workspace-service.test.ts`, `tests/client-route.test.ts`.
+  Why: Validate empty-client fallback and route delegation behavior for workspace endpoints.
+  Matters: Reduces regression risk for client dashboard read flows.
+- [x] Added ClientMessageService and migrated client message-create handler: `server/application/client/client-message-service.ts`, `server/routes/client.ts`.
+  Why: Move client message creation and non-blocking admin notification fanout out of inline route logic.
+  Matters: Completes service-backed decomposition of `client` route handlers in this module.
+- [x] Added client message route/service tests: `tests/client-message-service.test.ts`, `tests/client-route.test.ts`.
+  Why: Validate fail-closed subject/content checks, notification fanout resilience, and route delegation.
+  Matters: Reduces regression risk for client-to-agency messaging workflows.
+- [x] Added AgencyReadService and migrated agency read-cluster handlers: `server/application/agency/agency-read-service.ts`, `server/routes/agency.ts`.
+  Why: Move metrics/initiatives/integrations/staff/messages/notification-count orchestration out of inline route handlers.
+  Matters: Continues Phase 2 decomposition for `agency` route while preserving agency guard and superadmin staff behavior.
+- [x] Added agency read route/service tests: `tests/agency-read-service.test.ts`, `tests/agency-route.test.ts`.
+  Why: Validate fail-closed agency guard behavior and route delegation for agency read handlers.
+  Matters: Reduces regression risk for strategist/admin dashboard read paths.
+- [x] Added AgencyClientService and migrated agency client handlers: `server/application/agency/agency-client-service.ts`, `server/routes/agency.ts`.
+  Why: Move agency client list/detail/update/retainer/metrics orchestration out of inline route handlers.
+  Matters: Continues Phase 2 decomposition for `agency` route client-management flows.
+- [x] Expanded agency route/service tests for client handlers: `tests/agency-client-service.test.ts`, `tests/agency-route.test.ts`.
+  Why: Validate fail-closed missing-client behavior and route delegation for agency client operations.
+  Matters: Reduces regression risk for strategist client management endpoints.

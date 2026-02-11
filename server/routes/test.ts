@@ -1,53 +1,35 @@
 import { Router } from "express";
 import { storage } from "../storage";
+import { TestUserService } from "../application/test/test-user-service";
+import { requireAuth, requireRole } from "../middleware/supabase-auth";
 
 const router = Router();
+const testUserService = new TestUserService(storage);
 
 // TEST ENDPOINT: Create user with specific role (development only)
-router.post("/create-user", async (req, res) => {
-  if (process.env.NODE_ENV !== "development") {
-    return res.status(404).json({ message: "Not found" });
-  }
-
-  try {
-    const { email, password, fullName, role, companyName, agencyId: requestedAgencyId } = req.body;
-        
-    console.log(`[TEST CREATE USER] Request: email=${email}, role=${role}, requestedAgencyId=${requestedAgencyId}`);
-        
-    const { provisionUser } = await import("../lib/user-provisioning");
-        
-    let agencyId: string | undefined = requestedAgencyId;
-    if (!agencyId && (role === "Client" || !role)) {
-      const defaultAgency = await storage.getDefaultAgency();
-      if (!defaultAgency) {
-        return res.status(500).json({ message: "System configuration error: No default agency found" });
+export function createTestCreateUserHandler(service: TestUserService = testUserService) {
+  return async (req: any, res: any) => {
+    try {
+      const result = await service.createUser({
+        env: process.env.NODE_ENV,
+        email: req.body?.email,
+        password: req.body?.password,
+        fullName: req.body?.fullName,
+        role: req.body?.role,
+        companyName: req.body?.companyName,
+        requestedAgencyId: req.body?.agencyId,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
       }
-      agencyId = defaultAgency.id;
-      console.log(`[TEST CREATE USER] Using default agency: ${agencyId}`);
-    } else {
-      console.log(`[TEST CREATE USER] Using requested agency: ${agencyId}`);
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Test user creation error:", error);
+      return res.status(500).json({ message: error.message || "User creation failed" });
     }
-        
-    const result = await provisionUser({
-      email,
-      password,
-      fullName,
-      role: role || "Client",
-      agencyId: agencyId || null,
-      clientData: companyName ? { companyName } : undefined
-    });
-        
-    console.log(`[TEST CREATE USER] Profile created with ID: ${result.profileId}`);
+  };
+}
 
-    res.status(201).json({ 
-      message: "Test user created successfully",
-      user: { id: result.profileId, email: email },
-      profile: { id: result.profileId, fullName: fullName, role: role || "Client", agencyId }
-    });
-  } catch (error: any) {
-    console.error("Test user creation error:", error);
-    res.status(500).json({ message: error.message || "User creation failed" });
-  }
-});
+router.post("/create-user", requireAuth, requireRole("SuperAdmin"), createTestCreateUserHandler());
 
 export default router;
