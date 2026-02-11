@@ -9,3 +9,10 @@ export const InitiativeIntentRequestSchema = z.object({
 });
 
 export type InitiativeIntentRequest = z.infer<typeof InitiativeIntentRequestSchema>;
+
+export const InitiativeResponseRequestSchema = z.object({
+  response: z.enum(["approved", "rejected", "discussing"]),
+  feedback: z.string().optional(),
+});
+
+export type InitiativeResponseRequest = z.infer<typeof InitiativeResponseRequestSchema>;

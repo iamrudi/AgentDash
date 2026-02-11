@@ -1,217 +1,58 @@
-import { Router, type Request, type Response } from "express";
+import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, type AuthRequest } from "../middleware/supabase-auth";
-import { getAuthUrl, exchangeCodeForTokens } from "../lib/googleOAuth";
-import { generateOAuthState, verifyOAuthState } from "../lib/oauthState";
+import { OAuthService } from "../application/oauth/oauth-service";
 
 const router = Router();
+const oauthService = new OAuthService(storage);
 
-router.get("/google/initiate", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const profile = await storage.getProfileByUserId(req.user!.id);
-    if (!profile) {
-      return res.status(404).json({ message: "Profile not found" });
-    }
-
-    const service = req.query.service as 'GA4' | 'GSC';
-    if (!service || (service !== 'GA4' && service !== 'GSC')) {
-      return res.status(400).json({ message: "service query parameter must be 'GA4' or 'GSC'" });
-    }
-
-    let returnTo = req.query.returnTo as string;
-    
-    const defaultReturnTo = (profile.role === "Admin" || profile.role === "SuperAdmin") 
-      ? "/agency/integrations" 
-      : "/client";
-    
-    if (returnTo) {
-      returnTo = returnTo.trim();
-      
-      if (!returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('://')) {
-        console.warn(`[OAuth Security] Rejected unsafe returnTo: ${returnTo}`);
-        returnTo = defaultReturnTo;
-      }
-    } else {
-      returnTo = defaultReturnTo;
-    }
-
-    let clientId: string;
-    
-    if (profile.role === "Admin" || profile.role === "SuperAdmin") {
-      const targetClientId = req.query.clientId as string;
-      if (!targetClientId) {
-        return res.status(400).json({ message: "clientId query parameter required for Admin/SuperAdmin" });
-      }
-      clientId = targetClientId;
-    } else if (profile.role === "Client") {
-      const client = await storage.getClientByProfileId(profile.id);
-      if (!client) {
-        return res.status(404).json({ message: "Client record not found" });
-      }
-      clientId = client.id;
-    } else {
-      return res.status(403).json({ message: "Only Admin, SuperAdmin, and Client can initiate OAuth" });
-    }
-
-    const popup = req.query.popup === 'true';
-    const origin = popup ? req.get('origin') || req.get('referer')?.split('/').slice(0, 3).join('/') : undefined;
-
-    const state = generateOAuthState(clientId, profile.role, service, returnTo, popup, origin);
-
-    const authUrl = getAuthUrl(state, service);
-    res.json({ authUrl });
-  } catch (error: any) {
-    console.error("OAuth initiation error:", error);
-    res.status(500).json({ message: error.message || "OAuth initiation failed" });
-  }
-});
-
-router.get("/google/callback", async (req: Request, res: Response) => {
-  try {
-    const { code, state, error } = req.query;
-
-    if (error) {
-      return res.redirect(`/client?oauth_error=${encodeURIComponent(error as string)}`);
-    }
-
-    if (!code || !state) {
-      return res.redirect('/client?oauth_error=missing_parameters');
-    }
-
-    let stateData;
+export function createOAuthInitiateHandler(service: OAuthService = oauthService) {
+  return async (req: AuthRequest, res: any) => {
     try {
-      stateData = verifyOAuthState(state as string);
+      const popup = req.query.popup === "true";
+      const origin = popup ? req.get("origin") || req.get("referer")?.split("/").slice(0, 3).join("/") : undefined;
+
+      const result = await service.initiate({
+        userId: req.user!.id,
+        service: req.query.service as string | undefined,
+        returnTo: req.query.returnTo as string | undefined,
+        clientId: req.query.clientId as string | undefined,
+        popup,
+        origin,
+      });
+
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
     } catch (error: any) {
-      console.error("State verification failed:", error.message);
-      return res.redirect(`/client?oauth_error=invalid_state`);
+      console.error("OAuth initiation error:", error);
+      return res.status(500).json({ message: error.message || "OAuth initiation failed" });
     }
-    
-    const { clientId, service, returnTo: stateReturnTo } = stateData;
+  };
+}
 
-    let returnTo = stateReturnTo;
-    const defaultReturnTo = (stateData.initiatedBy === "Admin" || stateData.initiatedBy === "SuperAdmin") 
-      ? "/agency/integrations" 
-      : "/client";
-    
-    if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('://')) {
-      console.warn(`[OAuth Security] Invalid returnTo in callback, using fallback: ${returnTo}`);
-      returnTo = defaultReturnTo;
-    }
+router.get("/google/initiate", requireAuth, createOAuthInitiateHandler());
 
-    const tokens = await exchangeCodeForTokens(code as string);
-
-    const serviceName = service;
-    const existing = await storage.getIntegrationByClientId(clientId, serviceName);
-    
-    if (existing) {
-      await storage.updateIntegration(existing.id, {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken || existing.refreshToken,
-        expiresAt: tokens.expiresAt,
-      });
-    } else {
-      await storage.createIntegration({
-        clientId,
-        serviceName,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        expiresAt: tokens.expiresAt,
-      });
-    }
-
-    if (stateData.popup && stateData.origin) {
-      const htmlResponse = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'self';">
-  <title>OAuth Success</title>
-</head>
-<body>
-  <script>
-    (function() {
-      if (!window.opener) {
-        document.body.innerHTML = '<h1>OAuth Complete</h1><p>You can close this window.</p>';
-        return;
-      }
-      
-      try {
-        window.opener.postMessage({
-          type: 'GOOGLE_OAUTH_SUCCESS',
-          clientId: ${JSON.stringify(clientId)},
-          service: ${JSON.stringify(service)}
-        }, ${JSON.stringify(stateData.origin)});
-        
-        setTimeout(function() {
-          window.close();
-        }, 100);
-      } catch (e) {
-        console.error('Failed to post message:', e);
-        document.body.innerHTML = '<h1>OAuth Complete</h1><p>You can close this window.</p>';
-      }
-    })();
-  </script>
-  <p>OAuth successful. Closing window...</p>
-</body>
-</html>`;
-      return res.type('text/html').send(htmlResponse);
-    }
-
-    const separator = returnTo.includes('?') ? '&' : '?';
-    res.redirect(`${returnTo}${separator}success=google_connected&clientId=${clientId}&service=${service}`);
-  } catch (error: any) {
-    console.error("OAuth callback error:", error);
-    
-    let stateData;
+export function createOAuthCallbackHandler(service: OAuthService = oauthService) {
+  return async (req: any, res: any) => {
     try {
-      stateData = verifyOAuthState(req.query.state as string);
-    } catch (e) {
-      return res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
-    }
-    
-    if (stateData?.popup && stateData?.origin) {
-      const htmlResponse = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; connect-src 'self';">
-  <title>OAuth Error</title>
-</head>
-<body>
-  <script>
-    (function() {
-      if (!window.opener) {
-        document.body.innerHTML = '<h1>OAuth Error</h1><p>${error.message || 'Authentication failed'}. You can close this window.</p>';
-        return;
+      const result = await service.callback(req.query ?? {});
+      if (!result.ok || !result.data) {
+        return res.redirect(`/client?oauth_error=${encodeURIComponent(result.error || "oauth_failed")}`);
       }
-      
-      try {
-        window.opener.postMessage({
-          type: 'GOOGLE_OAUTH_ERROR',
-          error: ${JSON.stringify(error.message || 'Authentication failed')}
-        }, ${JSON.stringify(stateData.origin)});
-        
-        setTimeout(function() {
-          window.close();
-        }, 100);
-      } catch (e) {
-        console.error('Failed to post message:', e);
-        document.body.innerHTML = '<h1>OAuth Error</h1><p>You can close this window.</p>';
+
+      if (result.data.kind === "html") {
+        return res.type("text/html").send(result.data.html);
       }
-    })();
-  </script>
-  <p>OAuth failed. Closing window...</p>
-</body>
-</html>`;
-      return res.type('text/html').send(htmlResponse);
+      return res.redirect(result.data.location);
+    } catch (error: any) {
+      console.error("OAuth callback error:", error);
+      return res.redirect(`/client?oauth_error=${encodeURIComponent(error.message || "oauth_failed")}`);
     }
-    
-    res.redirect(`/client?oauth_error=${encodeURIComponent(error.message)}`);
-  }
-});
+  };
+}
+
+router.get("/google/callback", createOAuthCallbackHandler());
 
 export default router;

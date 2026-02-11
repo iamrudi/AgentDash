@@ -12,7 +12,6 @@ This document maps the Phase 1 increment changes to core primitives. It is inten
 - **P6 — AI Guarded Executor**
   - `server/gemini.ts` now routes through `server/ai/hardened-executor.ts` for schema-validated output and quota enforcement.
   - `server/routes/messages.ts` now routes through `server/ai/hardened-executor.ts` for client conversation analysis.
-  - `server/routes/crm.ts` now routes proposal generation through `server/ai/hardened-executor.ts`.
   - `server/agents/ai-provider-adapter.ts` now routes text generation through `server/ai/hardened-executor.ts`.
   - `server/vector/embedding-service.ts` now routes embedding generation through `server/ai/hardened-executor.ts`.
   - `server/application/opportunities/opportunity-service.ts` generates Opportunity Artifacts via hardened executor with output schema.

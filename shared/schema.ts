@@ -90,6 +90,7 @@ export const clients = pgTable("clients", {
   companyName: text("company_name").notNull(),
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   agencyId: uuid("agency_id").notNull().references(() => agencies.id, { onDelete: "cascade" }), // Every client belongs to an agency
+  accountManagerProfileId: uuid("account_manager_profile_id").references(() => profiles.id, { onDelete: "set null" }),
   businessContext: text("business_context"), // Strategic business context for AI recommendations
   retainerAmount: numeric("retainer_amount"), // Monthly retainer amount for auto-invoicing
   billingDay: integer("billing_day"), // Day of month for auto-invoicing (e.g., 25 for 25th)
@@ -104,6 +105,7 @@ export const clients = pgTable("clients", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   agencyIdIdx: index("clients_agency_id_idx").on(table.agencyId),
+  accountManagerProfileIdIdx: index("clients_account_manager_profile_id_idx").on(table.accountManagerProfileId),
 }));
 
 // PROJECTS
@@ -1888,6 +1890,7 @@ export const createClientUserSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   fullName: z.string().min(1, "Full name is required"),
   companyName: z.string().min(1, "Company name is required"),
+  accountManagerProfileId: z.string().uuid("Invalid account manager profile id").optional(),
   agencyId: z.string().optional(), // Optional for regular Admin, required for SuperAdmin (validated in backend)
 });
 

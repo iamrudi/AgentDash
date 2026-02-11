@@ -1,6 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
 import helmet from "helmet";
-import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import path from "path";
 import fs from "fs";
@@ -35,13 +34,6 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false,
   crossOriginEmbedderPolicy: false,
-}));
-
-// Simple CORS configuration - Allow all origins
-app.use(cors({
-  origin: true, // Allow all origins
-  credentials: true, // Allow cookies and authentication headers
-  optionsSuccessStatus: 200
 }));
 
 // Request ID for tracing

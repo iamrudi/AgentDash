@@ -50,7 +50,6 @@ Where:
 | **Agency Tasks Router** | `server/routes/agency-tasks.ts` | 80 | 🟢 | Core Team | Dec 2025 | 13 routes, task management |
 | **Agency Users Router** | `server/routes/agency-users.ts` | 80 | 🟢 | Core Team | Dec 2025 | 5 routes, user management |
 | **Staff Router** | `server/routes/staff.ts` | 80 | 🟢 | Core Team | Dec 2025 | 3 routes, task filtering |
-| **CRM Router** | `server/routes/crm.ts` | 78 | 🟡 | Core Team | Dec 2025 | 34 routes, mounted |
 | **Settings Router** | `server/routes/settings.ts` | 82 | 🟢 | Core Team | Dec 2025 | 2 routes, mounted |
 | **SuperAdmin Router** | `server/routes/superadmin.ts` | 82 | 🟢 | Core Team | Dec 2025 | 24 routes, governance |
 | **SuperAdmin Health Router** | `server/routes/superadmin-health.ts` | 82 | 🟢 | Core Team | Dec 2025 | 3 routes, health checks |
@@ -151,14 +150,6 @@ Where:
 | **HubSpot** | `server/lib/hubspot.ts` | 75 | 🟡 | Integrations | Dec 2025 | Needs error handling review |
 | **LinkedIn** | `server/lib/linkedin.ts` | 72 | 🟡 | Integrations | Dec 2025 | Limited functionality |
 
-### CRM
-
-| Module | Path | Score | Flag | Owner | Last Audit | Notes |
-|--------|------|-------|------|-------|------------|-------|
-| **CRM Routes** | `server/crm/crm-routes.ts` | 78 | 🟡 | CRM Team | Dec 2025 | Webhook handling |
-| **CRM Webhook Handler** | `server/crm/crm-webhook-handler.ts` | 80 | 🟢 | CRM Team | Dec 2025 | HubSpot signature verification |
-| **Routes CRM** | `server/routes/crm.ts` | 72 | 🟡 | CRM Team | Dec 2025 | Duplicated with crm-routes |
-
 ### Vector & Embeddings
 
 | Module | Path | Score | Flag | Owner | Last Audit | Notes |
@@ -221,7 +212,6 @@ server/storage/
 |------|------|--------|--------|
 | Deprecated rate limit methods | `googleApiRateLimiter.ts` | Remove `checkRateLimit`, `recordRequest` | Low |
 | Legacy logging | `logger.ts` | Remove after confirming Winston adoption | Low |
-| Redundant CRM routes | `routes/crm.ts` vs `crm/crm-routes.ts` | Consolidate into one | Medium |
 | Deprecated auth helpers | `auth.ts` | Consolidate `verifyClientAccess` patterns | Low |
 
 ### Medium Priority
@@ -260,7 +250,6 @@ server/storage/
 | `agency-tasks.ts` | 13 | task CRUD, bulk ops |
 | `agency-users.ts` | 5 | user management |
 | `staff.ts` | 3 | tasks, notifications |
-| `crm.ts` | 34 | companies, contacts, deals |
 | `settings.ts` | 2 | rate limit settings |
 | `superadmin.ts` | 24 | governance, agencies, users |
 | `superadmin-health.ts` | 3 | health checks |

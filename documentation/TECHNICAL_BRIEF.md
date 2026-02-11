@@ -34,7 +34,7 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 - **Google Gemini / OpenAI** - AI recommendations
 - **Google Analytics 4** - Website metrics
 - **Google Search Console** - Search performance
-- **HubSpot** - CRM integration
+- **HubSpot** - Agency integration
 - **LinkedIn** - Social metrics
 
 ---
@@ -71,7 +71,6 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   ├── agency-tasks.ts     # Task management (13 routes)
 │   │   ├── agency-users.ts     # User management (5 routes)
 │   │   ├── staff.ts            # Staff portal (3 routes)
-│   │   ├── crm.ts              # CRM (34 routes)
 │   │   ├── settings.ts         # Settings (2 routes)
 │   │   ├── superadmin.ts       # SuperAdmin governance (24 routes)
 │   │   ├── superadmin-health.ts # Health checks (3 routes)
@@ -118,7 +117,7 @@ A multi-tenant agency management platform built with React, Express.js, and Post
 │   │   └── hardened-executor.ts # Hardened AI execution layer
 │   ├── agents/
 │   │   ├── base-agent.ts       # BaseAgent abstract class
-│   │   ├── domain-agents.ts    # SEO, PPC, CRM, Reporting agents
+│   │   ├── domain-agents.ts    # SEO, PPC, Reporting agents
 │   │   ├── orchestrator.ts     # AgentOrchestrator routing
 │   │   ├── agent-routes.ts     # Agent REST API
 │   │   └── ai-provider-adapter.ts # AI provider abstraction
@@ -916,7 +915,7 @@ The multi-agent system enables specialized AI agents for different domains to be
 ```typescript
 // server/agents/base-agent.ts
 abstract class BaseAgent {
-  abstract readonly domain: AgentDomain;      // 'seo' | 'ppc' | 'crm' | 'reporting'
+  abstract readonly domain: AgentDomain;      // 'seo' | 'ppc' | 'reporting'
   abstract readonly capabilities: string[];
   
   // Core lifecycle methods
@@ -935,7 +934,6 @@ abstract class BaseAgent {
 // server/agents/domain-agents.ts
 // SEOAgent - Keyword analysis, content optimization, technical SEO
 // PPCAgent - Campaign analysis, bid optimization, budget allocation
-// CRMAgent - Lead scoring, pipeline analysis, customer segmentation
 // ReportingAgent - Report generation, data visualization, trend analysis
 ```
 
@@ -980,7 +978,7 @@ agents: {
   id: uuid PRIMARY KEY,
   agencyId: uuid REFERENCES agencies,
   name: varchar,
-  domain: varchar,           // 'seo' | 'ppc' | 'crm' | 'reporting'
+  domain: varchar,           // 'seo' | 'ppc' | 'reporting'
   status: varchar,           // 'active' | 'inactive' | 'maintenance'
   aiProvider: varchar,       // 'gemini' | 'openai'
   aiModel: varchar,
@@ -1031,71 +1029,6 @@ GET         /api/agents/executions                - List all executions
 GET         /api/agents/:id/executions            - List agent executions
 POST        /api/agents/orchestrate               - Execute via orchestrator
 ```
-
----
-
-## CRM Integration & Webhook Processing
-
-### CRM Webhook Handler
-
-The CRM system processes incoming webhook events from HubSpot and converts them into workflow signals.
-
-```typescript
-// server/crm/crm-webhook-handler.ts
-class CRMWebhookHandler {
-  // HubSpot signature verification for webhook security
-  verifyHubSpotSignature(requestBody: string, signature: string, clientSecret: string): Promise<boolean>;
-  
-  // Find agency by HubSpot portal ID (agency isolation)
-  findAgencyByPortalId(portalId: string): Promise<string | null>;
-  
-  // Normalize raw HubSpot events into standard format
-  normalizeHubSpotEvent(payload: CRMWebhookPayload): NormalizedCRMEvent;
-  
-  // Batch process webhook payloads with deduplication
-  processWebhookBatch(payloads: CRMWebhookPayload[]): Promise<ProcessResult>;
-  
-  // Route CRM events through SignalRouter for workflow triggering
-  processAndRouteCRMEvent(agencyId: string, event: NormalizedCRMEvent): Promise<RoutingResult>;
-}
-```
-
-### Supported CRM Event Types (16 total)
-
-```typescript
-type CRMEventType = 
-  | 'deal.created' | 'deal.updated' | 'deal.deleted' | 'deal.propertyChange'
-  | 'contact.created' | 'contact.updated' | 'contact.deleted' | 'contact.propertyChange'
-  | 'company.created' | 'company.updated' | 'company.deleted' | 'company.propertyChange'
-  | 'meeting.created' | 'meeting.updated'
-  | 'form.submitted';
-```
-
-### Signal Type Mapping
-
-| CRM Event | Signal Type | Urgency |
-|-----------|-------------|---------|
-| Deal stage change | `deal_stage_changed` | high |
-| Deal created | `deal_created` | normal |
-| Contact created | `contact_created` | normal |
-| Form submission | `form_submission` | high |
-| Meeting scheduled | `meeting_scheduled` | normal |
-
-### CRM API Endpoints
-
-```
-POST /api/crm/webhooks/hubspot  - Public webhook endpoint (no auth)
-GET  /api/crm/status/:agencyId  - Check HubSpot integration status
-GET  /api/crm/events            - List CRM signals for agency
-POST /api/crm/sync/:agencyId    - Trigger manual CRM data sync
-```
-
-### Agency Isolation
-
-CRM webhooks are isolated by agency via `hubspotPortalId` mapping in `agency_settings`:
-- Each agency configures their HubSpot portal ID
-- Incoming webhooks are matched to agencies by portal ID
-- Signals are created with agency-specific deduplication
 
 ---
 
@@ -1526,7 +1459,7 @@ class KnowledgeRetrievalService {
 | File | Purpose |
 |------|---------|
 | `server/agents/base-agent.ts` | BaseAgent abstract class |
-| `server/agents/domain-agents.ts` | SEO, PPC, CRM, Reporting agents |
+| `server/agents/domain-agents.ts` | SEO, PPC, Reporting agents |
 | `server/agents/orchestrator.ts` | AgentOrchestrator for routing |
 | `server/agents/agent-routes.ts` | Agent REST API endpoints |
 

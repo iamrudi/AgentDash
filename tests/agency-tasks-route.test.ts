@@ -13,10 +13,14 @@ import { TaskListService } from "../server/application/tasks/task-list-service";
 import { TaskQueryService } from "../server/application/tasks/task-query-service";
 import { TaskAssignmentService } from "../server/application/tasks/task-assignment-service";
 import { TaskMutationService } from "../server/application/tasks/task-mutation-service";
+import { TaskReadService } from "../server/application/tasks/task-read-service";
 import {
   createTaskListCreateHandler,
   createTaskListUpdateHandler,
   createTaskListDeleteHandler,
+  createTaskListTasksHandler,
+  createTaskSubtasksHandler,
+  createTaskActivitiesHandler,
   createTasksListHandler,
   createStaffAssignmentsListHandler,
   createTaskAssignHandler,
@@ -69,6 +73,57 @@ describe("Agency tasks route handlers", () => {
 
     expect(deleteTaskList).toHaveBeenCalledWith({ agencyId: "agency-1", isSuperAdmin: undefined }, "list-1");
     expect(res.status).toHaveBeenCalledWith(204);
+  });
+
+  it("delegates task-list tasks read to read service", async () => {
+    const listTasksByListId = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [{ id: "task-1" }],
+    });
+    const service = { listTasksByListId } as unknown as TaskReadService;
+    const handler = createTaskListTasksHandler(service);
+    const req = { params: { listId: "list-1" } } as any;
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), send: vi.fn() };
+
+    await handler(req, res);
+
+    expect(listTasksByListId).toHaveBeenCalledWith("list-1");
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("delegates subtasks read to read service", async () => {
+    const listSubtasks = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [{ id: "task-2" }],
+    });
+    const service = { listSubtasks } as unknown as TaskReadService;
+    const handler = createTaskSubtasksHandler(service);
+    const req = { params: { taskId: "task-1" } } as any;
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), send: vi.fn() };
+
+    await handler(req, res);
+
+    expect(listSubtasks).toHaveBeenCalledWith("task-1");
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  it("delegates task activities read to read service", async () => {
+    const listTaskActivities = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [{ id: "activity-1" }],
+    });
+    const service = { listTaskActivities } as unknown as TaskReadService;
+    const handler = createTaskActivitiesHandler(service);
+    const req = { params: { taskId: "task-1" } } as any;
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), send: vi.fn() };
+
+    await handler(req, res);
+
+    expect(listTaskActivities).toHaveBeenCalledWith("task-1");
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   it("delegates tasks list to query service", async () => {

@@ -7,10 +7,11 @@ import { InitiativeIntentService } from "../application/initiatives/initiative-i
 import { getRequestContext } from "../middleware/request-context";
 
 const router = Router();
+const initiativeIntentService = new InitiativeIntentService(storage);
 
 const intentSchema = InitiativeIntentRequestSchema;
 
-export function createInitiativeIntentHandler(service: InitiativeIntentService) {
+export function createInitiativeIntentHandler(service: InitiativeIntentService = initiativeIntentService) {
   return async (req: AuthRequest, res: any) => {
     try {
       const data = intentSchema.parse(req.body);
@@ -35,26 +36,29 @@ router.post(
   requireAuth,
   requireRole("Admin"),
   requireInitiativeAccess(storage),
-  createInitiativeIntentHandler(new InitiativeIntentService(storage))
+  createInitiativeIntentHandler()
 );
+
+export function createInitiativeIntentGetHandler(service: InitiativeIntentService = initiativeIntentService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getIntentByInitiativeId(req.params.initiativeId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
 
 router.get(
   "/initiative-intents/:initiativeId",
   requireAuth,
   requireRole("Admin"),
   requireInitiativeAccess(storage),
-  async (req: AuthRequest, res) => {
-    try {
-      const { initiativeId } = req.params;
-      const record = await storage.getInitiativeIntentByInitiativeId(initiativeId);
-      if (!record) {
-        return res.status(404).json({ message: "Intent not found" });
-      }
-      res.json(record);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  }
+  createInitiativeIntentGetHandler()
 );
 
 export default router;

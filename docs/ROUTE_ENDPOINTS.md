@@ -156,8 +156,6 @@ Dynamic or computed paths are not listed if they are not literal strings.
 | POST | /api/outcome-reviews/:initiativeId | `server/routes/outcome-reviews.ts` |
 | GET | /api/proposals/:id/print | `server/routes/proposals.ts` |
 | POST | /api/proposals/:id/print-token | `server/routes/proposals.ts` |
-| GET | /api/public/forms/:publicId | `server/routes/public.ts` |
-| POST | /api/public/forms/:publicId/submit | `server/routes/public.ts` |
 | GET | /api/retention-policies/ | `server/routes/retention-policies.ts` |
 | POST | /api/retention-policies/ | `server/routes/retention-policies.ts` |
 | DELETE | /api/retention-policies/:id | `server/routes/retention-policies.ts` |

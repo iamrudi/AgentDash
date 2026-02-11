@@ -1,8 +1,12 @@
 # Route Inventory Snapshot
 
-Date: 2026-02-10
+Date: 2026-02-11
 
 Purpose: Inventory of modular routers mounted under `/api` and any remaining legacy routing surface.
+
+Status checkpoint:
+- `server/routes/**/*.ts` has zero inline async route handlers (guarded by `tests/route-inline-guard.test.ts`).
+- `server/routes.ts` remains a compatibility shim + static invoice file-serving surface.
 
 ## Modular Routers (Mounted via `server/routes/index.ts`)
 
@@ -13,7 +17,6 @@ Purpose: Inventory of modular routers mounted under `/api` and any remaining leg
 | `/client` | `server/routes/client.ts` |
 | `/agency` | `server/routes/agency.ts` |
 | `/staff` | `server/routes/staff.ts` |
-| `/crm` | `server/routes/crm.ts` |
 | `/settings` | `server/routes/settings.ts` |
 | `/superadmin` | `server/routes/superadmin.ts` |
 | `/invoices` | `server/routes/invoices.ts` |
@@ -24,7 +27,6 @@ Purpose: Inventory of modular routers mounted under `/api` and any remaining leg
 | `/workflows` | `server/routes/workflows.ts` |
 | `/workflow-executions` | `server/routes/workflow-executions.ts` |
 | `/lineage` | `server/routes/lineage.ts` |
-| `/public` | `server/routes/public.ts` |
 | `/` | `server/routes/rule-engine.ts` |
 | `/` | `server/routes/signals.ts` |
 | `/` | `server/routes/ai-execution.ts` |
@@ -62,5 +64,3 @@ Purpose: Inventory of modular routers mounted under `/api` and any remaining leg
 ## Legacy / Monolith Surface
 
 - `server/routes.ts` is a shim that only sets policy boundaries and mounts modular routers. It also serves static invoice PDFs from `public/invoices`.
-- `server/routes.ts.backup` contains a legacy monolith but is not mounted.
-

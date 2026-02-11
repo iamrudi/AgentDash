@@ -24,7 +24,9 @@ vi.mock("../server/middleware/supabase-auth", async () => {
   };
 });
 
-import { createOpportunityHandler } from "../server/routes/opportunities";
+import { createOpportunityHandler, createOpportunityListByClientHandler } from "../server/routes/opportunities";
+import { OpportunityRecommendationRequestService } from "../server/application/opportunities/opportunity-recommendation-request-service";
+import { OpportunityReadService } from "../server/application/opportunities/opportunity-read-service";
 
 describe("Opportunities route", () => {
   it("uses the opportunity service to persist artifacts", async () => {
@@ -62,6 +64,13 @@ describe("Opportunities route", () => {
       generateOpportunityArtifactFromAI: vi.fn(),
       persistOpportunityArtifact: vi.fn(),
     } as any;
+    const recommendationService = {
+      requestRecommendations: vi.fn().mockResolvedValue({
+        ok: true,
+        status: 202,
+        data: { success: true, signalId: "signal-1" },
+      }),
+    } as unknown as OpportunityRecommendationRequestService;
 
     const req = {
       body: {
@@ -76,10 +85,33 @@ describe("Opportunities route", () => {
       json: vi.fn(),
     };
 
-    const handler = createOpportunityHandler(service);
+    const handler = createOpportunityHandler(service, recommendationService);
     await handler(req, res);
 
     expect(service.generateOpportunityArtifactFromAI).not.toHaveBeenCalled();
+    expect(recommendationService.requestRecommendations).toHaveBeenCalledTimes(1);
     expect(res.status).toHaveBeenCalledWith(202);
+  });
+
+  it("delegates client artifact listing to read service", async () => {
+    const listByClientId = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: [{ id: "artifact-1" }],
+    });
+    const service = { listByClientId } as unknown as OpportunityReadService;
+    const handler = createOpportunityListByClientHandler(service);
+    const req = {
+      params: { clientId: "client-1" },
+    } as any;
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+
+    await handler(req, res);
+
+    expect(listByClientId).toHaveBeenCalledWith("client-1");
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

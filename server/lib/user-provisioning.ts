@@ -21,6 +21,7 @@ interface UserProvisioningOptions {
     businessContext?: string;
     retainerAmount?: number;
     billingDay?: number;
+    accountManagerProfileId?: string;
   };
 }
 
@@ -130,6 +131,7 @@ export async function provisionUser(options: UserProvisioningOptions): Promise<U
           companyName: clientData.companyName,
           profileId: profile.id,
           agencyId: agencyId!,
+          accountManagerProfileId: clientData.accountManagerProfileId || null,
           businessContext: clientData.businessContext || null,
           retainerAmount: clientData.retainerAmount || 0,
           billingDay: clientData.billingDay || 1,

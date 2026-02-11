@@ -62,4 +62,14 @@ export class InitiativeIntentService {
 
     return { ok: true, status: 201, data: record };
   }
+
+  async getIntentByInitiativeId(
+    initiativeId: string
+  ): Promise<InitiativeIntentResult<unknown>> {
+    const record = await this.storage.getInitiativeIntentByInitiativeId(initiativeId);
+    if (!record) {
+      return { ok: false, status: 404, error: "Intent not found" };
+    }
+    return { ok: true, status: 200, data: record };
+  }
 }

@@ -270,7 +270,6 @@ server/routes/
 ├── agency-tasks.ts           # Task management endpoints (13 routes)
 ├── agency-users.ts           # User management endpoints (5 routes)
 ├── staff.ts                  # Staff portal endpoints (3 routes)
-├── crm.ts                    # CRM endpoints (34 routes)
 ├── settings.ts               # Settings endpoints (2 routes)
 ├── superadmin.ts             # SuperAdmin governance endpoints (24 routes)
 ├── superadmin-health.ts      # Health check endpoints (3 routes)
@@ -344,7 +343,6 @@ export function mountDomainRouters(app: Express): void {
 | agency-tasks | ✅ Mounted | 13 | Task CRUD, bulk operations |
 | agency-users | ✅ Mounted | 5 | User management |
 | staff | ✅ Mounted | 3 | Tasks, notifications |
-| crm | ✅ Mounted | 34 | Companies, contacts, deals, proposals, forms |
 | settings | ✅ Mounted | 2 | Rate limit settings |
 | superadmin | ✅ Mounted | 24 | Platform governance, agencies, users, audit logs |
 | superadmin-health | ✅ Mounted | 3 | Health check endpoints |
@@ -378,7 +376,6 @@ export function mountDomainRouters(app: Express): void {
 
 **Stability Testing:** All mounted domain routers have cross-tenant protection validated by 18 auth middleware tests
 
-> **Note:** CRM routes and integrations are mounted and production-safe, but CRM is not yet a required dependency for core agency workflows. The platform operates fully without CRM enabled.
 
 ### Security Guarantees
 
@@ -632,7 +629,6 @@ server/storage/
 | Tasks & Projects | Full task hierarchy management |
 | Strategic Initiatives | AI recommendation engine |
 | Invoices | Invoice generation, automation |
-| CRM | Companies, Contacts, Deals |
 | Hours Report | Time tracking analytics |
 | Settings | Branding, AI provider, integrations |
 

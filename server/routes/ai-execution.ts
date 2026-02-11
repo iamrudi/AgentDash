@@ -1,104 +1,105 @@
 /**
  * AI Execution Router
- * 
+ *
  * AI execution tracking, usage, and cache management API.
- * 
+ *
  * Routes: 5
  */
 
 import { Router } from 'express';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { hardenedAIExecutor } from '../ai/hardened-executor';
+import { AiExecutionService } from '../application/ai/ai-execution-service';
 
 const router = Router();
+const aiExecutionService = new AiExecutionService(hardenedAIExecutor);
 
-// Get AI execution by ID
-router.get("/ai-executions/:id", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const execution = await hardenedAIExecutor.getExecutionById(id);
-    
-    if (!execution) {
-      return res.status(404).json({ message: "AI execution not found" });
+export function createAiExecutionGetHandler(service: AiExecutionService = aiExecutionService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getExecutionById(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error('Error fetching AI execution:', error);
+      return res.status(500).json({ message: 'Failed to fetch AI execution' });
     }
+  };
+}
 
-    const agencyId = req.user?.agencyId;
-    if (execution.agencyId !== agencyId && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
+router.get('/ai-executions/:id', requireAuth, createAiExecutionGetHandler());
+
+export function createAiExecutionsByWorkflowHandler(service: AiExecutionService = aiExecutionService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getExecutionsByWorkflow(req.params.id, {
+        agencyId: req.user?.agencyId,
+        isSuperAdmin: req.user?.isSuperAdmin,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error('Error fetching AI executions:', error);
+      return res.status(500).json({ message: 'Failed to fetch AI executions' });
     }
+  };
+}
 
-    res.json(execution);
-  } catch (error: any) {
-    console.error("Error fetching AI execution:", error);
-    res.status(500).json({ message: "Failed to fetch AI execution" });
-  }
-});
+router.get('/workflow-executions/:id/ai-executions', requireAuth, createAiExecutionsByWorkflowHandler());
 
-// Get AI executions by workflow execution ID
-router.get("/workflow-executions/:id/ai-executions", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const agencyId = req.user?.agencyId;
-
-    const executions = await hardenedAIExecutor.getExecutionsByWorkflow(id);
-    
-    const filteredExecutions = executions.filter(
-      exec => exec.agencyId === agencyId || req.user?.isSuperAdmin
-    );
-
-    if (executions.length > 0 && filteredExecutions.length === 0 && !req.user?.isSuperAdmin) {
-      return res.status(403).json({ message: "Access denied" });
+export function createAiUsageHandler(service: AiExecutionService = aiExecutionService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.getUsageByAgency(req.user?.agencyId, {
+        periodStart: req.query.periodStart as string | undefined,
+        periodEnd: req.query.periodEnd as string | undefined,
+      });
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error('Error fetching AI usage:', error);
+      return res.status(500).json({ message: 'Failed to fetch AI usage' });
     }
+  };
+}
 
-    res.json(filteredExecutions);
-  } catch (error: any) {
-    console.error("Error fetching AI executions:", error);
-    res.status(500).json({ message: "Failed to fetch AI executions" });
-  }
-});
+router.get('/ai-usage', requireAuth, createAiUsageHandler());
 
-// Get AI usage tracking for agency
-router.get("/ai-usage", requireAuth, async (req: AuthRequest, res) => {
-  try {
-    const agencyId = req.user?.agencyId;
-    if (!agencyId) {
-      return res.status(403).json({ message: "Agency ID required" });
+export function createAiCacheStatsHandler(service: AiExecutionService = aiExecutionService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      const result = service.getCacheStats();
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error('Error fetching AI cache stats:', error);
+      return res.status(500).json({ message: 'Failed to fetch AI cache stats' });
     }
+  };
+}
 
-    const { periodStart, periodEnd } = req.query;
-    const usage = await hardenedAIExecutor.getUsageByAgency(
-      agencyId,
-      periodStart ? new Date(periodStart as string) : undefined,
-      periodEnd ? new Date(periodEnd as string) : undefined
-    );
+router.get('/ai-cache/stats', requireAuth, requireRole('Admin'), createAiCacheStatsHandler());
 
-    res.json(usage);
-  } catch (error: any) {
-    console.error("Error fetching AI usage:", error);
-    res.status(500).json({ message: "Failed to fetch AI usage" });
-  }
-});
+export function createAiCacheClearHandler(service: AiExecutionService = aiExecutionService) {
+  return async (_req: AuthRequest, res: any) => {
+    try {
+      const result = service.clearCache();
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error('Error clearing AI cache:', error);
+      return res.status(500).json({ message: 'Failed to clear AI cache' });
+    }
+  };
+}
 
-// Get AI cache stats (admin only)
-router.get("/ai-cache/stats", requireAuth, requireRole("Admin"), async (_req: AuthRequest, res) => {
-  try {
-    const stats = hardenedAIExecutor.getCacheStats();
-    res.json(stats);
-  } catch (error: any) {
-    console.error("Error fetching AI cache stats:", error);
-    res.status(500).json({ message: "Failed to fetch AI cache stats" });
-  }
-});
-
-// Clear AI cache (admin only)
-router.delete("/ai-cache", requireAuth, requireRole("Admin"), async (_req: AuthRequest, res) => {
-  try {
-    hardenedAIExecutor.clearCache();
-    res.json({ message: "AI cache cleared" });
-  } catch (error: any) {
-    console.error("Error clearing AI cache:", error);
-    res.status(500).json({ message: "Failed to clear AI cache" });
-  }
-});
+router.delete('/ai-cache', requireAuth, requireRole('Admin'), createAiCacheClearHandler());
 
 export default router;

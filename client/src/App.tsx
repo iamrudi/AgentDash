@@ -20,7 +20,6 @@ const ClientDetail = lazy(() => import("@/pages/client-detail"));
 const StaffDashboard = lazy(() => import("@/pages/staff-dashboard"));
 const StaffSettings = lazy(() => import("@/pages/staff-settings"));
 const StaffHours = lazy(() => import("@/pages/staff-hours"));
-const EmbedForm = lazy(() => import("@/pages/forms/embed"));
 
 // Client Portal Pages (lazy-loaded)
 const Dashboard = lazy(() => import("@/pages/client/dashboard"));
@@ -81,9 +80,6 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/reset-password" component={ResetPassword} />
-      
-      {/* Public Form Embed (no auth required) */}
-      <Route path="/forms/embed/:publicId" component={EmbedForm} />
       
       {/* Client Portal - All routes wrapped in ClientLayout */}
       <Route path="/client">

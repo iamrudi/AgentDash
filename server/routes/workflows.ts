@@ -9,14 +9,15 @@
 
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, type AuthRequest } from '../middleware/supabase-auth';
+import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { storage } from '../storage';
 import { resolveAgencyContext } from '../middleware/agency-context';
 
 const workflowsRouter = Router();
+workflowsRouter.use(requireAuth, requireRole("Admin", "SuperAdmin"));
 
 // Get all workflows for agency
-workflowsRouter.get("/", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.get("/", async (req: AuthRequest, res) => {
   try {
     const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
     if (!agencyId) {
@@ -51,7 +52,7 @@ const workflowValidationSchema = z.object({
   })).optional().default([]),
 });
 
-workflowsRouter.post("/validate", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.post("/validate", async (req: AuthRequest, res) => {
   try {
     const validationResult = workflowValidationSchema.safeParse(req.body);
     
@@ -105,7 +106,7 @@ workflowsRouter.post("/validate", requireAuth, async (req: AuthRequest, res) => 
 });
 
 // Get single workflow
-workflowsRouter.get("/:id", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.get("/:id", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);
@@ -127,7 +128,7 @@ workflowsRouter.get("/:id", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Create workflow
-workflowsRouter.post("/", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.post("/", async (req: AuthRequest, res) => {
   try {
     const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
     const resolvedAgencyId = agencyId || req.user?.agencyId;
@@ -163,7 +164,7 @@ workflowsRouter.post("/", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Update workflow
-workflowsRouter.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.patch("/:id", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);
@@ -198,7 +199,7 @@ workflowsRouter.patch("/:id", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Delete workflow
-workflowsRouter.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.delete("/:id", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);
@@ -221,7 +222,7 @@ workflowsRouter.delete("/:id", requireAuth, async (req: AuthRequest, res) => {
 });
 
 // Execute workflow manually
-workflowsRouter.post("/:id/execute", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.post("/:id/execute", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);
@@ -258,7 +259,7 @@ workflowsRouter.post("/:id/execute", requireAuth, async (req: AuthRequest, res) 
 });
 
 // Get workflow executions
-workflowsRouter.get("/:id/executions", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.get("/:id/executions", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);
@@ -281,7 +282,7 @@ workflowsRouter.get("/:id/executions", requireAuth, async (req: AuthRequest, res
 });
 
 // Duplicate workflow
-workflowsRouter.post("/:id/duplicate", requireAuth, async (req: AuthRequest, res) => {
+workflowsRouter.post("/:id/duplicate", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const workflow = await storage.getWorkflowById(id);

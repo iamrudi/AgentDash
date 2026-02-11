@@ -63,7 +63,6 @@ This document maps React pages to their backend API endpoints, query keys, and s
 │  │  ├── agency-tasks.ts         (13 routes)                             │   │
 │  │  ├── agency-users.ts         (5 routes)                              │   │
 │  │  ├── staff.ts                (3 routes)                              │   │
-│  │  ├── crm.ts                  (34 routes)                             │   │
 │  │  ├── settings.ts             (2 routes)                              │   │
 │  │  ├── superadmin.ts           (24 routes)                             │   │
 │  │  ├── superadmin-health.ts    (3 routes)                              │   │

@@ -2,152 +2,116 @@ import { Router } from 'express';
 import { storage } from '../storage';
 import { requireAuth, requireRole, type AuthRequest } from '../middleware/supabase-auth';
 import { resolveAgencyContext } from '../middleware/agency-context';
-import { createClientUserSchema, createStaffAdminUserSchema } from '@shared/schema';
-import { z } from 'zod';
+import { AgencyUserService } from '../application/agency-users/agency-user-service';
 
 const router = Router();
+const agencyUserService = new AgencyUserService(storage);
+
+export function createAgencyClientUserCreateHandler(service: AgencyUserService = agencyUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
+      const result = await service.createClientUser(agencyId!, req.body, req.user?.id);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      console.error("Client creation error:", error);
+      return res.status(500).json({ message: error.message || "Client creation failed" });
+    }
+  };
+}
 
 // Create client user (Admin only)
 // POST /api/agency/clients/create-user
-router.post("/clients/create-user", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const validatedData = createClientUserSchema.parse(req.body);
-    const { email, password, fullName, companyName } = validatedData;
+router.post("/clients/create-user", requireAuth, requireRole("Admin"), createAgencyClientUserCreateHandler());
 
-    const { provisionUser } = await import("../lib/user-provisioning");
-    
-    const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
-    
-    const result = await provisionUser({
-      email,
-      password,
-      fullName,
-      role: "Client",
-      agencyId: agencyId!,
-      clientData: {
-        companyName
+export function createAgencyUsersListHandler(service: AgencyUserService = agencyUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
+      const result = await service.listUsers(agencyId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
       }
-    });
-
-    res.status(201).json({ 
-      message: "Client created successfully",
-      client: { 
-        id: result.clientId!, 
-        companyName: companyName,
-        user: { 
-          email: email,
-          fullName: fullName
-        }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
       }
-    });
-  } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        message: "Validation failed", 
-        errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
-      });
+      console.error("Get users error:", error);
+      return res.status(500).json({ message: error.message || "Failed to fetch users" });
     }
-    console.error("Client creation error:", error);
-    res.status(500).json({ message: error.message || "Client creation failed" });
-  }
-});
+  };
+}
 
 // Get all users (Admin only)
 // GET /api/agency/users
-router.get("/users", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { agencyId } = resolveAgencyContext(req, { allowQueryParam: true });
-    const users = await storage.getAllUsersWithProfiles(agencyId);
-    res.json(users);
-  } catch (error: any) {
-    if (error.status) {
-      return res.status(error.status).json({ message: error.message });
+router.get("/users", requireAuth, requireRole("Admin"), createAgencyUsersListHandler());
+
+export function createAgencyUsersRoleUpdateHandler(service: AgencyUserService = agencyUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.updateRole(req.params.userId, req.body?.role);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Update user role error:", error);
+      return res.status(500).json({ message: error.message || "Failed to update user role" });
     }
-    console.error("Get users error:", error);
-    res.status(500).json({ message: error.message || "Failed to fetch users" });
-  }
-});
+  };
+}
 
 // Update user role (Admin only)
 // PATCH /api/agency/users/:userId/role
-router.patch("/users/:userId/role", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { userId } = req.params;
-    const { role } = req.body;
+router.patch("/users/:userId/role", requireAuth, requireRole("Admin"), createAgencyUsersRoleUpdateHandler());
 
-    if (!["Client", "Staff", "Admin"].includes(role)) {
-      return res.status(400).json({ message: "Invalid role" });
+export function createAgencyUsersDeleteHandler(service: AgencyUserService = agencyUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const result = await service.deleteUser(req.user?.id, req.params.userId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      console.error("Delete user error:", error);
+      return res.status(500).json({ message: error.message || "Failed to delete user" });
     }
-
-    await storage.updateUserRole(userId, role);
-    res.json({ message: "User role updated successfully" });
-  } catch (error: any) {
-    console.error("Update user role error:", error);
-    res.status(500).json({ message: error.message || "Failed to update user role" });
-  }
-});
+  };
+}
 
 // Delete user (Admin only)
 // DELETE /api/agency/users/:userId
-router.delete("/users/:userId", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const { userId } = req.params;
-    
-    if (req.user?.id === userId) {
-      return res.status(400).json({ message: "Cannot delete your own account" });
-    }
+router.delete("/users/:userId", requireAuth, requireRole("Admin"), createAgencyUsersDeleteHandler());
 
-    const { deleteUser } = await import("../lib/supabase-auth");
-    await deleteUser(userId);
-    
-    res.json({ message: "User deleted successfully" });
-  } catch (error: any) {
-    console.error("Delete user error:", error);
-    res.status(500).json({ message: error.message || "Failed to delete user" });
-  }
-});
+export function createAgencyStaffAdminUserCreateHandler(service: AgencyUserService = agencyUserService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
+      const result = await service.createStaffOrAdminUser(agencyId!, req.body);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error, errors: result.errors });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      console.error("User creation error:", error);
+      return res.status(500).json({ message: error.message || "User creation failed" });
+    }
+  };
+}
 
 // Create staff or admin user (Admin only)
 // POST /api/agency/users/create
-router.post("/users/create", requireAuth, requireRole("Admin"), async (req: AuthRequest, res) => {
-  try {
-    const validatedData = createStaffAdminUserSchema.parse(req.body);
-    const { email, password, fullName, role } = validatedData;
-
-    const { provisionUser } = await import("../lib/user-provisioning");
-    
-    const { agencyId } = resolveAgencyContext(req, { requireBodyField: 'agencyId' });
-    
-    const result = await provisionUser({
-      email,
-      password,
-      fullName,
-      role,
-      agencyId: agencyId!
-    });
-
-    res.status(201).json({ 
-      message: `${role} user created successfully`,
-      user: { 
-        id: result.profileId,
-        email: email,
-        fullName: fullName,
-        role: role
-      }
-    });
-  } catch (error: any) {
-    if (error.status) {
-      return res.status(error.status).json({ message: error.message });
-    }
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ 
-        message: "Validation failed", 
-        errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
-      });
-    }
-    console.error("User creation error:", error);
-    res.status(500).json({ message: error.message || "User creation failed" });
-  }
-});
+router.post("/users/create", requireAuth, requireRole("Admin"), createAgencyStaffAdminUserCreateHandler());
 
 export default router;
