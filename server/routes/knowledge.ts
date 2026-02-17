@@ -47,6 +47,27 @@ knowledgeRouter.post("/categories/initialize", requireAuth, requireRole("Admin")
   }
 });
 
+knowledgeRouter.get("/counts", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user?.agencyId;
+    if (!agencyId) {
+      return res.status(400).json({ message: "Agency context required" });
+    }
+
+    const knowledge = await storage.getClientKnowledge(agencyId, { status: "active" });
+    const counts: Record<string, number> = {};
+    for (const entry of knowledge) {
+      if (entry.clientId) {
+        counts[entry.clientId] = (counts[entry.clientId] || 0) + 1;
+      }
+    }
+    res.json(counts);
+  } catch (error: any) {
+    console.error("Error getting knowledge counts:", error);
+    res.status(500).json({ message: "Failed to get knowledge counts" });
+  }
+});
+
 // Search knowledge (must be before /:id to avoid route conflicts)
 knowledgeRouter.get("/search", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
   try {
