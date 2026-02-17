@@ -23,6 +23,7 @@ import {
   Clock,
   GitBranch,
   Brain,
+  BookOpen,
 } from "lucide-react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -110,6 +111,13 @@ const menuGroups = [
         icon: Brain,
         notificationKey: null,
         description: "Operational intelligence signals, insights, and priorities",
+      },
+      {
+        title: "Client Records",
+        url: "/agency/client-records",
+        icon: BookOpen,
+        notificationKey: null,
+        description: "Browse all knowledge entries across clients",
       },
     ],
   },
