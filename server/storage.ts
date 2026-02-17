@@ -3366,13 +3366,13 @@ export class DbStorage implements IStorage {
   ): Promise<ClientKnowledge[]> {
     const conditions = [eq(clientKnowledge.agencyId, agencyId)];
     
-    if (options?.clientId) {
+    if (options?.clientId && options.clientId !== "ALL") {
       conditions.push(eq(clientKnowledge.clientId, options.clientId));
     }
-    if (options?.categoryId) {
+    if (options?.categoryId && options.categoryId !== "ALL") {
       conditions.push(eq(clientKnowledge.categoryId, options.categoryId));
     }
-    if (options?.status) {
+    if (options?.status && options.status !== "ALL") {
       conditions.push(eq(clientKnowledge.status, options.status));
     }
 
@@ -3388,13 +3388,13 @@ export class DbStorage implements IStorage {
   ): Promise<ClientKnowledge[]> {
     const conditions = [];
 
-    if (options?.clientId) {
+    if (options?.clientId && options.clientId !== "ALL") {
       conditions.push(eq(clientKnowledge.clientId, options.clientId));
     }
-    if (options?.categoryId) {
+    if (options?.categoryId && options.categoryId !== "ALL") {
       conditions.push(eq(clientKnowledge.categoryId, options.categoryId));
     }
-    if (options?.status) {
+    if (options?.status && options.status !== "ALL") {
       conditions.push(eq(clientKnowledge.status, options.status));
     }
 

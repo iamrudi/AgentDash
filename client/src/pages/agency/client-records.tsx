@@ -17,7 +17,7 @@ export default function ClientRecords() {
   const [selectedClientId, setSelectedClientId] = useState("ALL");
   const [selectedCategoryId, setSelectedCategoryId] = useState("ALL");
 
-  const { data: clients = [] } = useQuery<Client[]>({
+  const { data: clients = [], isLoading: clientsLoading } = useQuery<Client[]>({
     queryKey: ["/api/agency/clients"],
   });
 
@@ -25,9 +25,11 @@ export default function ClientRecords() {
     queryKey: ["/api/knowledge", { status: "active" }],
   });
 
-  const { data: categories = [] } = useQuery<KnowledgeCategory[]>({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<KnowledgeCategory[]>({
     queryKey: ["/api/knowledge/categories"],
   });
+
+  const isLoading = recordsLoading || clientsLoading || categoriesLoading;
 
   const getClientName = (clientId: string | null) => {
     if (!clientId) return "—";
@@ -115,7 +117,7 @@ export default function ClientRecords() {
           </div>
         </CardHeader>
         <CardContent>
-          {recordsLoading ? (
+          {isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
