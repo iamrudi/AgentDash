@@ -168,6 +168,27 @@ export async function generateAIRecommendations(
 Include competitive analysis and opportunities to outperform these competitors.`;
     }
 
+    // 14. Fetch client knowledge records for AI context
+    const [knowledgeEntries, categories] = await Promise.all([
+      storage.getClientKnowledge(client.agencyId, { clientId, status: "active" }),
+      storage.getKnowledgeCategoriesByAgencyId(client.agencyId),
+    ]);
+
+    const categoryMap = new Map(categories.map(c => [c.id, c.displayName || c.name]));
+    const knowledgeRecords: Record<string, Array<{ title: string; structuredData?: unknown; content?: string | null; confidenceScore?: string | number | null }>> = {};
+    for (const entry of knowledgeEntries) {
+      const categoryName = categoryMap.get(entry.categoryId) || "Other";
+      if (!knowledgeRecords[categoryName]) {
+        knowledgeRecords[categoryName] = [];
+      }
+      knowledgeRecords[categoryName].push({
+        title: entry.title,
+        structuredData: entry.structuredData || undefined,
+        content: entry.structuredData ? undefined : entry.content,
+        confidenceScore: entry.confidenceScore,
+      });
+    }
+
     const catalog = loadFieldCatalog(defaultFieldCatalogPath());
     const inputResult = buildAIInput(catalog, {
       client: {
@@ -187,6 +208,7 @@ Include competitive analysis and opportunities to outperform these competitors.`
         linkedin: linkedinData,
         competitors: options.competitorDomains || null,
       },
+      knowledgeRecords,
     });
 
     if (!inputResult.ok) {
@@ -204,7 +226,10 @@ Include competitive analysis and opportunities to outperform these competitors.`
     } as const;
 
     const presetMeta = presetConfig[options.preset];
-    const systemPrompt = `You are an expert digital marketing strategist analyzing client performance data.\n\nANALYSIS TYPE: ${options.preset.toUpperCase().replace("-", " ")}\nFOCUS: ${presetMeta.focus}\n\nGenerate strategic recommendations that are:\n- Data-driven and specific\n- Actionable with clear next steps\n- Prioritized by impact\n- Include estimated costs where applicable\n- Aligned with the ${options.preset} preset requirements\n\nFor each recommendation, provide:\n1. A concise title (max 60 characters)\n2. A summary observation (1-2 sentences overview)\n3. Structured observation insights - key data points as an array of objects with:\n   - label: the metric or insight name (e.g., \"Current CTR\", \"Sessions Lost\", \"Opportunity\")\n   - value: the specific value or finding\n   - context (optional): brief explanation if needed\n4. A summary of the proposed action (1-2 sentences)\n5. Action tasks - specific, actionable steps (${presetMeta.taskComplexity})\n6. Impact level (High/Medium/Low)\n7. Estimated cost in USD (or 0 if no cost)\n8. The metric that triggered this recommendation\n9. Baseline value of that metric\n\nThe observationInsights should contain 2-4 key data points that support your recommendation.\n\nPRESET REQUIREMENTS:\n- Focus areas: ${presetMeta.areas.join(", ")}\n- Number of recommendations: ${presetMeta.count}\n- Implementation timeframe: ${presetMeta.timeframe}\n\nRespond with a JSON array of recommendations.`;
+    const knowledgeInstructions = Object.keys(knowledgeRecords).length > 0
+      ? `\n\nIMPORTANT - CLIENT KNOWLEDGE RECORDS:\nThe input data includes 'knowledgeRecords' grouped by category (e.g. KPI Targets, Business Goals, Business Constraints, Competitive Landscape, Industry Context, Brand Voice).\nYou MUST:\n- Align recommendations with the client's stated KPI targets and business goals\n- Respect any business constraints (budget limits, regulatory requirements)\n- Reference competitive positioning and industry trends in your reasoning\n- Use specific numeric targets from structuredData fields for precision\n- Reference specific client records in your observations (e.g. 'KPI: Monthly Organic Traffic Target — 25,000 sessions')`
+      : "";
+    const systemPrompt = `You are an expert digital marketing strategist analyzing client performance data.\n\nANALYSIS TYPE: ${options.preset.toUpperCase().replace("-", " ")}\nFOCUS: ${presetMeta.focus}\n\nGenerate strategic recommendations that are:\n- Data-driven and specific\n- Actionable with clear next steps\n- Prioritized by impact\n- Include estimated costs where applicable\n- Aligned with the ${options.preset} preset requirements\n\nFor each recommendation, provide:\n1. A concise title (max 60 characters)\n2. A summary observation (1-2 sentences overview)\n3. Structured observation insights - key data points as an array of objects with:\n   - label: the metric or insight name (e.g., \"Current CTR\", \"Sessions Lost\", \"Opportunity\")\n   - value: the specific value or finding\n   - context (optional): brief explanation if needed\n4. A summary of the proposed action (1-2 sentences)\n5. Action tasks - specific, actionable steps (${presetMeta.taskComplexity})\n6. Impact level (High/Medium/Low)\n7. Estimated cost in USD (or 0 if no cost)\n8. The metric that triggered this recommendation\n9. Baseline value of that metric\n\nThe observationInsights should contain 2-4 key data points that support your recommendation.\n\nPRESET REQUIREMENTS:\n- Focus areas: ${presetMeta.areas.join(", ")}\n- Number of recommendations: ${presetMeta.count}\n- Implementation timeframe: ${presetMeta.timeframe}${knowledgeInstructions}\n\nRespond with a JSON array of recommendations.`;
 
     const prompt = `${systemPrompt}\n\nINPUT DATA (schema-validated):\n${JSON.stringify(inputResult.aiInput, null, 2)}`;
 
