@@ -95,6 +95,15 @@ export function buildAIInput(
       ).optional().default([]),
     }).optional().default({ ga4: [], gsc: [] }),
     objectives: z.array(z.string()).optional().default([]),
+    knowledgeRecords: z.record(
+      z.string(),
+      z.array(z.object({
+        title: z.string(),
+        structuredData: z.any().optional().nullable(),
+        content: z.string().optional().nullable(),
+        confidenceScore: z.union([z.string(), z.number()]).optional().nullable(),
+      }))
+    ).optional().default({}),
   });
 
   const validation = schema.safeParse(exposed);

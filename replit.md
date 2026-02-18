@@ -117,5 +117,6 @@ The UI consists of four distinct portals:
 
 - `account_manager_profile_id` column added to `clients` table (was in Drizzle schema but missing from DB)
 - `embedding_max_tokens` column added to `agency_settings` table (was in Drizzle schema but missing from DB)
+- `embedding_token_limit`, `embedding_token_used`, `embedding_request_limit`, `embedding_request_used` columns added to `agency_quotas` table (were in Drizzle schema but missing from DB)
 - `request_type` column added to `ai_usage_tracking` table (was in Drizzle schema but missing from DB)
 - `embedding_token_limit`, `embedding_token_used`, `embedding_request_limit`, `embedding_request_used`, `ai_request_limit`, `ai_request_used` columns added to `agency_settings` table (were in Drizzle schema but missing from DB)

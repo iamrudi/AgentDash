@@ -32,6 +32,26 @@ export class OpportunityService {
       return { ok: false, error: "Client not found" };
     }
 
+    const [knowledgeEntries, categories] = await Promise.all([
+      this.storage.getClientKnowledge(client.agencyId, { clientId, status: "active" }),
+      this.storage.getKnowledgeCategoriesByAgencyId(client.agencyId),
+    ]);
+
+    const categoryMap = new Map(categories.map(c => [c.id, c.displayName || c.name]));
+    const knowledgeRecords: Record<string, Array<{ title: string; structuredData?: unknown; content?: string | null; confidenceScore?: string | number | null }>> = {};
+    for (const entry of knowledgeEntries) {
+      const categoryName = categoryMap.get(entry.categoryId) || "Other";
+      if (!knowledgeRecords[categoryName]) {
+        knowledgeRecords[categoryName] = [];
+      }
+      knowledgeRecords[categoryName].push({
+        title: entry.title,
+        structuredData: entry.structuredData || undefined,
+        content: entry.structuredData ? undefined : entry.content,
+        confidenceScore: entry.confidenceScore,
+      });
+    }
+
     const ga4 = metrics
       .filter((m) => (m.sessions || 0) > 0 || (m.conversions || 0) > 0 || (m.clicks || 0) > 0 || (m.impressions || 0) > 0 || (m.spend && parseFloat(m.spend) > 0))
       .map((m) => ({
@@ -56,7 +76,8 @@ export class OpportunityService {
     const clientRecord = {
       client,
       metrics: { ga4, gsc },
-      objectives: objectives.map((obj) => obj.title || obj.description || "").filter(Boolean),
+      objectives: objectives.map((obj) => (obj as any).title || obj.description || "").filter(Boolean),
+      knowledgeRecords,
     } as Record<string, unknown>;
 
     const catalog = loadFieldCatalog(defaultFieldCatalogPath());
@@ -90,9 +111,16 @@ export class OpportunityService {
       "- reasoning (string)",
       "- assumptions (array of strings)",
       "- confidence (high|med|low)",
-      "- evidence_refs (array of strings referencing signals/metrics)",
+      "- evidence_refs (array of strings referencing signals/metrics/client records)",
       "- risks (array of strings)",
       "- suggested_success_criteria (array of strings)",
+      "",
+      "IMPORTANT: The context includes 'knowledgeRecords' grouped by category (KPI Targets, Business Goals, Business Constraints, Competitive Landscape, Industry Context, Brand Voice).",
+      "You MUST align your opportunity with the client's stated KPI targets and business goals.",
+      "You MUST respect any business constraints (budget limits, regulatory requirements).",
+      "You SHOULD reference competitive positioning and industry trends to strengthen your reasoning.",
+      "Use structuredData fields (numeric targets, deadlines, success criteria) for precision rather than vague statements.",
+      "Reference specific client records in your evidence_refs (e.g. 'KPI: Monthly Organic Traffic Target — 25,000 sessions').",
       "",
       "Client Context:",
       JSON.stringify(inputResult.data, null, 2),
