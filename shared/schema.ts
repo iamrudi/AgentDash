@@ -1148,7 +1148,7 @@ export const agencyQuotas = pgTable("agency_quotas", {
   embeddingTokenUsed: integer("embedding_token_used").notNull().default(0),
   embeddingRequestLimit: integer("embedding_request_limit").notNull().default(50000),
   embeddingRequestUsed: integer("embedding_request_used").notNull().default(0),
-  storageLimit: integer("storage_limit").notNull().default(5368709120),
+  storageLimit: integer("storage_limit").notNull().default(2000000000),
   storageUsed: integer("storage_used").notNull().default(0),
   seatLimit: integer("seat_limit").notNull().default(10),
   seatsUsed: integer("seats_used").notNull().default(0),
