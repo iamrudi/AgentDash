@@ -84,6 +84,23 @@ The UI consists of four distinct portals:
 | Client (existing) | `32e126d0-d59b-4d91-89cb-0f293f4ec71a` | MMagency.co.uk |
 | Client (test/mock) | `f1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c` | TechFlow Solutions |
 
+### Test Client: MMagency.co.uk
+
+**Company:** MMagency.co.uk — Full-service digital marketing agency, SEO/PPC/social/content for UK SME & mid-market B2B
+**Business Context:** 12 active clients, 8 staff, £720K revenue targeting £1M, HubSpot CRM, strong referral pipeline
+**Retainer:** £5,000/month, 60 hours
+
+#### Seeded Client Records (16 total across 6 categories)
+
+| Category | Count | Example Titles |
+|----------|-------|----------------|
+| KPI Targets | 5 | Monthly Website Traffic Target, Lead Conversion Rate Target, Monthly Qualified Leads Target, Cost Per Acquisition Target, Annual Revenue Growth Target |
+| Business Goals | 3 | Launch Productised SEO Packages, Expand into Paid Social Management, Win 5 New Retainer Clients |
+| Brand Voice | 2 | Core Brand Voice Guidelines, Content Pillar Strategy |
+| Competitive Landscape | 2 | Primary Competitor: Impression Digital, Secondary Competitor: Embryo Digital |
+| Industry Context | 2 | UK Digital Marketing Industry Trends, SME Digital Maturity Shift |
+| Business Constraints | 2 | Marketing Budget Constraint (£3K/mo), Team Capacity Constraint (85% utilisation) |
+
 ### Test Client: TechFlow Solutions
 
 **Company:** TechFlow Solutions — B2B SaaS workflow automation for mid-market enterprises
