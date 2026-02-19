@@ -789,6 +789,7 @@ export class DbStorage implements IStorage {
           status: projects.status,
           description: projects.description,
           clientId: projects.clientId,
+          workflowExecutionId: projects.workflowExecutionId,
           createdAt: projects.createdAt,
         })
         .from(projects)
@@ -974,6 +975,9 @@ export class DbStorage implements IStorage {
           triggerMetric: initiatives.triggerMetric,
           baselineValue: initiatives.baselineValue,
           startDate: initiatives.startDate,
+          projectId: initiatives.projectId,
+          opportunityArtifactId: initiatives.opportunityArtifactId,
+          invoiceId: initiatives.invoiceId,
           implementationDate: initiatives.implementationDate,
           measuredImprovement: initiatives.measuredImprovement,
           lastEditedAt: initiatives.lastEditedAt,
@@ -2040,9 +2044,11 @@ export class DbStorage implements IStorage {
       .select({
         id: profiles.id,
         fullName: profiles.fullName,
+        email: profiles.email,
         role: profiles.role,
         isSuperAdmin: profiles.isSuperAdmin,
         agencyId: profiles.agencyId,
+        skills: profiles.skills,
         createdAt: profiles.createdAt,
         agencyName: agencies.name,
         clientId: clients.id,
@@ -2067,6 +2073,7 @@ export class DbStorage implements IStorage {
         id: clients.id,
         companyName: clients.companyName,
         profileId: clients.profileId,
+        accountManagerProfileId: clients.accountManagerProfileId,
         agencyId: clients.agencyId,
         businessContext: clients.businessContext,
         retainerAmount: clients.retainerAmount,

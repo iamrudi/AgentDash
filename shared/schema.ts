@@ -3168,7 +3168,7 @@ export const skuCompositions = pgTable("sku_compositions", {
   frozenAt: timestamp("frozen_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  initiativeIdIdx: index("sku_compositions_initiative_id_idx").on(table.initiativeId),
+  initiativeIdIdx: uniqueIndex("sku_compositions_initiative_id_idx").on(table.initiativeId),
 }));
 
 export const executionOutputs = pgTable("execution_outputs", {

@@ -10,6 +10,30 @@ const router = Router();
 
 const skuSchema = SkuCompositionRequestSchema;
 
+export function createSkuGetHandler(service: SkuCompositionService) {
+  return async (req: AuthRequest, res: any) => {
+    try {
+      const { initiativeId } = req.params;
+      const ctx = getRequestContext(req);
+      const result = await service.getComposition(ctx, initiativeId);
+      if (!result.ok) {
+        return res.status(result.status).json({ message: result.error });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message });
+    }
+  };
+}
+
+router.get(
+  "/sku-compositions/:initiativeId",
+  requireAuth,
+  requireRole("Admin"),
+  requireInitiativeAccess(storage),
+  createSkuGetHandler(new SkuCompositionService(storage))
+);
+
 export function createSkuCompositionHandler(service: SkuCompositionService) {
   return async (req: AuthRequest, res: any) => {
     try {
