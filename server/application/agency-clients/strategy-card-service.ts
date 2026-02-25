@@ -87,13 +87,9 @@ export class StrategyCardService {
       outputSchema
     );
 
-    if (!chatAnalysisResult.success) {
-      return {
-        ok: false,
-        status: 500,
-        error: chatAnalysisResult.error || "Failed to analyze chat history",
-      };
-    }
+    const chatAnalysis = chatAnalysisResult.success
+      ? chatAnalysisResult.data
+      : { painPoints: [], recentWins: [], activeQuestions: [] };
 
     return {
       ok: true,
@@ -102,8 +98,9 @@ export class StrategyCardService {
         businessContext: client.businessContext,
         clientObjectives: objectives,
         summaryKpis,
-        chatAnalysis: chatAnalysisResult.data,
+        chatAnalysis,
         knowledgeRecords: knowledgeByCategory,
+        aiUnavailable: !chatAnalysisResult.success,
       },
     };
   }
