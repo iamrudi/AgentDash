@@ -168,6 +168,27 @@ export async function generateAIRecommendations(
 Include competitive analysis and opportunities to outperform these competitors.`;
     }
 
+    // 14. Fetch client knowledge records for AI context
+    const [knowledgeEntries, categories] = await Promise.all([
+      storage.getClientKnowledge(client.agencyId, { clientId, status: "active" }),
+      storage.getKnowledgeCategoriesByAgencyId(client.agencyId),
+    ]);
+
+    const categoryMap = new Map(categories.map(c => [c.id, c.displayName || c.name]));
+    const knowledgeRecords: Record<string, Array<{ title: string; structuredData?: unknown; content?: string | null; confidenceScore?: string | number | null }>> = {};
+    for (const entry of knowledgeEntries) {
+      const categoryName = categoryMap.get(entry.categoryId) || "Other";
+      if (!knowledgeRecords[categoryName]) {
+        knowledgeRecords[categoryName] = [];
+      }
+      knowledgeRecords[categoryName].push({
+        title: entry.title,
+        structuredData: entry.structuredData || undefined,
+        content: entry.structuredData ? undefined : entry.content,
+        confidenceScore: entry.confidenceScore,
+      });
+    }
+
     const catalog = loadFieldCatalog(defaultFieldCatalogPath());
     const inputResult = buildAIInput(catalog, {
       client: {
@@ -187,6 +208,7 @@ Include competitive analysis and opportunities to outperform these competitors.`
         linkedin: linkedinData,
         competitors: options.competitorDomains || null,
       },
+      knowledgeRecords,
     });
 
     if (!inputResult.ok) {
@@ -198,13 +220,95 @@ Include competitive analysis and opportunities to outperform these competitors.`
     }
 
     const presetConfig = {
-      "quick-wins": { focus: "Quick wins", areas: ["Conversion rate optimization", "Paid search efficiencies", "Landing page improvements"], count: 3, taskComplexity: "Quick, low-lift actions", timeframe: "Immediate to 2 weeks" },
-      "strategic-growth": { focus: "Strategic growth", areas: ["Pipeline growth", "Brand demand", "Retention improvements"], count: 4, taskComplexity: "Mid-term initiatives with clear owners", timeframe: "1-3 months" },
-      "full-audit": { focus: "Full audit", areas: ["Acquisition", "Conversion", "Retention"], count: 5, taskComplexity: "Mix of quick wins and strategic initiatives", timeframe: "Immediate to 3+ months" },
+      "quick-wins": {
+        focus: "Quick wins across multiple marketing channels",
+        areas: ["Conversion rate optimisation", "Paid search efficiencies", "Content quick wins", "Email / CRM engagement", "Social media engagement"],
+        count: 3,
+        taskComplexity: "Quick, low-lift actions",
+        timeframe: "Immediate to 2 weeks",
+      },
+      "strategic-growth": {
+        focus: "Strategic growth spanning brand, demand generation, and customer lifecycle",
+        areas: ["Pipeline & demand generation", "Brand positioning & thought leadership", "Content strategy & SEO", "Customer retention & upsell", "Paid media diversification", "CRM & email automation"],
+        count: 4,
+        taskComplexity: "Mid-term initiatives with clear owners",
+        timeframe: "1-3 months",
+      },
+      "full-audit": {
+        focus: "Full multi-channel audit covering the entire marketing mix",
+        areas: ["Organic search & technical SEO", "Paid media (PPC, social ads)", "Content marketing & thought leadership", "Email marketing & CRM nurture", "Social media & community", "Conversion rate optimisation", "Analytics & measurement gaps"],
+        count: 5,
+        taskComplexity: "Mix of quick wins and strategic initiatives",
+        timeframe: "Immediate to 3+ months",
+      },
     } as const;
 
     const presetMeta = presetConfig[options.preset];
-    const systemPrompt = `You are an expert digital marketing strategist analyzing client performance data.\n\nANALYSIS TYPE: ${options.preset.toUpperCase().replace("-", " ")}\nFOCUS: ${presetMeta.focus}\n\nGenerate strategic recommendations that are:\n- Data-driven and specific\n- Actionable with clear next steps\n- Prioritized by impact\n- Include estimated costs where applicable\n- Aligned with the ${options.preset} preset requirements\n\nFor each recommendation, provide:\n1. A concise title (max 60 characters)\n2. A summary observation (1-2 sentences overview)\n3. Structured observation insights - key data points as an array of objects with:\n   - label: the metric or insight name (e.g., \"Current CTR\", \"Sessions Lost\", \"Opportunity\")\n   - value: the specific value or finding\n   - context (optional): brief explanation if needed\n4. A summary of the proposed action (1-2 sentences)\n5. Action tasks - specific, actionable steps (${presetMeta.taskComplexity})\n6. Impact level (High/Medium/Low)\n7. Estimated cost in USD (or 0 if no cost)\n8. The metric that triggered this recommendation\n9. Baseline value of that metric\n\nThe observationInsights should contain 2-4 key data points that support your recommendation.\n\nPRESET REQUIREMENTS:\n- Focus areas: ${presetMeta.areas.join(", ")}\n- Number of recommendations: ${presetMeta.count}\n- Implementation timeframe: ${presetMeta.timeframe}\n\nRespond with a JSON array of recommendations.`;
+
+    const availableDataSources: string[] = [];
+    if (formattedGA4.length > 0) availableDataSources.push("Google Analytics 4 (GA4) — website traffic, sessions, conversions, paid channel performance");
+    if (formattedGSC.length > 0) availableDataSources.push("Google Search Console (GSC) — organic search clicks, impressions, average position");
+    if (hubspotData) availableDataSources.push("HubSpot CRM — contacts, deals, pipeline data");
+    if (linkedinData) availableDataSources.push("LinkedIn — follower growth, post engagement, company page performance");
+    if (Object.keys(knowledgeRecords).length > 0) availableDataSources.push("Client Knowledge Records — KPIs, business goals, brand voice, competitive landscape, constraints");
+
+    const dataSourceContext = availableDataSources.length > 0
+      ? `\n\nAVAILABLE DATA SOURCES:\n${availableDataSources.map(s => `- ${s}`).join("\n")}\n\nUse evidence from ALL available data sources, not just one. Where data is limited for a channel, use the client's business context, knowledge records, and industry best practices to form recommendations.`
+      : "";
+
+    const knowledgeInstructions = Object.keys(knowledgeRecords).length > 0
+      ? `\n\nCLIENT KNOWLEDGE RECORDS (HIGH PRIORITY):\nThe input data includes 'knowledgeRecords' grouped by category (e.g. KPI Targets, Business Goals, Business Constraints, Competitive Landscape, Industry Context, Brand Voice).\nThese records are the client's strategic foundation. You MUST:\n- Use Business Goals as the PRIMARY driver for recommendation themes — each recommendation should connect back to a stated goal\n- Align recommendations with KPI Targets — reference specific numeric targets\n- Respect Business Constraints (budget limits, capacity, compliance) — do not recommend actions that violate them\n- Leverage Competitive Landscape to identify differentiation opportunities\n- Incorporate Industry Context to make recommendations forward-looking\n- Reflect Brand Voice guidelines in how actions are framed\n- Reference specific records by name (e.g. 'Business Goal: Launch Productised SEO Packages', 'KPI: Monthly Qualified Leads Target — 50')`
+      : "";
+
+    const systemPrompt = `You are a senior digital marketing strategist providing actionable, multi-channel recommendations for an agency's client.
+
+ANALYSIS TYPE: ${options.preset.toUpperCase().replace("-", " ")}
+FOCUS: ${presetMeta.focus}
+
+CRITICAL RULE — CHANNEL DIVERSITY:
+Your ${presetMeta.count} recommendations MUST span at least 3 different marketing channels or disciplines. Do NOT cluster all recommendations in a single area (e.g. do not produce 5 SEO recommendations). Spread recommendations across channels such as:
+- Organic search / SEO
+- Paid media (PPC, paid social)
+- Content marketing & thought leadership
+- Email marketing & marketing automation
+- CRM & sales enablement
+- Social media & community building
+- Conversion rate optimisation & UX
+- Analytics, measurement & reporting
+- Brand strategy & positioning
+
+If the available data is weighted toward one channel (e.g. mostly search data), still diversify:
+- Use the client's business goals, constraints, and competitive landscape to infer opportunities in other channels
+- Recommend improvements to under-represented channels where gaps are apparent
+- Connect data-rich channel insights to actions in data-sparse channels (e.g. search intent data informing content or email strategy)
+
+Generate strategic recommendations that are:
+- Data-driven where data exists, insight-driven where it does not
+- Actionable with clear, specific next steps
+- Prioritised by business impact (revenue, pipeline, efficiency)
+- Inclusive of estimated costs where applicable
+- Directly tied to the client's stated business goals and KPIs
+${dataSourceContext}
+For each recommendation, provide:
+1. A concise title (max 60 characters)
+2. A summary observation (1-2 sentences stating the problem or opportunity)
+3. Structured observation insights — 2-4 key data points as an array of objects with:
+   - label: the metric or insight name (e.g. "Current CTR", "Pipeline Gap", "Email Open Rate", "Competitor Advantage")
+   - value: the specific value or finding
+   - context (optional): brief explanation if needed
+4. A summary of the proposed action (1-2 sentences)
+5. Action tasks — specific, actionable steps (${presetMeta.taskComplexity})
+6. Impact level (High/Medium/Low)
+7. Estimated cost in USD (or 0 if no cost)
+8. The metric that triggered this recommendation
+9. Baseline value of that metric
+
+PRESET REQUIREMENTS:
+- Focus areas: ${presetMeta.areas.join(", ")}
+- Number of recommendations: ${presetMeta.count}
+- Implementation timeframe: ${presetMeta.timeframe}${knowledgeInstructions}
+
+Respond with a JSON array of recommendations.`;
 
     const prompt = `${systemPrompt}\n\nINPUT DATA (schema-validated):\n${JSON.stringify(inputResult.aiInput, null, 2)}`;
 

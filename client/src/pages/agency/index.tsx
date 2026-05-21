@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Building2, FolderKanban, MessageSquare, TrendingUp, Sparkles, MousePointer, Eye, DollarSign, AlertCircle } from "lucide-react";
-import { Project, Client, Initiative, ClientMessage } from "@shared/schema";
+import { Building2, FolderKanban, MessageSquare, TrendingUp, Sparkles, MousePointer, Eye, DollarSign, AlertCircle, BookOpen } from "lucide-react";
+import { Project, Client, Initiative, ClientMessage, ClientKnowledge } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "wouter";
 import { MetricsChart } from "@/components/dashboard/metrics-chart";
 import { DailyMetric } from "@shared/schema";
 import { ClientFilter } from "@/components/client-filter";
@@ -70,6 +72,10 @@ export default function AgencyDashboard() {
     queryKey: ["/api/agency/messages"],
   });
 
+  const { data: knowledgeEntries } = useQuery<ClientKnowledge[]>({
+    queryKey: ["/api/knowledge", { status: "active" }],
+  });
+
   const { data: metrics } = useQuery<DailyMetric[]>({
     queryKey: ["/api/agency/metrics"],
   });
@@ -118,6 +124,11 @@ export default function AgencyDashboard() {
   const totalClients = clients?.length || 0;
   const newRecommendations = filteredRecommendations?.filter(r => r.status === "New").length || 0;
   const unreadMessages = filteredMessages?.filter(m => m.isRead === "false" && m.senderRole === "Client").length || 0;
+  const totalClientRecords = knowledgeEntries?.length || 0;
+  const recentRecords = knowledgeEntries
+    ?.slice()
+    .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 5) || [];
   const recentMetrics = filteredMetrics?.slice(0, 30) || [];
   const totalRevenue = recentMetrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0);
 
@@ -196,7 +207,7 @@ export default function AgencyDashboard() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -257,6 +268,22 @@ export default function AgencyDashboard() {
             <CardContent>
               <div className="text-3xl font-bold font-mono" data-testid="text-new-recommendations">
                 {newRecommendations}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Client Records
+                </CardTitle>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold font-mono" data-testid="text-client-records">
+                {totalClientRecords}
               </div>
             </CardContent>
           </Card>
@@ -473,6 +500,61 @@ export default function AgencyDashboard() {
             </>
           )}
         </div>
+
+        {/* Recent Client Records */}
+        {recentRecords.length > 0 && (
+          <Card data-testid="card-recent-client-records">
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Recent Client Records</CardTitle>
+                  <CardDescription>Latest knowledge entries across all clients</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentRecords.map((record) => {
+                    const client = clients?.find(c => c.id === record.clientId);
+                    return (
+                      <TableRow key={record.id} data-testid={`row-record-${record.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-record-title-${record.id}`}>{record.title}</TableCell>
+                        <TableCell data-testid={`text-record-client-${record.id}`}>{client?.companyName || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" data-testid={`badge-status-${record.id}`}>
+                            {record.status || "active"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell data-testid={`text-record-date-${record.id}`}>
+                          {record.createdAt ? format(new Date(record.createdAt), "MMM d, yyyy") : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {record.clientId && (
+                            <Link href={`/agency/clients/${record.clientId}?tab=client-record`} data-testid={`link-view-record-${record.id}`}>
+                              <Button variant="ghost" size="sm" data-testid={`button-view-record-${record.id}`}>
+                                View
+                              </Button>
+                            </Link>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* AI Chat Modal */}

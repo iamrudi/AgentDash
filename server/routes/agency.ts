@@ -262,6 +262,7 @@ export function createAgencyInitiativesHandler(service: AgencyReadService = agen
 }
 
 router.get('/initiatives', requireAuth, requireRole('Admin'), createAgencyInitiativesHandler());
+router.get('/recommendations', requireAuth, requireRole('Admin'), createAgencyInitiativesHandler());
 
 export function createAgencyIntegrationsHandler(service: AgencyReadService = agencyReadService) {
   return async (req: AuthRequest, res: any) => {

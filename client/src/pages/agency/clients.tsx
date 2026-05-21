@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Client, createClientUserSchema, type CreateClientUser } from "@shared/schema";
-import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink, Sparkles } from "lucide-react";
+import { Building2, Plus, Search, LayoutGrid, List, CheckCircle2, XCircle, ExternalLink, Sparkles, BookOpen } from "lucide-react";
 import { ClientFilter } from "@/components/client-filter";
 import { useState } from "react";
 import { getAuthUser } from "@/lib/auth";
@@ -77,13 +77,17 @@ export default function AgencyClientsPage() {
     },
   });
 
-  const { data: clients } = useQuery<EnrichedClient[]>({
+  const { data: clients, isLoading: clientsLoading } = useQuery<EnrichedClient[]>({
     queryKey: ["/api/agency/clients"],
   });
   
   const { data: agencies, isLoading: agenciesLoading } = useQuery<Agency[]>({
     queryKey: ["/api/superadmin/agencies"],
     enabled: isSuperAdmin,
+  });
+
+  const { data: knowledgeCounts } = useQuery<Record<string, number>>({
+    queryKey: ["/api/knowledge/counts"],
   });
 
   const createClientMutation = useMutation({
@@ -362,7 +366,28 @@ export default function AgencyClientsPage() {
           </div>
         </div>
 
-        {!filteredClients || filteredClients.length === 0 ? (
+        {clientsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-5 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="h-12 w-12 rounded-full bg-muted animate-pulse shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-5 w-3/4 bg-muted animate-pulse rounded" />
+                      <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="h-6 w-20 bg-muted animate-pulse rounded-full" />
+                    <div className="h-6 w-24 bg-muted animate-pulse rounded-full" />
+                  </div>
+                  <div className="h-8 w-full bg-muted animate-pulse rounded" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : !filteredClients || filteredClients.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -463,6 +488,28 @@ export default function AgencyClientsPage() {
                     <div className="flex items-center gap-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
+                          <Link href={`/agency/clients/${client.id}?tab=client-record`} data-testid={`link-client-record-${client.id}`}>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="relative"
+                              data-testid={`button-client-record-${client.id}`}
+                            >
+                              <BookOpen className="h-4 w-4" />
+                              {knowledgeCounts && knowledgeCounts[client.id] > 0 && (
+                                <Badge variant="secondary" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none" data-testid={`badge-record-count-${client.id}`}>
+                                  {knowledgeCounts[client.id]}
+                                </Badge>
+                              )}
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Client Record{knowledgeCounts && knowledgeCounts[client.id] ? ` (${knowledgeCounts[client.id]})` : ""}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button 
                             variant="ghost" 
                             size="icon"
@@ -545,6 +592,28 @@ export default function AgencyClientsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link href={`/agency/clients/${client.id}?tab=client-record`} data-testid={`link-client-record-table-${client.id}`}>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="relative"
+                                data-testid={`button-client-record-table-${client.id}`}
+                              >
+                                <BookOpen className="h-4 w-4" />
+                                {knowledgeCounts && knowledgeCounts[client.id] > 0 && (
+                                  <Badge variant="secondary" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px] leading-none" data-testid={`badge-record-count-table-${client.id}`}>
+                                    {knowledgeCounts[client.id]}
+                                  </Badge>
+                                )}
+                              </Button>
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Client Record{knowledgeCounts && knowledgeCounts[client.id] ? ` (${knowledgeCounts[client.id]})` : ""}
+                          </TooltipContent>
+                        </Tooltip>
                         <Button 
                           variant="ghost" 
                           size="icon"

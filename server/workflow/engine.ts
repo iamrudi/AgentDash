@@ -989,8 +989,9 @@ export class WorkflowEngine {
       return null;
     }
 
-    if (!workflow.enabled) {
-      console.log(`Workflow ${workflowId} is disabled, skipping execution for signal ${signalId}`);
+    const isActive = workflow.status === "active";
+    if (!isActive) {
+      console.log(`Workflow ${workflowId} has status '${workflow.status}', skipping execution for signal ${signalId}`);
       return null;
     }
 

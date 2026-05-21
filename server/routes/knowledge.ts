@@ -17,12 +17,17 @@ const knowledgeRouter = Router();
 knowledgeRouter.get("/categories", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
   try {
     const agencyId = req.user?.agencyId;
-    if (!agencyId) {
+    if (!agencyId && req.user?.role !== "SuperAdmin") {
       return res.status(400).json({ message: "Agency context required" });
     }
 
+    if (!agencyId && req.user?.role === "SuperAdmin") {
+      const categories = await storage.getAllKnowledgeCategories();
+      return res.json(categories);
+    }
+
     const { knowledgeIngestionService } = await import("../intelligence/knowledge-ingestion-service");
-    const categories = await knowledgeIngestionService.getCategories(agencyId);
+    const categories = await knowledgeIngestionService.getCategories(agencyId!);
     res.json(categories);
   } catch (error: any) {
     console.error("Error getting knowledge categories:", error);
@@ -44,6 +49,29 @@ knowledgeRouter.post("/categories/initialize", requireAuth, requireRole("Admin")
   } catch (error: any) {
     console.error("Error initializing knowledge categories:", error);
     res.status(500).json({ message: "Failed to initialize knowledge categories" });
+  }
+});
+
+knowledgeRouter.get("/counts", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
+  try {
+    const agencyId = req.user?.agencyId;
+    if (!agencyId && req.user?.role !== "SuperAdmin") {
+      return res.status(400).json({ message: "Agency context required" });
+    }
+
+    const knowledge = agencyId
+      ? await storage.getClientKnowledge(agencyId, { status: "active" })
+      : await storage.getAllClientKnowledge({ status: "active" });
+    const counts: Record<string, number> = {};
+    for (const entry of knowledge) {
+      if (entry.clientId) {
+        counts[entry.clientId] = (counts[entry.clientId] || 0) + 1;
+      }
+    }
+    res.json(counts);
+  } catch (error: any) {
+    console.error("Error getting knowledge counts:", error);
+    res.status(500).json({ message: "Failed to get knowledge counts" });
   }
 });
 
@@ -114,12 +142,21 @@ knowledgeRouter.post("/", requireAuth, requireRole("Admin", "SuperAdmin"), async
 knowledgeRouter.get("/", requireAuth, requireRole("Admin", "SuperAdmin"), async (req: AuthRequest, res) => {
   try {
     const agencyId = req.user?.agencyId;
-    if (!agencyId) {
+    if (!agencyId && req.user?.role !== "SuperAdmin") {
       return res.status(400).json({ message: "Agency context required" });
     }
 
+    if (!agencyId && req.user?.role === "SuperAdmin") {
+      const allKnowledge = await storage.getAllClientKnowledge({
+        clientId: req.query.clientId as string,
+        categoryId: req.query.categoryId as string,
+        status: req.query.status as string,
+      });
+      return res.json(allKnowledge);
+    }
+
     const { knowledgeIngestionService } = await import("../intelligence/knowledge-ingestion-service");
-    const knowledge = await knowledgeIngestionService.getKnowledge(agencyId, {
+    const knowledge = await knowledgeIngestionService.getKnowledge(agencyId!, {
       clientId: req.query.clientId as string,
       categoryId: req.query.categoryId as string,
       status: req.query.status as string,

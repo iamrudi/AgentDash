@@ -24,6 +24,7 @@ interface StrategyCardData {
     recentWins: string[];
     activeQuestions: string[];
   };
+  aiUnavailable?: boolean;
 }
 
 export function ClientStrategyCard({ clientId }: { clientId: string }) {
@@ -38,11 +39,7 @@ export function ClientStrategyCard({ clientId }: { clientId: string }) {
 
   const updateBusinessContext = useMutation({
     mutationFn: async (context: string) => {
-      return await apiRequest(`/api/agency/clients/${clientId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ businessContext: context }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PATCH", `/api/agency/clients/${clientId}`, { businessContext: context });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/agency/clients', clientId, 'strategy-card'] });
@@ -125,6 +122,11 @@ export function ClientStrategyCard({ clientId }: { clientId: string }) {
         {/* Column 2: AI-Analyzed Chat Insights */}
         <div className="space-y-4">
           <h4 className="font-semibold">Recent Conversation Insights</h4>
+          {data?.aiUnavailable && (
+            <p className="text-xs text-muted-foreground italic" data-testid="ai-unavailable-notice">
+              AI analysis unavailable — connect an AI provider to enable conversation insights.
+            </p>
+          )}
           <div className="space-y-3" data-testid="chat-insights">
             {data?.chatAnalysis.painPoints.length ? (
               <div data-testid="pain-points">

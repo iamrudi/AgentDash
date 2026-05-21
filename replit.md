@@ -1,459 +1,139 @@
-# Agency Operational Intelligence Platform — Replit Documentation
+# Agency Operational Intelligence Platform
 
-## Purpose
+## Overview
 
-This repository contains the unified **Operational Intelligence System** for marketing agencies and in-house teams. It is a **multi-tenant, workflow-driven, AI-augmented operating system** that:
+This project is a multi-tenant, workflow-driven, AI-augmented operational intelligence system designed for marketing agencies and in-house teams. Its primary purpose is to integrate diverse data sources (analytics, CRM, commercial systems, internal knowledge), generate strategic recommendations via an "Intelligence Core," facilitate human review and approval, and then convert these strategies into structured projects and tasks. The platform orchestrates both human and AI resources for delivery and continually learns from outcomes to refine its processes. The core vision is to provide a unified operating system that streamlines agency operations, enhances strategic decision-making, and improves client delivery through intelligent automation and human-in-the-loop workflows.
 
-- connects data from analytics, CRM, commercial systems, and internal knowledge  
-- generates strategic recommendations through a central Intelligence Core  
-- enables human interpretation and approval  
-- converts strategy into structured projects and tasks  
-- orchestrates human and AI delivery resources  
-- continually learns from outcomes  
+## User Preferences
 
-The entire platform operates on a **single deterministic workflow engine**, with front-end, back-end, and AI layers acting only as interfaces to this engine.
+I prefer detailed explanations.
+I want an iterative development process.
+I expect clear communication regarding progress and any challenges.
+Before making major architectural changes or significant code refactors, please ask for approval and provide a brief explanation of the proposed changes and their impact.
+I like clean, well-documented code.
+I prefer to see a plan before significant implementation begins.
+Do not make changes to files outside the explicitly defined scope of a task without prior discussion.
 
----
+## System Architecture
 
-# 1. Architectural Principles
+The system is built around a "Workflow Engine" that acts as the central orchestrator, managing deterministic automations, AI reasoning, client delivery, CRM activities, and analytics ingestion. All components—UI, backend services, integrations, and AI providers—interface with this engine via explicit contracts. The architecture is designed to be additive; changes must extend functionality through new signals, rules, workflows, AI prompt templates, or output handlers, without altering core logic.
 
-## 1.1 Core Philosophy
+The platform employs a multi-tenancy model with four distinct portals: Agency, Client, Staff, and SuperAdmin. Multi-tenancy is enforced at the app layer (role-based access), database layer (PostgreSQL Row-Level Security), and resource layer (route-level ownership checks) to ensure strict tenant isolation.
 
-This system is **not a traditional application**.  
-It is a **Workflow Engine** that orchestrates:
+The Intelligence Core integrates a pluggable AI provider layer (OpenAI, Gemini) for generating text, recommendations, and analysis, with per-agency governance for model policy, token quotas, and PII redaction. It features a multi-agent architecture where specialist agents (SEO, PPC, CRM, Reporting) are coordinated by an Orchestrator Agent. Tenant-isolated vector memory stores contextual data for improved AI recommendations. The system includes predictive duration modeling, resource optimization, and commercial impact services (Duration Intelligence). It also incorporates a closed feedback loop for outcome tracking and AI calibration, and a Brand Knowledge Layer for formalized knowledge ingestion.
 
-- deterministic automations  
-- AI reasoning and generation  
-- client delivery  
-- CRM activity  
-- analytics ingestion  
-- multi-agent collaboration  
+The Workflow Engine defines various step types: Signal, Rule, AI, Action, Transform, Notification, and Branch. It guarantees determinism, atomicity (via database transactions), idempotency (input hashing), and full auditability. Strategic initiatives follow a lifecycle from Draft to Measured, generating projects, task lists, and tasks upon approval.
 
-Every component — UI panels, backend services, integrations, AI providers — plugs into the workflow engine through **explicit contracts**.
+The system includes comprehensive task, project, and CRM functionalities with a hierarchy of Projects → Task Lists → Tasks → Subtasks, supporting real-time messaging, time tracking, and staff assignments. A Visual Workflow Builder provides a drag-and-drop interface for creating and managing workflows.
 
-**If a feature requires editing core logic, it is rejected.**  
-All changes must be additive via:
+### Technology Stack:
 
-- new signal types  
-- new rules  
-- new workflow DAGs  
-- new AI prompt templates  
-- new output handlers  
+-   **Backend:** Express.js, Node.js
+-   **Frontend:** React 18, Wouter, TanStack Query, Tailwind, Shadcn/UI
+-   **Database:** PostgreSQL (Supabase) with Drizzle ORM
+-   **Authentication:** Supabase Auth (JWT session)
+-   **AI Engine:** Pluggable interface for OpenAI, Gemini
+-   **Workflow Engine:** Custom deterministic orchestration layer
+-   **Scheduling:** node-cron
+-   **PDF Generation:** Puppeteer
+-   **Deployment:** Replit
 
-The core engine remains untouched.
+### UI/UX Decisions:
 
-## 1.2 Refactor & Cleanup Rules
+The UI consists of four distinct portals:
+-   **Agency Portal:** Full administrative interface for managing clients, projects, staff, tasks, initiatives, invoices, workflows, and settings.
+-   **Client Portal:** Read-focused interface for dashboards, projects, invoices, strategic recommendations, reporting, and support.
+-   **Staff Portal:** Task-focused interface for managing personal tasks, hours, and settings.
+-   **SuperAdmin Portal:** Platform governance for managing agencies, users, audit logs, AI usage, and system health.
+-   **Visual Workflow Builder:** Drag-and-drop interface using React Flow for designing workflows.
 
-Refactors must:
+## External Dependencies
 
-1. Document all new behavior in `TECHNICAL_BRIEF.md`
-2. Register any cleanup/deletion work in `PRIORITY_LIST.md`
-3. Introduce **zero** new untracked legacy paths
-
-The system forbids:
-
-- undocumented feature flags  
-- unused endpoints  
-- unreachable branches  
-- abandoned experiments  
-
-Inactive or undocumented code must be deleted or added to `PRIORITY_LIST.md`.
-
----
-
-# 2. High-Level Architecture
-
-📄 Source: *Architecture Documentation* :contentReference[oaicite:7]{index=7}
-
-## 2.1 Technology Stack
-
-| Layer | Technology |
-|-------|------------|
-| Backend | Express.js, Node.js |
-| Frontend | React 18, Wouter, TanStack Query, Tailwind, Shadcn/UI |
-| Database | PostgreSQL (Supabase) with Drizzle ORM |
-| Auth | Supabase Auth (JWT session) |
-| AI Engine | Pluggable providers: OpenAI, Gemini |
-| Integrations | GA4, GSC, HubSpot, LinkedIn |
-| Workflow Engine | Custom deterministic orchestration layer |
-| Scheduling | node-cron |
-| PDF | Puppeteer |
-| Replit | Hosting + env vars |
+-   **Supabase:** Provides PostgreSQL database, Drizzle ORM integration, and user authentication (Supabase Auth).
+-   **OpenAI:** External AI provider for text generation, recommendations, and analysis.
+-   **Google Gemini:** External AI provider for text generation, recommendations, and analysis.
+-   **Google Analytics 4 (GA4):** Data integration for analytics signals.
+-   **Google Search Console (GSC):** Data integration for search performance signals.
+-   **HubSpot:** CRM integration for customer data and signals.
+-   **LinkedIn:** Social media and professional networking integration.
+-   **Replit:** Hosting environment for the platform.
 
 ---
 
-# 3. Multi-Tenancy & Access Model
-
-The system supports four portals:
-
-- **Agency Portal** (`/agency`)  
-- **Client Portal** (`/client`)  
-- **Staff Portal** (`/staff`)  
-- **SuperAdmin Portal** (`/superadmin`)  
-
-Multi-tenancy is enforced at three layers:
-
-1. **App Layer:** role-based access middleware  
-2. **Database Layer:** PostgreSQL Row-Level Security (RLS)  
-3. **Resource Layer:** route-level ownership checks  
-
-This ensures **strict tenant isolation** and shared infrastructure.
-
----
-
-# 4. Intelligence Core
-
-The Intelligence Core is composed of:
-
-### 4.1 AI Provider Layer
-- Unified interface:
-  - `generateText()`
-  - `generateRecommendation()`
-  - `generateAnalysis()`
-- Provider implementations (OpenAI, Gemini)
-- Per-agency governance:
-  - model policy  
-  - token quotas  
-  - cost ceilings  
-  - PII redaction  
-- Deterministic AI execution:
-  - schema validation  
-  - idempotency  
-  - output hashing  
-  - lineage logging  
-
-### 4.2 Multi-Agent Architecture
-Specialist agents:
-- SEO, PPC, CRM, Reporting  
-An **Orchestrator Agent** coordinates reasoning and routes tasks into workflows.
-
-### 4.3 Tenant-Isolated Vector Memory
-Stores:
-- analytics summaries  
-- CRM signals  
-- content history  
-- strategic notes  
-- task outcomes  
-
-Used for:
-- contextual retrieval  
-- brand knowledge modeling  
-- improved recommendation quality  
-
-### 4.4 Duration Intelligence (Completed December 2025)
-
-Predictive duration modeling and resource optimization:
-
-**Duration Model Service:**
-- Layered prediction: heuristic baselines → assignee offsets → client adjustments
-- Confidence scoring from sample count, variance, recency weighting
-- Cold start strategy with global defaults and fast adaptation
-
-**Resource Optimizer Service:**
-- Greedy allocation algorithm prioritizing skill fit and capacity
-- Objective function minimizing overload, SLA breach, context switching
-- Capacity profile management per staff member
-
-**Commercial Impact Service:**
-- Configurable scoring: revenue × w1 + client_tier × w2 + deadline_risk × w3 + strategic_value × w4
-- SLA risk detection and proactive breach alerts
-- Priority queue generation for optimized delivery
-
-**Task Lifecycle Integration:**
-- Task creation triggers async duration prediction
-- Task completion updates history and generates outcome feedback
-- Variance tracking for model improvement
-
-Data Tables:
-- task_execution_history
-- task_duration_predictions
-- resource_capacity_profiles
-- resource_allocation_plans
-- commercial_impact_factors
-
-### 4.5 Closed Feedback Loop (In Progress)
-
-Explicit "Outcome → Adapt AI → Improve Future Recommendations" cycle:
-
-**Outcome Tracking:**
-- Initiative outcomes captured on completion (success/failure, actual vs predicted impact)
-- Recommendation acceptance/rejection rates per client and type
-- Variance scoring between predicted and actual results
-
-**Quality Metrics:**
-- Rolling quality scores per recommendation type
-- Client-specific pattern detection
-- Calibration signal emission on threshold breaches
-
-**AI Calibration:**
-- Confidence adjustment based on historical accuracy
-- Client-weighted pattern influence on future suggestions
-- SuperAdmin governance visibility for calibration insights
-
-Data Tables (Planned):
-- recommendation_outcomes
-- recommendation_quality_metrics
-- ai_calibration_parameters
-
-### 4.6 Brand Knowledge Layer (In Progress)
-
-Formalized knowledge ingestion pipeline:
-
-**Knowledge Categories:**
-- Brand voice and messaging guidelines
-- Business constraints and preferences
-- Industry context and competitor information
-- Historical decisions and rationale
-- Client-specific operational notes
-
-**Ingestion Pipeline:**
-- Structured schemas per knowledge category
-- Validation against category definitions
-- Conflict detection with existing knowledge
-- Versioning and validity period tracking
-
-**Retrieval Integration:**
-- Context assembly for AI reasoning
-- Freshness-weighted retrieval
-- Category-based filtering for different AI tasks
-
-Data Tables (Planned):
-- knowledge_documents
-- knowledge_categories
-- knowledge_ingestion_log
-
----
-
-# 5. Workflow Engine
-
-The heart of the system.
-
-## 5.1 Step Types
-- **Signal** — triggers (analytics, CRM, internal)  
-- **Rule** — evaluate conditions with 16 operators  
-- **AI** — call intelligence core  
-- **Action** — create/update resources  
-- **Transform** — modify context  
-- **Notification** — staff/client alerts  
-- **Branch** — conditional logic  
-
-## 5.2 Guarantees
-- **Determinism** — identical inputs → identical outputs  
-- **Atomicity** — all steps run inside database transactions  
-- **Idempotency** — input hashing prevents duplicates  
-- **Auditability** — every step logged, timestamped, replayable  
-
-## 5.3 Data Tables
-- workflow_executions  
-- workflow_events  
-- rule_evaluations  
-
----
-
-# 6. Strategic Initiatives (Human-in-the-loop AI)
-
-Lifecycle:  
-**Draft → Needs Review → Approved → In Progress → Completed → Measured** :contentReference[oaicite:8]{index=8}
-
-Upon approval, workflows generate:
-
-- projects  
-- task lists  
-- tasks  
-- optional invoices  
-
-This fulfills the “interpret → challenge → approve → deliver → learn” loop from your vision.
-
----
-
-# 7. Task, Project & CRM System
-
-Hierarchy:  
-**Projects → Task Lists → Tasks → Subtasks** :contentReference[oaicite:9]{index=9}
-
-Features:
-- real-time messaging  
-- time tracking  
-- audit history  
-- staff assignments  
-
-CRM entities:  
-**Companies, Contacts, Deals, Pipelines, Lead Sources, Forms** — all emitting workflow signals.
-
----
-
-# 8. Integrations & Data Engine
-
-Supported integrations (OAuth-based):
-
-- GA4  
-- Google Search Console  
-- HubSpot  
-- LinkedIn  
-
-Each sync produces **signals** into the workflow engine.  
-Capabilities:  
-- metric aggregation  
-- anomaly detection  
-- retry logic  
-- token expiry detection  
-
----
-
-# 9. Portals & User Interfaces
-
-### 9.1 Agency Portal
-Full admin interface:
-- clients  
-- projects  
-- staff  
-- tasks  
-- initiatives  
-- invoices  
-- workflows  
-- settings  
-
-### 9.2 Client Portal
-Read-focused:
-- dashboard  
-- projects  
-- invoices  
-- strategic recommendations  
-- reporting  
-- support  
-
-### 9.3 Staff Portal
-Task-focused:
-- my tasks  
-- hours  
-- settings  
-
-### 9.4 SuperAdmin Portal
-Platform governance:
-- agencies  
-- users  
-- audit logs  
-- AI usage & model policies  
-- system health  
-
----
-
-# 10. Security Model
-
-Defense-in-depth:
-
-- HTTPS, CORS, rate limits  
-- JWT authentication  
-- RBAC middleware  
-- PostgreSQL RLS  
-- Zod validation  
-- AES-256-GCM encryption  
-- HMAC-SHA256 signatures  
-- full audit logging  
-
-The SuperAdmin layer has strict read/write separation and fully audited actions.
-
----
-
-# 11. Visual Workflow Builder
-
-Drag-and-drop DAG builder using **React Flow**:
-
-- step palette  
-- canvas  
-- node linking  
-- properties panel (WIP)  
-- validation endpoint  
-- duplicate workflow action  
-
-Routes:  
-- `/agency/workflows`  
-- `/agency/workflow-builder/:id?`
-
----
-
-# 12. Deployment (Replit)
-
-The platform runs on Replit using:
-
-- Express backend  
-- Vite dev server for frontend  
-- Supabase (DB + Auth)  
-- env vars for secrets  
-- node-cron for scheduled tasks  
-
----
-
-# 13. Recent Changes (December 2025)
-
-- Workflow builder UI (Priority 15)  
-- Enhanced analytics ingestion  
-- SLA & escalation engine  
-- Vector memory isolation  
-- Multi-agent system  
-- SuperAdmin governance  
-- **Duration Intelligence** ✅ - Predictive duration modeling, resource optimization, commercial impact scoring
-- **Closed Feedback Loop** ✅ - Outcome tracking, quality metrics, AI calibration
-- **Brand Knowledge Layer** ✅ - Structured knowledge ingestion pipeline with UI
-- **Platform Audit** ✅ - Maintenance scoring, technical debt register, documentation updates
-- **Routes Decomposition** ✅ - COMPLETE: 37 router registrations (~325 routes), 94% file size reduction (4,832→300 lines)
-- **Stability Testing Framework** ✅ - 44 Vitest tests (auth: 18, SLA: 18, maintenance: 8)
-
----
-
-# 14. Future Enhancements
-
-- Workflow version comparison  
-- Test execution sandbox  
-- Advanced reporting  
-- Mobile app support  
-- i18n support  
-- AI task-type model selection
-- Knowledge graph visualization
-- Cross-client pattern learning (with governance)
-- ~~Routes.ts refactoring~~ → ✅ COMPLETE (December 2025)
-- storage.ts decomposition → 🟡 IN PROGRESS (Phase 1-2 complete, 43 methods extracted)
-
----
-
-# 15. Documentation Cross-References
-
-| Document | Purpose | Location |
-|----------|---------|----------|
-| **ARCHITECTURE.md** | System architecture, diagrams, Intelligence Core | documentation/ |
-| **TECHNICAL_BRIEF.md** | Implementation patterns, API contracts | documentation/ |
-| **PRIORITY_LIST.md** | Roadmap, priorities, technical debt register | documentation/ |
-| **maintenance-matrix.md** | Module health scores, cleanup queue | documentation/ |
-| **frontend-backend-map.md** | React → API → Storage mapping | documentation/ |
-
-### Maintenance Scoring Quick Reference
-
-```
-MaintenanceScore = 100 - (5×Complexity + 10×TechDebt + 15×Incidents + 5×TestGap)
-
-🟢 ≥80: Healthy    🟡 60-79: Needs attention    🔴 <60: Critical
-```
-
-Current Status (December 2025):
-- Intelligence Layer: 82 🟢
-- AI Providers: 84 🟢
-- Real-time: 81 🟢 ← Health checks & metrics added
-- Domain Routers: 85 🟢 ← 37 registrations, ~325 routes, decomposition COMPLETE
-- Workflow Engine: 79 🟡
-- routes.ts: 85 🟢 ← Decomposition complete (300 lines, 3 routes)
-- storage.ts: 65 🟡 ← Decomposition in progress (3,245 lines, Phase 1-2 complete)
-- Storage Domains: 85 🟢 ← identity, agency, task domains extracted (43 methods)
-
----
-
-# 16. Getting Started
-
-1. Clone repository  
-2. Configure Replit secrets  
-3. Start backend: `npm run dev`  
-4. Start frontend: Vite auto-serves React  
-5. Run cron tasks automatically via node-cron  
-
----
-
-*Last Updated: December 2025*
+## Testing Credentials & Seed Data
+
+**ALWAYS use these details for testing. Do NOT guess credentials.**
+
+### Login Credentials
+
+| Role | Email | Password | Name | Agency |
+|------|-------|----------|------|--------|
+| **Admin** (primary test account) | `amy@mmagency.co.uk` | `Amy120#` | Amy Bull | Default Agency |
+| Admin | karen@mmagency.co.uk | Karen123!@# | Karen | Default Agency |
+| SuperAdmin | rudi@mmagency.co.uk | Rudi123!@# | Rudi | None (platform-wide) |
+| Client | brad@mmagency.co.uk | — | brad | Default Agency |
+| Staff | staff@mmagency.co.uk | — | Staff | Default Agency |
+
+**Primary test account for e2e tests:** `amy@mmagency.co.uk` / `Amy120#` (Admin role)
+
+### Agency & Client IDs
+
+| Entity | ID | Name |
+|--------|-----|------|
+| Agency | `614d7633-5dd9-4147-a261-ebf8458a2ec4` | Default Agency |
+| Client (existing) | `32e126d0-d59b-4d91-89cb-0f293f4ec71a` | MMagency.co.uk |
+| Client (test/mock) | `f1a2b3c4-d5e6-7f8a-9b0c-1d2e3f4a5b6c` | TechFlow Solutions |
+
+### Test Client: MMagency.co.uk
+
+**Company:** MMagency.co.uk — Full-service digital marketing agency, SEO/PPC/social/content for UK SME & mid-market B2B
+**Business Context:** 12 active clients, 8 staff, £720K revenue targeting £1M, HubSpot CRM, strong referral pipeline
+**Retainer:** £5,000/month, 60 hours
+
+#### Seeded Client Records (16 total across 6 categories)
+
+| Category | Count | Example Titles |
+|----------|-------|----------------|
+| KPI Targets | 5 | Monthly Website Traffic Target, Lead Conversion Rate Target, Monthly Qualified Leads Target, Cost Per Acquisition Target, Annual Revenue Growth Target |
+| Business Goals | 3 | Launch Productised SEO Packages, Expand into Paid Social Management, Win 5 New Retainer Clients |
+| Brand Voice | 2 | Core Brand Voice Guidelines, Content Pillar Strategy |
+| Competitive Landscape | 2 | Primary Competitor: Impression Digital, Secondary Competitor: Embryo Digital |
+| Industry Context | 2 | UK Digital Marketing Industry Trends, SME Digital Maturity Shift |
+| Business Constraints | 2 | Marketing Budget Constraint (£3K/mo), Team Capacity Constraint (85% utilisation) |
+
+### Test Client: TechFlow Solutions
+
+**Company:** TechFlow Solutions — B2B SaaS workflow automation for mid-market enterprises
+**Contact:** Sarah Chen (sarah@techflowsolutions.com)
+**Business Context:** Manufacturing & logistics focus, 4.2M ARR targeting 6.5M, 14-day free trial model, 18K avg deal size
+**Retainer:** 3,500/month, 40 hours, billing day 25
+
+#### Seeded Client Records (16 total across 6 categories)
+
+| Category | Count | Example Titles |
+|----------|-------|----------------|
+| KPI Targets | 5 | Monthly Organic Traffic Target, Lead Conversion Rate Target, Monthly Qualified Leads Target, Customer Acquisition Cost Target, Annual Revenue Growth Target |
+| Business Goals | 3 | Expand into DACH Market, Launch Partner Referral Programme, Achieve G2 Category Leader Status |
+| Brand Voice | 2 | Core Brand Voice Guidelines, Content Pillar Strategy |
+| Competitive Landscape | 2 | Primary Competitor: AutomateHQ, Secondary Competitor: FlowForge Enterprise |
+| Industry Context | 2 | Manufacturing Digital Transformation Trend, B2B SaaS Buyer Journey Shift |
+| Business Constraints | 2 | Marketing Budget Constraint, GDPR and Data Compliance Requirements |
+
+### Knowledge Category IDs (Default Agency)
+
+| Category | ID |
+|----------|-----|
+| KPI Targets | `3b6554e2-1d99-41a9-9adc-b7534d5d23fb` |
+| Business Goals | `26e2a55f-0cdb-4c2e-9f8d-cf2711493f3b` |
+| Brand Voice | `823a131a-c662-44da-9b31-56572eda62dd` |
+| Competitive Landscape | `52892d26-c79d-4f5f-9d79-05d06d577553` |
+| Industry Context | `5a2af431-56cb-45d7-ab1b-5acf05e5eaa2` |
+| Business Constraints | `b4240fc8-fd85-477d-bb93-1f445244b57f` |
+
+### DB Schema Patches Applied
+
+- `account_manager_profile_id` column added to `clients` table (was in Drizzle schema but missing from DB)
+- `embedding_max_tokens` column added to `agency_settings` table (was in Drizzle schema but missing from DB)
+- `embedding_token_limit`, `embedding_token_used`, `embedding_request_limit`, `embedding_request_used` columns added to `agency_quotas` table (were in Drizzle schema but missing from DB)
+- `request_type` column added to `ai_usage_tracking` table (was in Drizzle schema but missing from DB)
+- `embedding_token_limit`, `embedding_token_used`, `embedding_request_limit`, `embedding_request_used`, `ai_request_limit`, `ai_request_used` columns added to `agency_settings` table (were in Drizzle schema but missing from DB)

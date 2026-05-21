@@ -57,9 +57,8 @@ const Workflows = lazy(() => import("@/pages/agency/workflows"));
 
 // Intelligence Center (lazy-loaded)
 const AgencyIntelligence = lazy(() => import("@/pages/agency/intelligence"));
+const AgencyClientRecords = lazy(() => import("@/pages/agency/client-records"));
 
-// Brand Knowledge (lazy-loaded)
-const AgencyKnowledge = lazy(() => import("@/pages/agency/knowledge"));
 
 // Loading fallback component
 function PageLoader() {
@@ -282,10 +281,11 @@ function Router() {
           </AgencyLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/agency/knowledge">
+
+      <Route path="/agency/client-records">
         <ProtectedRoute allowedRoles={["Admin", "SuperAdmin"]}>
           <AgencyLayout>
-            <AgencyKnowledge />
+            <AgencyClientRecords />
           </AgencyLayout>
         </ProtectedRoute>
       </Route>

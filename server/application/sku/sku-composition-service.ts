@@ -16,6 +16,22 @@ export interface SkuCompositionResult<T> {
 export class SkuCompositionService {
   constructor(private storage: IStorage) {}
 
+  async getComposition(
+    ctx: RequestContext,
+    initiativeId: string
+  ): Promise<SkuCompositionResult<unknown>> {
+    if (!ctx.agencyId) {
+      return { ok: false, status: 403, error: "Agency context required" };
+    }
+
+    const record = await this.storage.getSkuCompositionByInitiativeId(initiativeId);
+    if (!record) {
+      return { ok: false, status: 404, error: "SKU composition not found" };
+    }
+
+    return { ok: true, status: 200, data: record };
+  }
+
   async createComposition(
     ctx: RequestContext,
     initiativeId: string,
@@ -33,6 +49,11 @@ export class SkuCompositionService {
         error: "Invalid payload",
         errors: parsed.error.errors,
       };
+    }
+
+    const existing = await this.storage.getSkuCompositionByInitiativeId(initiativeId);
+    if (existing) {
+      return { ok: false, status: 409, error: "SKU composition already exists for this initiative" };
     }
 
     const record = await this.storage.createSkuComposition({
@@ -68,9 +89,18 @@ export class SkuCompositionService {
       return { ok: false, status: 403, error: "Agency context required" };
     }
 
+    const existing = await this.storage.getSkuCompositionByInitiativeId(initiativeId);
+    if (!existing) {
+      return { ok: false, status: 404, error: "SKU composition not found" };
+    }
+
+    if (existing.frozenAt) {
+      return { ok: false, status: 409, error: "SKU composition is already frozen" };
+    }
+
     const record = await this.storage.freezeSkuComposition(initiativeId);
     if (!record) {
-      return { ok: false, status: 404, error: "SKU composition not found" };
+      return { ok: false, status: 500, error: "Failed to freeze SKU composition" };
     }
 
     if (this.storage.createAuditLog) {

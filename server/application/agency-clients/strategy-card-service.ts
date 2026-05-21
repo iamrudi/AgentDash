@@ -34,11 +34,33 @@ export class StrategyCardService {
       return { ok: false, status: 404, error: "Client not found" };
     }
 
+    const [knowledgeEntries, categories] = await Promise.all([
+      this.storage.getClientKnowledge(client.agencyId, { clientId, status: "active" }),
+      this.storage.getKnowledgeCategoriesByAgencyId(client.agencyId),
+    ]);
+
+    const categoryMap = new Map(categories.map(c => [c.id, c.displayName || c.name]));
+    const knowledgeByCategory: Record<string, Array<{ title: string; data: unknown }>> = {};
+    for (const entry of knowledgeEntries) {
+      const categoryName = categoryMap.get(entry.categoryId) || "Other";
+      if (!knowledgeByCategory[categoryName]) {
+        knowledgeByCategory[categoryName] = [];
+      }
+      knowledgeByCategory[categoryName].push({
+        title: entry.title,
+        data: entry.structuredData || entry.content,
+      });
+    }
+
     const summaryKpis = {
       totalSessions: metrics.reduce((sum, m) => sum + (m.sessions || 0), 0),
       totalConversions: metrics.reduce((sum, m) => sum + (m.conversions || 0), 0),
       totalSpend: metrics.reduce((sum, m) => sum + parseFloat(m.spend || "0"), 0),
     };
+
+    const knowledgeContext = Object.keys(knowledgeByCategory).length > 0
+      ? "\n\nCLIENT KNOWLEDGE RECORDS:\n" + JSON.stringify(knowledgeByCategory, null, 2)
+      : "";
 
     const recentMessages = messages.slice(-30);
     const chatHistoryText =
@@ -47,8 +69,8 @@ export class StrategyCardService {
         : "No recent conversations.";
 
     const systemPrompt =
-      'You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights.\n\nFocus on messages from the "Client" role and extract:\n- painPoints: Problems, frustrations, concerns, or improvement requests\n- recentWins: Positive feedback or satisfaction\n- activeQuestions: Unanswered questions or requests needing follow-up\n\nIf the conversation is only greetings/small talk, return empty arrays.\nRespond with a JSON object with keys painPoints, recentWins, activeQuestions.';
-    const prompt = `${systemPrompt}\n\nCHAT HISTORY:\n${chatHistoryText}`;
+      'You are an expert Account Manager analyzing a recent conversation history with a client. Your task is to distill this conversation into actionable insights.\n\nFocus on messages from the "Client" role and extract:\n- painPoints: Problems, frustrations, concerns, or improvement requests\n- recentWins: Positive feedback or satisfaction\n- activeQuestions: Unanswered questions or requests needing follow-up\n\nAlso consider the client\'s knowledge records (KPI targets, business goals, constraints, competitive landscape) when contextualising insights.\n\nIf the conversation is only greetings/small talk, return empty arrays.\nRespond with a JSON object with keys painPoints, recentWins, activeQuestions.';
+    const prompt = `${systemPrompt}${knowledgeContext}\n\nCHAT HISTORY:\n${chatHistoryText}`;
 
     const outputSchema = z.object({
       painPoints: z.array(z.string()),
@@ -65,13 +87,9 @@ export class StrategyCardService {
       outputSchema
     );
 
-    if (!chatAnalysisResult.success) {
-      return {
-        ok: false,
-        status: 500,
-        error: chatAnalysisResult.error || "Failed to analyze chat history",
-      };
-    }
+    const chatAnalysis = chatAnalysisResult.success
+      ? chatAnalysisResult.data
+      : { painPoints: [], recentWins: [], activeQuestions: [] };
 
     return {
       ok: true,
@@ -80,7 +98,9 @@ export class StrategyCardService {
         businessContext: client.businessContext,
         clientObjectives: objectives,
         summaryKpis,
-        chatAnalysis: chatAnalysisResult.data,
+        chatAnalysis,
+        knowledgeRecords: knowledgeByCategory,
+        aiUnavailable: !chatAnalysisResult.success,
       },
     };
   }

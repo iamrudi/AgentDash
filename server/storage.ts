@@ -573,6 +573,7 @@ export interface IStorage {
   // Knowledge Categories
   createKnowledgeCategory(category: InsertKnowledgeCategory): Promise<KnowledgeCategory>;
   getKnowledgeCategoriesByAgencyId(agencyId: string): Promise<KnowledgeCategory[]>;
+  getAllKnowledgeCategories(): Promise<KnowledgeCategory[]>;
   getKnowledgeCategoryById(id: string): Promise<KnowledgeCategory | undefined>;
   
   // Client Knowledge
@@ -580,6 +581,7 @@ export interface IStorage {
   updateClientKnowledge(id: string, data: Partial<InsertClientKnowledge>): Promise<ClientKnowledge | undefined>;
   getClientKnowledgeById(id: string): Promise<ClientKnowledge | undefined>;
   getClientKnowledge(agencyId: string, options?: { clientId?: string; categoryId?: string; status?: string }): Promise<ClientKnowledge[]>;
+  getAllClientKnowledge(options?: { clientId?: string; categoryId?: string; status?: string }): Promise<ClientKnowledge[]>;
   
   // Knowledge Ingestion Log
   createKnowledgeIngestionLog(log: InsertKnowledgeIngestionLog): Promise<KnowledgeIngestionLog>;
@@ -787,6 +789,7 @@ export class DbStorage implements IStorage {
           status: projects.status,
           description: projects.description,
           clientId: projects.clientId,
+          workflowExecutionId: projects.workflowExecutionId,
           createdAt: projects.createdAt,
         })
         .from(projects)
@@ -972,6 +975,9 @@ export class DbStorage implements IStorage {
           triggerMetric: initiatives.triggerMetric,
           baselineValue: initiatives.baselineValue,
           startDate: initiatives.startDate,
+          projectId: initiatives.projectId,
+          opportunityArtifactId: initiatives.opportunityArtifactId,
+          invoiceId: initiatives.invoiceId,
           implementationDate: initiatives.implementationDate,
           measuredImprovement: initiatives.measuredImprovement,
           lastEditedAt: initiatives.lastEditedAt,
@@ -2038,9 +2044,11 @@ export class DbStorage implements IStorage {
       .select({
         id: profiles.id,
         fullName: profiles.fullName,
+        email: profiles.email,
         role: profiles.role,
         isSuperAdmin: profiles.isSuperAdmin,
         agencyId: profiles.agencyId,
+        skills: profiles.skills,
         createdAt: profiles.createdAt,
         agencyName: agencies.name,
         clientId: clients.id,
@@ -2065,6 +2073,7 @@ export class DbStorage implements IStorage {
         id: clients.id,
         companyName: clients.companyName,
         profileId: clients.profileId,
+        accountManagerProfileId: clients.accountManagerProfileId,
         agencyId: clients.agencyId,
         businessContext: clients.businessContext,
         retainerAmount: clients.retainerAmount,
@@ -3323,6 +3332,13 @@ export class DbStorage implements IStorage {
       .orderBy(knowledgeCategories.name);
   }
 
+  async getAllKnowledgeCategories(): Promise<KnowledgeCategory[]> {
+    return await db
+      .select()
+      .from(knowledgeCategories)
+      .orderBy(knowledgeCategories.name);
+  }
+
   async getKnowledgeCategoryById(id: string): Promise<KnowledgeCategory | undefined> {
     const result = await db.select().from(knowledgeCategories).where(eq(knowledgeCategories.id, id)).limit(1);
     return result[0];
@@ -3357,13 +3373,13 @@ export class DbStorage implements IStorage {
   ): Promise<ClientKnowledge[]> {
     const conditions = [eq(clientKnowledge.agencyId, agencyId)];
     
-    if (options?.clientId) {
+    if (options?.clientId && options.clientId !== "ALL") {
       conditions.push(eq(clientKnowledge.clientId, options.clientId));
     }
-    if (options?.categoryId) {
+    if (options?.categoryId && options.categoryId !== "ALL") {
       conditions.push(eq(clientKnowledge.categoryId, options.categoryId));
     }
-    if (options?.status) {
+    if (options?.status && options.status !== "ALL") {
       conditions.push(eq(clientKnowledge.status, options.status));
     }
 
@@ -3371,6 +3387,28 @@ export class DbStorage implements IStorage {
       .select()
       .from(clientKnowledge)
       .where(and(...conditions))
+      .orderBy(desc(clientKnowledge.updatedAt));
+  }
+
+  async getAllClientKnowledge(
+    options?: { clientId?: string; categoryId?: string; status?: string }
+  ): Promise<ClientKnowledge[]> {
+    const conditions = [];
+
+    if (options?.clientId && options.clientId !== "ALL") {
+      conditions.push(eq(clientKnowledge.clientId, options.clientId));
+    }
+    if (options?.categoryId && options.categoryId !== "ALL") {
+      conditions.push(eq(clientKnowledge.categoryId, options.categoryId));
+    }
+    if (options?.status && options.status !== "ALL") {
+      conditions.push(eq(clientKnowledge.status, options.status));
+    }
+
+    return await db
+      .select()
+      .from(clientKnowledge)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(clientKnowledge.updatedAt));
   }
 

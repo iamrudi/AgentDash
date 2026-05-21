@@ -10,3 +10,4 @@ objectives,data,P6,json,,true,client,Admin;Staff,Admin;Staff,true,manual,,90,low
 signals.hubspot,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,hubspot,30,med,true
 signals.linkedin,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,linkedin,30,med,true
 signals.competitors,data,P3,json,,true,client,Admin;Staff,Admin;Staff,true,signal,manual,30,med,true
+knowledgeRecords,data,P6,json,,true,client,Admin;Staff,Admin;Staff,true,manual,,90,med,true
